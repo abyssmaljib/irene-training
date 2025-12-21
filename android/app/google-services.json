@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "971379888870",
+    "project_id": "newirene-b23bb",
+    "storage_bucket": "newirene-b23bb.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:971379888870:android:c48209f1b490e332b5a127",
+        "android_client_info": {
+          "package_name": "com.example.irene_training"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCaXbt-PzkHxBikHqycN6mhv8vpDZfsKk4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

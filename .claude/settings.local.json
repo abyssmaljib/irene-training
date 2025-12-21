@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter analyze:*)",
+      "Bash(flutter run:*)",
+      "Bash(flutter clean:*)",
+      "Bash(flutter pub get:*)",
+      "Bash(findstr:*)",
+      "Bash(dir:*)",
+      "Bash(supabase start:*)",
+      "Bash(supabase db reset:*)",
+      "Bash(mv:*)",
+      "Bash(npx supabase:*)",
+      "Bash(flutter test:*)",
+      "Bash(flutter pub:*)"
+    ]
+  }
+}

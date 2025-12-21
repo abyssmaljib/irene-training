@@ -1,0 +1,161 @@
+workflows:
+  # ============================================
+  # Android Production Build
+  # ============================================
+  android-release:
+    name: Android Release
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+    environment:
+      flutter: stable
+      java: 17
+      android_signing:
+        - irene_keystore  # Configure this in Codemagic UI
+      groups:
+        - google_play_credentials  # Configure this in Codemagic UI
+      vars:
+        PACKAGE_NAME: "com.giantkumakuma.irene"
+
+    triggering:
+      events:
+        - tag
+      tag_patterns:
+        - pattern: 'v*'
+          include: true
+
+    scripts:
+      - name: Set up local.properties
+        script: |
+          echo "flutter.sdk=$HOME/programs/flutter" > "$CM_BUILD_DIR/android/local.properties"
+
+      - name: Get Flutter dependencies
+        script: flutter pub get
+
+      - name: Run Flutter analyze
+        script: flutter analyze --no-fatal-infos
+
+      - name: Build AAB for Play Store
+        script: |
+          flutter build appbundle --release \
+            --build-number=$PROJECT_BUILD_NUMBER \
+            --build-name=1.0.$PROJECT_BUILD_NUMBER
+
+    artifacts:
+      - build/**/outputs/**/*.aab
+      - build/**/outputs/**/mapping.txt
+      - flutter_drive.log
+
+    publishing:
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        track: internal  # Start with internal, then: alpha -> beta -> production
+        submit_as_draft: true
+
+  # ============================================
+  # iOS Production Build
+  # ============================================
+  ios-release:
+    name: iOS Release
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: Irene App Store  # Configure this in Codemagic UI
+
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.giantkumakuma.irene
+      vars:
+        BUNDLE_ID: "com.giantkumakuma.irene"
+        APP_STORE_APP_ID: 000000000  # Replace with actual App Store app ID
+
+    triggering:
+      events:
+        - tag
+      tag_patterns:
+        - pattern: 'v*'
+          include: true
+
+    scripts:
+      - name: Get Flutter dependencies
+        script: flutter pub get
+
+      - name: Install CocoaPods dependencies
+        script: |
+          cd ios
+          pod install
+
+      - name: Run Flutter analyze
+        script: flutter analyze --no-fatal-infos
+
+      - name: Set up code signing
+        script: |
+          xcode-project use-profiles
+
+      - name: Build IPA for App Store
+        script: |
+          flutter build ipa --release \
+            --build-number=$PROJECT_BUILD_NUMBER \
+            --build-name=1.0.$PROJECT_BUILD_NUMBER \
+            --export-options-plist=/Users/builder/export_options.plist
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - flutter_drive.log
+
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        beta_groups:
+          - Internal Testers
+        submit_to_app_store: false  # Set to true for production release
+
+  # ============================================
+  # Development Build (for testing)
+  # ============================================
+  dev-build:
+    name: Development Build
+    max_build_duration: 30
+    instance_type: mac_mini_m2
+
+    environment:
+      flutter: stable
+      java: 17
+
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: 'develop'
+          include: true
+        - pattern: 'feature/*'
+          include: true
+
+    scripts:
+      - name: Get Flutter dependencies
+        script: flutter pub get
+
+      - name: Run Flutter analyze
+        script: flutter analyze --no-fatal-infos
+
+      - name: Run tests
+        script: flutter test
+
+      - name: Build Android APK (debug)
+        script: flutter build apk --debug
+
+      - name: Build iOS (debug)
+        script: |
+          cd ios
+          pod install
+          cd ..
+          flutter build ios --debug --no-codesign
+
+    artifacts:
+      - build/**/outputs/**/*.apk
