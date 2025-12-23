@@ -12,7 +12,10 @@
       "Bash(mv:*)",
       "Bash(npx supabase:*)",
       "Bash(flutter test:*)",
-      "Bash(flutter pub:*)"
+      "Bash(flutter pub:*)",
+      "Bash(git -C c:/irene_training add:*)",
+      "Bash(git -C c:/irene_training commit -m \"Update google-services.json with new package name\")",
+      "Bash(git -C c:/irene_training push)"
     ]
   }
 }
