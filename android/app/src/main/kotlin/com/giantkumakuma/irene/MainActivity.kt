@@ -1,4 +1,4 @@
-package com.example.irene_training
+package com.giantkumakuma.irene
 
 import io.flutter.embedding.android.FlutterActivity
 

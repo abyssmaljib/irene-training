@@ -59,13 +59,11 @@ workflows:
       - build/**/outputs/**/mapping.txt
       - flutter_drive.log
 
-    # Publishing disabled - download AAB manually and upload to Play Store
-    # Uncomment below when Google Play service account is configured
-    # publishing:
-    #   google_play:
-    #     credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
-    #     track: internal
-    #     submit_as_draft: true
+    publishing:
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        track: internal
+        submit_as_draft: false
 
   # ============================================
   # iOS Production Build
