@@ -12,8 +12,6 @@ workflows:
       java: 17
       android_signing:
         - irene_keystore  # Configure this in Codemagic UI
-      groups:
-        - google_play_credentials  # Configure this in Codemagic UI
       vars:
         PACKAGE_NAME: "com.giantkumakuma.irene"
 
@@ -46,11 +44,13 @@ workflows:
       - build/**/outputs/**/mapping.txt
       - flutter_drive.log
 
-    publishing:
-      google_play:
-        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
-        track: internal  # Start with internal, then: alpha -> beta -> production
-        submit_as_draft: true
+    # Publishing disabled - download AAB manually and upload to Play Store
+    # Uncomment below when Google Play service account is configured
+    # publishing:
+    #   google_play:
+    #     credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+    #     track: internal
+    #     submit_as_draft: true
 
   # ============================================
   # iOS Production Build
