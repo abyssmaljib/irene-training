@@ -12,6 +12,8 @@ workflows:
       java: 17
       android_signing:
         - irene_keystore  # Configure this in Codemagic UI
+      groups:
+        - env_secrets  # Contains GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
       vars:
         PACKAGE_NAME: "com.giantkumakuma.irene"
 
