@@ -13,9 +13,14 @@ plugins {
 }
 
 // Load key.properties for release signing
-val keystorePropertiesFile = rootProject.file("app/key.properties")
+// Check both locations: app/key.properties (local) and key.properties (Codemagic)
+val keystorePropertiesFile = listOf(
+    rootProject.file("app/key.properties"),
+    rootProject.file("key.properties")
+).firstOrNull { it.exists() }
+
 val keystoreProperties = Properties()
-if (keystorePropertiesFile.exists()) {
+if (keystorePropertiesFile != null) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
@@ -35,7 +40,7 @@ android {
 
     signingConfigs {
         create("release") {
-            if (keystorePropertiesFile.exists()) {
+            if (keystorePropertiesFile != null) {
                 keyAlias = keystoreProperties["keyAlias"] as String
                 keyPassword = keystoreProperties["keyPassword"] as String
                 storeFile = file(keystoreProperties["storeFile"] as String)
