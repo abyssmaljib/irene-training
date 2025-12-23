@@ -27,6 +27,12 @@ workflows:
         script: |
           echo "flutter.sdk=$HOME/programs/flutter" > "$CM_BUILD_DIR/android/local.properties"
 
+      - name: Create .env file
+        script: |
+          echo "SUPABASE_URL=$SUPABASE_URL" > .env
+          echo "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY" >> .env
+          echo "CLARITY_PROJECT_ID=$CLARITY_PROJECT_ID" >> .env
+
       - name: Get Flutter dependencies
         script: flutter pub get
 
@@ -81,6 +87,12 @@ workflows:
           include: true
 
     scripts:
+      - name: Create .env file
+        script: |
+          echo "SUPABASE_URL=$SUPABASE_URL" > .env
+          echo "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY" >> .env
+          echo "CLARITY_PROJECT_ID=$CLARITY_PROJECT_ID" >> .env
+
       - name: Get Flutter dependencies
         script: flutter pub get
 
@@ -138,6 +150,12 @@ workflows:
           include: true
 
     scripts:
+      - name: Create .env file
+        script: |
+          echo "SUPABASE_URL=$SUPABASE_URL" > .env
+          echo "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY" >> .env
+          echo "CLARITY_PROJECT_ID=$CLARITY_PROJECT_ID" >> .env
+
       - name: Get Flutter dependencies
         script: flutter pub get
 
