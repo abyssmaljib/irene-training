@@ -112,12 +112,29 @@ class _TopicDetailScreenState extends State<TopicDetailScreen>
         return;
       }
 
+      // DEBUG: ทดสอบดึงข้อมูลทั้งหมดของ topic นี้ก่อน
+      final allRows = await Supabase.instance.client
+          .from('training_v_topic_detail')
+          .select()
+          .eq('topic_id', widget.topic.topicId);
+      debugPrint('=== DEBUG training_v_topic_detail ===');
+      debugPrint('Current user.id: ${user.id}');
+      debugPrint('Topic ID: ${widget.topic.topicId}');
+      debugPrint('All rows count: ${allRows.length}');
+      for (var i = 0; i < allRows.length; i++) {
+        final row = allRows[i];
+        debugPrint('Row $i: user_id=${row['user_id']}, content_id=${row['content_id']}, content_title=${row['content_title']}');
+      }
+      debugPrint('=====================================');
+
       final response = await Supabase.instance.client
           .from('training_v_topic_detail')
           .select()
           .eq('topic_id', widget.topic.topicId)
           .or('user_id.eq.${user.id},user_id.is.null')
           .maybeSingle();
+
+      debugPrint('After filter - response: $response');
 
       if (mounted) {
         debugPrint('Topic detail response: $response');

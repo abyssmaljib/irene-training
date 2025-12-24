@@ -44,40 +44,35 @@ class _ContentTabState extends State<ContentTab> {
 
       // ถ้ามี content update หรือยังไม่เคยอ่าน → mark as read
       // ถ้าอ่านแล้วและไม่มี update → unmark
-      final shouldMarkAsRead = !widget.topicDetail.isRead || widget.topicDetail.hasContentUpdate;
+      final shouldMarkAsRead =
+          !widget.topicDetail.isRead || widget.topicDetail.hasContentUpdate;
 
       if (shouldMarkAsRead) {
         // Mark as read and save current content version
-        await Supabase.instance.client.from('training_user_progress').upsert(
-          {
-            'user_id': user.id,
-            'topic_id': widget.topicDetail.topicId,
-            'season_id': seasonId,
-            'content_read_at': DateTime.now().toIso8601String(),
-            'content_read_count': widget.topicDetail.readCount + 1,
-            'content_version_read': widget.topicDetail.contentVersion,
-          },
-          onConflict: 'user_id,topic_id,season_id',
-        );
+        await Supabase.instance.client.from('training_user_progress').upsert({
+          'user_id': user.id,
+          'topic_id': widget.topicDetail.topicId,
+          'season_id': seasonId,
+          'content_read_at': DateTime.now().toIso8601String(),
+          'content_read_count': widget.topicDetail.readCount + 1,
+          'content_version_read': widget.topicDetail.contentVersion,
+        }, onConflict: 'user_id,topic_id,season_id');
       } else {
         // Unmark as read - set content_read_at to null
-        await Supabase.instance.client.from('training_user_progress').upsert(
-          {
-            'user_id': user.id,
-            'topic_id': widget.topicDetail.topicId,
-            'season_id': seasonId,
-            'content_read_at': null,
-          },
-          onConflict: 'user_id,topic_id,season_id',
-        );
+        await Supabase.instance.client.from('training_user_progress').upsert({
+          'user_id': user.id,
+          'topic_id': widget.topicDetail.topicId,
+          'season_id': seasonId,
+          'content_read_at': null,
+        }, onConflict: 'user_id,topic_id,season_id');
       }
 
       widget.onMarkAsRead();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('เกิดข้อผิดพลาด: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('เกิดข้อผิดพลาด: $e')));
       }
     } finally {
       if (mounted) {
@@ -116,7 +111,10 @@ class _ContentTabState extends State<ContentTab> {
         if (widget.topicDetail.readingTimeMinutes != null)
           Container(
             width: double.infinity,
-            padding: EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm + 4),
+            padding: EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm + 4,
+            ),
             color: AppColors.primaryBackground,
             child: Row(
               children: [
@@ -140,15 +138,9 @@ class _ContentTabState extends State<ContentTab> {
             selectable: true,
             padding: AppSpacing.paddingMd,
             styleSheet: MarkdownStyleSheet(
-              h1: AppTypography.heading2.copyWith(
-                color: AppColors.primaryText,
-              ),
-              h2: AppTypography.heading3.copyWith(
-                color: AppColors.primaryText,
-              ),
-              h3: AppTypography.title.copyWith(
-                color: AppColors.primaryText,
-              ),
+              h1: AppTypography.heading2.copyWith(color: AppColors.primaryText),
+              h2: AppTypography.heading3.copyWith(color: AppColors.primaryText),
+              h3: AppTypography.title.copyWith(color: AppColors.primaryText),
               p: AppTypography.body.copyWith(
                 fontSize: 15,
                 height: 1.6,
@@ -170,10 +162,7 @@ class _ContentTabState extends State<ContentTab> {
               ),
               blockquoteDecoration: BoxDecoration(
                 border: Border(
-                  left: BorderSide(
-                    color: AppColors.primary,
-                    width: 4,
-                  ),
+                  left: BorderSide(color: AppColors.primary, width: 4),
                 ),
                 color: AppColors.accent1,
               ),
@@ -185,7 +174,9 @@ class _ContentTabState extends State<ContentTab> {
         // ถ้ามี content update ให้แสดงเหมือนยังไม่อ่าน (ต้องกดอ่านอีกรอบ)
         Builder(
           builder: (context) {
-            final showAsRead = widget.topicDetail.isRead && !widget.topicDetail.hasContentUpdate;
+            final showAsRead =
+                widget.topicDetail.isRead &&
+                !widget.topicDetail.hasContentUpdate;
             return Container(
               width: double.infinity,
               padding: AppSpacing.paddingMd,
@@ -222,7 +213,7 @@ class _ContentTabState extends State<ContentTab> {
                         else
                           Icon(
                             showAsRead
-                                ? Iconsax.tick_square5
+                                ? Iconsax.tick_square
                                 : Iconsax.tick_square,
                             size: 24,
                             color: showAsRead
@@ -231,9 +222,7 @@ class _ContentTabState extends State<ContentTab> {
                           ),
                         AppSpacing.horizontalGapSm,
                         Text(
-                          showAsRead
-                              ? 'อ่านแล้ว'
-                              : 'ทำเครื่องหมายว่าอ่านแล้ว',
+                          showAsRead ? 'อ่านแล้ว' : 'ทำเครื่องหมายว่าอ่านแล้ว',
                           style: AppTypography.bodySmall.copyWith(
                             fontWeight: FontWeight.w500,
                             color: showAsRead

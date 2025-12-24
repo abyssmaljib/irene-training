@@ -63,8 +63,8 @@ class TopicWithProgress {
 
   factory TopicWithProgress.fromJson(Map<String, dynamic> json) {
     return TopicWithProgress(
-      topicId: json['topic_id'] as String,
-      topicName: json['topic_name'] as String,
+      topicId: json['topic_id'] as String? ?? '',
+      topicName: json['topic_name'] as String? ?? 'ไม่ทราบชื่อ',
       topicType: json['topic_type'] as String?,
       notionUrl: json['notion_url'] as String?,
       coverImageUrl: json['cover_image_url'] as String?,

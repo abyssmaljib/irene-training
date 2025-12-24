@@ -21,15 +21,17 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // Initialize Crashlytics
-  // Pass all uncaught "fatal" errors from the framework to Crashlytics
-  FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+  // Initialize Crashlytics (NOT supported on Web)
+  if (!kIsWeb) {
+    // Pass all uncaught "fatal" errors from the framework to Crashlytics
+    FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
 
-  // Pass all uncaught asynchronous errors to Crashlytics
-  PlatformDispatcher.instance.onError = (error, stack) {
-    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-    return true;
-  };
+    // Pass all uncaught asynchronous errors to Crashlytics
+    PlatformDispatcher.instance.onError = (error, stack) {
+      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+      return true;
+    };
+  }
 
   await Supabase.initialize(
     url: SupabaseConfig.url,
@@ -99,8 +101,10 @@ class _AuthWrapperState extends State<AuthWrapper> {
           final userId = data.session!.user.id;
           // Set in Clarity
           Clarity.setCustomUserId(userId);
-          // Set in Crashlytics
-          FirebaseCrashlytics.instance.setUserIdentifier(userId);
+          // Set in Crashlytics (NOT supported on Web)
+          if (!kIsWeb) {
+            FirebaseCrashlytics.instance.setUserIdentifier(userId);
+          }
         }
       }
     });

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:lottie/lottie.dart';
 import '../models/topic_with_progress.dart';
 import '../widgets/topic_card.dart';
 import '../../../core/theme/app_theme.dart';
@@ -9,7 +8,6 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/gradient_text.dart';
 import 'topic_detail_screen.dart';
-
 
 class DirectoryScreen extends StatefulWidget {
   const DirectoryScreen({super.key});
@@ -133,38 +131,31 @@ class _DirectoryScreenState extends State<DirectoryScreen> {
   }
 
   @override
-Widget build(BuildContext context) {
-  return Scaffold(
-    appBar: AppBar(
-      backgroundColor: AppColors.secondaryBackground,
-      automaticallyImplyLeading: false,
-      toolbarHeight: 72,
-      titleSpacing: 16,
-      title: GradientText(
-        'IRENE Academy',
-        style: AppTypography.heading3.copyWith(
-          letterSpacing: 1.62,
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: AppColors.secondaryBackground,
+        automaticallyImplyLeading: false,
+        titleSpacing: 16, // ระยะห่างของ title จากขอบซ้าย
+        title: GradientText(
+          'IRENE Academy',
+          style: AppTypography.heading3.copyWith(
+            letterSpacing: 1.62,
+            fontWeight: FontWeight.w900, // ความหนาของตัวอักษร
+          ),
+          colors: [AppColors.greenText, AppColors.secondary],
         ),
-        colors: [
-          AppColors.greenText,
-          AppColors.secondary,
-        ],
+        centerTitle: false,
+        elevation: 0,
       ),
-      centerTitle: false,
-      elevation: 0,
-    ),
-    body: _buildBody(),
-  );
-}
+      body: _buildBody(),
+    );
+  }
 
   Widget _buildBody() {
     if (_isLoading) {
-      return Center(
-        child: Lottie.asset(
-          'assets/animations/loading.json',
-          width: 150,
-          height: 150,
-        ),
+      return const Center(
+        child: CircularProgressIndicator(color: AppColors.primary),
       );
     }
 
@@ -175,7 +166,10 @@ Widget build(BuildContext context) {
           children: [
             const Text('เกิดข้อผิดพลาด'),
             AppSpacing.verticalGapSm,
-            Text(_error!, style: AppTypography.bodySmall.copyWith(color: AppColors.error)),
+            Text(
+              _error!,
+              style: AppTypography.bodySmall.copyWith(color: AppColors.error),
+            ),
             AppSpacing.verticalGapMd,
             SizedBox(
               height: AppSpacing.buttonHeight,
@@ -253,11 +247,7 @@ Widget build(BuildContext context) {
       );
 
       // เพิ่ม spacing หลังแต่ละกลุ่ม
-      slivers.add(
-        SliverToBoxAdapter(
-          child: SizedBox(height: AppSpacing.md),
-        ),
-      );
+      slivers.add(SliverToBoxAdapter(child: SizedBox(height: AppSpacing.md)));
     }
 
     return RefreshIndicator(
@@ -286,10 +276,12 @@ class _SearchBarDelegate extends SliverPersistentHeaderDelegate {
     double shrinkOffset,
     bool overlapsContent,
   ) {
+    // Search Bar Container
     return Container(
-      height: 72,  // เพิ่มบรรทัดนี้!
+      height: 52, // ความสูงของกล่อง search bar (ต้องตรงกับ maxExtent/minExtent)
       color: AppColors.secondaryBackground,
-      padding: EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.sm + 4),
+      // padding: ซ้าย 16px, บน 0, ขวา 16px, ล่าง 0 (ให้ตรงกับ titleSpacing ของ AppBar)
+      padding: EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, 0),
       child: TextField(
         controller: controller,
         onChanged: onChanged,
@@ -321,17 +313,11 @@ class _SearchBarDelegate extends SliverPersistentHeaderDelegate {
                 )
               : null,
           enabledBorder: OutlineInputBorder(
-            borderSide: const BorderSide(
-              color: Colors.transparent,
-              width: 2,
-            ),
+            borderSide: const BorderSide(color: Colors.transparent, width: 2),
             borderRadius: AppRadius.smallRadius,
           ),
           focusedBorder: OutlineInputBorder(
-            borderSide: const BorderSide(
-              color: AppColors.primary,
-              width: 2,
-            ),
+            borderSide: const BorderSide(color: AppColors.primary, width: 2),
             borderRadius: AppRadius.smallRadius,
           ),
           contentPadding: EdgeInsets.symmetric(
@@ -344,10 +330,10 @@ class _SearchBarDelegate extends SliverPersistentHeaderDelegate {
   }
 
   @override
-  double get maxExtent => 72;
+  double get maxExtent => 52;
 
   @override
-  double get minExtent => 72;
+  double get minExtent => 52;
 
   @override
   bool shouldRebuild(covariant _SearchBarDelegate oldDelegate) => true;
@@ -357,13 +343,14 @@ class _SearchBarDelegate extends SliverPersistentHeaderDelegate {
 class _StickyHeaderDelegate extends SliverPersistentHeaderDelegate {
   final String title;
 
-
-  _StickyHeaderDelegate({
-    required this.title,
-  });
+  _StickyHeaderDelegate({required this.title});
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
     return Container(
       width: double.infinity,
       color: AppColors.secondaryBackground,
@@ -377,18 +364,14 @@ class _StickyHeaderDelegate extends SliverPersistentHeaderDelegate {
                 alignment: Alignment.centerLeft,
                 child: Text(
                   title,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                 ),
               ),
             ),
           ),
-          const Divider(
-            height: 1,
-            thickness: 1,
-            color: AppColors.alternate,
-          ),
+          const Divider(height: 1, thickness: 1, color: AppColors.alternate),
         ],
       ),
     );
