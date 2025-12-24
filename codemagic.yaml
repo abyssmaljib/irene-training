@@ -86,7 +86,7 @@ workflows:
         bundle_identifier: com.giantkumakuma.irene
       vars:
         BUNDLE_ID: "com.giantkumakuma.irene"
-        APP_STORE_APP_ID: 000000000  # Replace with actual App Store app ID
+        APP_STORE_APP_ID: 6756898503
 
     triggering:
       events:
