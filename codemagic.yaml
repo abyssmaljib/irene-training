@@ -108,7 +108,10 @@ workflows:
       - name: Install CocoaPods dependencies
         script: |
           cd ios
-          pod install
+          rm -rf Pods
+          rm -f Podfile.lock
+          pod cache clean --all
+          pod install --repo-update
 
       - name: Run Flutter analyze
         script: flutter analyze --no-fatal-infos
