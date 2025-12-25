@@ -23,6 +23,56 @@ class ContentTab extends StatefulWidget {
 
 class _ContentTabState extends State<ContentTab> {
   bool _isMarking = false;
+  double _holdProgress = 0.0;
+  bool _isHolding = false;
+  static const int _holdDurationMs = 3000; // 3 วินาที
+
+  void _startHold() {
+    // ถ้าอ่านแล้วและไม่มี update → ต้องกดค้าง
+    final showAsRead = widget.topicDetail.isRead && !widget.topicDetail.hasContentUpdate;
+    if (!showAsRead) {
+      // ถ้ายังไม่อ่าน → toggle ทันที
+      _toggleReadStatus();
+      return;
+    }
+
+    // เริ่มกดค้าง
+    setState(() {
+      _isHolding = true;
+      _holdProgress = 0.0;
+    });
+    _animateHold();
+  }
+
+  void _animateHold() async {
+    const int steps = 60; // 60 fps
+    const int stepDurationMs = _holdDurationMs ~/ steps;
+
+    for (int i = 0; i <= steps; i++) {
+      if (!_isHolding) return;
+
+      await Future.delayed(const Duration(milliseconds: stepDurationMs));
+
+      if (!mounted || !_isHolding) return;
+
+      setState(() {
+        _holdProgress = i / steps;
+      });
+
+      if (i == steps) {
+        // กดค้างครบแล้ว → toggle
+        _isHolding = false;
+        _toggleReadStatus();
+      }
+    }
+  }
+
+  void _cancelHold() {
+    setState(() {
+      _isHolding = false;
+      _holdProgress = 0.0;
+    });
+  }
 
   Future<void> _toggleReadStatus() async {
     if (_isMarking) return;
@@ -185,9 +235,10 @@ class _ContentTabState extends State<ContentTab> {
                 boxShadow: AppShadows.cardShadow,
               ),
               child: SafeArea(
-                child: InkWell(
-                  onTap: _toggleReadStatus,
-                  borderRadius: AppRadius.smallRadius,
+                child: GestureDetector(
+                  onTapDown: (_) => _startHold(),
+                  onTapUp: (_) => _cancelHold(),
+                  onTapCancel: _cancelHold,
                   child: Container(
                     height: AppSpacing.buttonHeight,
                     decoration: BoxDecoration(
@@ -201,33 +252,67 @@ class _ContentTabState extends State<ContentTab> {
                             : AppColors.alternate,
                       ),
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    child: Stack(
                       children: [
-                        if (_isMarking)
-                          const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        else
-                          Icon(
-                            showAsRead
-                                ? Iconsax.tick_square
-                                : Iconsax.tick_square,
-                            size: 24,
-                            color: showAsRead
-                                ? AppColors.success
-                                : AppColors.primary,
+                        // Progress bar สำหรับกดค้าง
+                        if (_isHolding)
+                          Positioned.fill(
+                            child: ClipRRect(
+                              borderRadius: AppRadius.smallRadius,
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: FractionallySizedBox(
+                                  widthFactor: _holdProgress,
+                                  heightFactor: 1.0,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: AppColors.error.withValues(alpha: 0.2),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
-                        AppSpacing.horizontalGapSm,
-                        Text(
-                          showAsRead ? 'อ่านแล้ว' : 'ทำเครื่องหมายว่าอ่านแล้ว',
-                          style: AppTypography.bodySmall.copyWith(
-                            fontWeight: FontWeight.w500,
-                            color: showAsRead
-                                ? AppColors.success
-                                : AppColors.primary,
+                        // Content
+                        Center(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              if (_isMarking)
+                                const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              else
+                                Icon(
+                                  showAsRead
+                                      ? Iconsax.tick_square
+                                      : Iconsax.tick_square,
+                                  size: 24,
+                                  color: _isHolding
+                                      ? AppColors.error
+                                      : showAsRead
+                                          ? AppColors.success
+                                          : AppColors.primary,
+                                ),
+                              AppSpacing.horizontalGapSm,
+                              Text(
+                                _isHolding
+                                    ? 'กดค้างเพื่อยกเลิก...'
+                                    : showAsRead
+                                        ? 'อ่านแล้ว'
+                                        : 'ทำเครื่องหมายว่าอ่านแล้ว',
+                                style: AppTypography.bodySmall.copyWith(
+                                  fontWeight: FontWeight.w500,
+                                  color: _isHolding
+                                      ? AppColors.error
+                                      : showAsRead
+                                          ? AppColors.success
+                                          : AppColors.primary,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],

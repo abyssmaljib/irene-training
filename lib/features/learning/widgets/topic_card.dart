@@ -44,7 +44,7 @@ class TopicCard extends StatelessWidget {
         context,
         '📖 ยังไม่อ่าน',
         AppColors.tagNeutralBg,
-        AppColors.secondaryText,
+        AppColors.tagNeutralText,
         FontWeight.w400,
       ));
     } else {
@@ -52,7 +52,7 @@ class TopicCard extends StatelessWidget {
         context,
         '✅ อ่านแล้ว',
         AppColors.tagReadBg,
-        AppColors.success,
+        AppColors.tagReadText,
         FontWeight.w600,
       ));
     }
@@ -63,8 +63,8 @@ class TopicCard extends StatelessWidget {
         tags.add(_buildTag(
           context,
           '✅ ผ่านแล้ว',
-          AppColors.tagReadBg,
-          AppColors.success,
+          AppColors.tagPassedBg,
+          AppColors.tagPassedText,
           FontWeight.w600,
         ));
         break;
@@ -83,7 +83,7 @@ class TopicCard extends StatelessWidget {
           context,
           '📝 ยังไม่ทำ',
           AppColors.tagNeutralBg,
-          AppColors.secondaryText,
+          AppColors.tagNeutralText,
           FontWeight.w400,
         ));
         break;

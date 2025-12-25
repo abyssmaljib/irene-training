@@ -13,6 +13,7 @@ import '../services/badge_service.dart';
 import '../widgets/content_tab.dart';
 import '../widgets/quiz_tab.dart';
 import '../widgets/badge_earned_dialog.dart';
+import '../../../core/widgets/irene_app_bar.dart';
 import 'quiz_screen.dart';
 import 'quiz_result_screen.dart';
 
@@ -440,23 +441,9 @@ class _TopicDetailScreenState extends State<TopicDetailScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.primaryBackground,
-      appBar: AppBar(
-        backgroundColor: AppColors.secondaryBackground,
-        automaticallyImplyLeading: false,
+      appBar: IreneSecondaryAppBar(
+        title: widget.topic.topicName,
         toolbarHeight: 72,
-        titleSpacing: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          widget.topic.topicName,
-          style: AppTypography.title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        centerTitle: false,
-        elevation: 0,
         bottom: TabBar(
           controller: _tabController,
           labelColor: AppColors.primary,

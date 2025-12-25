@@ -244,3 +244,198 @@ class ProgressTag extends StatelessWidget {
     );
   }
 }
+
+/// Action Chip - For tab-like actions with icon support
+/// Similar to FlutterFlow's button widget with selected state
+class ActionChip extends StatelessWidget {
+  final String text;
+  final bool isSelected;
+  final VoidCallback? onPressed;
+  final IconData? icon;
+  final double iconSize;
+  final double height;
+  final EdgeInsetsGeometry? padding;
+  final BorderRadius? borderRadius;
+
+  const ActionChip({
+    super.key,
+    required this.text,
+    this.isSelected = false,
+    this.onPressed,
+    this.icon,
+    this.iconSize = 15.0,
+    this.height = 35.0,
+    this.padding,
+    this.borderRadius,
+  });
+
+  /// Factory for left-positioned chip (rounded left corners only)
+  factory ActionChip.left({
+    required String text,
+    bool isSelected = false,
+    VoidCallback? onPressed,
+    IconData? icon,
+  }) {
+    return ActionChip(
+      text: text,
+      isSelected: isSelected,
+      onPressed: onPressed,
+      icon: icon,
+      borderRadius: const BorderRadius.only(
+        topLeft: Radius.circular(8.0),
+        bottomLeft: Radius.circular(8.0),
+        topRight: Radius.zero,
+        bottomRight: Radius.zero,
+      ),
+    );
+  }
+
+  /// Factory for right-positioned chip (rounded right corners only)
+  factory ActionChip.right({
+    required String text,
+    bool isSelected = false,
+    VoidCallback? onPressed,
+    IconData? icon,
+  }) {
+    return ActionChip(
+      text: text,
+      isSelected: isSelected,
+      onPressed: onPressed,
+      icon: icon,
+      borderRadius: const BorderRadius.only(
+        topLeft: Radius.zero,
+        bottomLeft: Radius.zero,
+        topRight: Radius.circular(8.0),
+        bottomRight: Radius.circular(8.0),
+      ),
+    );
+  }
+
+  /// Factory for middle-positioned chip (no rounded corners)
+  factory ActionChip.middle({
+    required String text,
+    bool isSelected = false,
+    VoidCallback? onPressed,
+    IconData? icon,
+  }) {
+    return ActionChip(
+      text: text,
+      isSelected: isSelected,
+      onPressed: onPressed,
+      icon: icon,
+      borderRadius: BorderRadius.zero,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final effectivePadding = padding ??
+        const EdgeInsets.symmetric(horizontal: 16.0);
+    final effectiveBorderRadius = borderRadius ?? AppRadius.smallRadius;
+
+    return Material(
+      color: isSelected ? AppColors.accent1 : AppColors.secondaryBackground,
+      borderRadius: effectiveBorderRadius,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: effectiveBorderRadius,
+        child: Container(
+          height: height,
+          padding: effectivePadding,
+          decoration: BoxDecoration(
+            borderRadius: effectiveBorderRadius,
+            border: Border.all(
+              color: isSelected ? AppColors.secondary : AppColors.alternate,
+              width: 1.0,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (icon != null) ...[
+                Icon(
+                  icon,
+                  size: iconSize,
+                  color: isSelected
+                      ? AppColors.primaryText
+                      : AppColors.secondaryText,
+                ),
+                AppSpacing.horizontalGapXs,
+              ],
+              Text(
+                text,
+                style: AppTypography.bodySmall.copyWith(
+                  color: isSelected
+                      ? AppColors.primaryText
+                      : AppColors.secondaryText,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Action Chip Group - For grouping multiple action chips together
+class ActionChipGroup extends StatelessWidget {
+  final List<ActionChipData> chips;
+  final int selectedIndex;
+  final ValueChanged<int>? onSelected;
+
+  const ActionChipGroup({
+    super.key,
+    required this.chips,
+    this.selectedIndex = 0,
+    this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(chips.length, (index) {
+        final chip = chips[index];
+        final isSelected = index == selectedIndex;
+
+        BorderRadius borderRadius;
+        if (chips.length == 1) {
+          borderRadius = AppRadius.smallRadius;
+        } else if (index == 0) {
+          borderRadius = const BorderRadius.only(
+            topLeft: Radius.circular(8.0),
+            bottomLeft: Radius.circular(8.0),
+          );
+        } else if (index == chips.length - 1) {
+          borderRadius = const BorderRadius.only(
+            topRight: Radius.circular(8.0),
+            bottomRight: Radius.circular(8.0),
+          );
+        } else {
+          borderRadius = BorderRadius.zero;
+        }
+
+        return ActionChip(
+          text: chip.text,
+          icon: chip.icon,
+          isSelected: isSelected,
+          borderRadius: borderRadius,
+          onPressed: () => onSelected?.call(index),
+        );
+      }),
+    );
+  }
+}
+
+/// Data class for ActionChipGroup
+class ActionChipData {
+  final String text;
+  final IconData? icon;
+
+  const ActionChipData({
+    required this.text,
+    this.icon,
+  });
+}

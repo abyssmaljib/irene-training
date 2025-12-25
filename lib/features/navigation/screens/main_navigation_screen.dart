@@ -3,8 +3,10 @@ import 'package:iconsax/iconsax.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
-import '../../learning/screens/directory_screen.dart';
-import '../../settings/screens/settings_screen.dart';
+import '../../home/screens/home_screen.dart';
+import '../../checklist/screens/checklist_screen.dart';
+import '../../board/screens/board_screen.dart';
+import '../../residents/screens/residents_screen.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
@@ -17,8 +19,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
 
   final List<Widget> _screens = [
-    const DirectoryScreen(),
-    const SettingsScreen(),
+    const HomeScreen(),
+    const ChecklistScreen(),
+    const BoardScreen(),
+    const ResidentsScreen(),
   ];
 
   @override
@@ -33,7 +37,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         child: SafeArea(
           child: Padding(
             padding: EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
+              horizontal: AppSpacing.sm,
               vertical: AppSpacing.sm,
             ),
             child: Row(
@@ -41,15 +45,27 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               children: [
                 _buildNavItem(
                   index: 0,
-                  icon: Iconsax.book_1,
-                  activeIcon: Iconsax.book_1,
-                  label: 'เรียนรู้',
+                  icon: Iconsax.home_2,
+                  activeIcon: Iconsax.home_15,
+                  label: 'หน้าหลัก',
                 ),
                 _buildNavItem(
                   index: 1,
-                  icon: Iconsax.menu_1,
-                  activeIcon: Iconsax.menu_1,
-                  label: 'ตั้งค่า',
+                  icon: Iconsax.task_square,
+                  activeIcon: Iconsax.task_square5,
+                  label: 'เช็คลิสต์',
+                ),
+                _buildNavItem(
+                  index: 2,
+                  icon: Iconsax.document_text,
+                  activeIcon: Iconsax.document_text_1,
+                  label: 'กระดานข่าว',
+                ),
+                _buildNavItem(
+                  index: 3,
+                  icon: Iconsax.health,
+                  activeIcon: Iconsax.health5,
+                  label: 'คนไข้',
                 ),
               ],
             ),
@@ -75,7 +91,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       },
       behavior: HitTestBehavior.opaque,
       child: SizedBox(
-        width: 64,
+        width: 72,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
@@ -90,7 +106,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               label,
               textAlign: TextAlign.center,
               style: AppTypography.caption.copyWith(
-                fontSize: 11,
+                fontSize: 10,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
                 color: isSelected ? AppColors.primary : AppColors.secondaryText,
               ),

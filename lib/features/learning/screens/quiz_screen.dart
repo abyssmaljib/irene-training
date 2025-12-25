@@ -36,7 +36,7 @@ class _QuizScreenState extends State<QuizScreen> {
   bool _isAnswered = false;
   int _score = 0;
 
-  late int _remainingSeconds;
+  int _elapsedSeconds = 0;
   Timer? _timer;
   DateTime? _questionStartTime;
 
@@ -45,7 +45,6 @@ class _QuizScreenState extends State<QuizScreen> {
   @override
   void initState() {
     super.initState();
-    _remainingSeconds = widget.session.timeLimitSeconds;
     _loadQuestions();
   }
 
@@ -95,19 +94,36 @@ class _QuizScreenState extends State<QuizScreen> {
 
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_remainingSeconds > 0) {
-        setState(() => _remainingSeconds--);
-      } else {
-        _timer?.cancel();
-        _submitQuiz();
-      }
+      setState(() => _elapsedSeconds++);
     });
   }
 
   String get _formattedTime {
-    final minutes = _remainingSeconds ~/ 60;
-    final seconds = _remainingSeconds % 60;
+    final minutes = _elapsedSeconds ~/ 60;
+    final seconds = _elapsedSeconds % 60;
     return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  // สีตามเวลาที่ใช้
+  // 0-10 นาที: เขียว, 10-15 นาที: ส้ม, >15 นาที: แดง
+  Color get _timerBackgroundColor {
+    if (_elapsedSeconds < 600) {
+      return AppColors.tagPassedBg; // เขียว (0-10 นาที)
+    } else if (_elapsedSeconds < 900) {
+      return AppColors.tagPendingBg; // ส้ม (10-15 นาที)
+    } else {
+      return AppColors.tagFailedBg; // แดง (>15 นาที)
+    }
+  }
+
+  Color get _timerTextColor {
+    if (_elapsedSeconds < 600) {
+      return AppColors.tagPassedText; // เขียว
+    } else if (_elapsedSeconds < 900) {
+      return AppColors.tagPendingText; // ส้ม
+    } else {
+      return AppColors.error; // แดง
+    }
   }
 
   double get _progress => _questions.isEmpty
@@ -261,9 +277,11 @@ class _QuizScreenState extends State<QuizScreen> {
             text: 'ทำต่อ',
             onPressed: () => Navigator.pop(context, false),
           ),
-          AppSpacing.horizontalGapSm,
+          const SizedBox(width: 8),
           DangerButton(
             text: 'ออก',
+            icon: Iconsax.logout,
+            width: 100,
             onPressed: () => Navigator.pop(context, true),
           ),
         ],
@@ -328,9 +346,7 @@ class _QuizScreenState extends State<QuizScreen> {
               margin: const EdgeInsets.only(right: 16),
               padding: EdgeInsets.symmetric(horizontal: AppSpacing.sm + 4, vertical: 6),
               decoration: BoxDecoration(
-                color: _remainingSeconds < 60
-                    ? AppColors.tagFailedBg
-                    : AppColors.primaryBackground,
+                color: _timerBackgroundColor,
                 borderRadius: AppRadius.mediumRadius,
               ),
               child: Row(
@@ -339,18 +355,14 @@ class _QuizScreenState extends State<QuizScreen> {
                   Icon(
                     Iconsax.timer_1,
                     size: 16,
-                    color: _remainingSeconds < 60
-                        ? AppColors.error
-                        : AppColors.secondaryText,
+                    color: _timerTextColor,
                   ),
                   AppSpacing.horizontalGapXs,
                   Text(
                     _formattedTime,
                     style: AppTypography.bodySmall.copyWith(
                       fontWeight: FontWeight.w600,
-                      color: _remainingSeconds < 60
-                          ? AppColors.error
-                          : AppColors.primaryText,
+                      color: _timerTextColor,
                     ),
                   ),
                 ],

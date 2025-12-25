@@ -6,7 +6,7 @@ import '../widgets/topic_card.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
-import '../../../core/widgets/gradient_text.dart';
+import '../../../core/widgets/irene_app_bar.dart';
 import 'topic_detail_screen.dart';
 
 class DirectoryScreen extends StatefulWidget {
@@ -133,21 +133,7 @@ class _DirectoryScreenState extends State<DirectoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: AppColors.secondaryBackground,
-        automaticallyImplyLeading: false,
-        titleSpacing: 16, // ระยะห่างของ title จากขอบซ้าย
-        title: GradientText(
-          'IRENE Academy',
-          style: AppTypography.heading3.copyWith(
-            letterSpacing: 1.62,
-            fontWeight: FontWeight.w900, // ความหนาของตัวอักษร
-          ),
-          colors: [AppColors.greenText, AppColors.secondary],
-        ),
-        centerTitle: false,
-        elevation: 0,
-      ),
+      appBar: const IreneSecondaryAppBar(title: 'เรียนรู้'),
       body: _buildBody(),
     );
   }

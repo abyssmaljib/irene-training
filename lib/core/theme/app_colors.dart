@@ -43,22 +43,23 @@ class AppColors {
   static const Color inputFocused = Color(0xFF0D9488);
   static const Color inputError = Color(0xFFC60031);
 
-  // Tag/Badge Colors
-  static const Color tagPassedBg = Color(0xFFD4EDDA);
-  static const Color tagPassedText = Color(0xFF023618);
-  static const Color tagPendingBg = Color(0xFFFFF3CD);
-  static const Color tagPendingText = Color(0xFF856404);
-  static const Color tagFailedBg = Color(0xFFF8D7DA);
-  static const Color tagFailedText = Color(0xFFC60031);
-  static const Color tagNeutralBg = Color(0xFFF1F4F8);
-  static const Color tagNeutralText = Color(0xFF5B616D);
+  // Tag/Badge Colors (Pastel - สบายตา)
+  static const Color tagPassedBg = Color(0xFFE8F5E9);     // Soft mint green
+  static const Color tagPassedText = Color(0xFF2E7D4A);   // Muted green
+  static const Color tagPendingBg = Color(0xFFFFF8E7);    // Soft cream yellow
+  static const Color tagPendingText = Color(0xFF9A7B38);  // Muted amber
+  static const Color tagFailedBg = Color(0xFFFCE8EC);     // Soft pink
+  static const Color tagFailedText = Color(0xFFB5495B);   // Muted rose
+  static const Color tagNeutralBg = Color(0xFFF5F7FA);    // Very soft gray
+  static const Color tagNeutralText = Color(0xFF7A8599);  // Muted gray
 
-  // Additional Tag Colors
-  static const Color tagReadBg = Color(0xFFBFFFF3);        // Light Teal for "อ่านแล้ว"
-  static const Color tagReviewBg = Color(0xFFFFFCDB);     // Light Yellow for "ต้องทบทวน"
-  static const Color tagReviewText = Color(0xFF835C00);   // Dark Yellow text
-  static const Color tagUpdateBg = Color(0xFFFFE4D6);     // Light Orange for "เนื้อหาอัพเดต"
-  static const Color tagUpdateText = Color(0xFFB84300);   // Dark Orange text
+  // Additional Tag Colors (Pastel - สบายตา)
+  static const Color tagReadBg = Color(0xFFE0F2F1);       // Soft teal for "อ่านแล้ว"
+  static const Color tagReadText = Color(0xFF26867A);     // Muted teal text
+  static const Color tagReviewBg = Color(0xFFFFF9E6);     // Soft cream for "ต้องทบทวน"
+  static const Color tagReviewText = Color(0xFFA68B3D);   // Muted gold text
+  static const Color tagUpdateBg = Color(0xFFFFF0E8);     // Soft peach for "เนื้อหาอัพเดต"
+  static const Color tagUpdateText = Color(0xFFBF6E40);   // Muted coral text
 
   // Result Screen Background
   static const Color resultPassedBg = Color(0xFFE8F5E9);  // Light Green background

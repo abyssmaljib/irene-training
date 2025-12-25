@@ -117,6 +117,66 @@ class _BadgeEarnedDialogState extends State<BadgeEarnedDialog>
     }
   }
 
+  double _getRarityBorderWidth(String rarity) {
+    switch (rarity) {
+      case 'legendary':
+        return 5;
+      case 'epic':
+        return 4;
+      case 'rare':
+        return 3.5;
+      default:
+        return 3;
+    }
+  }
+
+  List<BoxShadow> _getRarityShadows(String rarity, Color color) {
+    switch (rarity) {
+      case 'legendary':
+        return [
+          BoxShadow(
+            color: color.withValues(alpha: 0.4),
+            blurRadius: 24,
+            spreadRadius: 6,
+          ),
+          BoxShadow(
+            color: color.withValues(alpha: 0.2),
+            blurRadius: 40,
+            spreadRadius: 10,
+          ),
+        ];
+      case 'epic':
+        return [
+          BoxShadow(
+            color: color.withValues(alpha: 0.35),
+            blurRadius: 20,
+            spreadRadius: 4,
+          ),
+          BoxShadow(
+            color: color.withValues(alpha: 0.15),
+            blurRadius: 30,
+            spreadRadius: 6,
+          ),
+        ];
+      case 'rare':
+        return [
+          BoxShadow(
+            color: color.withValues(alpha: 0.3),
+            blurRadius: 16,
+            spreadRadius: 3,
+          ),
+        ];
+      default:
+        return [
+          BoxShadow(
+            color: color.withValues(alpha: 0.2),
+            blurRadius: 12,
+            spreadRadius: 2,
+          ),
+        ];
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final badge = _currentBadge;
@@ -200,7 +260,7 @@ class _BadgeEarnedDialogState extends State<BadgeEarnedDialog>
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   children: [
-                    // Badge icon
+                    // Badge icon with rarity-based styling
                     Container(
                       width: 100,
                       height: 100,
@@ -209,15 +269,9 @@ class _BadgeEarnedDialogState extends State<BadgeEarnedDialog>
                         shape: BoxShape.circle,
                         border: Border.all(
                           color: rarityColor,
-                          width: 3,
+                          width: _getRarityBorderWidth(badge.rarity),
                         ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: rarityColor.withValues(alpha: 0.2),
-                            blurRadius: 12,
-                            spreadRadius: 2,
-                          ),
-                        ],
+                        boxShadow: _getRarityShadows(badge.rarity, rarityColor),
                       ),
                       child: Center(
                         child: badge.imageUrl != null
@@ -237,23 +291,76 @@ class _BadgeEarnedDialogState extends State<BadgeEarnedDialog>
 
                     AppSpacing.verticalGapMd,
 
-                    // Rarity label
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: rarityColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        _getRarityLabel(badge.rarity),
-                        style: AppTypography.caption.copyWith(
-                          color: rarityColor,
-                          fontWeight: FontWeight.w600,
+                    // Category & Rarity tags
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // Category tag
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryBackground,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: AppColors.alternate,
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                badge.categoryIcon,
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                badge.categoryDisplayName,
+                                style: AppTypography.caption.copyWith(
+                                  color: AppColors.secondaryText,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 8),
+                        // Rarity tag
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: rarityColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: rarityColor.withValues(alpha: 0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                badge.rarityEmoji,
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                _getRarityLabel(badge.rarity),
+                                style: AppTypography.caption.copyWith(
+                                  color: rarityColor,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
 
                     AppSpacing.verticalGapSm,

@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart' hide Badge;
+import 'package:iconsax/iconsax.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/buttons.dart';
 import '../../auth/screens/login_screen.dart';
+import '../../learning/screens/directory_screen.dart';
 import '../../learning/models/badge.dart';
 import '../../learning/models/thinking_skill_data.dart';
 import '../../learning/services/badge_service.dart';
+import '../../learning/widgets/badge_info_dialog.dart';
 // TODO: Temporarily hidden - import '../../learning/widgets/skill_visualization_section.dart';
 import '../models/user_profile.dart';
+import '../../../core/widgets/irene_app_bar.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -166,16 +170,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.primaryBackground,
-      appBar: AppBar(
-        backgroundColor: AppColors.secondaryBackground,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        title: Text(
-          'ตั้งค่า',
-          style: AppTypography.title,
-        ),
-        centerTitle: false,
-      ),
+      appBar: const IreneSecondaryAppBar(title: 'โปรไฟล์'),
       body: _buildBody(),
     );
   }
@@ -218,7 +213,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
 
     return SafeArea(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: AppSpacing.screenPadding,
         child: Column(
           children: [
@@ -266,20 +261,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             AppSpacing.verticalGapMd,
+            // Menu Section
+            _buildMenuSection(),
+            AppSpacing.verticalGapMd,
             // Badges Section - แสดงเสมอ
             _buildBadgesSection(),
             AppSpacing.verticalGapMd,
             // TODO: Thinking Skills Section temporarily hidden for review
             // if (_skillsData != null && _skillsData!.hasData)
-            //   Expanded(
-            //     child: SingleChildScrollView(
-            //       child: SkillVisualizationSection(
-            //         skillsData: _skillsData,
-            //       ),
-            //     ),
-            //   )
-            // else
-            const Spacer(),
+            //   SkillVisualizationSection(
+            //     skillsData: _skillsData,
+            //   ),
+            AppSpacing.verticalGapXl,
             // Log Out Button
             SizedBox(
               width: double.infinity,
@@ -322,6 +315,99 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Widget _buildMenuSection() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.secondaryBackground,
+        borderRadius: AppRadius.mediumRadius,
+        border: Border.all(color: AppColors.alternate),
+      ),
+      child: Column(
+        children: [
+          _buildMenuItem(
+            icon: Iconsax.book_1,
+            label: 'เรียนรู้',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const DirectoryScreen()),
+              );
+            },
+          ),
+          Divider(height: 1, color: AppColors.alternate),
+          _buildMenuItem(
+            icon: Iconsax.calendar_1,
+            label: 'เวรของฉัน',
+            onTap: () {
+              // TODO: Navigate to shift screen
+            },
+          ),
+          Divider(height: 1, color: AppColors.alternate),
+          _buildMenuItem(
+            icon: Iconsax.warning_2,
+            label: 'ใบเตือน',
+            onTap: () {
+              // TODO: Navigate to warnings screen
+            },
+          ),
+          Divider(height: 1, color: AppColors.alternate),
+          _buildMenuItem(
+            icon: Iconsax.setting_2,
+            label: 'ตั้งค่า',
+            onTap: () {
+              // TODO: Navigate to app settings
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMenuItem({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppRadius.mediumRadius,
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.md,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.accent1,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: AppColors.primary, size: 20),
+              ),
+              AppSpacing.horizontalGapMd,
+              Expanded(
+                child: Text(
+                  label,
+                  style: AppTypography.body,
+                ),
+              ),
+              Icon(
+                Iconsax.arrow_right_3,
+                size: 18,
+                color: AppColors.secondaryText,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildBadgesSection() {
     return Container(
       width: double.infinity,
@@ -360,6 +446,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   style: AppTypography.caption.copyWith(
                     color: AppColors.primary,
                     fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              // Info button - min 48px tap target
+              SizedBox(
+                width: 48,
+                height: 48,
+                child: IconButton(
+                  onPressed: () => BadgeInfoDialog.show(context),
+                  icon: const Icon(
+                    Iconsax.info_circle,
+                    color: AppColors.secondaryText,
+                    size: 20,
                   ),
                 ),
               ),

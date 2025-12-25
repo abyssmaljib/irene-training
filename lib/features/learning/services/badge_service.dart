@@ -283,6 +283,122 @@ class BadgeService {
     }
   }
 
+  /// ดึงสถิติ badge ทั้งหมด (จำนวน user ที่ได้แต่ละ badge)
+  Future<BadgeStats> getBadgeStats() async {
+    try {
+      final currentUser = _client.auth.currentUser;
+
+      // ดึง badge ทั้งหมด
+      final allBadges = await _client
+          .from('training_badges')
+          .select()
+          .eq('is_active', true)
+          .order('rarity')
+          .order('category')
+          .order('name');
+
+      // ดึงจำนวน user ที่ได้แต่ละ badge
+      final userBadgeCounts = await _client
+          .from('training_user_badges')
+          .select('badge_id');
+
+      // นับจำนวน user ต่อ badge
+      final countMap = <String, int>{};
+      for (final row in userBadgeCounts as List) {
+        final badgeId = row['badge_id'] as String;
+        countMap[badgeId] = (countMap[badgeId] ?? 0) + 1;
+      }
+
+      // ดึง badge ที่ current user ได้
+      final earnedBadgeIds = <String>{};
+      if (currentUser != null) {
+        final userBadges = await _client
+            .from('training_user_badges')
+            .select('badge_id')
+            .eq('user_id', currentUser.id);
+        for (final row in userBadges as List) {
+          earnedBadgeIds.add(row['badge_id'] as String);
+        }
+      }
+
+      // ดึงจำนวน user ทั้งหมด
+      final totalUsersResult = await _client
+          .from('user_info')
+          .select('id');
+      final totalUsers = (totalUsersResult as List).length;
+
+      // สร้าง badge info list
+      final badges = <BadgeInfo>[];
+      for (final badgeData in allBadges as List) {
+        final badgeId = badgeData['id'] as String;
+        badges.add(BadgeInfo(
+          badge: Badge.fromBadgeTable(badgeData),
+          earnedCount: countMap[badgeId] ?? 0,
+          totalUsers: totalUsers,
+          isEarnedByCurrentUser: earnedBadgeIds.contains(badgeId),
+        ));
+      }
+
+      // Sort: earned first, then by rarity
+      badges.sort((a, b) {
+        if (a.isEarnedByCurrentUser != b.isEarnedByCurrentUser) {
+          return a.isEarnedByCurrentUser ? -1 : 1;
+        }
+        return 0;
+      });
+
+      // Group by category (earned first in each category)
+      final byCategory = <String, List<BadgeInfo>>{};
+      for (final info in badges) {
+        final cat = info.badge.category;
+        byCategory[cat] = [...(byCategory[cat] ?? []), info];
+      }
+      // Sort each category: earned first
+      for (final cat in byCategory.keys) {
+        byCategory[cat]!.sort((a, b) {
+          if (a.isEarnedByCurrentUser != b.isEarnedByCurrentUser) {
+            return a.isEarnedByCurrentUser ? -1 : 1;
+          }
+          return 0;
+        });
+      }
+
+      // Group by rarity (earned first in each rarity)
+      final byRarity = <String, List<BadgeInfo>>{};
+      for (final info in badges) {
+        final rar = info.badge.rarity;
+        byRarity[rar] = [...(byRarity[rar] ?? []), info];
+      }
+      // Sort each rarity: earned first
+      for (final rar in byRarity.keys) {
+        byRarity[rar]!.sort((a, b) {
+          if (a.isEarnedByCurrentUser != b.isEarnedByCurrentUser) {
+            return a.isEarnedByCurrentUser ? -1 : 1;
+          }
+          return 0;
+        });
+      }
+
+      return BadgeStats(
+        badges: badges,
+        byCategory: byCategory,
+        byRarity: byRarity,
+        totalBadges: badges.length,
+        totalUsers: totalUsers,
+        earnedBadgeIds: earnedBadgeIds,
+      );
+    } catch (e) {
+      debugPrint('BadgeService: Error getting badge stats: $e');
+      return BadgeStats(
+        badges: [],
+        byCategory: {},
+        byRarity: {},
+        totalBadges: 0,
+        totalUsers: 0,
+      );
+    }
+  }
+
   /// ดึง badge ทั้งหมด (รวมที่ยังไม่ได้)
   Future<List<Badge>> getAllBadges({String? seasonId, String? userId}) async {
     try {
