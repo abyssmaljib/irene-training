@@ -55,8 +55,8 @@ class _ChecklistScreenState extends State<ChecklistScreen> with SingleTickerProv
                 unselectedLabelColor: AppColors.secondaryText,
                 indicatorColor: AppColors.primary,
                 tabs: [
-                  Tab(text: 'งาน Routine'),
-                  Tab(text: 'งานมอบหมาย'),
+                  Tab(text: 'กิจวัตร'),
+                  Tab(text: 'ภารกิจ'),
                 ],
               ),
             ),

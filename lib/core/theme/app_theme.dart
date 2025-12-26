@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'app_colors.dart';
+import 'app_typography.dart';
 
 // Re-export AppColors so existing imports still work
 export 'app_colors.dart';
@@ -8,7 +9,7 @@ class AppTheme {
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
-      fontFamily: 'MiSansThai',
+      fontFamily: AppTypography.fontFamily,
 
       colorScheme: ColorScheme.light(
         primary: AppColors.primary,
@@ -26,7 +27,7 @@ class AppTheme {
         elevation: 0,
         centerTitle: false,
         titleTextStyle: TextStyle(
-          fontFamily: 'MiSansThai',
+          fontFamily: AppTypography.fontFamily,
           fontSize: 20,
           fontWeight: FontWeight.w600,
           color: AppColors.primaryText,

@@ -8,6 +8,10 @@ import '../../../core/widgets/irene_app_bar.dart';
 import '../../home/models/zone.dart';
 import '../../home/services/zone_service.dart';
 import '../../settings/screens/settings_screen.dart';
+import '../models/med_completion_status.dart';
+import '../models/report_completion_status.dart';
+import '../services/med_completion_service.dart';
+import '../services/report_completion_service.dart';
 import '../widgets/residents_filter_drawer.dart';
 
 /// หน้าคนไข้ - Residents
@@ -28,6 +32,8 @@ enum SelectionMode {
 
 class _ResidentsScreenState extends State<ResidentsScreen> {
   final _zoneService = ZoneService();
+  final _medCompletionService = MedCompletionService();
+  final _reportCompletionService = ReportCompletionService();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   // Zone data
@@ -37,6 +43,12 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
   // Resident data
   List<_ResidentItem> _residents = [];
   bool _isLoadingResidents = true;
+
+  // Med completion status map (residentId -> status)
+  Map<int, MedCompletionStatus> _medStatusMap = {};
+
+  // Report completion status map (residentId -> status)
+  Map<int, ReportCompletionStatus> _reportStatusMap = {};
 
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
@@ -74,7 +86,45 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
   }
 
   Future<void> _loadData() async {
-    await Future.wait([_loadZones(), _loadResidents()]);
+    await Future.wait([
+      _loadZones(),
+      _loadResidents(),
+      _loadMedCompletionStatus(),
+      _loadReportCompletionStatus(),
+    ]);
+  }
+
+  Future<void> _loadReportCompletionStatus() async {
+    try {
+      final statusMap = await _reportCompletionService
+          .getReportCompletionStatusMap();
+      if (mounted) {
+        setState(() {
+          _reportStatusMap = statusMap;
+        });
+      }
+    } catch (e) {
+      debugPrint('Load report completion status error: $e');
+    }
+  }
+
+  Future<void> _loadMedCompletionStatus() async {
+    try {
+      // ดึงสถานะจัดยาตาม logic:
+      // - ก่อน 21:00 → ดูวันนี้ (ยาที่จัดเมื่อคืน สำหรับเสิร์ฟวันนี้)
+      // - หลัง 21:00 → ดูวันพรุ่งนี้ (ยาที่กำลังจัดสำหรับเสิร์ฟพรุ่งนี้)
+      final targetDate = _medCompletionService.getTargetDate();
+      final statusMap = await _medCompletionService.getMedCompletionStatusMap(
+        checkDate: targetDate,
+      );
+      if (mounted) {
+        setState(() {
+          _medStatusMap = statusMap;
+        });
+      }
+    } catch (e) {
+      debugPrint('Load med completion status error: $e');
+    }
   }
 
   Future<void> _loadZones() async {
@@ -153,9 +203,6 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
               zoneId: zoneData?['id'] as int? ?? json['s_zone'] as int? ?? 0,
               zoneName: zoneData?['zone'] as String? ?? '-',
               imageUrl: json['i_picture_url'] as String?,
-              // Mock data for demo - แสดงป้ายสลับกัน
-              isMedicineCompleted: residentId % 3 == 0,
-              isReportCompleted: residentId % 2 == 0,
             );
           }).toList();
           _isLoadingResidents = false;
@@ -224,7 +271,7 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: AppColors.surface,
+      backgroundColor: AppColors.background,
       drawer: ResidentsFilterDrawer(
         zones: _zones,
         selectedZoneIds: _selectedZoneIds,
@@ -698,9 +745,8 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Section header
-        Container(
-          color: AppColors.surface,
+        // Section header - transparent background
+        Padding(
           padding: EdgeInsets.fromLTRB(
             AppSpacing.md,
             AppSpacing.md,
@@ -777,13 +823,26 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
           ),
         ),
 
-        // Residents
-        ...residents.map((resident) => _buildResidentCard(resident)),
+        // Residents - wrapped in single container with shadow
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            boxShadow: AppShadows.cardShadow,
+          ),
+          child: Column(
+            children: residents.asMap().entries.map((entry) {
+              final index = entry.key;
+              final resident = entry.value;
+              final isLast = index == residents.length - 1;
+              return _buildResidentCard(resident, showDivider: !isLast);
+            }).toList(),
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildResidentCard(_ResidentItem resident) {
+  Widget _buildResidentCard(_ResidentItem resident, {bool showDivider = true}) {
     final isInSelectionMode = _selectionMode != SelectionMode.none;
     final isSelected = _selectedResidentIds.contains(resident.id);
 
@@ -802,7 +861,7 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
             Padding(
               padding: EdgeInsets.all(AppSpacing.md),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Avatar
                   _buildAvatar(resident),
@@ -860,30 +919,8 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
                             ),
                           ),
 
-                        // Status badges
-                        if (resident.isMedicineCompleted ||
-                            resident.isReportCompleted)
-                          Padding(
-                            padding: EdgeInsets.only(top: 6),
-                            child: Wrap(
-                              spacing: 6,
-                              runSpacing: 4,
-                              children: [
-                                if (resident.isMedicineCompleted)
-                                  _buildStatusBadge(
-                                    '💊 จัดยาเรียบร้อย',
-                                    AppColors.tagPassedBg,
-                                    AppColors.tagPassedText,
-                                  ),
-                                if (resident.isReportCompleted)
-                                  _buildStatusBadge(
-                                    '📝 เขียนรายงานเรียบร้อย',
-                                    AppColors.tagPendingBg,
-                                    AppColors.tagPendingText,
-                                  ),
-                              ],
-                            ),
-                          ),
+                        // Status badges - ใช้ข้อมูลจริงจาก _medStatusMap และ _reportStatusMap
+                        _buildStatusBadgesRow(resident.id),
                       ],
                     ),
                   ),
@@ -920,7 +957,14 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
                 ],
               ),
             ),
-            Divider(height: 1, indent: 72, color: AppColors.background),
+            // Divider - อยู่นอก padding เพื่อให้ padding บน-ล่างสมดุล
+            if (showDivider)
+              Padding(
+                padding: EdgeInsets.only(
+                  left: AppSpacing.md + 48 + AppSpacing.md,
+                ),
+                child: Container(height: 1, color: AppColors.background),
+              ),
           ],
         ),
       ),
@@ -972,19 +1016,147 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
     );
   }
 
-  Widget _buildStatusBadge(String text, Color bgColor, Color textColor) {
+  /// สร้าง badge สำหรับสถานะจัดยา (พร้อม icon check ถ้าจัดเรียบร้อย)
+  Widget _buildMedBadge(
+    String text,
+    Color bgColor,
+    Color textColor,
+    bool showCheck,
+  ) {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Text(
-        text,
-        style: AppTypography.caption.copyWith(
-          color: textColor,
-          fontWeight: FontWeight.w500,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (showCheck) ...[
+            Icon(
+              Icons.check_circle_outline,
+              size: 14,
+              color: textColor,
+            ),
+            SizedBox(width: 4),
+          ],
+          Text(
+            text,
+            style: AppTypography.caption.copyWith(
+              color: textColor,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// สร้าง badges ทั้งหมดในบรรทัดเดียว (จัดยา + รายงาน)
+  Widget _buildStatusBadgesRow(int residentId) {
+    final medStatus = _medStatusMap[residentId];
+    final reportStatus = _reportStatusMap[residentId];
+
+    final List<Widget> badges = [];
+
+    // Badge จัดยา
+    if (medStatus != null && !medStatus.hasNoMedication) {
+      final String text;
+      final Color bgColor;
+      final Color textColor;
+      final bool showCheck;
+
+      if (medStatus.isCompleted) {
+        text = 'จัดยาเรียบร้อย ${medStatus.completionFraction}';
+        bgColor = AppColors.tagPassedBg;
+        textColor = AppColors.tagPassedText;
+        showCheck = true;
+      } else if (medStatus.isPartial) {
+        text = 'จัดยาบางส่วน ${medStatus.completionFraction}';
+        bgColor = AppColors.tagPendingBg;
+        textColor = AppColors.tagPendingText;
+        showCheck = false;
+      } else {
+        text = 'รอจัดยา ${medStatus.completionFraction}';
+        bgColor = AppColors.background;
+        textColor = AppColors.secondaryText;
+        showCheck = false;
+      }
+
+      badges.add(_buildMedBadge(text, bgColor, textColor, showCheck));
+    }
+
+    // Badge รายงาน
+    if (reportStatus != null) {
+      // เวรดึก - สีม่วงพาสเทล
+      badges.add(
+        _buildShiftBadge(
+          emoji: '\ud83c\udf19', // 🌙
+          label: 'เวรดึก',
+          isCompleted: reportStatus.hasNightReport,
+          completedBgColor: const Color(0xFFEDE7F6), // ม่วงพาสเทล bg
+          completedTextColor: const Color(0xFF7C4DFF), // ม่วง text
         ),
+      );
+
+      // เวรเช้า - สีส้มพาสเทล
+      badges.add(
+        _buildShiftBadge(
+          emoji: '\u2600\ufe0f', // ☀️
+          label: 'เวรเช้า',
+          isCompleted: reportStatus.hasMorningReport,
+          completedBgColor: const Color(0xFFFFF3E0), // ส้มพาสเทล bg
+          completedTextColor: const Color(0xFFFF9800), // ส้ม text
+        ),
+      );
+    }
+
+    if (badges.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: EdgeInsets.only(top: 6),
+      child: Wrap(spacing: 6, runSpacing: 4, children: badges),
+    );
+  }
+
+  /// สร้าง badge สำหรับแต่ละ shift
+  Widget _buildShiftBadge({
+    required String emoji,
+    required String label,
+    required bool isCompleted,
+    required Color completedBgColor,
+    required Color completedTextColor,
+  }) {
+    final bgColor = isCompleted ? completedBgColor : AppColors.background;
+    final textColor = isCompleted ? completedTextColor : AppColors.secondaryText;
+
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (isCompleted) ...[
+            Icon(
+              Icons.check_circle_outline,
+              size: 14,
+              color: textColor,
+            ),
+            SizedBox(width: 4),
+          ],
+          Text(
+            '$label$emoji',
+            style: AppTypography.caption.copyWith(
+              color: textColor,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -998,8 +1170,6 @@ class _ResidentItem {
   final int zoneId;
   final String zoneName;
   final String? imageUrl;
-  final bool isMedicineCompleted;
-  final bool isReportCompleted;
 
   _ResidentItem({
     required this.id,
@@ -1009,7 +1179,5 @@ class _ResidentItem {
     required this.zoneId,
     required this.zoneName,
     this.imageUrl,
-    this.isMedicineCompleted = false,
-    this.isReportCompleted = false,
   });
 }

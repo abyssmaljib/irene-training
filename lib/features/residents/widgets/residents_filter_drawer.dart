@@ -39,10 +39,6 @@ class _ResidentsFilterDrawerState extends State<ResidentsFilterDrawer> {
     _searchController = TextEditingController(text: widget.searchQuery);
     _searchFocusNode = FocusNode();
 
-    // Auto focus search field when drawer opens
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _searchFocusNode.requestFocus();
-    });
   }
 
   @override
@@ -221,23 +217,6 @@ class _ResidentsFilterDrawerState extends State<ResidentsFilterDrawer> {
               ],
             ),
           ),
-          // Close button
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: AppColors.background,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.close,
-                color: AppColors.secondaryText,
-                size: 20,
-              ),
-            ),
-          ),
         ],
       ),
     );
@@ -321,7 +300,8 @@ class _ResidentsFilterDrawerState extends State<ResidentsFilterDrawer> {
     final allSelected = _tempSelectedZoneIds.length == sortedZones.length &&
         sortedZones.isNotEmpty;
 
-    return Padding(
+    return Container(
+      color: AppColors.surface,
       padding: EdgeInsets.all(AppSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -357,9 +337,8 @@ class _ResidentsFilterDrawerState extends State<ResidentsFilterDrawer> {
                   alignment: Alignment.center,
                   child: Text(
                     allSelected ? 'ยกเลิกทั้งหมด' : 'เลือกทั้งหมด',
-                    style: AppTypography.caption.copyWith(
+                    style: AppTypography.label.copyWith(
                       color: allSelected ? AppColors.primary : AppColors.secondaryText,
-                      fontWeight: FontWeight.w300,
                     ),
                   ),
                 ),
@@ -401,9 +380,8 @@ class _ResidentsFilterDrawerState extends State<ResidentsFilterDrawer> {
                       ],
                       Text(
                         zone.name,
-                        style: AppTypography.caption.copyWith(
+                        style: AppTypography.label.copyWith(
                           color: isSelected ? AppColors.primary : AppColors.secondaryText,
-                          fontWeight: FontWeight.w300,
                         ),
                       ),
                     ],

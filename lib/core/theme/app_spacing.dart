@@ -85,25 +85,25 @@ class AppShadows {
     color: Color(0x14000000), // 8% opacity
     blurRadius: 8,
     spreadRadius: 0,
-    offset: Offset(0, 2),
+    offset: Offset(0, 0),
   );
-  
+
   // Medium shadow - for cards
   static const BoxShadow medium = BoxShadow(
     color: Color(0x14000000), // 8% opacity
     blurRadius: 16,
     spreadRadius: 0,
-    offset: Offset(0, 4),
+    offset: Offset(0, 0),
   );
-  
+
   // Elevated shadow - for modals, overlays
   static const BoxShadow elevated = BoxShadow(
     color: Color(0x1F000000), // 12% opacity
     blurRadius: 24,
     spreadRadius: 0,
-    offset: Offset(0, 6),
+    offset: Offset(0, 0),
   );
-  
+
   // Card shadow (as shown in design)
   static const List<BoxShadow> cardShadow = [
     BoxShadow(

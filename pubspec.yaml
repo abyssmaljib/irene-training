@@ -79,24 +79,22 @@ flutter:
     - assets/animations/
 
   fonts:
-    - family: MiSansThai
+    - family: Anuphan
       fonts:
-        - asset: assets/fonts/MiSansThai-Thin.ttf
+        - asset: assets/fonts/Anuphan/static/Anuphan-Thin.ttf
           weight: 100
-        - asset: assets/fonts/MiSansThai-ExtraLight.ttf
+        - asset: assets/fonts/Anuphan/static/Anuphan-ExtraLight.ttf
           weight: 200
-        - asset: assets/fonts/MiSansThai-Light.ttf
+        - asset: assets/fonts/Anuphan/static/Anuphan-Light.ttf
           weight: 300
-        - asset: assets/fonts/MiSansThai.ttf
+        - asset: assets/fonts/Anuphan/static/Anuphan-Regular.ttf
           weight: 400
-        - asset: assets/fonts/MiSansThai-Medium.ttf
+        - asset: assets/fonts/Anuphan/static/Anuphan-Medium.ttf
           weight: 500
-        - asset: assets/fonts/MiSansThai-Demibold.ttf
+        - asset: assets/fonts/Anuphan/static/Anuphan-SemiBold.ttf
           weight: 600
-        - asset: assets/fonts/MiSansThai-Bold.ttf
+        - asset: assets/fonts/Anuphan/static/Anuphan-Bold.ttf
           weight: 700
-        - asset: assets/fonts/MiSansThai-Heavy.ttf
-          weight: 800
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg

@@ -63,10 +63,7 @@ class IreneAppBar extends StatelessWidget {
                 if (titleBadge != null) SizedBox(width: 20),
                 Text(
                   title,
-                  style: AppTypography.heading2.copyWith(
-                    color: AppColors.primaryText,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: AppTypography.heading2,
                 ),
                 if (titleBadge != null) ...[
                   SizedBox(width: 8),
@@ -265,7 +262,7 @@ class IreneSecondaryAppBar extends StatelessWidget implements PreferredSizeWidge
       ),
       title: Text(
         title,
-        style: AppTypography.title.copyWith(fontWeight: FontWeight.w500),
+        style: AppTypography.title,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
