@@ -51,6 +51,9 @@ class ReportCompletionService {
   }
 
   /// ดึงสถานะรายงานของผู้พักทั้งหมด
+  /// Logic:
+  /// - เวรเช้า: รายงานที่เขียนวันนี้ช่วง 07:00-19:00
+  /// - เวรดึก: รายงานที่เขียนเมื่อวาน 19:00 ถึงวันนี้ 07:00
   Future<Map<int, ReportCompletionStatus>> getReportCompletionStatusMap() async {
     final nursinghomeId = await _userService.getNursinghomeId();
     if (nursinghomeId == null) return {};
@@ -60,28 +63,17 @@ class ReportCompletionService {
       final today = DateTime(now.year, now.month, now.day);
       final yesterday = today.subtract(const Duration(days: 1));
 
-      // Query รายงานเวรเช้าของวันนี้
-      final morningReports = await _queryReports(
+      // Query รายงานเวรเช้า: วันนี้ 07:00 - 19:00
+      final morningReports = await _queryMorningReports(
         nursinghomeId: nursinghomeId,
-        shift: 'เวรเช้า',
         date: today,
       );
 
-      // Query รายงานเวรดึก
-      // - ถ้าเป็นเวรเช้า → เช็คเวรดึกของเมื่อวาน (ส่งเมื่อเช้านี้)
-      // - ถ้าเป็นเวรดึก → เช็คเวรดึกของวันนี้ (ยังไม่ส่ง/จะส่งพรุ่งนี้)
-      final isCurrentlyMorningShift =
-          now.hour >= _morningShiftStart && now.hour < _nightShiftStart;
-
-      final nightReportDate = isCurrentlyMorningShift ? yesterday : today;
-      final nightReportQueryDate = isCurrentlyMorningShift ? today : today.add(const Duration(days: 1));
-
-      // รายงานเวรดึก จะถูก created ตอนเช้าวันถัดไป
-      // เช่น เวรดึกของวันที่ 26 → created_at = 27 ธ.ค. เช้า
-      final nightReports = await _queryNightReports(
+      // Query รายงานเวรดึก: เมื่อวาน 19:00 - วันนี้ 07:00
+      final nightReports = await _queryNightReports2(
         nursinghomeId: nursinghomeId,
-        nightReportDate: nightReportDate,
-        createdDate: nightReportQueryDate,
+        yesterday: yesterday,
+        today: today,
       );
 
       // รวม results
@@ -121,10 +113,9 @@ class ReportCompletionService {
     }
   }
 
-  /// Query รายงานเวรเช้า
-  Future<Map<int, Map<String, dynamic>>> _queryReports({
+  /// Query รายงานเวรเช้า: วันนี้ตั้งแต่ 00:00 (ไม่จำกัดเวลาสิ้นสุด เผื่อส่งช้า)
+  Future<Map<int, Map<String, dynamic>>> _queryMorningReports({
     required int nursinghomeId,
-    required String shift,
     required DateTime date,
   }) async {
     final dateStr =
@@ -133,15 +124,13 @@ class ReportCompletionService {
     final response = await Supabase.instance.client
         .from('combined_vitalsign_details_view')
         .select('resident_id, created_at, user_nickname, isFullReport')
-        .eq('shift', shift)
+        .eq('shift', 'เวรเช้า')
         .eq('isFullReport', true)
-        .gte('created_at', '$dateStr 00:00:00')
-        .lt('created_at', '$dateStr 23:59:59');
+        .gte('created_at', '$dateStr 00:00:00');
 
     final Map<int, Map<String, dynamic>> result = {};
     for (final row in response as List) {
       final residentId = row['resident_id'] as int;
-      // เอาเฉพาะ record แรก (ล่าสุด)
       if (!result.containsKey(residentId)) {
         result[residentId] = row;
       }
@@ -149,24 +138,24 @@ class ReportCompletionService {
     return result;
   }
 
-  /// Query รายงานเวรดึก
-  /// เวรดึกของวันที่ X จะถูก created ตอนเช้าวันที่ X+1
-  Future<Map<int, Map<String, dynamic>>> _queryNightReports({
+  /// Query รายงานเวรดึก: เมื่อวาน 19:00 - วันนี้ 12:00 (เผื่อส่งช้า แต่ไม่ซ้อนกับเวรเช้า)
+  Future<Map<int, Map<String, dynamic>>> _queryNightReports2({
     required int nursinghomeId,
-    required DateTime nightReportDate,
-    required DateTime createdDate,
+    required DateTime yesterday,
+    required DateTime today,
   }) async {
-    final createdDateStr =
-        '${createdDate.year}-${createdDate.month.toString().padLeft(2, '0')}-${createdDate.day.toString().padLeft(2, '0')}';
+    final yesterdayStr =
+        '${yesterday.year}-${yesterday.month.toString().padLeft(2, '0')}-${yesterday.day.toString().padLeft(2, '0')}';
+    final todayStr =
+        '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
 
-    // เวรดึกส่งตอนเช้า (ก่อน 07:00 - 12:00 โดยประมาณ)
     final response = await Supabase.instance.client
         .from('combined_vitalsign_details_view')
         .select('resident_id, created_at, user_nickname, isFullReport')
         .eq('shift', 'เวรดึก')
         .eq('isFullReport', true)
-        .gte('created_at', '$createdDateStr 00:00:00')
-        .lt('created_at', '$createdDateStr 12:00:00');
+        .gte('created_at', '$yesterdayStr 19:00:00')
+        .lt('created_at', '$todayStr 12:00:00');
 
     final Map<int, Map<String, dynamic>> result = {};
     for (final row in response as List) {

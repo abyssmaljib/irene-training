@@ -13,6 +13,8 @@ import '../models/report_completion_status.dart';
 import '../services/med_completion_service.dart';
 import '../services/report_completion_service.dart';
 import '../widgets/residents_filter_drawer.dart';
+import 'resident_detail_screen.dart';
+import '../../../core/widgets/tags_badges.dart';
 
 /// หน้าคนไข้ - Residents
 /// แสดงรายชื่อคนไข้ พร้อม action จัดยา/รายงาน
@@ -39,6 +41,7 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
   // Zone data
   List<Zone> _zones = [];
   Set<int> _selectedZoneIds = {};
+  Set<SpatialStatus> _selectedSpatialStatuses = {};
 
   // Resident data
   List<_ResidentItem> _residents = [];
@@ -168,7 +171,8 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
             s_zone,
             s_status,
             i_picture_url,
-            nursinghome_zone!s_zone(id, zone)
+            s_special_status,
+            nursinghome_zone(id, zone)
           ''')
           .eq('nursinghome_id', nursinghomeId)
           .eq('s_status', 'Stay')
@@ -203,6 +207,7 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
               zoneId: zoneData?['id'] as int? ?? json['s_zone'] as int? ?? 0,
               zoneName: zoneData?['zone'] as String? ?? '-',
               imageUrl: json['i_picture_url'] as String?,
+              spatialStatus: json['s_special_status'] as String?,
             );
           }).toList();
           _isLoadingResidents = false;
@@ -231,6 +236,13 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
       list = list.where((r) => _selectedZoneIds.contains(r.zoneId)).toList();
     }
 
+    if (_selectedSpatialStatuses.isNotEmpty) {
+      list = list.where((r) {
+        final status = SpatialStatusExtension.fromString(r.spatialStatus);
+        return _selectedSpatialStatuses.contains(status);
+      }).toList();
+    }
+
     return list;
   }
 
@@ -255,10 +267,13 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
   }
 
   bool get _hasActiveFilters =>
-      _selectedZoneIds.isNotEmpty || _searchQuery.isNotEmpty;
+      _selectedZoneIds.isNotEmpty ||
+      _selectedSpatialStatuses.isNotEmpty ||
+      _searchQuery.isNotEmpty;
 
   int get _activeFilterCount {
     int count = _selectedZoneIds.length;
+    count += _selectedSpatialStatuses.length;
     if (_searchQuery.isNotEmpty) count++;
     return count;
   }
@@ -276,6 +291,7 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
         zones: _zones,
         selectedZoneIds: _selectedZoneIds,
         searchQuery: _searchQuery,
+        selectedSpatialStatuses: _selectedSpatialStatuses,
         onZoneSelectionChanged: (zones) {
           setState(() {
             _selectedZoneIds = zones;
@@ -285,6 +301,11 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
           setState(() {
             _searchQuery = query;
             _searchController.text = query;
+          });
+        },
+        onSpatialStatusChanged: (statuses) {
+          setState(() {
+            _selectedSpatialStatuses = statuses;
           });
         },
       ),
@@ -846,12 +867,129 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
     final isInSelectionMode = _selectionMode != SelectionMode.none;
     final isSelected = _selectedResidentIds.contains(resident.id);
 
+    // ถ้าอยู่ใน selection mode ไม่ให้ swipe
+    if (isInSelectionMode) {
+      return _buildResidentCardContent(
+        resident,
+        isSelected: isSelected,
+        isInSelectionMode: true,
+        showDivider: showDivider,
+      );
+    }
+
+    // ใช้ swipe ได้เมื่อไม่อยู่ใน selection mode
+    return ClipRect(
+      child: Dismissible(
+        key: Key('resident_${resident.id}'),
+        confirmDismiss: (direction) async {
+          if (direction == DismissDirection.endToStart) {
+            // Swipe ซ้าย → จัดยา
+            _onSwipeMedicine(resident);
+          } else if (direction == DismissDirection.startToEnd) {
+            // Swipe ขวา → สร้างรายงาน
+            _onSwipeReport(resident);
+          }
+          return false; // ไม่ลบ item
+        },
+        background: _buildSwipeBackground(
+          alignment: Alignment.centerLeft,
+          color: AppColors.tagPendingBg,
+          icon: Iconsax.edit_2,
+          iconColor: AppColors.tagPendingText,
+          label: 'สร้างรายงาน',
+        ),
+        secondaryBackground: _buildSwipeBackground(
+          alignment: Alignment.centerRight,
+          color: AppColors.tagPassedBg,
+          icon: Iconsax.add_square,
+          iconColor: AppColors.tagPassedText,
+          label: 'จัดยา',
+        ),
+        child: _buildResidentCardContent(
+          resident,
+          isSelected: false,
+          isInSelectionMode: false,
+          showDivider: showDivider,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSwipeBackground({
+    required Alignment alignment,
+    required Color color,
+    required IconData icon,
+    required Color iconColor,
+    required String label,
+  }) {
+    return Container(
+      color: color,
+      alignment: alignment,
+      padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: alignment == Alignment.centerRight
+            ? [
+                Text(
+                  label,
+                  style: AppTypography.bodySmall.copyWith(
+                    color: iconColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                AppSpacing.horizontalGapSm,
+                Icon(icon, color: iconColor, size: 24),
+              ]
+            : [
+                Icon(icon, color: iconColor, size: 24),
+                AppSpacing.horizontalGapSm,
+                Text(
+                  label,
+                  style: AppTypography.bodySmall.copyWith(
+                    color: iconColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+      ),
+    );
+  }
+
+  void _onSwipeMedicine(_ResidentItem resident) {
+    // เลือก resident แล้วเข้า selection mode จัดยา
+    setState(() {
+      _selectionMode = SelectionMode.medicine;
+      _selectedResidentIds.clear();
+      _selectedResidentIds.add(resident.id);
+    });
+  }
+
+  void _onSwipeReport(_ResidentItem resident) {
+    // เลือก resident แล้วเข้า selection mode รายงาน
+    setState(() {
+      _selectionMode = SelectionMode.report;
+      _selectedResidentIds.clear();
+      _selectedResidentIds.add(resident.id);
+    });
+  }
+
+  Widget _buildResidentCardContent(
+    _ResidentItem resident, {
+    required bool isSelected,
+    required bool isInSelectionMode,
+    required bool showDivider,
+  }) {
     return GestureDetector(
       onTap: () {
         if (isInSelectionMode) {
           _toggleResidentSelection(resident.id);
         } else {
-          // TODO: Navigate to resident detail
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ResidentDetailScreen(residentId: resident.id),
+            ),
+          );
         }
       },
       child: Container(
@@ -972,31 +1110,46 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
   }
 
   Widget _buildAvatar(_ResidentItem resident) {
-    if (resident.imageUrl != null && resident.imageUrl!.isNotEmpty) {
-      // Image avatar
-      return Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: resident.gender == 'หญิง'
-                ? AppColors.tertiary
-                : AppColors.secondary,
-            width: 2,
-          ),
-        ),
-        child: ClipOval(
-          child: Image.network(
-            resident.imageUrl!,
-            fit: BoxFit.cover,
-            errorBuilder: (_, e, s) => _buildDefaultAvatar(resident),
-          ),
-        ),
-      );
-    } else {
-      return _buildDefaultAvatar(resident);
+    final avatarWidget = resident.imageUrl != null && resident.imageUrl!.isNotEmpty
+        ? Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: resident.gender == 'หญิง'
+                    ? AppColors.tertiary
+                    : AppColors.secondary,
+                width: 2,
+              ),
+            ),
+            child: ClipOval(
+              child: Image.network(
+                resident.imageUrl!,
+                fit: BoxFit.cover,
+                errorBuilder: (_, e, s) => _buildDefaultAvatar(resident),
+              ),
+            ),
+          )
+        : _buildDefaultAvatar(resident);
+
+    // ถ้าไม่มี spatial status ให้แสดง avatar เฉยๆ
+    if (resident.spatialStatus == null || resident.spatialStatus!.isEmpty) {
+      return avatarWidget;
     }
+
+    // ใส่ badge มุมขวาบน
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        avatarWidget,
+        Positioned(
+          top: -2,
+          right: -2,
+          child: SpatialStatusBadge.fromString(resident.spatialStatus),
+        ),
+      ],
+    );
   }
 
   Widget _buildDefaultAvatar(_ResidentItem resident) {
@@ -1170,6 +1323,7 @@ class _ResidentItem {
   final int zoneId;
   final String zoneName;
   final String? imageUrl;
+  final String? spatialStatus;
 
   _ResidentItem({
     required this.id,
@@ -1179,5 +1333,6 @@ class _ResidentItem {
     required this.zoneId,
     required this.zoneName,
     this.imageUrl,
+    this.spatialStatus,
   });
 }

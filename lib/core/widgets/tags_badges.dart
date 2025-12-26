@@ -439,3 +439,139 @@ class ActionChipData {
     this.icon,
   });
 }
+
+/// Spatial Status for residents
+enum SpatialStatus {
+  none, // ไม่มีสถานะ
+  newResident, // ผู้พักใหม่
+  refer, // ส่งต่อ/Refer
+  home, // กลับบ้าน
+}
+
+/// Extension to convert string to SpatialStatus
+extension SpatialStatusExtension on SpatialStatus {
+  /// Convert from database string value
+  static SpatialStatus fromString(String? value) {
+    switch (value?.toLowerCase()) {
+      case 'new':
+        return SpatialStatus.newResident;
+      case 'refer':
+        return SpatialStatus.refer;
+      case 'home':
+        return SpatialStatus.home;
+      default:
+        return SpatialStatus.none;
+    }
+  }
+
+  /// Convert to database string value
+  String toDbString() {
+    switch (this) {
+      case SpatialStatus.newResident:
+        return 'new';
+      case SpatialStatus.refer:
+        return 'Refer';
+      case SpatialStatus.home:
+        return 'Home';
+      case SpatialStatus.none:
+        return '';
+    }
+  }
+
+  /// Get display label in Thai
+  String get label {
+    switch (this) {
+      case SpatialStatus.newResident:
+        return 'ใหม่';
+      case SpatialStatus.refer:
+        return 'ส่งต่อ';
+      case SpatialStatus.home:
+        return 'กลับบ้าน';
+      case SpatialStatus.none:
+        return '';
+    }
+  }
+}
+
+/// Spatial Status Badge - Circle badge for resident avatar overlay
+/// Shows at top-right corner of profile picture
+class SpatialStatusBadge extends StatelessWidget {
+  final SpatialStatus status;
+  final double size;
+  final double iconSize;
+
+  const SpatialStatusBadge({
+    super.key,
+    required this.status,
+    this.size = 20.0,
+    this.iconSize = 12.0,
+  });
+
+  /// Create from database string value
+  factory SpatialStatusBadge.fromString(String? statusString, {double size = 20.0}) {
+    return SpatialStatusBadge(
+      status: SpatialStatusExtension.fromString(statusString),
+      size: size,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (status == SpatialStatus.none) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: _getBackgroundColor(),
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: AppColors.secondaryBackground,
+          width: 1.5,
+        ),
+        boxShadow: const [
+          BoxShadow(
+            blurRadius: 4.0,
+            color: Color(0x33000000),
+            offset: Offset(0.0, 2.0),
+          ),
+        ],
+      ),
+      child: Center(
+        child: Icon(
+          _getIcon(),
+          color: AppColors.secondaryBackground,
+          size: iconSize,
+        ),
+      ),
+    );
+  }
+
+  Color _getBackgroundColor() {
+    switch (status) {
+      case SpatialStatus.newResident:
+        return AppColors.spatialNewBg;
+      case SpatialStatus.refer:
+        return AppColors.spatialReferBg;
+      case SpatialStatus.home:
+        return AppColors.spatialHomeBg;
+      case SpatialStatus.none:
+        return Colors.transparent;
+    }
+  }
+
+  IconData _getIcon() {
+    switch (status) {
+      case SpatialStatus.newResident:
+        return Iconsax.star_1;
+      case SpatialStatus.refer:
+        return Iconsax.hospital;
+      case SpatialStatus.home:
+        return Iconsax.home_2;
+      case SpatialStatus.none:
+        return Iconsax.close_circle;
+    }
+  }
+}

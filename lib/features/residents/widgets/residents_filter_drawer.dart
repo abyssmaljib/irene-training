@@ -3,6 +3,7 @@ import 'package:iconsax/iconsax.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/tags_badges.dart';
 import '../../home/models/zone.dart';
 
 /// Filter Drawer สำหรับหน้า Residents
@@ -11,16 +12,20 @@ class ResidentsFilterDrawer extends StatefulWidget {
   final List<Zone> zones;
   final Set<int> selectedZoneIds;
   final String searchQuery;
+  final Set<SpatialStatus> selectedSpatialStatuses;
   final ValueChanged<Set<int>> onZoneSelectionChanged;
   final ValueChanged<String> onSearchChanged;
+  final ValueChanged<Set<SpatialStatus>> onSpatialStatusChanged;
 
   const ResidentsFilterDrawer({
     super.key,
     required this.zones,
     required this.selectedZoneIds,
     required this.searchQuery,
+    required this.selectedSpatialStatuses,
     required this.onZoneSelectionChanged,
     required this.onSearchChanged,
+    required this.onSpatialStatusChanged,
   });
 
   @override
@@ -29,6 +34,7 @@ class ResidentsFilterDrawer extends StatefulWidget {
 
 class _ResidentsFilterDrawerState extends State<ResidentsFilterDrawer> {
   late Set<int> _tempSelectedZoneIds;
+  late Set<SpatialStatus> _tempSelectedSpatialStatuses;
   late TextEditingController _searchController;
   late FocusNode _searchFocusNode;
 
@@ -36,9 +42,9 @@ class _ResidentsFilterDrawerState extends State<ResidentsFilterDrawer> {
   void initState() {
     super.initState();
     _tempSelectedZoneIds = Set.from(widget.selectedZoneIds);
+    _tempSelectedSpatialStatuses = Set.from(widget.selectedSpatialStatuses);
     _searchController = TextEditingController(text: widget.searchQuery);
     _searchFocusNode = FocusNode();
-
   }
 
   @override
@@ -84,20 +90,36 @@ class _ResidentsFilterDrawerState extends State<ResidentsFilterDrawer> {
     widget.onSearchChanged('');
   }
 
+  void _toggleSpatialStatus(SpatialStatus status) {
+    setState(() {
+      if (_tempSelectedSpatialStatuses.contains(status)) {
+        _tempSelectedSpatialStatuses.remove(status);
+      } else {
+        _tempSelectedSpatialStatuses.add(status);
+      }
+    });
+    widget.onSpatialStatusChanged(Set.from(_tempSelectedSpatialStatuses));
+  }
+
   void _clearAll() {
     setState(() {
       _tempSelectedZoneIds.clear();
+      _tempSelectedSpatialStatuses.clear();
       _searchController.clear();
     });
     widget.onZoneSelectionChanged({});
+    widget.onSpatialStatusChanged({});
     widget.onSearchChanged('');
   }
 
   bool get _hasFilters =>
-      _tempSelectedZoneIds.isNotEmpty || _searchController.text.isNotEmpty;
+      _tempSelectedZoneIds.isNotEmpty ||
+      _tempSelectedSpatialStatuses.isNotEmpty ||
+      _searchController.text.isNotEmpty;
 
   int get _filterCount {
     int count = _tempSelectedZoneIds.length;
+    count += _tempSelectedSpatialStatuses.length;
     if (_searchController.text.isNotEmpty) count++;
     return count;
   }
@@ -134,6 +156,12 @@ class _ResidentsFilterDrawerState extends State<ResidentsFilterDrawer> {
 
                 // Zone Section
                 _buildZoneSection(sortedZones),
+
+                // Divider
+                Divider(height: 1, color: AppColors.alternate),
+
+                // Spatial Status Section
+                _buildSpatialStatusSection(),
 
                 // Extra space at bottom
                 SizedBox(height: AppSpacing.lg),
@@ -380,6 +408,87 @@ class _ResidentsFilterDrawerState extends State<ResidentsFilterDrawer> {
                       ],
                       Text(
                         zone.name,
+                        style: AppTypography.label.copyWith(
+                          color: isSelected ? AppColors.primary : AppColors.secondaryText,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSpatialStatusSection() {
+    // รายการ status ที่แสดง (ไม่รวม none)
+    const statuses = [
+      SpatialStatus.newResident,
+      SpatialStatus.refer,
+      SpatialStatus.home,
+    ];
+
+    return Container(
+      color: AppColors.surface,
+      padding: EdgeInsets.all(AppSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Section header
+          Row(
+            children: [
+              Icon(Iconsax.status, size: 18, color: AppColors.secondaryText),
+              AppSpacing.horizontalGapSm,
+              Text(
+                'สถานะพิเศษ',
+                style: AppTypography.body.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.secondaryText,
+                ),
+              ),
+            ],
+          ),
+          AppSpacing.verticalGapMd,
+          // Status chips
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: statuses.map((status) {
+              final isSelected = _tempSelectedSpatialStatuses.contains(status);
+              return GestureDetector(
+                onTap: () => _toggleSpatialStatus(status),
+                child: AnimatedContainer(
+                  duration: Duration(milliseconds: 200),
+                  height: 36,
+                  padding: EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: isSelected ? AppColors.accent1 : Colors.transparent,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isSelected ? AppColors.primary : AppColors.alternate,
+                      width: isSelected ? 1.5 : 1,
+                    ),
+                  ),
+                  alignment: Alignment.center,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (isSelected) ...[
+                        Icon(
+                          Iconsax.tick_circle5,
+                          size: 14,
+                          color: AppColors.primary,
+                        ),
+                        SizedBox(width: 6),
+                      ],
+                      // Status icon
+                      SpatialStatusBadge(status: status, size: 18, iconSize: 10),
+                      SizedBox(width: 6),
+                      Text(
+                        status.label,
                         style: AppTypography.label.copyWith(
                           color: isSelected ? AppColors.primary : AppColors.secondaryText,
                         ),

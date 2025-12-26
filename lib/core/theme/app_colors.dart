@@ -83,6 +83,11 @@ class AppColors {
   static const Color customColor2 = Color(0xFF554C6F);
   static const Color customColor3 = Color(0xFF4C719F);
 
+  // Spatial Status Colors (for resident badges)
+  static const Color spatialNewBg = Color(0xFF55B1C9); // Secondary - Light Blue
+  static const Color spatialReferBg = Color(0xFFC60031); // Error - Red
+  static const Color spatialHomeBg = Color(0xFF0D9488); // Primary - Teal
+
   // Pastels
   static const Color pastelYellow = Color(0xFFF1EF99);
   static const Color pastelOrange = Color(0xFFEBC49F);
