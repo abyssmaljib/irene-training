@@ -287,9 +287,7 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
             ),
 
             // Resident list
-            SliverFillRemaining(
-              child: _buildResidentList(),
-            ),
+            SliverFillRemaining(child: _buildResidentList()),
           ],
         ),
       ),
@@ -309,31 +307,30 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
             ..._selectedZoneIds.map((zoneId) {
               final zone = _zones.firstWhere(
                 (z) => z.id == zoneId,
-                orElse: () => Zone(id: zoneId, nursinghomeId: 0, name: '-', residentCount: 0),
+                orElse: () => Zone(
+                  id: zoneId,
+                  nursinghomeId: 0,
+                  name: '-',
+                  residentCount: 0,
+                ),
               );
               return Padding(
                 padding: EdgeInsets.only(right: AppSpacing.sm),
-                child: _buildFilterChip(
-                  '🏠 ${zone.name}',
-                  () {
-                    setState(() {
-                      _selectedZoneIds.remove(zoneId);
-                    });
-                  },
-                ),
+                child: _buildFilterChip('🏠 ${zone.name}', () {
+                  setState(() {
+                    _selectedZoneIds.remove(zoneId);
+                  });
+                }),
               );
             }),
             // Search chip
             if (_searchQuery.isNotEmpty)
-              _buildFilterChip(
-                '🔍 "$_searchQuery"',
-                () {
-                  setState(() {
-                    _searchQuery = '';
-                    _searchController.clear();
-                  });
-                },
-              ),
+              _buildFilterChip('🔍 "$_searchQuery"', () {
+                setState(() {
+                  _searchQuery = '';
+                  _searchController.clear();
+                });
+              }),
           ],
         ),
       ),
@@ -361,11 +358,7 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
           AppSpacing.horizontalGapXs,
           GestureDetector(
             onTap: onRemove,
-            child: Icon(
-              Icons.close,
-              size: 14,
-              color: AppColors.primary,
-            ),
+            child: Icon(Icons.close, size: 14, color: AppColors.primary),
           ),
         ],
       ),
@@ -561,7 +554,9 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
     required VoidCallback onTap,
   }) {
     final bgColor = isSelected ? selectedBgColor : Colors.transparent;
-    final contentColor = isSelected ? selectedContentColor : AppColors.secondaryText;
+    final contentColor = isSelected
+        ? selectedContentColor
+        : AppColors.secondaryText;
     final borderColor = isSelected ? selectedContentColor : AppColors.alternate;
 
     return GestureDetector(
@@ -582,10 +577,7 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
             AppSpacing.horizontalGapXs,
             Text(
               label,
-              style: AppTypography.caption.copyWith(
-                color: contentColor,
-                fontWeight: FontWeight.w400,
-              ),
+              style: AppTypography.buttonSmall.copyWith(color: contentColor),
             ),
           ],
         ),
@@ -706,7 +698,7 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Section header with white background
+        // Section header
         Container(
           color: AppColors.surface,
           padding: EdgeInsets.fromLTRB(
@@ -719,27 +711,13 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
             children: [
               Text(
                 title,
-                style: AppTypography.title.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              AppSpacing.horizontalGapSm,
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.background,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  '${residents.length}',
-                  style: AppTypography.bodySmall.copyWith(
-                    color: AppColors.secondaryText,
-                  ),
+                style: AppTypography.subtitle.copyWith(
+                  color: AppColors.primary,
                 ),
               ),
               Spacer(),
               // ปุ่มเลือกทั้งหมดใน zone (แสดงเฉพาะตอน selection mode)
-              if (isInSelectionMode)
+              if (isInSelectionMode) ...[
                 GestureDetector(
                   onTap: () => _toggleZoneSelection(residents),
                   child: Container(
@@ -780,12 +758,24 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
                     ),
                   ),
                 ),
+                AppSpacing.horizontalGapSm,
+              ],
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${residents.length}',
+                  style: AppTypography.bodySmall.copyWith(
+                    color: AppColors.secondaryText,
+                  ),
+                ),
+              ),
             ],
           ),
         ),
-
-        // Divider
-        Divider(height: 1, color: AppColors.alternate),
 
         // Residents
         ...residents.map((resident) => _buildResidentCard(resident)),
@@ -826,28 +816,32 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
                         // Name
                         Text(
                           resident.name,
-                          style: AppTypography.bodySmall.copyWith(
-                            fontWeight: FontWeight.w500,
+                          style: AppTypography.title.copyWith(
                             color: AppColors.primaryText,
                           ),
                         ),
 
-                        // Gender & Age
-                        if (resident.gender != null || resident.age != null)
+                        // Gender & Age - skip if both are empty
+                        if ((resident.gender != null &&
+                                resident.gender!.isNotEmpty) ||
+                            resident.age != null)
                           Padding(
                             padding: EdgeInsets.only(top: 2),
                             child: Row(
                               children: [
-                                if (resident.gender != null)
+                                if (resident.gender != null &&
+                                    resident.gender!.isNotEmpty)
                                   Text(
                                     resident.gender!,
                                     style: AppTypography.body.copyWith(
                                       color: resident.gender == 'หญิง'
                                           ? AppColors.tertiary
                                           : AppColors.secondary,
+                                      fontWeight: FontWeight.w500,
                                     ),
                                   ),
                                 if (resident.gender != null &&
+                                    resident.gender!.isNotEmpty &&
                                     resident.age != null)
                                   Text(
                                     ', ',
@@ -926,7 +920,7 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
                 ],
               ),
             ),
-            Divider(height: 1, indent: 72, color: AppColors.alternate),
+            Divider(height: 1, indent: 72, color: AppColors.background),
           ],
         ),
       ),
