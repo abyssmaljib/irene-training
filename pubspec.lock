@@ -473,7 +473,7 @@ packages:
     source: hosted
     version: "0.0.8"
   image:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: image
       sha256: "48c11d0943b93b6fb29103d956ff89aafeae48f6058a3939649be2093dcff0bf"

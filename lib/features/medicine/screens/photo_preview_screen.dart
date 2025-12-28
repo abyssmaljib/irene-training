@@ -1,0 +1,286 @@
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/material.dart';
+import 'package:iconsax/iconsax.dart';
+import 'package:image/image.dart' as img;
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_spacing.dart';
+import '../../../core/theme/app_typography.dart';
+
+/// หน้า Preview รูปก่อน upload
+/// ให้ user ดูรูป หมุนรูป และยืนยันก่อน upload
+class PhotoPreviewScreen extends StatefulWidget {
+  final File imageFile;
+  final String photoType; // '2C' หรือ '3C'
+  final String mealLabel; // ชื่อมื้อสำหรับแสดง
+
+  const PhotoPreviewScreen({
+    super.key,
+    required this.imageFile,
+    required this.photoType,
+    required this.mealLabel,
+  });
+
+  /// แสดงหน้า preview และรอผลลัพธ์
+  /// Returns File ที่หมุนแล้ว (ถ้าหมุน) หรือ null ถ้ายกเลิก
+  static Future<File?> show({
+    required BuildContext context,
+    required File imageFile,
+    required String photoType,
+    required String mealLabel,
+  }) async {
+    return Navigator.push<File?>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PhotoPreviewScreen(
+          imageFile: imageFile,
+          photoType: photoType,
+          mealLabel: mealLabel,
+        ),
+      ),
+    );
+  }
+
+  @override
+  State<PhotoPreviewScreen> createState() => _PhotoPreviewScreenState();
+}
+
+class _PhotoPreviewScreenState extends State<PhotoPreviewScreen> {
+  int _rotationAngle = 0; // 0, 90, 180, 270
+  bool _isProcessing = false;
+  late File _currentFile;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentFile = widget.imageFile;
+  }
+
+  void _rotateRight() {
+    setState(() {
+      _rotationAngle = (_rotationAngle + 90) % 360;
+    });
+  }
+
+  void _rotateLeft() {
+    setState(() {
+      _rotationAngle = (_rotationAngle - 90) % 360;
+      if (_rotationAngle < 0) _rotationAngle += 360;
+    });
+  }
+
+  Future<void> _confirm() async {
+    // ถ้าไม่ได้หมุน ส่งไฟล์เดิมกลับ
+    if (_rotationAngle == 0) {
+      Navigator.pop(context, _currentFile);
+      return;
+    }
+
+    // ถ้าหมุน ต้อง process รูป
+    setState(() => _isProcessing = true);
+
+    try {
+      final rotatedFile = await _rotateImage(_currentFile, _rotationAngle);
+      if (mounted) {
+        Navigator.pop(context, rotatedFile);
+      }
+    } catch (e) {
+      debugPrint('Error rotating image: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('ไม่สามารถหมุนรูปได้'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        setState(() => _isProcessing = false);
+      }
+    }
+  }
+
+  /// หมุนรูปและบันทึกเป็นไฟล์ใหม่
+  Future<File> _rotateImage(File file, int angle) async {
+    final bytes = await file.readAsBytes();
+    final image = img.decodeImage(bytes);
+
+    if (image == null) {
+      throw Exception('Cannot decode image');
+    }
+
+    img.Image rotated;
+    switch (angle) {
+      case 90:
+        rotated = img.copyRotate(image, angle: 90);
+        break;
+      case 180:
+        rotated = img.copyRotate(image, angle: 180);
+        break;
+      case 270:
+        rotated = img.copyRotate(image, angle: 270);
+        break;
+      default:
+        rotated = image;
+    }
+
+    // Encode เป็น JPEG
+    final rotatedBytes = img.encodeJpg(rotated, quality: 85);
+
+    // บันทึกเป็นไฟล์ใหม่
+    final newPath = file.path.replaceAll('.jpg', '_rotated.jpg');
+    final newFile = File(newPath);
+    await newFile.writeAsBytes(Uint8List.fromList(rotatedBytes));
+
+    return newFile;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final borderColor = widget.photoType == '2C'
+        ? const Color(0xFF0EA5E9)
+        : const Color(0xFF10B981);
+    final typeLabel = widget.photoType == '2C' ? 'จัดยา' : 'เสิร์ฟยา';
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        title: Text(
+          '$typeLabel - ${widget.mealLabel}',
+          style: AppTypography.title.copyWith(color: Colors.white),
+        ),
+        leading: IconButton(
+          onPressed: () => Navigator.pop(context, null),
+          icon: const Icon(Icons.close),
+        ),
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // รูป Preview
+            Expanded(
+              child: Center(
+                child: Transform.rotate(
+                  angle: _rotationAngle * 3.14159 / 180,
+                  child: Image.file(
+                    _currentFile,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+            ),
+
+            // Controls
+            Container(
+              padding: EdgeInsets.all(AppSpacing.lg),
+              decoration: BoxDecoration(
+                color: Colors.black87,
+                border: Border(
+                  top: BorderSide(color: Colors.white24),
+                ),
+              ),
+              child: Column(
+                children: [
+                  // ปุ่มหมุน
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _buildRotateButton(
+                        icon: Iconsax.rotate_left,
+                        label: 'หมุนซ้าย',
+                        onTap: _isProcessing ? null : _rotateLeft,
+                      ),
+                      SizedBox(width: AppSpacing.xl),
+                      _buildRotateButton(
+                        icon: Iconsax.rotate_right,
+                        label: 'หมุนขวา',
+                        onTap: _isProcessing ? null : _rotateRight,
+                      ),
+                    ],
+                  ),
+
+                  SizedBox(height: AppSpacing.lg),
+
+                  // ปุ่มยืนยัน/ยกเลิก
+                  Row(
+                    children: [
+                      // ยกเลิก
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _isProcessing
+                              ? null
+                              : () => Navigator.pop(context, null),
+                          icon: const Icon(Icons.close),
+                          label: const Text('ถ่ายใหม่'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white70,
+                            side: BorderSide(color: Colors.white30),
+                            padding: EdgeInsets.symmetric(vertical: 14),
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: AppSpacing.md),
+                      // ยืนยัน
+                      Expanded(
+                        flex: 2,
+                        child: ElevatedButton.icon(
+                          onPressed: _isProcessing ? null : _confirm,
+                          icon: _isProcessing
+                              ? SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.check),
+                          label: Text(_isProcessing ? 'กำลังประมวลผล...' : 'ยืนยัน'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: borderColor,
+                            foregroundColor: Colors.white,
+                            padding: EdgeInsets.symmetric(vertical: 14),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRotateButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback? onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white10,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white24),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: Colors.white, size: 28),
+            SizedBox(height: 4),
+            Text(
+              label,
+              style: AppTypography.caption.copyWith(color: Colors.white70),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

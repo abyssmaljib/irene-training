@@ -1,5 +1,6 @@
 import 'medicine_summary.dart';
 import 'med_log.dart';
+import 'med_error_log.dart';
 
 /// สถานะของมื้อยา
 enum MealPhotoStatus {
@@ -30,11 +31,19 @@ class MealPhotoGroup {
   /// Log การจัดยา/ให้ยา (ถ้ามี)
   final MedLog? medLog;
 
+  /// สถานะการตรวจสอบรูป 2C จากหัวหน้าเวร
+  final NurseMarkStatus nurseMark2C;
+
+  /// สถานะการตรวจสอบรูป 3C จากหัวหน้าเวร
+  final NurseMarkStatus nurseMark3C;
+
   MealPhotoGroup({
     required this.mealKey,
     required this.label,
     required this.medicines,
     this.medLog,
+    this.nurseMark2C = NurseMarkStatus.none,
+    this.nurseMark3C = NurseMarkStatus.none,
   });
 
   /// สถานะของมื้อนี้

@@ -9,10 +9,9 @@ import '../../../core/widgets/irene_app_bar.dart';
 import '../../home/models/zone.dart';
 import '../../home/services/zone_service.dart';
 import '../../medicine/screens/medicine_photos_screen.dart';
+import '../../medicine/services/medicine_service.dart';
 import '../../settings/screens/settings_screen.dart';
-import '../models/med_completion_status.dart';
 import '../models/report_completion_status.dart';
-import '../services/med_completion_service.dart';
 import '../services/report_completion_service.dart';
 import '../widgets/residents_filter_drawer.dart';
 import 'resident_detail_screen.dart';
@@ -29,7 +28,7 @@ class ResidentsScreen extends StatefulWidget {
 
 class _ResidentsScreenState extends State<ResidentsScreen> {
   final _zoneService = ZoneService();
-  final _medCompletionService = MedCompletionService();
+  final _medicineService = MedicineService.instance;
   final _reportCompletionService = ReportCompletionService();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
@@ -43,7 +42,7 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
   bool _isLoadingResidents = true;
 
   // Med completion status map (residentId -> status)
-  Map<int, MedCompletionStatus> _medStatusMap = {};
+  Map<int, ResidentMedSummary> _medStatusMap = {};
 
   // Report completion status map (residentId -> status)
   Map<int, ReportCompletionStatus> _reportStatusMap = {};
@@ -73,9 +72,14 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
   }
 
   Future<void> _loadData() async {
+    // โหลด zones และ residents พร้อมกัน
     await Future.wait([
       _loadZones(),
       _loadResidents(),
+    ]);
+
+    // โหลด med status และ report status หลังจากมี residents แล้ว
+    await Future.wait([
       _loadMedCompletionStatus(),
       _loadReportCompletionStatus(),
     ]);
@@ -96,11 +100,27 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
   }
 
   Future<void> _loadMedCompletionStatus() async {
+    // รอให้โหลด residents เสร็จก่อน
+    if (_residents.isEmpty) return;
+
     try {
-      final targetDate = _medCompletionService.getTargetDate();
-      final statusMap = await _medCompletionService.getMedCompletionStatusMap(
-        checkDate: targetDate,
+      // ใช้ logic เดียวกับ MedCompletionService สำหรับหา target date
+      // หลัง 21:00 = ดูวันพรุ่งนี้ (กำลังจัดยาสำหรับพรุ่งนี้)
+      final now = DateTime.now();
+      final DateTime targetDate;
+      if (now.hour >= 21) {
+        targetDate = DateTime(now.year, now.month, now.day + 1);
+      } else {
+        targetDate = DateTime(now.year, now.month, now.day);
+      }
+
+      // ดึงสถานะการจัดยาของ residents ทั้งหมด
+      final residentIds = _residents.map((r) => r.id).toList();
+      final statusMap = await _medicineService.getMedCompletionStatusForResidents(
+        residentIds,
+        targetDate,
       );
+
       if (mounted) {
         setState(() {
           _medStatusMap = statusMap;

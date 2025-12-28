@@ -45,20 +45,24 @@ class MedicinePhotoItem extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  // รูปยา (ใช้ CachedNetworkImage สำหรับ caching)
+                  // รูปยา (ใช้ CachedNetworkImage)
                   hasPhoto
                       ? CachedNetworkImage(
                           imageUrl: photoUrl,
                           fit: BoxFit.cover,
-                          placeholder: (context, url) => Center(
-                            child: CircularProgressIndicator(
-                              color: AppColors.primary,
-                              strokeWidth: 2,
+                          placeholder: (context, url) => Container(
+                            color: AppColors.background,
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                color: AppColors.primary,
+                                strokeWidth: 2,
+                              ),
                             ),
                           ),
                           errorWidget: (context, url, error) => _buildPlaceholder(),
-                          fadeInDuration: const Duration(milliseconds: 200),
-                          memCacheWidth: 200, // Limit memory cache size
+                          fadeInDuration: const Duration(milliseconds: 150),
+                          memCacheWidth: 300,
+                          memCacheHeight: 300,
                         )
                       : _buildPlaceholder(),
 
@@ -92,9 +96,11 @@ class MedicinePhotoItem extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Medicine name
+                  // Medicine name + strength
                   Text(
-                    medicine.displayName,
+                    medicine.str != null && medicine.str!.isNotEmpty
+                        ? '${medicine.displayName} ${medicine.str}'
+                        : medicine.displayName,
                     style: AppTypography.caption.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
@@ -246,6 +252,31 @@ class MedicinePhotoItem extends StatelessWidget {
     );
   }
 
+  /// Format ชื่อการค้า + strength + (generic name)
+  /// เช่น "Berlontin 100 mg (gabapentin)"
+  String _formatBrandNameWithGeneric() {
+    final parts = <String>[];
+
+    // Brand name
+    if (medicine.brandName != null && medicine.brandName!.isNotEmpty) {
+      parts.add(medicine.brandName!);
+    }
+
+    // Strength
+    if (medicine.str != null && medicine.str!.isNotEmpty) {
+      parts.add(medicine.str!);
+    }
+
+    var result = parts.join(' ');
+
+    // Generic name in parentheses
+    if (medicine.displayName.isNotEmpty) {
+      result += ' (${medicine.displayName})';
+    }
+
+    return result;
+  }
+
   /// Card แสดงรายละเอียดยา
   Widget _buildMedicineDetailCard() {
     return Container(
@@ -261,26 +292,14 @@ class MedicinePhotoItem extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Row 1: Brand name + Strength
-          if (medicine.brandName != null || medicine.str != null)
+          // Row 1: Brand name + Strength (generic name)
+          if (medicine.brandName != null && medicine.brandName!.isNotEmpty)
             Padding(
               padding: EdgeInsets.only(bottom: 8),
-              child: Row(
-                children: [
-                  if (medicine.brandName != null && medicine.brandName!.isNotEmpty) ...[
-                    Expanded(
-                      child: _buildInfoItem(
-                        icon: Iconsax.tag,
-                        label: 'ชื่อการค้า',
-                        value: medicine.brandName!,
-                      ),
-                    ),
-                  ],
-                  if (medicine.str != null && medicine.str!.isNotEmpty) ...[
-                    if (medicine.brandName != null) SizedBox(width: 12),
-                    _buildInfoChip(medicine.str!, AppColors.primary),
-                  ],
-                ],
+              child: _buildInfoItem(
+                icon: Iconsax.tag,
+                label: 'ชื่อการค้า',
+                value: _formatBrandNameWithGeneric(),
               ),
             ),
 

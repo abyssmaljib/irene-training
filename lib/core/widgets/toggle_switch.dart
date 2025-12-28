@@ -3,7 +3,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/theme/app_spacing.dart';
 
-/// Segmented Control - Toggle between 2 options
+/// Segmented Control - Toggle between 2 options with sliding animation
 class SegmentedControl extends StatelessWidget {
   final List<String> options;
   final int selectedIndex;
@@ -24,40 +24,64 @@ class SegmentedControl extends StatelessWidget {
         color: AppColors.background,
         borderRadius: AppRadius.smallRadius,
       ),
-      child: Row(
-        children: List.generate(options.length, (index) {
-          final isSelected = index == selectedIndex;
-          return Expanded(
-            child: GestureDetector(
-              onTap: () => onChanged(index),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  color: isSelected ? AppColors.primary : Colors.transparent,
-                  borderRadius: AppRadius.smallRadius,
-                  boxShadow: isSelected
-                      ? [
-                          BoxShadow(
-                            color: AppColors.primary.withValues(alpha: 0.3),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Text(
-                  options[index],
-                  textAlign: TextAlign.center,
-                  style: AppTypography.bodySmall.copyWith(
-                    color: isSelected ? AppColors.surface : AppColors.textSecondary,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final itemWidth = (constraints.maxWidth - 8) / options.length;
+
+          return Stack(
+            children: [
+              // Sliding indicator (animated pill)
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeInOut,
+                left: selectedIndex * itemWidth,
+                top: 0,
+                bottom: 0,
+                width: itemWidth,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: AppRadius.smallRadius,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.3),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
                 ),
               ),
-            ),
+
+              // Text labels (row of options)
+              Row(
+                children: List.generate(options.length, (index) {
+                  final isSelected = index == selectedIndex;
+                  return Expanded(
+                    child: GestureDetector(
+                      onTap: () => onChanged(index),
+                      behavior: HitTestBehavior.opaque,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        child: AnimatedDefaultTextStyle(
+                          duration: const Duration(milliseconds: 200),
+                          style: AppTypography.bodySmall.copyWith(
+                            color: isSelected ? AppColors.surface : AppColors.textSecondary,
+                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                          ),
+                          child: Text(
+                            options[index],
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ],
           );
-        }),
+        },
       ),
     );
   }

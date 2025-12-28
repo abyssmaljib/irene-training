@@ -1,10 +1,10 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../models/med_log.dart';
+import '../models/med_error_log.dart';
 import '../models/meal_photo_group.dart';
 import 'medicine_photo_item.dart';
 
@@ -17,6 +17,7 @@ class MealSectionCard extends StatefulWidget {
   final bool isExpanded; // controlled from parent
   final VoidCallback? onExpandChanged; // callback when tapped
   final Future<void> Function(String mealKey, String photoType)? onTakePhoto; // callback สำหรับถ่ายรูป
+  final Future<void> Function(String mealKey, String photoType)? onDeletePhoto; // callback สำหรับลบรูป
 
   const MealSectionCard({
     super.key,
@@ -26,6 +27,7 @@ class MealSectionCard extends StatefulWidget {
     this.isExpanded = false,
     this.onExpandChanged,
     this.onTakePhoto,
+    this.onDeletePhoto,
   });
 
   @override
@@ -154,6 +156,13 @@ class _MealSectionCardState extends State<MealSectionCard>
 
                     // Status icon
                     _buildStatusIcon(group.status),
+
+                    // Nurse mark badges (2C และ 3C)
+                    if (group.nurseMark2C != NurseMarkStatus.none ||
+                        group.nurseMark3C != NurseMarkStatus.none) ...[
+                      SizedBox(width: 6),
+                      _buildNurseMarkBadges(group.nurseMark2C, group.nurseMark3C),
+                    ],
 
                     // Expand arrow
                     if (hasMedicines) ...[
@@ -328,6 +337,94 @@ class _MealSectionCardState extends State<MealSectionCard>
     }
   }
 
+  /// สร้าง badge แสดงสถานะการตรวจสอบจากหัวหน้าเวร
+  /// แสดงเป็น pill badge: "2C ✓" และ "3C ✓"
+  Widget _buildNurseMarkBadges(NurseMarkStatus mark2C, NurseMarkStatus mark3C) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Badge 2C
+        if (mark2C != NurseMarkStatus.none)
+          _buildSingleNurseMarkBadge(mark2C, is2C: true),
+        // Badge 3C
+        if (mark3C != NurseMarkStatus.none) ...[
+          if (mark2C != NurseMarkStatus.none) const SizedBox(width: 4),
+          _buildSingleNurseMarkBadge(mark3C, is2C: false),
+        ],
+      ],
+    );
+  }
+
+  /// สร้าง badge เดี่ยวสำหรับ nurse mark - แบบ pill badge
+  Widget _buildSingleNurseMarkBadge(NurseMarkStatus status, {required bool is2C}) {
+    // กำหนดสีและ icon ตาม status
+    Color bgColor;
+    Color textColor;
+    IconData icon;
+
+    switch (status) {
+      case NurseMarkStatus.correct:
+        // เขียว - รูปตรง
+        bgColor = const Color(0xFFDCFCE7); // green-100
+        textColor = const Color(0xFF166534); // green-800
+        icon = Icons.check_circle;
+        break;
+      case NurseMarkStatus.incorrect:
+        // แดง - รูปไม่ตรง
+        bgColor = const Color(0xFFFEE2E2); // red-100
+        textColor = const Color(0xFFDC2626); // red-600
+        icon = Icons.cancel;
+        break;
+      case NurseMarkStatus.noPhoto:
+        // เทา - ไม่มีรูป
+        bgColor = const Color(0xFFF3F4F6); // gray-100
+        textColor = const Color(0xFF6B7280); // gray-500
+        icon = Icons.image_not_supported;
+        break;
+      case NurseMarkStatus.swapped:
+        // เหลือง - ตำแหน่งสลับ
+        bgColor = const Color(0xFFFEF3C7); // amber-100
+        textColor = const Color(0xFFD97706); // amber-600
+        icon = Icons.swap_horiz;
+        break;
+      case NurseMarkStatus.none:
+        return const SizedBox.shrink();
+    }
+
+    final label = is2C ? 'จัด' : 'เสิร์ฟ';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: textColor.withValues(alpha: 0.2),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: AppTypography.caption.copyWith(
+              color: textColor,
+              fontWeight: FontWeight.w700,
+              fontSize: 10,
+            ),
+          ),
+          const SizedBox(width: 2),
+          Icon(
+            icon,
+            size: 12,
+            color: textColor,
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildContent() {
     final medicines = widget.mealGroup.medicines;
     final medLog = widget.mealGroup.medLog;
@@ -343,46 +440,41 @@ class _MealSectionCardState extends State<MealSectionCard>
         AppSpacing.md,
         AppSpacing.md,
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // ฝั่งซ้าย: Grid รูปตัวอย่างยา
-          Expanded(
-            flex: 1,
-            child: GridView.builder(
-              shrinkWrap: true,
-              physics: NeverScrollableScrollPhysics(),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: AppSpacing.xs,
-                mainAxisSpacing: AppSpacing.xs,
-                childAspectRatio: 1.0,
-              ),
-              itemCount: medicines.length,
-              itemBuilder: (context, index) {
-                return MedicinePhotoItem(
-                  medicine: medicines[index],
-                  showFoiled: widget.showFoiled,
-                  showOverlay: widget.showOverlay,
-                );
-              },
+          // Grid รูปตัวอย่างยา - แสดงเต็มความกว้าง
+          GridView.builder(
+            shrinkWrap: true,
+            physics: NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              crossAxisSpacing: AppSpacing.xs,
+              mainAxisSpacing: AppSpacing.xs,
+              childAspectRatio: 1.0,
             ),
+            itemCount: medicines.length,
+            itemBuilder: (context, index) {
+              return MedicinePhotoItem(
+                medicine: medicines[index],
+                showFoiled: widget.showFoiled,
+                showOverlay: widget.showOverlay,
+              );
+            },
           ),
 
-          // ฝั่งขวา: รูปจัดยา/ให้ยา (2C/3C) จาก med_logs หรือปุ่มถ่ายรูป
-          SizedBox(width: AppSpacing.sm),
-          Expanded(
-            flex: 1,
-            child: hasLogPhoto
-                ? _buildLogPhoto(logPhotoUrl, medLog!)
-                : _buildCameraButton(),
-          ),
+          SizedBox(height: AppSpacing.sm),
+
+          // รูปจัดยา/ให้ยา (2C/3C) หรือปุ่มถ่ายรูป - อยู่ด้านล่าง
+          hasLogPhoto
+              ? _buildLogPhoto(logPhotoUrl, medLog!)
+              : _buildCameraButton(),
         ],
       ),
     );
   }
 
-  /// ปุ่มถ่ายรูป
+  /// ปุ่มถ่ายรูป - แบบยาวเต็มความกว้าง
   Widget _buildCameraButton() {
     final photoType = widget.showFoiled ? '2C' : '3C';
     final label = widget.showFoiled ? 'ถ่ายรูปจัดยา' : 'ถ่ายรูปเสิร์ฟยา';
@@ -390,57 +482,60 @@ class _MealSectionCardState extends State<MealSectionCard>
         ? const Color(0xFF0EA5E9)
         : const Color(0xFF10B981);
 
-    return AspectRatio(
-      aspectRatio: 1.0,
-      child: Container(
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.05),
-          borderRadius: AppRadius.smallRadius,
-          border: Border.all(
-            color: color.withValues(alpha: 0.3),
-            width: 2,
-            style: BorderStyle.solid,
-          ),
+    return Container(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.05),
+        borderRadius: AppRadius.smallRadius,
+        border: Border.all(
+          color: color.withValues(alpha: 0.3),
+          width: 2,
+          style: BorderStyle.solid,
         ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: widget.onTakePhoto != null
-                ? () => widget.onTakePhoto!(widget.mealGroup.mealKey, photoType)
-                : null,
-            borderRadius: AppRadius.smallRadius,
-            child: Column(
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: widget.onTakePhoto != null
+              ? () => widget.onTakePhoto!(widget.mealGroup.mealKey, photoType)
+              : null,
+          borderRadius: AppRadius.smallRadius,
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
-                  padding: EdgeInsets.all(12),
+                  padding: EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     color: color.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
                     Iconsax.camera,
-                    size: 28,
+                    size: 24,
                     color: color,
                   ),
                 ),
-                SizedBox(height: 8),
-                Text(
-                  label,
-                  style: AppTypography.caption.copyWith(
-                    color: color,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                SizedBox(height: 2),
-                Text(
-                  'กดเพื่อถ่ายรูป',
-                  style: AppTypography.caption.copyWith(
-                    color: AppColors.textSecondary,
-                    fontSize: 10,
-                  ),
-                  textAlign: TextAlign.center,
+                SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      label,
+                      style: AppTypography.body.copyWith(
+                        color: color,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      'กดเพื่อถ่ายรูป',
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.textSecondary,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -460,97 +555,170 @@ class _MealSectionCardState extends State<MealSectionCard>
         ? medLog.createdAt
         : medLog.timestamp3C ?? medLog.createdAt;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // รูปถ่าย
-        GestureDetector(
-          onTap: () => _showLogPhotoFullScreen(photoUrl),
-          child: Hero(
-            tag: 'log_photo_${widget.mealGroup.mealKey}_$photoUrl',
-            child: AspectRatio(
-              aspectRatio: 1.0,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: AppColors.background,
-                  borderRadius: AppRadius.smallRadius,
-                  border: Border.all(
-                    color: widget.showFoiled
-                        ? const Color(0xFF0EA5E9)
-                        : const Color(0xFF10B981),
-                    width: 2,
+    final borderColor = widget.showFoiled
+        ? const Color(0xFF0EA5E9)
+        : const Color(0xFF10B981);
+
+    return GestureDetector(
+      onTap: () => _showLogPhotoFullScreen(photoUrl),
+      child: Hero(
+        tag: 'log_photo_${widget.mealGroup.mealKey}_$photoUrl',
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.background,
+            borderRadius: AppRadius.smallRadius,
+            border: Border.all(color: borderColor, width: 2),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: AspectRatio(
+            aspectRatio: 4 / 3, // รูปยาวขึ้น ดูชัดขึ้น
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // รูปจัดยา/ให้ยา - ใช้ Image.network ที่จะโหลดจนกว่าจะเสร็จ
+                // ใช้ BoxFit.contain เพื่อรักษาสัดส่วนรูปยา (ไม่บิดเบี้ยว)
+                Container(
+                  color: Colors.black,
+                  child: Image.network(
+                    photoUrl,
+                    fit: BoxFit.contain,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      final progress = loadingProgress.expectedTotalBytes != null
+                          ? loadingProgress.cumulativeBytesLoaded /
+                              loadingProgress.expectedTotalBytes!
+                          : null;
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            CircularProgressIndicator(
+                              value: progress,
+                              color: AppColors.primary,
+                              strokeWidth: 2,
+                            ),
+                            if (progress != null) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                '${(progress * 100).toInt()}%',
+                                style: AppTypography.caption.copyWith(
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Iconsax.image,
+                              size: 32,
+                              color: AppColors.textSecondary,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'โหลดรูปไม่สำเร็จ',
+                              style: AppTypography.caption.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
                   ),
                 ),
-                clipBehavior: Clip.antiAlias,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    // รูปจัดยา/ให้ยา
-                    CachedNetworkImage(
-                      imageUrl: photoUrl,
-                      fit: BoxFit.cover,
-                      placeholder: (context, url) => Center(
-                        child: CircularProgressIndicator(
-                          color: AppColors.primary,
-                          strokeWidth: 2,
-                        ),
-                      ),
-                      errorWidget: (context, url, error) => Center(
-                        child: Icon(
-                          Iconsax.image,
-                          size: 32,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      fadeInDuration: const Duration(milliseconds: 200),
-                      memCacheWidth: 400,
-                    ),
 
-                    // Badge 2C/3C
-                    Positioned(
-                      top: 4,
-                      right: 4,
+                // ปุ่มลบรูป (มุมขวาบน)
+                if (widget.onDeletePhoto != null)
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: GestureDetector(
+                      onTap: () => _showDeleteConfirmDialog(),
                       child: Container(
-                        padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: widget.showFoiled
-                              ? const Color(0xFF0EA5E9)
-                              : const Color(0xFF10B981),
-                          borderRadius: AppRadius.fullRadius,
+                          color: Colors.black54,
+                          shape: BoxShape.circle,
                         ),
-                        child: Text(
-                          widget.showFoiled ? '2C' : '3C',
-                          style: AppTypography.caption.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 10,
+                        child: Icon(
+                          Iconsax.trash,
+                          size: 18,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                // Badge 2C/3C + ข้อมูลผู้ถ่าย
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.7),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        // Badge 2C/3C
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: borderColor,
+                            borderRadius: AppRadius.fullRadius,
+                          ),
+                          child: Text(
+                            widget.showFoiled ? '2C' : '3C',
+                            style: AppTypography.caption.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 10,
+                            ),
                           ),
                         ),
-                      ),
+                        SizedBox(width: 8),
+                        // ข้อมูลผู้ถ่ายและเวลา
+                        Expanded(
+                          child: Text(
+                            _formatPhotoInfo(photographer, timestamp),
+                            style: AppTypography.caption.copyWith(
+                              color: Colors.white,
+                              fontSize: 11,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        // กดเพื่อดูรูปขยาย
+                        Icon(
+                          Iconsax.maximize_4,
+                          size: 16,
+                          color: Colors.white70,
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
         ),
-
-        // ข้อมูลผู้ถ่ายและเวลา
-        if (photographer != null || timestamp != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text(
-              _formatPhotoInfo(photographer, timestamp),
-              style: AppTypography.caption.copyWith(
-                color: AppColors.textSecondary,
-                fontSize: 10,
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-      ],
+      ),
     );
   }
 
@@ -571,6 +739,61 @@ class _MealSectionCardState extends State<MealSectionCard>
     }
 
     return parts.join(' - ');
+  }
+
+  /// แสดง dialog ยืนยันการลบรูป
+  void _showDeleteConfirmDialog() {
+    final photoType = widget.showFoiled ? '2C' : '3C';
+    final typeLabel = widget.showFoiled ? 'จัดยา' : 'เสิร์ฟยา';
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.secondaryBackground,
+        shape: RoundedRectangleBorder(
+          borderRadius: AppRadius.mediumRadius,
+        ),
+        title: Row(
+          children: [
+            Icon(Iconsax.trash, color: AppColors.error, size: 24),
+            SizedBox(width: 8),
+            Text(
+              'ลบรูป$typeLabel',
+              style: AppTypography.title,
+            ),
+          ],
+        ),
+        content: Text(
+          'ต้องการลบรูป$typeLabel ($photoType) ของมื้อนี้หรือไม่?\n\nการลบจะไม่สามารถกู้คืนได้',
+          style: AppTypography.body,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'ยกเลิก',
+              style: AppTypography.body.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              widget.onDeletePhoto?.call(
+                widget.mealGroup.mealKey,
+                photoType,
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+            ),
+            child: Text('ลบรูป'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showLogPhotoFullScreen(String photoUrl) {
@@ -618,27 +841,51 @@ class _FullScreenPhotoView extends StatelessWidget {
             // Background - tap to close
             Container(color: Colors.transparent),
 
-            // Image with Hero
+            // Image with Hero - ใช้ Image.network ที่จะโหลดจนกว่าจะเสร็จ
             Center(
               child: Hero(
                 tag: heroTag,
                 child: InteractiveViewer(
                   minScale: 0.5,
                   maxScale: 4.0,
-                  child: CachedNetworkImage(
-                    imageUrl: photoUrl,
+                  child: Image.network(
+                    photoUrl,
                     fit: BoxFit.contain,
-                    placeholder: (context, url) => Center(
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2,
-                      ),
-                    ),
-                    errorWidget: (context, url, error) => Icon(
-                      Iconsax.image,
-                      size: 64,
-                      color: Colors.white54,
-                    ),
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      final progress = loadingProgress.expectedTotalBytes != null
+                          ? loadingProgress.cumulativeBytesLoaded /
+                              loadingProgress.expectedTotalBytes!
+                          : null;
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            CircularProgressIndicator(
+                              value: progress,
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                            if (progress != null) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                '${(progress * 100).toInt()}%',
+                                style: AppTypography.caption.copyWith(
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) {
+                      return Icon(
+                        Iconsax.image,
+                        size: 64,
+                        color: Colors.white54,
+                      );
+                    },
                   ),
                 ),
               ),

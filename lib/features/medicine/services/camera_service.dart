@@ -191,6 +191,60 @@ class CameraService {
     return url;
   }
 
+  /// ลบรูปยาจาก med_log
+  /// [residentId] - ID ของ resident
+  /// [mealKey] - ชื่อมื้อ
+  /// [date] - วันที่
+  /// [photoType] - '2C' หรือ '3C'
+  Future<bool> deletePhoto({
+    required int residentId,
+    required String mealKey,
+    required DateTime date,
+    required String photoType,
+  }) async {
+    try {
+      final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+
+      // ค้นหา med_log
+      final existingLogs = await _supabase
+          .from('A_Med_logs')
+          .select('id, SecondCPictureUrl, ThirdCPictureUrl')
+          .eq('resident_id', residentId)
+          .eq('meal', mealKey)
+          .eq('Created_Date', dateStr);
+
+      if ((existingLogs as List).isEmpty) {
+        debugPrint('CameraService: no med_log found to delete photo');
+        return false;
+      }
+
+      final logId = existingLogs[0]['id'];
+      final updateData = <String, dynamic>{};
+
+      if (photoType == '2C') {
+        // ลบรูป 2C
+        updateData['SecondCPictureUrl'] = null;
+        updateData['2C_completed_by'] = null;
+      } else {
+        // ลบรูป 3C
+        updateData['ThirdCPictureUrl'] = null;
+        updateData['3C_Compleated_by'] = null;
+        updateData['3C_time_stamps'] = null;
+      }
+
+      await _supabase
+          .from('A_Med_logs')
+          .update(updateData)
+          .eq('id', logId);
+
+      debugPrint('CameraService: deleted $photoType photo from med_log $logId');
+      return true;
+    } catch (e) {
+      debugPrint('CameraService deletePhoto error: $e');
+      return false;
+    }
+  }
+
   /// แปลงชื่อไฟล์ให้ safe (ลบ characters พิเศษ)
   String _sanitizeFileName(String name) {
     return name

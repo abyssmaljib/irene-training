@@ -10,6 +10,7 @@ import '../services/medicine_service.dart';
 import '../widgets/day_picker.dart';
 import '../widgets/meal_section_card.dart';
 import 'medicine_list_screen.dart';
+import 'photo_preview_screen.dart';
 
 /// หน้ารูปตัวอย่างยา
 class MedicinePhotosScreen extends StatefulWidget {
@@ -45,7 +46,13 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
 
   /// โหลดข้อมูลยาแบ่งตามมื้อ
   /// [forceRefresh] = true จะบังคับ fetch ใหม่จาก API (ใช้ตอน pull-to-refresh)
-  Future<void> _loadMealGroups({bool forceRefresh = false}) async {
+  /// [preserveExpanded] = true จะเก็บสถานะ expanded ไว้ (ใช้หลังถ่ายรูป)
+  Future<void> _loadMealGroups({
+    bool forceRefresh = false,
+    bool preserveExpanded = false,
+  }) async {
+    final previousExpandedIndex = _expandedIndex;
+
     setState(() => _isLoading = true);
     try {
       final groups = await _medicineService.getMedicinePhotosByMeal(
@@ -53,19 +60,28 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
         _selectedDate,
         forceRefresh: forceRefresh,
       );
-      // หา index แรกที่มียา สำหรับ expand เริ่มต้น
-      int? firstWithMedicines;
-      for (int i = 0; i < groups.length; i++) {
-        if (groups[i].hasMedicines) {
-          firstWithMedicines = i;
-          break;
+
+      // กำหนด expanded index
+      int? newExpandedIndex;
+      if (preserveExpanded && previousExpandedIndex != null) {
+        // เก็บ index เดิมไว้ (ถ้ายังอยู่ในช่วง)
+        if (previousExpandedIndex < groups.length) {
+          newExpandedIndex = previousExpandedIndex;
+        }
+      } else {
+        // หา index แรกที่มียา สำหรับ expand เริ่มต้น
+        for (int i = 0; i < groups.length; i++) {
+          if (groups[i].hasMedicines) {
+            newExpandedIndex = i;
+            break;
+          }
         }
       }
 
       setState(() {
         _mealGroups = groups;
         _isLoading = false;
-        _expandedIndex = firstWithMedicines;
+        _expandedIndex = newExpandedIndex;
       });
     } catch (e) {
       debugPrint('Error loading meal groups: $e');
@@ -259,6 +275,7 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
           isExpanded: _expandedIndex == index,
           onExpandChanged: () => _onMealExpanded(index),
           onTakePhoto: _onTakePhoto,
+          onDeletePhoto: _onDeletePhoto,
         );
       },
     );
@@ -277,38 +294,72 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
     });
   }
 
-  /// ถ่ายรูปยา
+  /// ถ่ายรูปยา พร้อมหน้า preview ให้หมุนรูปได้
   Future<void> _onTakePhoto(String mealKey, String photoType) async {
-    // แสดง loading indicator
-    _showLoadingDialog();
-
     try {
-      final url = await _cameraService.captureAndUpload(
+      // 1. ถ่ายรูป
+      final file = await _cameraService.takePhoto();
+      if (file == null) return; // user ยกเลิก
+
+      if (!mounted) return;
+
+      // 2. แสดงหน้า preview ให้ user ดูและหมุนรูป
+      final mealLabel = _getMealLabel(mealKey);
+      final confirmedFile = await PhotoPreviewScreen.show(
+        context: context,
+        imageFile: file,
+        photoType: photoType,
+        mealLabel: mealLabel,
+      );
+
+      if (confirmedFile == null) return; // user ยกเลิก/ถ่ายใหม่
+
+      if (!mounted) return;
+
+      // 3. แสดง loading และ upload
+      _showLoadingDialog();
+
+      final url = await _cameraService.uploadPhoto(
+        file: confirmedFile,
         residentId: widget.residentId,
         mealKey: mealKey,
         photoType: photoType,
         date: _selectedDate,
       );
 
+      if (url == null) {
+        if (mounted) Navigator.pop(context);
+        throw Exception('Upload failed');
+      }
+
+      // 4. อัพเดต med_log
+      await _cameraService.updateMedLog(
+        residentId: widget.residentId,
+        mealKey: mealKey,
+        date: _selectedDate,
+        photoUrl: url,
+        photoType: photoType,
+      );
+
       // ปิด loading dialog
       if (mounted) Navigator.pop(context);
 
-      if (url != null) {
-        // รีโหลดข้อมูลเพื่อแสดงรูปใหม่
-        await _loadMealGroups(forceRefresh: true);
+      // รีโหลดข้อมูลเพื่อแสดงรูปใหม่ (เก็บสถานะ expand ไว้)
+      await _loadMealGroups(forceRefresh: true, preserveExpanded: true);
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('บันทึกรูปเรียบร้อยแล้ว'),
-              backgroundColor: AppColors.tagPassedText,
-            ),
-          );
-        }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('บันทึกรูปเรียบร้อยแล้ว'),
+            backgroundColor: AppColors.tagPassedText,
+          ),
+        );
       }
     } catch (e) {
-      // ปิด loading dialog
-      if (mounted) Navigator.pop(context);
+      // ปิด loading dialog ถ้ายังเปิดอยู่
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -321,7 +372,75 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
     }
   }
 
-  void _showLoadingDialog() {
+  /// แปลง mealKey เป็น label สำหรับแสดงใน preview
+  String _getMealLabel(String mealKey) {
+    if (mealKey.contains('morning') || mealKey.contains('เช้า')) {
+      if (mealKey.contains('before') || mealKey.contains('ก่อน')) {
+        return 'ก่อนอาหารเช้า';
+      }
+      return 'หลังอาหารเช้า';
+    } else if (mealKey.contains('noon') || mealKey.contains('กลางวัน')) {
+      if (mealKey.contains('before') || mealKey.contains('ก่อน')) {
+        return 'ก่อนอาหารกลางวัน';
+      }
+      return 'หลังอาหารกลางวัน';
+    } else if (mealKey.contains('evening') || mealKey.contains('เย็น')) {
+      if (mealKey.contains('before') || mealKey.contains('ก่อน')) {
+        return 'ก่อนอาหารเย็น';
+      }
+      return 'หลังอาหารเย็น';
+    }
+    return 'ก่อนนอน';
+  }
+
+  /// ลบรูปยา
+  Future<void> _onDeletePhoto(String mealKey, String photoType) async {
+    _showLoadingDialog(message: 'กำลังลบรูป...');
+
+    try {
+      final success = await _cameraService.deletePhoto(
+        residentId: widget.residentId,
+        mealKey: mealKey,
+        date: _selectedDate,
+        photoType: photoType,
+      );
+
+      // ปิด loading dialog
+      if (mounted) Navigator.pop(context);
+
+      if (success) {
+        // รีโหลดข้อมูลเพื่อแสดงสถานะใหม่ (เก็บสถานะ expand ไว้)
+        await _loadMealGroups(forceRefresh: true, preserveExpanded: true);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('ลบรูปเรียบร้อยแล้ว'),
+              backgroundColor: AppColors.tagPassedText,
+            ),
+          );
+        }
+      } else {
+        throw Exception('Delete failed');
+      }
+    } catch (e) {
+      // ปิด loading dialog ถ้ายังเปิดอยู่
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาด: $e'),
+            backgroundColor: AppColors.tagFailedText,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showLoadingDialog({String message = 'กำลังบันทึกรูป...'}) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -338,7 +457,7 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
               CircularProgressIndicator(color: AppColors.primary),
               SizedBox(height: 16),
               Text(
-                'กำลังบันทึกรูป...',
+                message,
                 style: AppTypography.body,
               ),
             ],

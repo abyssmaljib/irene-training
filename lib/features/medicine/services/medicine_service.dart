@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/medicine_summary.dart';
 import '../models/med_log.dart';
+import '../models/med_error_log.dart';
 import '../models/meal_photo_group.dart';
 
 /// Service สำหรับจัดการข้อมูลยา
@@ -261,6 +262,9 @@ class MedicineService {
       // ดึง logs ของวันที่กำหนด
       final logs = await getMedLogsForDate(residentId, date);
 
+      // ดึง error logs (nurse mark) ของวันที่กำหนด
+      final errorLogs = await getMedErrorLogsForDate(residentId, date);
+
       // สร้าง map ของ logs
       final logsMap = <String, MedLog>{};
       for (final log in logs) {
@@ -286,11 +290,37 @@ class MedicineService {
           prn: filterPrn,
         );
 
+        // หา nurse mark สำหรับมื้อนี้
+        // A_Med_error_log meal format: "${beforeAfter}${bldb}" เช่น "ก่อนอาหารเช้า", "หลังอาหารกลางวัน"
+        // Database เก็บแบบมี "อาหาร" อยู่ เช่น "ก่อนอาหารเช้า" ไม่ใช่ "ก่อนเช้า"
+        final errorLogMealKey = beforeAfter.isEmpty ? bldb : '$beforeAfter$bldb';
+
+        NurseMarkStatus nurseMark2C = NurseMarkStatus.none;
+        NurseMarkStatus nurseMark3C = NurseMarkStatus.none;
+
+        for (final errorLog in errorLogs) {
+          if (errorLog.meal == errorLogMealKey) {
+            debugPrint('  Matched errorLog for "$errorLogMealKey": 2C=${errorLog.field2CPicture}, 3C=${errorLog.field3CPicture}, reply=${errorLog.replyNurseMark}');
+            if (errorLog.field2CPicture == true && errorLog.replyNurseMark != null) {
+              nurseMark2C = NurseMarkStatusExtension.fromString(errorLog.replyNurseMark);
+            }
+            if (errorLog.field3CPicture == true && errorLog.replyNurseMark != null) {
+              nurseMark3C = NurseMarkStatusExtension.fromString(errorLog.replyNurseMark);
+            }
+          }
+        }
+
+        if (nurseMark2C != NurseMarkStatus.none || nurseMark3C != NurseMarkStatus.none) {
+          debugPrint('  -> nurseMark2C: $nurseMark2C, nurseMark3C: $nurseMark3C');
+        }
+
         result.add(MealPhotoGroup(
           mealKey: mealKey,
           label: label,
           medicines: medicinesInMeal,
           medLog: logsMap[mealKey],
+          nurseMark2C: nurseMark2C,
+          nurseMark3C: nurseMark3C,
         ));
       }
 
@@ -340,4 +370,139 @@ class MealStatus {
 
   /// ให้ยาแล้ว
   bool get isCompleted => medicineCount > 0 && hasPhoto;
+}
+
+/// Model สำหรับสรุปสถานะการจัดยาของผู้พัก (ใช้ในหน้า residents list)
+class ResidentMedSummary {
+  final int residentId;
+  final int totalMealsWithMedicine; // จำนวนมื้อที่มียา
+  final int completedMeals; // จำนวนมื้อที่จัดยาแล้ว (มีรูป 2C)
+  final String completionFraction; // เช่น "2/5"
+  final String completionStatus; // 'completed', 'partial', 'not_started', 'no_medication'
+
+  ResidentMedSummary({
+    required this.residentId,
+    required this.totalMealsWithMedicine,
+    required this.completedMeals,
+    required this.completionFraction,
+    required this.completionStatus,
+  });
+
+  bool get isCompleted => completionStatus == 'completed';
+  bool get isPartial => completionStatus == 'partial';
+  bool get isNotStarted => completionStatus == 'not_started';
+  bool get hasNoMedication => completionStatus == 'no_medication';
+}
+
+/// Extension สำหรับดึงสถานะการจัดยาของ residents หลายคน
+extension MedicineServiceResidentStatus on MedicineService {
+  /// ดึงสถานะการจัดยาของ resident คนเดียว
+  /// นับเฉพาะมื้อที่มียาจริงๆ (ไม่ hardcode 7 มื้อ)
+  Future<ResidentMedSummary?> getMedCompletionStatusForResident(
+    int residentId,
+    DateTime date,
+  ) async {
+    try {
+      // ใช้ getMedicinePhotosByMeal ซึ่งมี logic filter ถูกต้อง
+      final mealGroups = await getMedicinePhotosByMeal(
+        residentId,
+        date,
+        filterPrn: false, // เฉพาะยาปกติ (ไม่รวมยาตามอาการ)
+      );
+
+      // นับเฉพาะมื้อที่มียา
+      final mealsWithMedicine = mealGroups.where((g) => g.medicines.isNotEmpty).toList();
+      final totalMeals = mealsWithMedicine.length;
+
+      if (totalMeals == 0) {
+        return ResidentMedSummary(
+          residentId: residentId,
+          totalMealsWithMedicine: 0,
+          completedMeals: 0,
+          completionFraction: '0/0',
+          completionStatus: 'no_medication',
+        );
+      }
+
+      // นับมื้อที่จัดยาแล้ว (มีรูป 2C)
+      final completedMeals = mealsWithMedicine.where((g) => g.isArranged).length;
+
+      final String status;
+      if (completedMeals == totalMeals) {
+        status = 'completed';
+      } else if (completedMeals > 0) {
+        status = 'partial';
+      } else {
+        status = 'not_started';
+      }
+
+      return ResidentMedSummary(
+        residentId: residentId,
+        totalMealsWithMedicine: totalMeals,
+        completedMeals: completedMeals,
+        completionFraction: '$completedMeals/$totalMeals',
+        completionStatus: status,
+      );
+    } catch (e) {
+      debugPrint('getMedCompletionStatusForResident error: $e');
+      return null;
+    }
+  }
+
+  /// ดึงสถานะการจัดยาของ residents หลายคน
+  /// Returns Map โดย key = residentId
+  Future<Map<int, ResidentMedSummary>> getMedCompletionStatusForResidents(
+    List<int> residentIds,
+    DateTime date,
+  ) async {
+    final result = <int, ResidentMedSummary>{};
+
+    // Process ทีละคน (อาจเพิ่ม parallel ในอนาคต)
+    for (final residentId in residentIds) {
+      final status = await getMedCompletionStatusForResident(residentId, date);
+      if (status != null) {
+        result[residentId] = status;
+      }
+    }
+
+    debugPrint('getMedCompletionStatusForResidents: got ${result.length} statuses');
+    return result;
+  }
+}
+
+/// Service สำหรับดึงข้อมูล error logs (nurse mark)
+extension MedicineServiceErrorLogs on MedicineService {
+  /// ดึง error logs ของวันที่กำหนด
+  /// ใช้สำหรับแสดง badge สถานะการตรวจสอบรูปยาโดยหัวหน้าเวร
+  Future<List<MedErrorLog>> getMedErrorLogsForDate(
+    int residentId,
+    DateTime date,
+  ) async {
+    try {
+      final dateStr =
+          '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+
+      // Table name is A_Med_Error_Log (with underscores and capital letters)
+      // Column name is CalendarDate (camelCase) in database
+      final response = await Supabase.instance.client
+          .from('A_Med_Error_Log')
+          .select()
+          .eq('resident_id', residentId)
+          .eq('CalendarDate', dateStr);
+
+      debugPrint('getMedErrorLogsForDate: got ${(response as List).length} error logs for $dateStr');
+
+      // Debug: print meal values to check format
+      for (final json in response as List) {
+        debugPrint('  Error log meal: "${json['meal']}", reply: "${json['reply_nurseMark']}", 2C: ${json['2CPicture']}, 3C: ${json['3CPicture']}');
+      }
+
+      return (response as List)
+          .map((json) => MedErrorLog.fromJson(json))
+          .toList();
+    } catch (e) {
+      debugPrint('getMedErrorLogsForDate error: $e');
+      return [];
+    }
+  }
 }
