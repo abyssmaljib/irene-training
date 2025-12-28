@@ -1,0 +1,677 @@
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/material.dart';
+import 'package:iconsax/iconsax.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_spacing.dart';
+import '../../../core/theme/app_typography.dart';
+import '../models/med_log.dart';
+import '../models/meal_photo_group.dart';
+import 'medicine_photo_item.dart';
+
+/// Card สำหรับแสดงยาในแต่ละมื้อ (Expandable)
+/// ใช้ isExpanded + onExpandChanged สำหรับ controlled accordion behavior
+class MealSectionCard extends StatefulWidget {
+  final MealPhotoGroup mealGroup;
+  final bool showFoiled; // true = แผง (2C), false = เม็ดยา (3C)
+  final bool showOverlay; // แสดง overlay จำนวนเม็ดยา
+  final bool isExpanded; // controlled from parent
+  final VoidCallback? onExpandChanged; // callback when tapped
+  final Future<void> Function(String mealKey, String photoType)? onTakePhoto; // callback สำหรับถ่ายรูป
+
+  const MealSectionCard({
+    super.key,
+    required this.mealGroup,
+    this.showFoiled = true,
+    this.showOverlay = true,
+    this.isExpanded = false,
+    this.onExpandChanged,
+    this.onTakePhoto,
+  });
+
+  @override
+  State<MealSectionCard> createState() => _MealSectionCardState();
+}
+
+class _MealSectionCardState extends State<MealSectionCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _iconTurns;
+  late Animation<double> _heightFactor;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 200),
+      vsync: this,
+    );
+    _iconTurns = Tween<double>(begin: 0.0, end: 0.5).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+    _heightFactor = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInOut,
+    );
+
+    // Set initial animation value based on isExpanded
+    if (widget.isExpanded) {
+      _controller.value = 1.0;
+    }
+  }
+
+  @override
+  void didUpdateWidget(MealSectionCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Animate when isExpanded changes from parent
+    if (widget.isExpanded != oldWidget.isExpanded) {
+      if (widget.isExpanded) {
+        _controller.forward();
+      } else {
+        _controller.reverse();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _handleTap() {
+    // Notify parent to handle accordion behavior
+    widget.onExpandChanged?.call();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final group = widget.mealGroup;
+    final hasMedicines = group.hasMedicines;
+
+    return Container(
+      margin: EdgeInsets.only(bottom: AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: AppColors.secondaryBackground,
+        borderRadius: AppRadius.smallRadius,
+        boxShadow: AppShadows.cardShadow,
+      ),
+      child: Column(
+        children: [
+          // Header - always visible
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: hasMedicines ? _handleTap : null,
+              borderRadius: AppRadius.smallRadius,
+              child: Padding(
+                padding: EdgeInsets.all(AppSpacing.md),
+                child: Row(
+                  children: [
+                    // Meal icon
+                    _buildMealIcon(group.mealKey),
+                    AppSpacing.horizontalGapSm,
+
+                    // Label + Before/After badge
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Text(
+                            _getMealTimeLabel(group.mealKey),
+                            style: AppTypography.body.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: hasMedicines
+                                  ? AppColors.primaryText
+                                  : AppColors.textSecondary,
+                            ),
+                          ),
+                          SizedBox(width: 6),
+                          _buildBeforeAfterBadge(group.mealKey),
+                        ],
+                      ),
+                    ),
+
+                    // Medicine count badge
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: hasMedicines
+                            ? AppColors.accent1
+                            : AppColors.background,
+                        borderRadius: AppRadius.fullRadius,
+                      ),
+                      child: Text(
+                        '${group.medicineCount}',
+                        style: AppTypography.caption.copyWith(
+                          color: hasMedicines
+                              ? AppColors.primary
+                              : AppColors.textSecondary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+
+                    SizedBox(width: 8),
+
+                    // Status icon
+                    _buildStatusIcon(group.status),
+
+                    // Expand arrow
+                    if (hasMedicines) ...[
+                      SizedBox(width: 8),
+                      RotationTransition(
+                        turns: _iconTurns,
+                        child: Icon(
+                          Iconsax.arrow_down_1,
+                          size: 20,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // Expandable content
+          if (hasMedicines)
+            ClipRect(
+              child: AnimatedBuilder(
+                animation: _heightFactor,
+                builder: (context, child) {
+                  return Align(
+                    heightFactor: _heightFactor.value,
+                    alignment: Alignment.topCenter,
+                    child: child,
+                  );
+                },
+                child: _buildContent(),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// แปลง mealKey เป็นชื่อมื้อ (ไม่รวม ก่อน/หลัง)
+  String _getMealTimeLabel(String mealKey) {
+    if (mealKey.contains('morning') || mealKey.contains('เช้า')) {
+      return 'เช้า';
+    } else if (mealKey.contains('noon') || mealKey.contains('กลางวัน')) {
+      return 'กลางวัน';
+    } else if (mealKey.contains('evening') || mealKey.contains('เย็น')) {
+      return 'เย็น';
+    } else {
+      return 'ก่อนนอน';
+    }
+  }
+
+  /// สี Pastel สำหรับแต่ละมื้อ
+  /// เช้า - เหลือง, กลางวัน - ส้ม, เย็น - น้ำเงิน, ก่อนนอน - ม่วง
+  static const _mealColors = {
+    'morning': Color(0xFFF59E0B), // Amber/Yellow
+    'noon': Color(0xFFF97316), // Orange
+    'evening': Color(0xFF3B82F6), // Blue
+    'bedtime': Color(0xFF8B5CF6), // Purple
+  };
+
+  /// สี Pastel Background สำหรับแต่ละมื้อ
+  static const _mealBgColors = {
+    'morning': Color(0xFFFEF3C7), // Amber-100
+    'noon': Color(0xFFFFEDD5), // Orange-100
+    'evening': Color(0xFFDBEAFE), // Blue-100
+    'bedtime': Color(0xFFEDE9FE), // Purple-100
+  };
+
+  /// สีสำหรับ ก่อน/หลัง อาหาร
+  /// ก่อน - โทนฟ้า, หลัง - โทนแดง
+  static const _beforeColor = Color(0xFF0EA5E9); // Sky-500
+  static const _afterColor = Color(0xFFEF4444); // Red-500
+  static const _beforeBgColor = Color(0xFFE0F2FE); // Sky-100
+  static const _afterBgColor = Color(0xFFFEE2E2); // Red-100
+
+  Widget _buildMealIcon(String mealKey) {
+    IconData icon;
+    Color iconColor;
+    Color bgColor;
+
+    // กำหนดสีตามมื้อ
+    if (mealKey.contains('morning') || mealKey.contains('เช้า')) {
+      icon = Iconsax.sun_1;
+      iconColor = _mealColors['morning']!;
+      bgColor = _mealBgColors['morning']!;
+    } else if (mealKey.contains('noon') || mealKey.contains('กลางวัน')) {
+      icon = Iconsax.sun;
+      iconColor = _mealColors['noon']!;
+      bgColor = _mealBgColors['noon']!;
+    } else if (mealKey.contains('evening') || mealKey.contains('เย็น')) {
+      icon = Iconsax.moon;
+      iconColor = _mealColors['evening']!;
+      bgColor = _mealBgColors['evening']!;
+    } else {
+      // ก่อนนอน
+      icon = Iconsax.moon;
+      iconColor = _mealColors['bedtime']!;
+      bgColor = _mealBgColors['bedtime']!;
+    }
+
+    return Container(
+      padding: EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: AppRadius.smallRadius,
+      ),
+      child: Icon(icon, size: 16, color: iconColor),
+    );
+  }
+
+  /// Badge แสดง ก่อน/หลัง อาหาร
+  Widget _buildBeforeAfterBadge(String mealKey) {
+    final isBedtime =
+        mealKey.contains('bedtime') || mealKey == 'ก่อนนอน';
+
+    // ก่อนนอนไม่ต้องแสดง badge
+    if (isBedtime) return SizedBox.shrink();
+
+    // ตรวจสอบว่าเป็น "ก่อน" หรือ "หลัง" อาหาร
+    final isBefore = mealKey.contains('before') ||
+        (mealKey.contains('ก่อน') && !mealKey.contains('ก่อนนอน'));
+
+    final color = isBefore ? _beforeColor : _afterColor;
+    final bgColor = isBefore ? _beforeBgColor : _afterBgColor;
+    final label = isBefore ? 'ก่อน' : 'หลัง';
+
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: AppRadius.fullRadius,
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Text(
+        label,
+        style: AppTypography.caption.copyWith(
+          color: color,
+          fontWeight: FontWeight.w600,
+          fontSize: 10,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusIcon(MealPhotoStatus status) {
+    switch (status) {
+      case MealPhotoStatus.completed:
+        return Icon(
+          Iconsax.tick_circle5,
+          size: 20,
+          color: AppColors.tagPassedText,
+        );
+      case MealPhotoStatus.arranged:
+        return Icon(
+          Iconsax.clock,
+          size: 20,
+          color: AppColors.tagPendingText,
+        );
+      case MealPhotoStatus.pending:
+        return Icon(
+          Iconsax.minus_cirlce,
+          size: 20,
+          color: AppColors.textSecondary,
+        );
+      case MealPhotoStatus.noMedicine:
+        return Icon(
+          Iconsax.minus,
+          size: 20,
+          color: AppColors.inputBorder,
+        );
+    }
+  }
+
+  Widget _buildContent() {
+    final medicines = widget.mealGroup.medicines;
+    final medLog = widget.mealGroup.medLog;
+    final logPhotoUrl = widget.showFoiled
+        ? medLog?.picture2CUrl
+        : medLog?.picture3CUrl;
+    final hasLogPhoto = logPhotoUrl != null && logPhotoUrl.isNotEmpty;
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        0,
+        AppSpacing.md,
+        AppSpacing.md,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ฝั่งซ้าย: Grid รูปตัวอย่างยา
+          Expanded(
+            flex: 1,
+            child: GridView.builder(
+              shrinkWrap: true,
+              physics: NeverScrollableScrollPhysics(),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: AppSpacing.xs,
+                mainAxisSpacing: AppSpacing.xs,
+                childAspectRatio: 1.0,
+              ),
+              itemCount: medicines.length,
+              itemBuilder: (context, index) {
+                return MedicinePhotoItem(
+                  medicine: medicines[index],
+                  showFoiled: widget.showFoiled,
+                  showOverlay: widget.showOverlay,
+                );
+              },
+            ),
+          ),
+
+          // ฝั่งขวา: รูปจัดยา/ให้ยา (2C/3C) จาก med_logs หรือปุ่มถ่ายรูป
+          SizedBox(width: AppSpacing.sm),
+          Expanded(
+            flex: 1,
+            child: hasLogPhoto
+                ? _buildLogPhoto(logPhotoUrl, medLog!)
+                : _buildCameraButton(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// ปุ่มถ่ายรูป
+  Widget _buildCameraButton() {
+    final photoType = widget.showFoiled ? '2C' : '3C';
+    final label = widget.showFoiled ? 'ถ่ายรูปจัดยา' : 'ถ่ายรูปเสิร์ฟยา';
+    final color = widget.showFoiled
+        ? const Color(0xFF0EA5E9)
+        : const Color(0xFF10B981);
+
+    return AspectRatio(
+      aspectRatio: 1.0,
+      child: Container(
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.05),
+          borderRadius: AppRadius.smallRadius,
+          border: Border.all(
+            color: color.withValues(alpha: 0.3),
+            width: 2,
+            style: BorderStyle.solid,
+          ),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: widget.onTakePhoto != null
+                ? () => widget.onTakePhoto!(widget.mealGroup.mealKey, photoType)
+                : null,
+            borderRadius: AppRadius.smallRadius,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Iconsax.camera,
+                    size: 28,
+                    color: color,
+                  ),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  label,
+                  style: AppTypography.caption.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'กดเพื่อถ่ายรูป',
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.textSecondary,
+                    fontSize: 10,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// แสดงรูปจัดยา/ให้ยา จาก med_logs พร้อมชื่อผู้ถ่ายและเวลา
+  Widget _buildLogPhoto(String photoUrl, MedLog medLog) {
+    // ดึงชื่อผู้ถ่ายและเวลาตาม mode (2C หรือ 3C)
+    final photographer = widget.showFoiled
+        ? medLog.userNickname2c
+        : medLog.userNickname3c;
+    final timestamp = widget.showFoiled
+        ? medLog.createdAt
+        : medLog.timestamp3C ?? medLog.createdAt;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // รูปถ่าย
+        GestureDetector(
+          onTap: () => _showLogPhotoFullScreen(photoUrl),
+          child: Hero(
+            tag: 'log_photo_${widget.mealGroup.mealKey}_$photoUrl',
+            child: AspectRatio(
+              aspectRatio: 1.0,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: AppRadius.smallRadius,
+                  border: Border.all(
+                    color: widget.showFoiled
+                        ? const Color(0xFF0EA5E9)
+                        : const Color(0xFF10B981),
+                    width: 2,
+                  ),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // รูปจัดยา/ให้ยา
+                    CachedNetworkImage(
+                      imageUrl: photoUrl,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Center(
+                        child: CircularProgressIndicator(
+                          color: AppColors.primary,
+                          strokeWidth: 2,
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => Center(
+                        child: Icon(
+                          Iconsax.image,
+                          size: 32,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      fadeInDuration: const Duration(milliseconds: 200),
+                      memCacheWidth: 400,
+                    ),
+
+                    // Badge 2C/3C
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: Container(
+                        padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: widget.showFoiled
+                              ? const Color(0xFF0EA5E9)
+                              : const Color(0xFF10B981),
+                          borderRadius: AppRadius.fullRadius,
+                        ),
+                        child: Text(
+                          widget.showFoiled ? '2C' : '3C',
+                          style: AppTypography.caption.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        // ข้อมูลผู้ถ่ายและเวลา
+        if (photographer != null || timestamp != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              _formatPhotoInfo(photographer, timestamp),
+              style: AppTypography.caption.copyWith(
+                color: AppColors.textSecondary,
+                fontSize: 10,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// Format ข้อมูลผู้ถ่ายและเวลา เช่น "โซฟิยา - 27/12 22:28"
+  String _formatPhotoInfo(String? photographer, DateTime? timestamp) {
+    final parts = <String>[];
+
+    if (photographer != null && photographer.isNotEmpty) {
+      parts.add(photographer);
+    }
+
+    if (timestamp != null) {
+      final day = timestamp.day.toString().padLeft(2, '0');
+      final month = timestamp.month.toString().padLeft(2, '0');
+      final hour = timestamp.hour.toString().padLeft(2, '0');
+      final minute = timestamp.minute.toString().padLeft(2, '0');
+      parts.add('$day/$month $hour:$minute');
+    }
+
+    return parts.join(' - ');
+  }
+
+  void _showLogPhotoFullScreen(String photoUrl) {
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        opaque: false,
+        barrierColor: Colors.black87,
+        pageBuilder: (context, animation, secondaryAnimation) {
+          return FadeTransition(
+            opacity: animation,
+            child: _FullScreenPhotoView(
+              photoUrl: photoUrl,
+              heroTag: 'log_photo_${widget.mealGroup.mealKey}_$photoUrl',
+              title: widget.showFoiled ? 'จัดยา (แผง)' : 'เสิร์ฟยา (เม็ด)',
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Full screen photo viewer with Hero animation
+class _FullScreenPhotoView extends StatelessWidget {
+  final String photoUrl;
+  final String heroTag;
+  final String title;
+
+  const _FullScreenPhotoView({
+    required this.photoUrl,
+    required this.heroTag,
+    required this.title,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: GestureDetector(
+        onTap: () => Navigator.pop(context),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Background - tap to close
+            Container(color: Colors.transparent),
+
+            // Image with Hero
+            Center(
+              child: Hero(
+                tag: heroTag,
+                child: InteractiveViewer(
+                  minScale: 0.5,
+                  maxScale: 4.0,
+                  child: CachedNetworkImage(
+                    imageUrl: photoUrl,
+                    fit: BoxFit.contain,
+                    placeholder: (context, url) => Center(
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    ),
+                    errorWidget: (context, url, error) => Icon(
+                      Iconsax.image,
+                      size: 64,
+                      color: Colors.white54,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            // Close button & Title
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 8,
+              left: 16,
+              right: 16,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    title,
+                    style: AppTypography.title.copyWith(
+                      color: Colors.white,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: Icon(
+                      Iconsax.close_circle,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
