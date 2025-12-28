@@ -116,7 +116,9 @@ class ResidentHeader extends StatelessWidget {
       parts.add('${resident.age} ปี');
     }
     if (resident.gender != null && resident.gender!.isNotEmpty) {
-      parts.add(resident.gender == 'M' ? 'ชาย' : 'หญิง');
+      // gender อาจเป็น 'M'/'F' หรือ 'ชาย'/'หญิง' ขึ้นอยู่กับ data source
+      final isMale = resident.gender == 'M' || resident.gender == 'ชาย';
+      parts.add(isMale ? 'ชาย' : 'หญิง');
     }
     return parts.join(' • ');
   }

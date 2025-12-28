@@ -9,7 +9,7 @@ import '../providers/resident_detail_provider.dart';
 import '../widgets/resident_detail/collapsible_header.dart';
 import '../widgets/resident_detail/view_segmented_control.dart';
 import '../widgets/resident_detail/care_dashboard_view.dart';
-import '../widgets/resident_detail/clinical_view_placeholder.dart';
+import '../widgets/resident_detail/clinical_view.dart';
 import '../widgets/resident_detail/profile_info_view.dart';
 import '../widgets/resident_detail/quick_action_fab.dart';
 
@@ -179,7 +179,10 @@ class _ResidentDetailScreenState extends ConsumerState<ResidentDetailScreen> {
           isLoadingVitalSign: vitalSignAsync.isLoading,
         );
       case DetailViewType.clinical:
-        return ClinicalViewPlaceholder();
+        return ClinicalView(
+          residentId: widget.residentId,
+          residentName: resident.name,
+        );
       case DetailViewType.info:
         return ProfileInfoView(resident: resident);
     }

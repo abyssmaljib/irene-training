@@ -14,26 +14,32 @@ class ResidentDetailService {
   Future<ResidentDetail?> getResidentById(int id) async {
     try {
       final response = await _supabase
-          .from('residents')
+          .from('combined_resident_details_view')
           .select('''
-            id,
+            resident_id,
             i_Name_Surname,
             i_gender,
-            i_DOB,
+            i_dob_datetime,
             i_picture_url,
             i_National_ID_num,
+            zone_id,
             s_zone,
             s_bed,
             s_status,
             s_special_status,
-            s_contract_date,
+            s_contract_date_datetime,
+            s_reason_being_here,
             m_past_history,
             m_dietary,
             m_fooddrug_allergy,
-            underlying_disease_list,
-            nursinghome_zone!s_zone(id, zone)
+            underlying_diseases_list,
+            programs_list,
+            program_pastel_color_list,
+            relatives_list,
+            line_group_id,
+            s_stay_period
           ''')
-          .eq('id', id)
+          .eq('resident_id', id)
           .maybeSingle();
 
       if (response == null) return null;

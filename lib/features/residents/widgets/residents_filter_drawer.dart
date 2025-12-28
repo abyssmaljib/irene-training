@@ -11,20 +11,16 @@ import '../../home/models/zone.dart';
 class ResidentsFilterDrawer extends StatefulWidget {
   final List<Zone> zones;
   final Set<int> selectedZoneIds;
-  final String searchQuery;
   final Set<SpatialStatus> selectedSpatialStatuses;
   final ValueChanged<Set<int>> onZoneSelectionChanged;
-  final ValueChanged<String> onSearchChanged;
   final ValueChanged<Set<SpatialStatus>> onSpatialStatusChanged;
 
   const ResidentsFilterDrawer({
     super.key,
     required this.zones,
     required this.selectedZoneIds,
-    required this.searchQuery,
     required this.selectedSpatialStatuses,
     required this.onZoneSelectionChanged,
-    required this.onSearchChanged,
     required this.onSpatialStatusChanged,
   });
 
@@ -35,23 +31,12 @@ class ResidentsFilterDrawer extends StatefulWidget {
 class _ResidentsFilterDrawerState extends State<ResidentsFilterDrawer> {
   late Set<int> _tempSelectedZoneIds;
   late Set<SpatialStatus> _tempSelectedSpatialStatuses;
-  late TextEditingController _searchController;
-  late FocusNode _searchFocusNode;
 
   @override
   void initState() {
     super.initState();
     _tempSelectedZoneIds = Set.from(widget.selectedZoneIds);
     _tempSelectedSpatialStatuses = Set.from(widget.selectedSpatialStatuses);
-    _searchController = TextEditingController(text: widget.searchQuery);
-    _searchFocusNode = FocusNode();
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    _searchFocusNode.dispose();
-    super.dispose();
   }
 
   void _toggleZone(int zoneId) {
@@ -62,7 +47,6 @@ class _ResidentsFilterDrawerState extends State<ResidentsFilterDrawer> {
         _tempSelectedZoneIds.add(zoneId);
       }
     });
-    // Apply immediately
     widget.onZoneSelectionChanged(Set.from(_tempSelectedZoneIds));
   }
 
@@ -74,20 +58,7 @@ class _ResidentsFilterDrawerState extends State<ResidentsFilterDrawer> {
         _tempSelectedZoneIds = widget.zones.map((z) => z.id).toSet();
       }
     });
-    // Apply immediately
     widget.onZoneSelectionChanged(Set.from(_tempSelectedZoneIds));
-  }
-
-  void _onSearchChanged(String value) {
-    setState(() {});
-    widget.onSearchChanged(value);
-  }
-
-  void _clearSearch() {
-    setState(() {
-      _searchController.clear();
-    });
-    widget.onSearchChanged('');
   }
 
   void _toggleSpatialStatus(SpatialStatus status) {
@@ -105,23 +76,17 @@ class _ResidentsFilterDrawerState extends State<ResidentsFilterDrawer> {
     setState(() {
       _tempSelectedZoneIds.clear();
       _tempSelectedSpatialStatuses.clear();
-      _searchController.clear();
     });
     widget.onZoneSelectionChanged({});
     widget.onSpatialStatusChanged({});
-    widget.onSearchChanged('');
   }
 
   bool get _hasFilters =>
       _tempSelectedZoneIds.isNotEmpty ||
-      _tempSelectedSpatialStatuses.isNotEmpty ||
-      _searchController.text.isNotEmpty;
+      _tempSelectedSpatialStatuses.isNotEmpty;
 
   int get _filterCount {
-    int count = _tempSelectedZoneIds.length;
-    count += _tempSelectedSpatialStatuses.length;
-    if (_searchController.text.isNotEmpty) count++;
-    return count;
+    return _tempSelectedZoneIds.length + _tempSelectedSpatialStatuses.length;
   }
 
   @override
@@ -148,12 +113,6 @@ class _ResidentsFilterDrawerState extends State<ResidentsFilterDrawer> {
             child: ListView(
               padding: EdgeInsets.zero,
               children: [
-                // Search Section
-                _buildSearchSection(),
-
-                // Divider
-                Divider(height: 1, color: AppColors.alternate),
-
                 // Zone Section
                 _buildZoneSection(sortedZones),
 
@@ -250,80 +209,6 @@ class _ResidentsFilterDrawerState extends State<ResidentsFilterDrawer> {
     );
   }
 
-  Widget _buildSearchSection() {
-    return Padding(
-      padding: EdgeInsets.all(AppSpacing.lg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Section header
-          Row(
-            children: [
-              Icon(Iconsax.search_normal, size: 18, color: AppColors.secondaryText),
-              AppSpacing.horizontalGapSm,
-              Text(
-                'ค้นหา',
-                style: AppTypography.body.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.secondaryText,
-                ),
-              ),
-            ],
-          ),
-          AppSpacing.verticalGapMd,
-          // Search field
-          Container(
-            height: 48,
-            decoration: BoxDecoration(
-              color: AppColors.background,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: _searchController.text.isNotEmpty
-                    ? AppColors.primary
-                    : AppColors.alternate,
-                width: _searchController.text.isNotEmpty ? 1.5 : 1,
-              ),
-            ),
-            child: TextField(
-              controller: _searchController,
-              focusNode: _searchFocusNode,
-              decoration: InputDecoration(
-                hintText: 'พิมพ์ชื่อผู้พัก...',
-                hintStyle: AppTypography.body.copyWith(
-                  color: AppColors.secondaryText,
-                ),
-                prefixIcon: Icon(
-                  Iconsax.search_normal,
-                  color: _searchController.text.isNotEmpty
-                      ? AppColors.primary
-                      : AppColors.secondaryText,
-                  size: 20,
-                ),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? GestureDetector(
-                        onTap: _clearSearch,
-                        child: Icon(
-                          Iconsax.close_circle5,
-                          color: AppColors.secondaryText,
-                          size: 20,
-                        ),
-                      )
-                    : null,
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: AppSpacing.md,
-                  vertical: 14,
-                ),
-              ),
-              style: AppTypography.body,
-              onChanged: _onSearchChanged,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildZoneSection(List<Zone> sortedZones) {
     final allSelected = _tempSelectedZoneIds.length == sortedZones.length &&
         sortedZones.isNotEmpty;
@@ -374,7 +259,7 @@ class _ResidentsFilterDrawerState extends State<ResidentsFilterDrawer> {
             ],
           ),
           AppSpacing.verticalGapMd,
-          // Zone chips - ใช้ design เดียวกับหน้าหลัก
+          // Zone chips
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -424,7 +309,6 @@ class _ResidentsFilterDrawerState extends State<ResidentsFilterDrawer> {
   }
 
   Widget _buildSpatialStatusSection() {
-    // รายการ status ที่แสดง (ไม่รวม none)
     const statuses = [
       SpatialStatus.newResident,
       SpatialStatus.refer,
@@ -484,7 +368,6 @@ class _ResidentsFilterDrawerState extends State<ResidentsFilterDrawer> {
                         ),
                         SizedBox(width: 6),
                       ],
-                      // Status icon
                       SpatialStatusBadge(status: status, size: 18, iconSize: 10),
                       SizedBox(width: 6),
                       Text(

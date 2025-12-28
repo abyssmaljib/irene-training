@@ -64,6 +64,7 @@ class VitalSignSnapshot extends StatelessWidget {
                 unit: 'mmHg',
                 status: vitalSign?.bpStatus ?? VitalStatus.normal,
                 onTap: onTapBP,
+                isBP: true,
               ),
               AppSpacing.horizontalGapSm,
               _buildVitalCard(
@@ -110,6 +111,7 @@ class VitalSignSnapshot extends StatelessWidget {
     required String unit,
     required VitalStatus status,
     VoidCallback? onTap,
+    bool isBP = false,
   }) {
     return GestureDetector(
       onTap: onTap,
@@ -146,31 +148,34 @@ class VitalSignSnapshot extends StatelessWidget {
               ],
             ),
 
-            // Value
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Expanded(
-                  child: Text(
-                    value,
-                    style: AppTypography.heading3.copyWith(
-                      color: status.textColor,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                if (unit.isNotEmpty)
-                  Padding(
-                    padding: EdgeInsets.only(bottom: 2),
+            // Value - แสดงแบบพิเศษสำหรับ BP
+            if (isBP)
+              _buildBPValue(value, status)
+            else
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
                     child: Text(
-                      unit,
-                      style: AppTypography.caption.copyWith(
-                        color: AppColors.secondaryText,
+                      value,
+                      style: AppTypography.heading3.copyWith(
+                        color: status.textColor,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (unit.isNotEmpty)
+                    Padding(
+                      padding: EdgeInsets.only(bottom: 2),
+                      child: Text(
+                        unit,
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.secondaryText,
+                        ),
                       ),
                     ),
-                  ),
-              ],
-            ),
+                ],
+              ),
 
             // Status
             Container(
@@ -200,6 +205,63 @@ class VitalSignSnapshot extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  /// Widget แสดงค่า BP แบบแยก sys/dias
+  Widget _buildBPValue(String value, VitalStatus status) {
+    // แยก systolic/diastolic จาก "110/70"
+    final parts = value.split('/');
+    final sys = parts.isNotEmpty ? parts[0] : '-';
+    final dias = parts.length > 1 ? parts[1] : '-';
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Systolic
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(
+                  sys,
+                  style: AppTypography.title.copyWith(
+                    color: status.textColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  '/',
+                  style: AppTypography.bodySmall.copyWith(
+                    color: status.textColor,
+                  ),
+                ),
+                Text(
+                  dias,
+                  style: AppTypography.bodySmall.copyWith(
+                    color: status.textColor,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        Spacer(),
+        Padding(
+          padding: EdgeInsets.only(bottom: 2),
+          child: Text(
+            'mmHg',
+            style: AppTypography.caption.copyWith(
+              color: AppColors.secondaryText,
+              fontSize: 9,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
