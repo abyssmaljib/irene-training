@@ -82,6 +82,7 @@ flutter:
   assets:
     - .env
     - assets/animations/
+    - assets/images/
 
   fonts:
     - family: Anuphan

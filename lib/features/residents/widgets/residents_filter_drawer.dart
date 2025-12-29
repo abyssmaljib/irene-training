@@ -285,7 +285,7 @@ class _ResidentsFilterDrawerState extends State<ResidentsFilterDrawer> {
                     children: [
                       if (isSelected) ...[
                         Icon(
-                          Iconsax.tick_circle5,
+                          Iconsax.tick_circle,
                           size: 14,
                           color: AppColors.primary,
                         ),
@@ -362,7 +362,7 @@ class _ResidentsFilterDrawerState extends State<ResidentsFilterDrawer> {
                     children: [
                       if (isSelected) ...[
                         Icon(
-                          Iconsax.tick_circle5,
+                          Iconsax.tick_circle,
                           size: 14,
                           color: AppColors.primary,
                         ),

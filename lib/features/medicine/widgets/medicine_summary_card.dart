@@ -39,10 +39,10 @@ class _MedicineSummaryCardState extends State<MedicineSummaryCard> {
     try {
       final medicines = await _medicineService.getActiveMedicines(widget.residentId);
 
-      // Group by ATC Level 1 (main category)
+      // Group by ATC Level 1 (main category), fallback to group
       final grouped = <String, List<MedicineSummary>>{};
       for (final med in medicines) {
-        final category = med.atcLevel1NameTh ?? 'อื่นๆ';
+        final category = med.atcLevel1NameTh ?? med.group ?? 'อื่นๆ';
         grouped.putIfAbsent(category, () => []);
         grouped[category]!.add(med);
       }

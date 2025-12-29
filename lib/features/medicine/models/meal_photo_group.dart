@@ -37,6 +37,12 @@ class MealPhotoGroup {
   /// สถานะการตรวจสอบรูป 3C จากหัวหน้าเวร
   final NurseMarkStatus nurseMark3C;
 
+  /// ชื่อผู้ตรวจสอบรูป 2C (format: "ชื่อจริง (ชื่อเล่น)")
+  final String? reviewer2CName;
+
+  /// ชื่อผู้ตรวจสอบรูป 3C (format: "ชื่อจริง (ชื่อเล่น)")
+  final String? reviewer3CName;
+
   MealPhotoGroup({
     required this.mealKey,
     required this.label,
@@ -44,6 +50,8 @@ class MealPhotoGroup {
     this.medLog,
     this.nurseMark2C = NurseMarkStatus.none,
     this.nurseMark3C = NurseMarkStatus.none,
+    this.reviewer2CName,
+    this.reviewer3CName,
   });
 
   /// สถานะของมื้อนี้

@@ -12,6 +12,8 @@ class MedLog {
   final String? userNicknameArrangemed; // ผู้จัดยา
   final String? userNickname2c; // ผู้ถ่ายรูป 2C
   final String? userNickname3c; // ผู้ถ่ายรูป 3C
+  final String? userId2c; // user_id ของผู้ถ่ายรูป 2C
+  final String? userId3c; // user_id ของผู้ถ่ายรูป 3C
 
   MedLog({
     this.id,
@@ -25,6 +27,8 @@ class MedLog {
     this.userNicknameArrangemed,
     this.userNickname2c,
     this.userNickname3c,
+    this.userId2c,
+    this.userId3c,
   });
 
   factory MedLog.fromJson(Map<String, dynamic> json) {
@@ -45,6 +49,8 @@ class MedLog {
       userNicknameArrangemed: json['user_nickname_arrangemed'],
       userNickname2c: json['user_nickname_2c'],
       userNickname3c: json['user_nickname_3c'],
+      userId2c: json['2C_completed_by'],
+      userId3c: json['3C_Compleated_by'],
     );
   }
 

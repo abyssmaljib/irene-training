@@ -5,7 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
-import '../../../core/widgets/buttons.dart';
+import '../../../core/widgets/confirm_dialog.dart';
 import '../models/question.dart';
 import '../models/quiz_session.dart';
 import '../models/quiz_answer.dart';
@@ -258,37 +258,12 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   Future<bool> _onWillPop() async {
-    final shouldExit = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: AppRadius.mediumRadius,
-        ),
-        title: Text(
-          'ออกจากการสอบ?',
-          style: AppTypography.title,
-        ),
-        content: Text(
-          'คุณต้องการออกจากการสอบหรือไม่?\nคำตอบที่ทำไว้จะไม่ถูกบันทึก',
-          style: AppTypography.body,
-        ),
-        actions: [
-          SecondaryButton(
-            text: 'ทำต่อ',
-            onPressed: () => Navigator.pop(context, false),
-          ),
-          const SizedBox(width: 8),
-          DangerButton(
-            text: 'ออก',
-            icon: Iconsax.logout,
-            width: 100,
-            onPressed: () => Navigator.pop(context, true),
-          ),
-        ],
-      ),
+    final shouldExit = await ConfirmDialog.show(
+      context,
+      type: ConfirmDialogType.exitQuiz,
     );
 
-    if (shouldExit == true) {
+    if (shouldExit) {
       _timer?.cancel();
       // Delete incomplete session
       try {
@@ -301,7 +276,7 @@ class _QuizScreenState extends State<QuizScreen> {
       }
     }
 
-    return shouldExit ?? false;
+    return shouldExit;
   }
 
   @override

@@ -8,6 +8,9 @@ class MedErrorLog {
   final bool? field3CPicture; // ตรวจสอบรูป 3C (เสิร์ฟยา)
   final String? replyNurseMark; // "รูปตรง", "รูปไม่ตรง", "ไม่มีรูป", "ตำแหน่งสลับ"
   final DateTime? createdAt;
+  // ข้อมูลผู้ตรวจสอบ (join จาก user_info)
+  final String? reviewerFullName;
+  final String? reviewerNickname;
 
   MedErrorLog({
     required this.id,
@@ -18,9 +21,26 @@ class MedErrorLog {
     this.field3CPicture,
     this.replyNurseMark,
     this.createdAt,
+    this.reviewerFullName,
+    this.reviewerNickname,
   });
 
+  /// ชื่อผู้ตรวจสอบสำหรับแสดงผล: "ชื่อจริง (ชื่อเล่น)"
+  String? get reviewerDisplayName {
+    if (reviewerFullName == null && reviewerNickname == null) return null;
+    if (reviewerNickname != null && reviewerNickname!.isNotEmpty) {
+      if (reviewerFullName != null && reviewerFullName!.isNotEmpty) {
+        return '$reviewerFullName ($reviewerNickname)';
+      }
+      return reviewerNickname;
+    }
+    return reviewerFullName;
+  }
+
   factory MedErrorLog.fromJson(Map<String, dynamic> json) {
+    // ข้อมูล user_info จาก join (ถ้ามี)
+    final userInfo = json['user_info'] as Map<String, dynamic>?;
+
     return MedErrorLog(
       id: json['id'] as int,
       residentId: json['resident_id'] as int?,
@@ -38,6 +58,9 @@ class MedErrorLog {
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'] as String)
           : null,
+      // ข้อมูลผู้ตรวจสอบจาก user_info join
+      reviewerFullName: userInfo?['full_name'] as String?,
+      reviewerNickname: userInfo?['nickname'] as String?,
     );
   }
 }

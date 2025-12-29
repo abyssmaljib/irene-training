@@ -297,15 +297,19 @@ class MedicineService {
 
         NurseMarkStatus nurseMark2C = NurseMarkStatus.none;
         NurseMarkStatus nurseMark3C = NurseMarkStatus.none;
+        String? reviewer2CName;
+        String? reviewer3CName;
 
         for (final errorLog in errorLogs) {
           if (errorLog.meal == errorLogMealKey) {
             debugPrint('  Matched errorLog for "$errorLogMealKey": 2C=${errorLog.field2CPicture}, 3C=${errorLog.field3CPicture}, reply=${errorLog.replyNurseMark}');
             if (errorLog.field2CPicture == true && errorLog.replyNurseMark != null) {
               nurseMark2C = NurseMarkStatusExtension.fromString(errorLog.replyNurseMark);
+              reviewer2CName = errorLog.reviewerDisplayName;
             }
             if (errorLog.field3CPicture == true && errorLog.replyNurseMark != null) {
               nurseMark3C = NurseMarkStatusExtension.fromString(errorLog.replyNurseMark);
+              reviewer3CName = errorLog.reviewerDisplayName;
             }
           }
         }
@@ -321,6 +325,8 @@ class MedicineService {
           medLog: logsMap[mealKey],
           nurseMark2C: nurseMark2C,
           nurseMark3C: nurseMark3C,
+          reviewer2CName: reviewer2CName,
+          reviewer3CName: reviewer3CName,
         ));
       }
 
@@ -484,9 +490,10 @@ extension MedicineServiceErrorLogs on MedicineService {
 
       // Table name is A_Med_Error_Log (with underscores and capital letters)
       // Column name is CalendarDate (camelCase) in database
+      // Join กับ user_info เพื่อดึงชื่อผู้ตรวจสอบ
       final response = await Supabase.instance.client
           .from('A_Med_Error_Log')
-          .select()
+          .select('*, user_info:user_id(full_name, nickname)')
           .eq('resident_id', residentId)
           .eq('CalendarDate', dateStr);
 

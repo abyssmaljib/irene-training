@@ -4,7 +4,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
-import '../../../core/widgets/buttons.dart';
+import '../../../core/widgets/confirm_dialog.dart';
+import '../../../core/services/user_service.dart';
 import '../../auth/screens/login_screen.dart';
 import '../../learning/screens/directory_screen.dart';
 import '../../learning/models/badge.dart';
@@ -24,12 +25,19 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   UserProfile? _userProfile;
+  UserRole? _userRole;
+  String? _userEmail;
   // NOTE: _skillsData temporarily unused - skill visualization hidden for review
   // ignore: unused_field
   ThinkingSkillsData? _skillsData;
   List<Badge> _earnedBadges = [];
   bool _isLoading = true;
   String? _error;
+
+  // Dev emails that can change role
+  static const _devEmails = ['beautyheechul@gmail.com'];
+
+  bool get _isDevMode => _devEmails.contains(_userEmail);
 
   @override
   void initState() {
@@ -40,9 +48,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _loadData() async {
     await Future.wait([
       _loadUserProfile(),
+      _loadUserRole(),
       _loadThinkingSkills(),
       _loadBadges(),
     ]);
+  }
+
+  Future<void> _loadUserRole() async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      _userEmail = user?.email;
+
+      final role = await UserService().getRole(forceRefresh: true);
+      if (mounted) {
+        setState(() {
+          _userRole = role;
+        });
+      }
+    } catch (e) {
+      debugPrint('Load user role error: $e');
+    }
   }
 
   Future<void> _loadBadges() async {
@@ -126,35 +151,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _showLogoutDialog() async {
-    final shouldLogout = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: AppRadius.mediumRadius,
-        ),
-        title: Text(
-          'ออกจากระบบ',
-          style: AppTypography.title,
-        ),
-        content: Text(
-          'คุณต้องการออกจากระบบหรือไม่?',
-          style: AppTypography.body,
-        ),
-        actions: [
-          SecondaryButton(
-            text: 'ยกเลิก',
-            onPressed: () => Navigator.pop(context, false),
-          ),
-          AppSpacing.horizontalGapSm,
-          DangerButton(
-            text: 'ออกจากระบบ',
-            onPressed: () => Navigator.pop(context, true),
-          ),
-        ],
-      ),
+    final shouldLogout = await ConfirmDialog.show(
+      context,
+      type: ConfirmDialogType.logout,
+      imageAsset: 'assets/images/confirm_cat.webp',
+      imageSize: 120,
     );
 
-    if (shouldLogout == true && mounted) {
+    if (shouldLogout && mounted) {
       await Supabase.instance.client.auth.signOut();
       if (mounted) {
         Navigator.pushAndRemoveUntil(
@@ -260,10 +264,50 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 color: AppColors.primary,
               ),
             ),
+            // User Role Badge
+            if (_userRole != null) ...[
+              AppSpacing.verticalGapSm,
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm,
+                  vertical: AppSpacing.xs,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: AppRadius.smallRadius,
+                  border: Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Iconsax.user_tag,
+                      size: 14,
+                      color: AppColors.primary,
+                    ),
+                    SizedBox(width: 4),
+                    Text(
+                      _userRole!.displayName,
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             AppSpacing.verticalGapMd,
             // Menu Section
             _buildMenuSection(),
             AppSpacing.verticalGapMd,
+            // Dev Role Selector - only for dev emails
+            if (_isDevMode) ...[
+              _buildDevRoleSelector(),
+              AppSpacing.verticalGapMd,
+            ],
             // Badges Section - แสดงเสมอ
             _buildBadgesSection(),
             AppSpacing.verticalGapMd,
@@ -406,6 +450,129 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildDevRoleSelector() {
+    final roles = [
+      {'name': null, 'display': 'พนักงาน (ไม่มี role)', 'color': Colors.grey},
+      {'name': 'admin', 'display': 'Admin (หัวหน้าเวร)', 'color': Colors.indigo},
+      {'name': 'superAdmin', 'display': 'Super Admin', 'color': Colors.red},
+    ];
+
+    return Container(
+      width: double.infinity,
+      padding: AppSpacing.paddingMd,
+      decoration: BoxDecoration(
+        color: Colors.amber.shade50,
+        borderRadius: AppRadius.mediumRadius,
+        border: Border.all(color: Colors.amber.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Iconsax.code, size: 16, color: Colors.amber.shade700),
+              AppSpacing.horizontalGapSm,
+              Text(
+                'Dev Mode - เลือก Role',
+                style: AppTypography.label.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.amber.shade700,
+                ),
+              ),
+            ],
+          ),
+          AppSpacing.verticalGapSm,
+          Text(
+            'Role ปัจจุบัน: ${_userRole?.displayName ?? "พนักงาน"}',
+            style: AppTypography.bodySmall.copyWith(
+              color: Colors.amber.shade900,
+            ),
+          ),
+          AppSpacing.verticalGapMd,
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: roles.map((role) {
+              final isSelected = _userRole?.name == role['name'];
+              final color = role['color'] as Color;
+
+              return InkWell(
+                onTap: () => _changeRole(role['name'] as String?),
+                borderRadius: AppRadius.smallRadius,
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                    vertical: AppSpacing.sm,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? color.withValues(alpha: 0.2)
+                        : color.withValues(alpha: 0.05),
+                    borderRadius: AppRadius.smallRadius,
+                    border: Border.all(
+                      color: isSelected
+                          ? color
+                          : color.withValues(alpha: 0.3),
+                      width: isSelected ? 2 : 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (isSelected) ...[
+                        Icon(
+                          Iconsax.tick_circle,
+                          size: 16,
+                          color: color,
+                        ),
+                        SizedBox(width: 4),
+                      ],
+                      Text(
+                        role['display'] as String,
+                        style: AppTypography.bodySmall.copyWith(
+                          color: color,
+                          fontWeight:
+                              isSelected ? FontWeight.w600 : FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _changeRole(String? roleName) async {
+    final success = await UserService().updateRole(roleName);
+    if (!mounted) return;
+
+    if (success) {
+      // Reload role
+      await _loadUserRole();
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'เปลี่ยน role เป็น: ${roleName ?? "พนักงาน"}',
+          ),
+          backgroundColor: AppColors.primary,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('ไม่สามารถเปลี่ยน role ได้'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
   }
 
   Widget _buildBadgesSection() {

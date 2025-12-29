@@ -102,7 +102,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 style: AppTypography.caption.copyWith(color: AppColors.secondaryText),
               ),
               trailing: _selectedZone?.id == zone.id
-                  ? Icon(Iconsax.tick_circle5, color: AppColors.primary)
+                  ? Icon(Iconsax.tick_circle, color: AppColors.primary)
                   : null,
               onTap: () {
                 setState(() {

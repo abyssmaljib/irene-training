@@ -4,9 +4,11 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/toggle_switch.dart';
+import '../../../core/services/user_service.dart';
 import '../models/meal_photo_group.dart';
 import '../services/camera_service.dart';
 import '../services/medicine_service.dart';
+import '../services/med_error_log_service.dart';
 import '../widgets/day_picker.dart';
 import '../widgets/meal_section_card.dart';
 import 'medicine_list_screen.dart';
@@ -30,6 +32,7 @@ class MedicinePhotosScreen extends StatefulWidget {
 class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
   final _medicineService = MedicineService.instance;
   final _cameraService = CameraService.instance;
+  final _medErrorLogService = MedErrorLogService();
 
   DateTime _selectedDate = DateTime.now();
   bool _showFoiled = true; // true = แผง (2C), false = เม็ดยา (3C)
@@ -37,11 +40,21 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
   List<MealPhotoGroup> _mealGroups = [];
   bool _isLoading = true;
   int? _expandedIndex; // index ของมื้อที่ expand อยู่ (null = ไม่มีมื้อไหน expand)
+  bool _canQC = false; // สิทธิ์ QC (admin/superAdmin)
 
   @override
   void initState() {
     super.initState();
     _loadMealGroups();
+    _checkQCPermission();
+  }
+
+  /// ตรวจสอบว่า user มีสิทธิ์ QC หรือไม่
+  Future<void> _checkQCPermission() async {
+    final canQC = await UserService().canQC();
+    if (mounted) {
+      setState(() => _canQC = canQC);
+    }
   }
 
   /// โหลดข้อมูลยาแบ่งตามมื้อ
@@ -273,9 +286,11 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
           showFoiled: _showFoiled,
           showOverlay: _showOverlay,
           isExpanded: _expandedIndex == index,
+          canQC: _canQC,
           onExpandChanged: () => _onMealExpanded(index),
           onTakePhoto: _onTakePhoto,
           onDeletePhoto: _onDeletePhoto,
+          onQCPhoto: _onQCPhoto,
         );
       },
     );
@@ -391,6 +406,101 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
       return 'หลังอาหารเย็น';
     }
     return 'ก่อนนอน';
+  }
+
+  /// QC รูปยา (สำหรับ admin/superAdmin)
+  Future<void> _onQCPhoto(String mealKey, String photoType, String status) async {
+    final is2C = photoType == '2C';
+
+    // ถ้าเป็น __reset__ ให้ลบ record แทน
+    if (status == '__reset__') {
+      _showLoadingDialog(message: 'กำลังยกเลิก...');
+
+      try {
+        final success = await _medErrorLogService.deleteErrorLog(
+          residentId: widget.residentId,
+          date: _selectedDate,
+          meal: mealKey,
+          is2CPicture: is2C,
+        );
+
+        if (mounted) Navigator.pop(context);
+
+        if (success) {
+          await _loadMealGroups(forceRefresh: true, preserveExpanded: true);
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('ยกเลิกการตรวจเรียบร้อยแล้ว'),
+                backgroundColor: AppColors.primary,
+              ),
+            );
+          }
+        } else {
+          throw Exception('Delete failed');
+        }
+      } catch (e) {
+        if (mounted && Navigator.canPop(context)) {
+          Navigator.pop(context);
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('เกิดข้อผิดพลาด: $e'),
+              backgroundColor: AppColors.tagFailedText,
+            ),
+          );
+        }
+      }
+      return;
+    }
+
+    // บันทึกผลการตรวจปกติ
+    _showLoadingDialog(message: 'กำลังบันทึก...');
+
+    try {
+      final success = await _medErrorLogService.saveErrorLog(
+        residentId: widget.residentId,
+        date: _selectedDate,
+        meal: mealKey,
+        is2CPicture: is2C,
+        replyNurseMark: status,
+      );
+
+      // ปิด loading dialog
+      if (mounted) Navigator.pop(context);
+
+      if (success) {
+        // รีโหลดข้อมูลเพื่อแสดงสถานะใหม่ (เก็บสถานะ expand ไว้)
+        await _loadMealGroups(forceRefresh: true, preserveExpanded: true);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('บันทึกผลตรวจ "$status" เรียบร้อยแล้ว'),
+              backgroundColor: AppColors.tagPassedText,
+            ),
+          );
+        }
+      } else {
+        throw Exception('Save failed');
+      }
+    } catch (e) {
+      // ปิด loading dialog ถ้ายังเปิดอยู่
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาด: $e'),
+            backgroundColor: AppColors.tagFailedText,
+          ),
+        );
+      }
+    }
   }
 
   /// ลบรูปยา

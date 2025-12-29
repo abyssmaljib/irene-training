@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/confirm_dialog.dart';
 import '../models/med_log.dart';
 import '../models/med_error_log.dart';
 import '../models/meal_photo_group.dart';
@@ -15,9 +17,11 @@ class MealSectionCard extends StatefulWidget {
   final bool showFoiled; // true = แผง (2C), false = เม็ดยา (3C)
   final bool showOverlay; // แสดง overlay จำนวนเม็ดยา
   final bool isExpanded; // controlled from parent
+  final bool canQC; // ถ้า true แสดงปุ่ม QC (สำหรับ admin/superAdmin)
   final VoidCallback? onExpandChanged; // callback when tapped
   final Future<void> Function(String mealKey, String photoType)? onTakePhoto; // callback สำหรับถ่ายรูป
   final Future<void> Function(String mealKey, String photoType)? onDeletePhoto; // callback สำหรับลบรูป
+  final Future<void> Function(String mealKey, String photoType, String status)? onQCPhoto; // callback สำหรับ QC
 
   const MealSectionCard({
     super.key,
@@ -25,9 +29,11 @@ class MealSectionCard extends StatefulWidget {
     this.showFoiled = true,
     this.showOverlay = true,
     this.isExpanded = false,
+    this.canQC = false,
     this.onExpandChanged,
     this.onTakePhoto,
     this.onDeletePhoto,
+    this.onQCPhoto,
   });
 
   @override
@@ -244,21 +250,31 @@ class _MealSectionCardState extends State<MealSectionCard>
     Color iconColor;
     Color bgColor;
 
-    // กำหนดสีตามมื้อ
+    // ตรวจสอบว่าเป็น "ก่อน" หรือ "หลัง"
+    final isBefore = mealKey.contains('before') ||
+        (mealKey.contains('ก่อน') && !mealKey.contains('ก่อนนอน'));
+
+    // กำหนด icon และสีตามมื้อ (แยกละเอียดตามรูป)
     if (mealKey.contains('morning') || mealKey.contains('เช้า')) {
-      icon = Iconsax.sun_1;
+      // เช้า - สีส้ม
       iconColor = _mealColors['morning']!;
       bgColor = _mealBgColors['morning']!;
+      // ก่อนเช้า = sunrise, หลังเช้า = sun
+      icon = isBefore ? Iconsax.sun_1 : Iconsax.sun;
     } else if (mealKey.contains('noon') || mealKey.contains('กลางวัน')) {
-      icon = Iconsax.sun;
+      // กลางวัน - สีส้ม
       iconColor = _mealColors['noon']!;
       bgColor = _mealBgColors['noon']!;
+      // ก่อนกลางวัน = sun_fog (พระอาทิตย์แรง), หลังกลางวัน = sun
+      icon = isBefore ? Iconsax.sun_fog : Iconsax.sun;
     } else if (mealKey.contains('evening') || mealKey.contains('เย็น')) {
-      icon = Iconsax.moon;
+      // เย็น - สีน้ำเงิน
       iconColor = _mealColors['evening']!;
       bgColor = _mealBgColors['evening']!;
+      // ก่อนเย็น = sun_1 (sunset), หลังเย็น = cloud
+      icon = isBefore ? Iconsax.sun_1 : Iconsax.cloud;
     } else {
-      // ก่อนนอน
+      // ก่อนนอน - สีม่วง + moon
       icon = Iconsax.moon;
       iconColor = _mealColors['bedtime']!;
       bgColor = _mealBgColors['bedtime']!;
@@ -312,7 +328,7 @@ class _MealSectionCardState extends State<MealSectionCard>
     switch (status) {
       case MealPhotoStatus.completed:
         return Icon(
-          Iconsax.tick_circle5,
+          Iconsax.tick_circle,
           size: 20,
           color: AppColors.tagPassedText,
         );
@@ -545,6 +561,28 @@ class _MealSectionCardState extends State<MealSectionCard>
     );
   }
 
+  /// ตรวจสอบว่าสามารถลบรูปได้หรือไม่
+  /// - ต้องถ่ายไม่เกิน 6 ชม.
+  /// - ต้องเป็นคนถ่ายรูปเอง (ยกเว้น admin)
+  bool _canDeletePhoto({
+    required DateTime? timestamp,
+    required String? photographerUserId,
+  }) {
+    if (timestamp == null) return false;
+
+    // ตรวจสอบเวลา: ต้องถ่ายไม่เกิน 6 ชม.
+    final now = DateTime.now();
+    final difference = now.difference(timestamp);
+    if (difference.inHours >= 6) return false;
+
+    // ตรวจสอบ user: ต้องเป็นคนถ่ายรูปเอง
+    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+    if (currentUserId == null) return false;
+    if (photographerUserId == null) return false;
+
+    return currentUserId == photographerUserId;
+  }
+
   /// แสดงรูปจัดยา/ให้ยา จาก med_logs พร้อมชื่อผู้ถ่ายและเวลา
   Widget _buildLogPhoto(String photoUrl, MedLog medLog) {
     // ดึงชื่อผู้ถ่ายและเวลาตาม mode (2C หรือ 3C)
@@ -554,6 +592,15 @@ class _MealSectionCardState extends State<MealSectionCard>
     final timestamp = widget.showFoiled
         ? medLog.createdAt
         : medLog.timestamp3C ?? medLog.createdAt;
+    final photographerUserId = widget.showFoiled
+        ? medLog.userId2c
+        : medLog.userId3c;
+
+    // ตรวจสอบว่าสามารถลบรูปได้หรือไม่ (ภายใน 6 ชม. + เป็นคนถ่ายเอง)
+    final canDelete = _canDeletePhoto(
+      timestamp: timestamp,
+      photographerUserId: photographerUserId,
+    );
 
     final borderColor = widget.showFoiled
         ? const Color(0xFF0EA5E9)
@@ -634,8 +681,8 @@ class _MealSectionCardState extends State<MealSectionCard>
                   ),
                 ),
 
-                // ปุ่มลบรูป (มุมขวาบน)
-                if (widget.onDeletePhoto != null)
+                // ปุ่มลบรูป (มุมขวาบน) - แสดงเฉพาะรูปที่ถ่ายไม่เกิน 6 ชม.
+                if (widget.onDeletePhoto != null && canDelete)
                   Positioned(
                     top: 8,
                     right: 8,
@@ -653,6 +700,22 @@ class _MealSectionCardState extends State<MealSectionCard>
                           color: Colors.white,
                         ),
                       ),
+                    ),
+                  ),
+
+                // ปุ่ม QC (มุมซ้ายบน) - แสดงเฉพาะ admin/superAdmin
+                if (widget.canQC && widget.onQCPhoto != null)
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    child: _QCButton(
+                      onTap: _showQCDialog,
+                      currentStatus: widget.showFoiled
+                          ? widget.mealGroup.nurseMark2C
+                          : widget.mealGroup.nurseMark3C,
+                      reviewerName: widget.showFoiled
+                          ? widget.mealGroup.reviewer2CName
+                          : widget.mealGroup.reviewer3CName,
                     ),
                   ),
 
@@ -675,7 +738,7 @@ class _MealSectionCardState extends State<MealSectionCard>
                     ),
                     child: Row(
                       children: [
-                        // Badge 2C/3C
+                        // Badge จัดโดย/เสิร์ฟโดย
                         Container(
                           padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
@@ -683,7 +746,7 @@ class _MealSectionCardState extends State<MealSectionCard>
                             borderRadius: AppRadius.fullRadius,
                           ),
                           child: Text(
-                            widget.showFoiled ? '2C' : '3C',
+                            widget.showFoiled ? 'จัดโดย' : 'เสิร์ฟโดย',
                             style: AppTypography.caption.copyWith(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -741,59 +804,50 @@ class _MealSectionCardState extends State<MealSectionCard>
     return parts.join(' - ');
   }
 
-  /// แสดง dialog ยืนยันการลบรูป
-  void _showDeleteConfirmDialog() {
+  /// แสดง dialog เลือกสถานะ QC
+  Future<void> _showQCDialog() async {
     final photoType = widget.showFoiled ? '2C' : '3C';
     final typeLabel = widget.showFoiled ? 'จัดยา' : 'เสิร์ฟยา';
 
-    showDialog(
+    // ดึงสถานะปัจจุบัน
+    final currentMark = widget.showFoiled
+        ? widget.mealGroup.nurseMark2C
+        : widget.mealGroup.nurseMark3C;
+
+    final result = await showModalBottomSheet<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.secondaryBackground,
-        shape: RoundedRectangleBorder(
-          borderRadius: AppRadius.mediumRadius,
-        ),
-        title: Row(
-          children: [
-            Icon(Iconsax.trash, color: AppColors.error, size: 24),
-            SizedBox(width: 8),
-            Text(
-              'ลบรูป$typeLabel',
-              style: AppTypography.title,
-            ),
-          ],
-        ),
-        content: Text(
-          'ต้องการลบรูป$typeLabel ($photoType) ของมื้อนี้หรือไม่?\n\nการลบจะไม่สามารถกู้คืนได้',
-          style: AppTypography.body,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'ยกเลิก',
-              style: AppTypography.body.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              widget.onDeletePhoto?.call(
-                widget.mealGroup.mealKey,
-                photoType,
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-              foregroundColor: Colors.white,
-            ),
-            child: Text('ลบรูป'),
-          ),
-        ],
+      backgroundColor: Colors.transparent,
+      builder: (context) => _QCBottomSheet(
+        photoType: photoType,
+        typeLabel: typeLabel,
+        currentStatus: currentMark,
       ),
     );
+
+    if (result != null && widget.onQCPhoto != null) {
+      await widget.onQCPhoto!(widget.mealGroup.mealKey, photoType, result);
+    }
+  }
+
+  /// แสดง dialog ยืนยันการลบรูป
+  Future<void> _showDeleteConfirmDialog() async {
+    final photoType = widget.showFoiled ? '2C' : '3C';
+    final typeLabel = widget.showFoiled ? 'จัดยา' : 'เสิร์ฟยา';
+
+    final shouldDelete = await ConfirmDialog.show(
+      context,
+      type: ConfirmDialogType.delete,
+      title: 'ลบรูป$typeLabel',
+      message: 'ต้องการลบรูป$typeLabel ($photoType) ของมื้อนี้หรือไม่?\n\nการลบจะไม่สามารถกู้คืนได้',
+      confirmText: 'ลบรูป',
+    );
+
+    if (shouldDelete) {
+      widget.onDeletePhoto?.call(
+        widget.mealGroup.mealKey,
+        photoType,
+      );
+    }
   }
 
   void _showLogPhotoFullScreen(String photoUrl) {
@@ -812,6 +866,450 @@ class _MealSectionCardState extends State<MealSectionCard>
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+/// ปุ่ม QC พร้อม pulse animation เพื่อดึงดูดความสนใจ
+/// แสดงสถานะการตรวจสอบปัจจุบันหากมี พร้อมชื่อผู้ตรวจสอบ
+class _QCButton extends StatefulWidget {
+  final VoidCallback onTap;
+  final NurseMarkStatus currentStatus;
+  final String? reviewerName; // ชื่อผู้ตรวจสอบ (format: "ชื่อจริง (ชื่อเล่น)")
+
+  const _QCButton({
+    required this.onTap,
+    required this.currentStatus,
+    this.reviewerName,
+  });
+
+  @override
+  State<_QCButton> createState() => _QCButtonState();
+}
+
+class _QCButtonState extends State<_QCButton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _opacityAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
+
+    // เริ่ม animation เฉพาะเมื่อยังไม่ได้ตรวจสอบ
+    if (widget.currentStatus == NurseMarkStatus.none) {
+      _controller.repeat(reverse: true);
+    }
+
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.08).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+
+    _opacityAnimation = Tween<double>(begin: 0.7, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void didUpdateWidget(_QCButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // เริ่ม/หยุด animation เมื่อ status เปลี่ยน
+    if (widget.currentStatus != oldWidget.currentStatus) {
+      if (widget.currentStatus == NurseMarkStatus.none) {
+        _controller.repeat(reverse: true);
+      } else {
+        _controller.stop();
+        _controller.value = 0;
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  /// ข้อมูลสีและ icon ตาม status
+  ({Color color, Color bgColor, IconData icon, String label}) _getStatusStyle() {
+    switch (widget.currentStatus) {
+      case NurseMarkStatus.correct:
+        return (
+          color: const Color(0xFF166534), // green-800
+          bgColor: const Color(0xFFDCFCE7), // green-100
+          icon: Icons.check_circle,
+          label: 'รูปตรง',
+        );
+      case NurseMarkStatus.incorrect:
+        return (
+          color: const Color(0xFFDC2626), // red-600
+          bgColor: const Color(0xFFFEE2E2), // red-100
+          icon: Icons.cancel,
+          label: 'รูปไม่ตรง',
+        );
+      case NurseMarkStatus.noPhoto:
+        return (
+          color: const Color(0xFF6B7280), // gray-500
+          bgColor: const Color(0xFFF3F4F6), // gray-100
+          icon: Icons.image_not_supported,
+          label: 'ไม่มีรูป',
+        );
+      case NurseMarkStatus.swapped:
+        return (
+          color: const Color(0xFFD97706), // amber-600
+          bgColor: const Color(0xFFFEF3C7), // amber-100
+          icon: Icons.swap_horiz,
+          label: 'ตำแหน่งสลับ',
+        );
+      case NurseMarkStatus.none:
+        return (
+          color: Colors.white,
+          bgColor: Colors.transparent,
+          icon: Icons.touch_app,
+          label: 'ตรวจสอบ',
+        );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasStatus = widget.currentStatus != NurseMarkStatus.none;
+    final style = _getStatusStyle();
+
+    // ถ้ามี status แล้ว แสดงแบบ solid badge (ไม่มี animation)
+    if (hasStatus) {
+      // สร้าง label: ถ้ามีชื่อผู้ตรวจ แสดง "ตรวจโดย ชื่อ" ไม่งั้นแสดง status label
+      final displayLabel = widget.reviewerName != null && widget.reviewerName!.isNotEmpty
+          ? 'ตรวจโดย ${widget.reviewerName}'
+          : style.label;
+
+      return GestureDetector(
+        onTap: widget.onTap,
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: style.bgColor,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: style.color.withValues(alpha: 0.3),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.15),
+                blurRadius: 4,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                style.icon,
+                size: 14,
+                color: style.color,
+              ),
+              SizedBox(width: 4),
+              Text(
+                displayLabel,
+                style: AppTypography.caption.copyWith(
+                  color: style.color,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // ยังไม่ได้ตรวจสอบ - แสดงแบบ gradient + animation
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: _scaleAnimation.value,
+          child: Opacity(
+            opacity: _opacityAnimation.value,
+            child: child,
+          ),
+        );
+      },
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                const Color(0xFFF59E0B), // amber-500
+                const Color(0xFFF97316), // orange-500
+              ],
+            ),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFF59E0B).withValues(alpha: 0.4),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.touch_app,
+                size: 16,
+                color: Colors.white,
+              ),
+              SizedBox(width: 6),
+              Text(
+                'ตรวจสอบ',
+                style: AppTypography.caption.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Bottom sheet สำหรับเลือกสถานะ QC
+class _QCBottomSheet extends StatelessWidget {
+  final String photoType;
+  final String typeLabel;
+  final NurseMarkStatus currentStatus;
+
+  const _QCBottomSheet({
+    required this.photoType,
+    required this.typeLabel,
+    required this.currentStatus,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.secondaryBackground,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: AppSpacing.paddingLg,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Handle bar
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.inputBorder,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              SizedBox(height: AppSpacing.md),
+
+              // Title
+              Text(
+                'ตรวจสอบรูป$typeLabel ($photoType)',
+                style: AppTypography.heading3,
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: AppSpacing.lg),
+
+              // Options - 2x2 grid
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildOption(
+                      context,
+                      status: 'รูปตรง',
+                      icon: Icons.check_circle,
+                      color: const Color(0xFF22C55E), // green-500
+                      bgColor: const Color(0xFFDCFCE7), // green-100
+                      isSelected: currentStatus == NurseMarkStatus.correct,
+                    ),
+                  ),
+                  SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: _buildOption(
+                      context,
+                      status: 'รูปไม่ตรง',
+                      icon: Icons.cancel,
+                      color: const Color(0xFFEF4444), // red-500
+                      bgColor: const Color(0xFFFEE2E2), // red-100
+                      isSelected: currentStatus == NurseMarkStatus.incorrect,
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: AppSpacing.sm),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildOption(
+                      context,
+                      status: 'ไม่มีรูป',
+                      icon: Icons.image_not_supported,
+                      color: const Color(0xFF6B7280), // gray-500
+                      bgColor: const Color(0xFFF3F4F6), // gray-100
+                      isSelected: currentStatus == NurseMarkStatus.noPhoto,
+                    ),
+                  ),
+                  SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: _buildOption(
+                      context,
+                      status: 'ตำแหน่งสลับ',
+                      icon: Icons.swap_horiz,
+                      color: const Color(0xFFD97706), // amber-600
+                      bgColor: const Color(0xFFFEF3C7), // amber-100
+                      isSelected: currentStatus == NurseMarkStatus.swapped,
+                    ),
+                  ),
+                ],
+              ),
+
+              SizedBox(height: AppSpacing.lg),
+
+              // Reset button - แสดงเฉพาะเมื่อมี status อยู่แล้ว
+              if (currentStatus != NurseMarkStatus.none) ...[
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => Navigator.pop(context, '__reset__'),
+                    borderRadius: AppRadius.smallRadius,
+                    child: Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        color: AppColors.error.withValues(alpha: 0.08),
+                        borderRadius: AppRadius.smallRadius,
+                        border: Border.all(
+                          color: AppColors.error.withValues(alpha: 0.3),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.refresh,
+                            size: 18,
+                            color: AppColors.error,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'ยกเลิกการตรวจ',
+                            style: AppTypography.button.copyWith(
+                              color: AppColors.error,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(height: AppSpacing.sm),
+              ],
+
+              // Cancel button
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => Navigator.pop(context),
+                  borderRadius: AppRadius.smallRadius,
+                  child: Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.symmetric(vertical: 14),
+                    child: Center(
+                      child: Text(
+                        'ปิด',
+                        style: AppTypography.button.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOption(
+    BuildContext context, {
+    required String status,
+    required IconData icon,
+    required Color color,
+    required Color bgColor,
+    required bool isSelected,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => Navigator.pop(context, status),
+        borderRadius: AppRadius.smallRadius,
+        child: Container(
+          padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
+          decoration: BoxDecoration(
+            color: isSelected ? color.withValues(alpha: 0.15) : bgColor,
+            borderRadius: AppRadius.smallRadius,
+            border: Border.all(
+              color: isSelected ? color : color.withValues(alpha: 0.3),
+              width: isSelected ? 2 : 1,
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 32,
+                color: color,
+              ),
+              SizedBox(height: AppSpacing.xs),
+              Text(
+                status,
+                style: AppTypography.body.copyWith(
+                  color: color,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                ),
+              ),
+              if (isSelected) ...[
+                SizedBox(height: 2),
+                Text(
+                  '(เลือกอยู่)',
+                  style: AppTypography.caption.copyWith(
+                    color: color.withValues(alpha: 0.7),
+                    fontSize: 10,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
