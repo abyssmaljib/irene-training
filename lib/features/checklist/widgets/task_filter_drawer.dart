@@ -4,6 +4,7 @@ import 'package:iconsax/iconsax.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../medicine/widgets/day_picker.dart';
 import '../providers/task_provider.dart';
 
 /// Drawer สำหรับเลือก view mode และ filters
@@ -43,6 +44,34 @@ class TaskFilterDrawer extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Date Selector Section
+                    Padding(
+                      padding: EdgeInsets.all(AppSpacing.md),
+                      child: Text(
+                        'เลือกวันที่',
+                        style: AppTypography.title.copyWith(
+                          color: AppColors.secondaryText,
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                      child: Consumer(
+                        builder: (context, ref, _) {
+                          final selectedDate = ref.watch(selectedDateProvider);
+                          return DayPicker(
+                            selectedDate: selectedDate,
+                            onDateChanged: (date) {
+                              ref.read(selectedDateProvider.notifier).state = date;
+                              refreshTasks(ref);
+                            },
+                          );
+                        },
+                      ),
+                    ),
+
+                    const Divider(height: 32),
+
                     // View Mode Section
                     Padding(
                       padding: EdgeInsets.all(AppSpacing.md),
@@ -267,7 +296,7 @@ class _ViewModeOption extends StatelessWidget {
         ),
       ),
       selected: isSelected,
-      selectedTileColor: AppColors.accent1.withValues(alpha: 0.5),
+      selectedTileColor: AppColors.primary.withValues(alpha: 0.08), // อ่อนลงเพื่อให้อ่านง่าย
     );
   }
 
@@ -327,8 +356,7 @@ class _RoleFilterSection extends ConsumerWidget {
     final allRolesAsync = ref.watch(allSystemRolesProvider);
     final selectedRoleId = ref.watch(selectedRoleFilterProvider);
     final userRoleAsync = ref.watch(currentUserSystemRoleProvider);
-    final pendingForMyRole = ref.watch(pendingTasksForMyRoleProvider);
-    final pendingForAllRoles = ref.watch(pendingTasksForAllRolesProvider);
+    final pendingPerRole = ref.watch(pendingTasksPerRoleProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -343,40 +371,64 @@ class _RoleFilterSection extends ConsumerWidget {
           ),
         ),
         allRolesAsync.when(
-          data: (roles) {
+          data: (allRoles) {
             final userRole = userRoleAsync.valueOrNull;
-            // Determine which option is selected
-            // null or user's role id = "ตำแหน่งของฉัน"
-            // -1 = "ดูทุกตำแหน่ง"
-            final isMyRoleSelected = selectedRoleId == null ||
-                (userRole != null && selectedRoleId == userRole.id);
-            final isAllSelected = selectedRoleId == -1;
+            if (userRole == null) {
+              return Padding(
+                padding: EdgeInsets.all(AppSpacing.md),
+                child: Text(
+                  'ไม่พบข้อมูลตำแหน่ง',
+                  style: AppTypography.body.copyWith(color: AppColors.secondaryText),
+                ),
+              );
+            }
+
+            // สร้างรายการ role ที่ user มีสิทธิ์ดู
+            // 1. role ของตัวเอง
+            // 2. role ใน relatedRoleIds
+            final visibleRoleIds = <int>{userRole.id, ...userRole.relatedRoleIds};
+            final visibleRoles = allRoles
+                .where((r) => visibleRoleIds.contains(r.id))
+                .toList();
+
+            // เรียงลำดับให้ role ของตัวเองอยู่บนสุด
+            visibleRoles.sort((a, b) {
+              if (a.id == userRole.id) return -1;
+              if (b.id == userRole.id) return 1;
+              return a.name.compareTo(b.name);
+            });
+
+            // คำนวณจำนวนงานที่ไม่ระบุ role (ทุกคนทำได้)
+            final unassignedCount = pendingPerRole[-999] ?? 0;
 
             return Padding(
               padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
               child: Column(
                 children: [
-                  // ตำแหน่งของฉัน option
-                  _RoleOption(
-                    label: 'ตำแหน่งของฉัน',
-                    subtitle: userRole?.name ?? 'ไม่ระบุ',
-                    isSelected: isMyRoleSelected,
-                    pendingCount: pendingForMyRole,
-                    onTap: () {
-                      ref.read(selectedRoleFilterProvider.notifier).state = null;
-                    },
-                  ),
-                  AppSpacing.verticalGapSm,
-                  // ดูทุกตำแหน่ง option
-                  _RoleOption(
-                    label: 'ดูทุกตำแหน่ง',
-                    subtitle: 'แสดงงานของทุกตำแหน่ง',
-                    isSelected: isAllSelected,
-                    pendingCount: pendingForAllRoles,
-                    onTap: () {
-                      ref.read(selectedRoleFilterProvider.notifier).state = -1;
-                    },
-                  ),
+                  // แสดงแต่ละ role ที่มีสิทธิ์ดู
+                  for (int i = 0; i < visibleRoles.length; i++) ...[
+                    if (i > 0) AppSpacing.verticalGapSm,
+                    Builder(builder: (context) {
+                      final role = visibleRoles[i];
+                      final isMyRole = role.id == userRole.id;
+                      final isSelected = selectedRoleId == role.id ||
+                          (selectedRoleId == null && isMyRole);
+                      // จำนวนงาน = งานของ role นั้น + งานที่ไม่ระบุ role (ทุกคนทำได้)
+                      final roleCount = (pendingPerRole[role.id] ?? 0) + unassignedCount;
+
+                      return _RoleOption(
+                        label: isMyRole
+                            ? '${role.abb ?? role.name} (ฉัน)'
+                            : role.abb ?? role.name,
+                        subtitle: role.name,
+                        isSelected: isSelected,
+                        pendingCount: roleCount,
+                        onTap: () {
+                          ref.read(selectedRoleFilterProvider.notifier).state = role.id;
+                        },
+                      );
+                    }),
+                  ],
                 ],
               ),
             );

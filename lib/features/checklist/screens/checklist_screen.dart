@@ -30,6 +30,30 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
   String? _expandedTimeBlock;
 
   @override
+  void initState() {
+    super.initState();
+    // Subscribe to realtime updates
+    _subscribeToRealtimeUpdates();
+  }
+
+  @override
+  void dispose() {
+    // Unsubscribe from all channels when leaving the screen
+    ref.read(taskRealtimeServiceProvider).unsubscribeAll();
+    super.dispose();
+  }
+
+  void _subscribeToRealtimeUpdates() {
+    final realtimeService = ref.read(taskRealtimeServiceProvider);
+    realtimeService.subscribe(
+      onTaskUpdated: () {
+        // Refresh tasks when other NA updates a task
+        refreshTasks(ref);
+      },
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final viewMode = ref.watch(taskViewModeProvider);
     final filteredTasksAsync = ref.watch(filteredTasksProvider);
@@ -52,7 +76,7 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
             title: 'เช็คลิสต์',
             showFilterButton: true,
             isFilterActive: viewMode != TaskViewMode.upcoming,
-            filterCount: ref.watch(pendingTasksForMyRoleProvider),
+            filterCount: ref.watch(myRolePendingTasksCountProvider),
             onFilterTap: () {
               _scaffoldKey.currentState?.openDrawer();
             },
@@ -76,10 +100,7 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
             floating: true,
             delegate: _FilterBarDelegate(
               child: _buildResidentFilterBar(filteredResidentsAsync, selectedResidents),
-              height: selectedResidents.isEmpty &&
-                      filteredResidentsAsync.valueOrNull?.isEmpty != false
-                  ? 0
-                  : 44,
+              height: _calculateResidentFilterHeight(filteredResidentsAsync),
             ),
           ),
           // Current view mode header - pinned at top
@@ -220,6 +241,31 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
         error: (_, _) => const SizedBox.shrink(),
       ),
     );
+  }
+
+  /// คำนวณความสูงของ resident filter bar ตามจำนวน residents
+  /// เพื่อให้ Wrap แสดงได้หลายแถว
+  double _calculateResidentFilterHeight(AsyncValue<List<ResidentSimple>> residentsAsync) {
+    final residents = residentsAsync.valueOrNull;
+    if (residents == null || residents.isEmpty) {
+      return 0;
+    }
+
+    // ประมาณการ: chip กว้างเฉลี่ย ~100px, หน้าจอกว้าง ~360px
+    // แต่ละแถวรองรับได้ ~3 chips
+    // 1 แถว = 28 (chip height) + 8 (runSpacing) = 36
+    // padding top/bottom = 8 + 4 = 12
+    const chipHeight = 28.0;
+    const runSpacing = 8.0;
+    const paddingVertical = 12.0;
+    const chipsPerRow = 3;
+
+    // +1 สำหรับ "ทั้งหมด" chip
+    final totalChips = residents.length + 1;
+    final rows = (totalChips / chipsPerRow).ceil();
+    final height = (rows * chipHeight) + ((rows - 1) * runSpacing) + paddingVertical;
+
+    return height.clamp(36.0, 200.0); // จำกัดความสูงสูงสุด
   }
 
   Widget _buildResidentFilterBar(
@@ -372,6 +418,8 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
 
   Widget _buildFilteredTaskList(
       AsyncValue<List<TaskLog>> tasksAsync, TaskViewMode viewMode) {
+    final currentUserId = ref.watch(currentUserIdProvider);
+
     return tasksAsync.when(
       data: (tasks) {
         if (tasks.isEmpty) {
@@ -387,6 +435,7 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
               padding: EdgeInsets.only(bottom: AppSpacing.sm),
               child: TaskCard(
                 task: task,
+                currentUserId: currentUserId,
                 onTap: () => _onTaskTap(task),
                 onCheckChanged: (checked) => _onTaskCheckChanged(task, checked),
               ),
@@ -420,6 +469,8 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
 
   Widget _buildGroupedTaskList(
       AsyncValue<Map<String, List<TaskLog>>> groupedTasksAsync) {
+    final currentUserId = ref.watch(currentUserIdProvider);
+
     return groupedTasksAsync.when(
       data: (groupedTasks) {
         if (groupedTasks.isEmpty) {
@@ -446,6 +497,7 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
                 timeBlock: timeBlock,
                 tasks: tasks,
                 isExpanded: _expandedTimeBlock == timeBlock,
+                currentUserId: currentUserId,
                 onExpandChanged: () {
                   setState(() {
                     // Accordion behavior: ถ้ากดที่เปิดอยู่ = ปิด, ถ้ากดอันอื่น = เปิดอันใหม่

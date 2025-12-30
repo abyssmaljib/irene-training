@@ -7,7 +7,13 @@ import '../models/resident_simple.dart';
 import '../models/system_role.dart';
 import '../models/task_log.dart';
 import '../models/user_shift.dart';
+import '../services/task_realtime_service.dart';
 import '../services/task_service.dart';
+
+/// Provider สำหรับ TaskRealtimeService
+final taskRealtimeServiceProvider = Provider<TaskRealtimeService>((ref) {
+  return TaskRealtimeService.instance;
+});
 
 /// View mode สำหรับหน้า Checklist
 enum TaskViewMode {
@@ -102,13 +108,18 @@ final tasksProvider = FutureProvider<List<TaskLog>>((ref) async {
 final taskRefreshCounterProvider = StateProvider<int>((ref) => 0);
 
 /// Helper function to filter tasks by selected zones, residents, and role
+/// selectedRoleId: null = ใช้ role ของ user, อื่นๆ = filter ตาม role นั้นเฉพาะ
 List<TaskLog> _filterByZonesResidentsAndRole(
   List<TaskLog> tasks,
   Set<int> selectedZones,
   Set<int> selectedResidents,
+  SystemRole? userRole,
   int? selectedRoleId,
 ) {
   var filtered = tasks;
+
+  // Filter out tasks that should be hidden (referred/home residents, empty taskType)
+  filtered = filtered.where((t) => !t.shouldBeHidden).toList();
 
   // Filter by zones first
   if (selectedZones.isNotEmpty) {
@@ -124,11 +135,14 @@ List<TaskLog> _filterByZonesResidentsAndRole(
         .toList();
   }
 
-  // Filter by role (if selected)
-  // selectedRoleId: null = ไม่ filter, -1 = ดูทุก role, อื่นๆ = filter ตาม role นั้น
-  if (selectedRoleId != null && selectedRoleId != -1) {
+  // Filter by role
+  // แสดงเฉพาะงานที่:
+  // 1. assignedRoleId == selectedRoleId (หรือ userRole.id ถ้า selectedRoleId == null)
+  // 2. assignedRoleId == null (งานที่ไม่ระบุ role = ทุกคนทำได้)
+  final targetRoleId = selectedRoleId ?? userRole?.id;
+  if (targetRoleId != null) {
     filtered = filtered
-        .where((t) => t.isAssignedToRole(selectedRoleId))
+        .where((t) => t.assignedRoleId == null || t.assignedRoleId == targetRoleId)
         .toList();
   }
 
@@ -148,6 +162,7 @@ final filteredTasksProvider = Provider<AsyncValue<List<TaskLog>>>((ref) {
   final selectedZones = ref.watch(selectedZonesFilterProvider);
   final selectedResidents = ref.watch(selectedResidentsFilterProvider);
   final selectedRoleId = ref.watch(effectiveRoleFilterProvider);
+  final userRole = ref.watch(currentUserSystemRoleProvider).valueOrNull;
 
   return tasksAsync.when(
     data: (tasks) {
@@ -155,7 +170,7 @@ final filteredTasksProvider = Provider<AsyncValue<List<TaskLog>>>((ref) {
 
       // Apply zone, resident, and role filter
       final filteredTasks = _filterByZonesResidentsAndRole(
-        tasks, selectedZones, selectedResidents, selectedRoleId);
+        tasks, selectedZones, selectedResidents, userRole, selectedRoleId);
 
       switch (viewMode) {
         case TaskViewMode.upcoming:
@@ -182,12 +197,13 @@ final groupedTasksProvider =
   final selectedZones = ref.watch(selectedZonesFilterProvider);
   final selectedResidents = ref.watch(selectedResidentsFilterProvider);
   final selectedRoleId = ref.watch(effectiveRoleFilterProvider);
+  final userRole = ref.watch(currentUserSystemRoleProvider).valueOrNull;
 
   return tasksAsync.when(
     data: (tasks) {
       // Apply zone, resident, and role filter
       final filteredTasks = _filterByZonesResidentsAndRole(
-        tasks, selectedZones, selectedResidents, selectedRoleId);
+        tasks, selectedZones, selectedResidents, userRole, selectedRoleId);
       return AsyncValue.data(service.groupTasksByTimeBlock(filteredTasks));
     },
     loading: () => const AsyncValue.loading(),
@@ -204,13 +220,14 @@ final taskCountsProvider = Provider<Map<TaskViewMode, int>>((ref) {
   final selectedZones = ref.watch(selectedZonesFilterProvider);
   final selectedResidents = ref.watch(selectedResidentsFilterProvider);
   final selectedRoleId = ref.watch(effectiveRoleFilterProvider);
+  final userRole = ref.watch(currentUserSystemRoleProvider).valueOrNull;
 
   if (!tasksAsync.hasValue) return {};
 
   final allTasks = tasksAsync.value!;
   // Apply zone, resident, and role filter
   final tasks = _filterByZonesResidentsAndRole(
-    allTasks, selectedZones, selectedResidents, selectedRoleId);
+    allTasks, selectedZones, selectedResidents, userRole, selectedRoleId);
   final shift = shiftAsync.valueOrNull;
 
   return {
@@ -341,6 +358,9 @@ List<TaskLog> _getPendingTasksInNext2Hours(List<TaskLog> tasks) {
   final twoHoursLater = now.add(const Duration(hours: 2));
 
   return tasks.where((task) {
+    // Skip hidden tasks (referred/home residents, empty taskType)
+    if (task.shouldBeHidden) return false;
+
     // Only pending tasks (not done, not problem)
     if (task.isDone || task.isProblem) return false;
 
@@ -356,14 +376,18 @@ List<TaskLog> _getPendingTasksInNext2Hours(List<TaskLog> tasks) {
 final pendingTasksPerZoneProvider = Provider<Map<int, int>>((ref) {
   final tasksAsync = ref.watch(tasksProvider);
   final selectedRoleId = ref.watch(effectiveRoleFilterProvider);
+  final userRole = ref.watch(currentUserSystemRoleProvider).valueOrNull;
 
   if (!tasksAsync.hasValue) return {};
 
   var tasks = tasksAsync.value!;
 
-  // Apply role filter
-  if (selectedRoleId != null && selectedRoleId != -1) {
-    tasks = tasks.where((t) => t.isAssignedToRole(selectedRoleId)).toList();
+  // Apply role filter - แสดงเฉพาะงานของ role ที่เลือก + งานที่ไม่ระบุ role
+  final targetRoleId = selectedRoleId ?? userRole?.id;
+  if (targetRoleId != null) {
+    tasks = tasks.where((t) =>
+      t.assignedRoleId == null || t.assignedRoleId == targetRoleId
+    ).toList();
   }
 
   // Get pending tasks in next 2 hours
@@ -380,18 +404,42 @@ final pendingTasksPerZoneProvider = Provider<Map<int, int>>((ref) {
   return result;
 });
 
-/// Provider สำหรับจำนวนงานค้างทั้งหมด (ใน 2 ชม. ข้างหน้า) - ไม่ filter zone
+/// Provider สำหรับจำนวนงานค้างทั้งหมด (ใน 2 ชม. ข้างหน้า) - ตาม role ที่เลือกในตัวกรอง
 final totalPendingTasksCountProvider = Provider<int>((ref) {
   final tasksAsync = ref.watch(tasksProvider);
   final selectedRoleId = ref.watch(effectiveRoleFilterProvider);
+  final userRole = ref.watch(currentUserSystemRoleProvider).valueOrNull;
 
   if (!tasksAsync.hasValue) return 0;
 
   var tasks = tasksAsync.value!;
 
-  // Apply role filter
-  if (selectedRoleId != null && selectedRoleId != -1) {
-    tasks = tasks.where((t) => t.isAssignedToRole(selectedRoleId)).toList();
+  // Apply role filter - แสดงเฉพาะงานของ role ที่เลือก + งานที่ไม่ระบุ role
+  final targetRoleId = selectedRoleId ?? userRole?.id;
+  if (targetRoleId != null) {
+    tasks = tasks.where((t) =>
+      t.assignedRoleId == null || t.assignedRoleId == targetRoleId
+    ).toList();
+  }
+
+  return _getPendingTasksInNext2Hours(tasks).length;
+});
+
+/// Provider สำหรับจำนวนงานค้างของ role ตัวเอง (ใน 2 ชม. ข้างหน้า)
+/// ใช้แสดง badge ที่ icon filter - ไม่ขึ้นกับ role ที่เลือกในตัวกรอง
+final myRolePendingTasksCountProvider = Provider<int>((ref) {
+  final tasksAsync = ref.watch(tasksProvider);
+  final userRole = ref.watch(currentUserSystemRoleProvider).valueOrNull;
+
+  if (!tasksAsync.hasValue) return 0;
+
+  var tasks = tasksAsync.value!;
+
+  // Filter เฉพาะงานของ role ตัวเอง + งานที่ไม่ระบุ role
+  if (userRole != null) {
+    tasks = tasks.where((t) =>
+      t.assignedRoleId == null || t.assignedRoleId == userRole.id
+    ).toList();
   }
 
   return _getPendingTasksInNext2Hours(tasks).length;
@@ -426,42 +474,3 @@ final pendingTasksPerRoleProvider = Provider<Map<int, int>>((ref) {
   return result;
 });
 
-/// Provider สำหรับจำนวนงานค้างของ role ที่เลือก (สำหรับ "ตำแหน่งของฉัน")
-final pendingTasksForMyRoleProvider = Provider<int>((ref) {
-  final tasksAsync = ref.watch(tasksProvider);
-  final userRole = ref.watch(currentUserSystemRoleProvider).valueOrNull;
-  final selectedZones = ref.watch(selectedZonesFilterProvider);
-
-  if (!tasksAsync.hasValue) return 0;
-
-  var tasks = tasksAsync.value!;
-
-  // Apply zone filter
-  if (selectedZones.isNotEmpty) {
-    tasks = tasks.where((t) => t.zoneId != null && selectedZones.contains(t.zoneId)).toList();
-  }
-
-  // Filter by user's role
-  if (userRole != null) {
-    tasks = tasks.where((t) => t.isAssignedToRole(userRole.id)).toList();
-  }
-
-  return _getPendingTasksInNext2Hours(tasks).length;
-});
-
-/// Provider สำหรับจำนวนงานค้างทั้งหมด (ทุก role) - สำหรับ "ดูทุกตำแหน่ง"
-final pendingTasksForAllRolesProvider = Provider<int>((ref) {
-  final tasksAsync = ref.watch(tasksProvider);
-  final selectedZones = ref.watch(selectedZonesFilterProvider);
-
-  if (!tasksAsync.hasValue) return 0;
-
-  var tasks = tasksAsync.value!;
-
-  // Apply zone filter
-  if (selectedZones.isNotEmpty) {
-    tasks = tasks.where((t) => t.zoneId != null && selectedZones.contains(t.zoneId)).toList();
-  }
-
-  return _getPendingTasksInNext2Hours(tasks).length;
-});

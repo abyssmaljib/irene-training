@@ -16,6 +16,7 @@ class TaskTimeSection extends StatefulWidget {
   final void Function(TaskLog task, bool? checked)? onTaskCheckChanged;
   final bool isExpanded; // controlled from parent
   final VoidCallback? onExpandChanged; // callback when tapped
+  final String? currentUserId; // user ID สำหรับตรวจสอบ unseen badge
 
   const TaskTimeSection({
     super.key,
@@ -25,6 +26,7 @@ class TaskTimeSection extends StatefulWidget {
     this.onTaskCheckChanged,
     this.isExpanded = false,
     this.onExpandChanged,
+    this.currentUserId,
   });
 
   @override
@@ -97,9 +99,12 @@ class _TaskTimeSectionState extends State<TaskTimeSection>
 
   @override
   Widget build(BuildContext context) {
-    final completedCount = widget.tasks.where((t) => t.isDone).length;
+    // นับงานที่ยังไม่ได้ทำ (status == null)
+    // งานติดปัญหา (isProblem) ถือว่าพยายามทำแล้ว ไม่นับเป็น pending
+    final pendingCount = widget.tasks.where((t) => t.isPending).length;
     final totalCount = widget.tasks.length;
     final hasTasks = widget.tasks.isNotEmpty;
+    final isCurrentTimeBlock = _isCurrentTimeBlock();
 
     return Container(
       margin: EdgeInsets.only(bottom: AppSpacing.sm),
@@ -107,6 +112,9 @@ class _TaskTimeSectionState extends State<TaskTimeSection>
         color: AppColors.surface,
         borderRadius: AppRadius.smallRadius,
         boxShadow: [AppShadows.subtle],
+        border: isCurrentTimeBlock
+            ? Border.all(color: AppColors.primary, width: 2)
+            : null,
       ),
       child: Column(
         children: [
@@ -143,19 +151,24 @@ class _TaskTimeSectionState extends State<TaskTimeSection>
                         ),
                       ),
                     ),
-                    // Progress badge
+                    // Progress badge (pending/total)
                     Container(
                       padding:
-                          const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: _getProgressColor(completedCount, totalCount),
-                        borderRadius: BorderRadius.circular(12),
+                        color: _getProgressBgColor(pendingCount, totalCount),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: _getProgressColor(pendingCount, totalCount),
+                          width: 1.5,
+                        ),
                       ),
                       child: Text(
-                        '$completedCount/$totalCount',
+                        '$pendingCount/$totalCount',
                         style: AppTypography.caption.copyWith(
-                          color: Colors.white,
+                          color: _getProgressColor(pendingCount, totalCount),
                           fontWeight: FontWeight.w600,
+                          fontSize: 12,
                         ),
                       ),
                     ),
@@ -227,18 +240,17 @@ class _TaskTimeSectionState extends State<TaskTimeSection>
         children: [
           // แสดง tasks (จำกัดจำนวนหรือทั้งหมด)
           for (int i = 0; i < displayCount; i++)
-            Padding(
-              padding: EdgeInsets.only(bottom: AppSpacing.sm),
-              child: RepaintBoundary(
-                child: TaskCard(
-                  task: widget.tasks[i],
-                  onTap: widget.onTaskTap != null
-                      ? () => widget.onTaskTap!(widget.tasks[i])
-                      : null,
-                  onCheckChanged: widget.onTaskCheckChanged != null
-                      ? (checked) => widget.onTaskCheckChanged!(widget.tasks[i], checked)
-                      : null,
-                ),
+            RepaintBoundary(
+              child: TaskCard(
+                task: widget.tasks[i],
+                currentUserId: widget.currentUserId,
+                flat: true, // แสดงแบบ flat ภายใน section
+                onTap: widget.onTaskTap != null
+                    ? () => widget.onTaskTap!(widget.tasks[i])
+                    : null,
+                onCheckChanged: widget.onTaskCheckChanged != null
+                    ? (checked) => widget.onTaskCheckChanged!(widget.tasks[i], checked)
+                    : null,
               ),
             ),
           // ปุ่ม "ดูเพิ่มเติม" หรือ "ย่อ"
@@ -262,18 +274,31 @@ class _TaskTimeSectionState extends State<TaskTimeSection>
 
   Color _getHeaderColor() {
     // Map timeBlock to color
-    if (widget.timeBlock.contains('07:00') || widget.timeBlock.contains('09:00')) {
+    // ใช้ startsWith เพื่อตรวจสอบเวลาเริ่มต้นของ timeBlock อย่างแม่นยำ
+    final timeBlock = widget.timeBlock.trim();
+
+    // เวรดึก (23:00 - 05:00)
+    if (timeBlock.startsWith('23:00') ||
+        timeBlock.startsWith('01:00') ||
+        timeBlock.startsWith('03:00')) {
+      return AppColors.pastelPurple; // ม่วงพาสเทลสำหรับเวรดึก
+    }
+    // เวรเช้า (05:00 - 11:00)
+    if (timeBlock.startsWith('05:00') ||
+        timeBlock.startsWith('07:00') ||
+        timeBlock.startsWith('09:00')) {
       return AppColors.pastelYellow1;
-    } else if (widget.timeBlock.contains('11:00') || widget.timeBlock.contains('13:00')) {
+    }
+    // เวรกลางวัน (11:00 - 15:00)
+    if (timeBlock.startsWith('11:00') || timeBlock.startsWith('13:00')) {
       return AppColors.pastelOrange1;
-    } else if (widget.timeBlock.contains('15:00') || widget.timeBlock.contains('17:00')) {
+    }
+    // เวรบ่าย (15:00 - 19:00)
+    if (timeBlock.startsWith('15:00') || timeBlock.startsWith('17:00')) {
       return AppColors.pastelLightGreen1;
-    } else if (widget.timeBlock.contains('19:00') || widget.timeBlock.contains('21:00')) {
-      return AppColors.pastelDarkGreen1;
-    } else if (widget.timeBlock.contains('23:00') ||
-        widget.timeBlock.contains('01:00') ||
-        widget.timeBlock.contains('03:00') ||
-        widget.timeBlock.contains('05:00')) {
+    }
+    // เวรเย็น (19:00 - 23:00)
+    if (timeBlock.startsWith('19:00') || timeBlock.startsWith('21:00')) {
       return AppColors.pastelDarkGreen1;
     }
     return AppColors.accent1;
@@ -295,11 +320,59 @@ class _TaskTimeSectionState extends State<TaskTimeSection>
     }
   }
 
-  Color _getProgressColor(int completed, int total) {
-    if (total == 0) return AppColors.secondaryText;
-    if (completed == total) return AppColors.tagPassedText;
-    if (completed > 0) return AppColors.tagPendingText;
-    return AppColors.secondaryText;
+  /// คำนวณสี badge ตาม pending count
+  /// - เขียว: ทำครบ (pending = 0)
+  /// - เหลืองทอง: ยังทำไม่ครบ (pending > 0)
+  /// - ฟ้าอ่อน: ไม่มีงาน
+  Color _getProgressColor(int pending, int total) {
+    if (total == 0) return AppColors.secondary.withValues(alpha: 0.6);
+    if (pending == 0) return AppColors.tagPassedText; // เขียว - ทำครบแล้ว
+    return const Color(0xFFA08030); // เหลืองทองเข้ม - ยังมีงานค้าง
+  }
+
+  /// คำนวณสี background ของ badge ตาม pending count
+  Color _getProgressBgColor(int pending, int total) {
+    if (total == 0) return AppColors.secondary.withValues(alpha: 0.2);
+    if (pending == 0) return AppColors.tagPassedBg; // เขียวอ่อน - ทำครบแล้ว
+    return const Color(0xFFE8D5A0); // เหลืองครีม - ยังมีงานค้าง
+  }
+
+  /// ตรวจสอบว่า timeBlock นี้ครอบคลุมเวลาปัจจุบันหรือไม่
+  /// timeBlock format: "07:00 - 09:00", "09:00 - 11:00", etc.
+  bool _isCurrentTimeBlock() {
+    final now = DateTime.now();
+    final currentHour = now.hour;
+    final currentMinute = now.minute;
+
+    // Parse timeBlock เช่น "07:00 - 09:00"
+    final parts = widget.timeBlock.split(' - ');
+    if (parts.length != 2) return false;
+
+    try {
+      final startParts = parts[0].split(':');
+      final endParts = parts[1].split(':');
+
+      final startHour = int.parse(startParts[0]);
+      final endHour = int.parse(endParts[0]);
+
+      // แปลงเวลาปัจจุบันเป็นนาทีทั้งหมด
+      final currentTotalMinutes = currentHour * 60 + currentMinute;
+      final startTotalMinutes = startHour * 60;
+      final endTotalMinutes = endHour * 60;
+
+      // กรณีข้ามวัน (เช่น 23:00 - 01:00)
+      if (endHour < startHour) {
+        // ถ้าเวลาปัจจุบันหลังเที่ยงคืน (0-endHour) หรือ ก่อนเที่ยงคืน (startHour-24)
+        return currentTotalMinutes >= startTotalMinutes ||
+            currentTotalMinutes < endTotalMinutes;
+      }
+
+      // กรณีปกติ
+      return currentTotalMinutes >= startTotalMinutes &&
+          currentTotalMinutes < endTotalMinutes;
+    } catch (e) {
+      return false;
+    }
   }
 }
 

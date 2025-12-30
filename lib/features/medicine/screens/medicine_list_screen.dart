@@ -212,7 +212,7 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
                 ),
                 SizedBox(width: 8),
               ],
-              expandedHeight: _availableGroups.isNotEmpty ? 160 : 120,
+              expandedHeight: _availableGroups.isNotEmpty ? 168 : 120,
               flexibleSpace: FlexibleSpaceBar(
                 background: Container(
                   color: AppColors.secondaryBackground,

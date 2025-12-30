@@ -57,6 +57,8 @@ class TaskService {
   }
 
   /// ดึง tasks ทั้งหมดของวันที่กำหนด
+  ///
+  /// ใช้ adjust_date ที่คำนวณตาม "วันทำงาน" (07:00-06:59 วันถัดไป) ใน database แล้ว
   Future<List<TaskLog>> getTasksByDate(
     DateTime date,
     int nursinghomeId, {

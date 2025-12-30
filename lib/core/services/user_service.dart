@@ -164,10 +164,10 @@ class UserService {
     }
 
     try {
-      // Query user_info joined with user_system_roles
+      // Query user_info joined with user_system_roles (รวม related_role_ids)
       final response = await Supabase.instance.client
           .from('user_info')
-          .select('role_id, user_system_roles(id, role_name)')
+          .select('role_id, user_system_roles(id, role_name, abb, related_role_ids)')
           .eq('id', user.id)
           .maybeSingle();
 

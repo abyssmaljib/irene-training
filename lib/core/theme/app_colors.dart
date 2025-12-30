@@ -96,6 +96,7 @@ class AppColors {
   static const Color pastelYellow1 = Color(0xFFFFF6BD);
   static const Color pastelLightGreen1 = Color(0xFFCEEDC7);
   static const Color pastelDarkGreen1 = Color(0xFF86C8BC);
+  static const Color pastelPurple = Color(0xFFD4C5E8); // Soft lavender for night section
 
   // Gradient for Header
   static const LinearGradient primaryGradient = LinearGradient(

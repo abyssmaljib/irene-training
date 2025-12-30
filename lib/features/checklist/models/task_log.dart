@@ -23,6 +23,8 @@ class TaskLog {
   final String? sampleImageUrl;
   final int? postponeFrom;
   final int? postponeTo;
+  final DateTime? expectedDatePostponeFrom; // วันเวลาเดิมที่ถูกเลื่อนมา
+  final bool mustCompleteByPost; // งานต้องทำหลังจากโพสต์
 
   // Role assignment fields
   final int? assignedRoleId;
@@ -30,6 +32,18 @@ class TaskLog {
 
   // Recurrence note (ข้อความกำกับสำคัญจาก A_Repeated_Task)
   final String? recurNote;
+
+  // Recurrence fields
+  final int? recurrenceInterval; // ทุกกี่ (วัน/สัปดาห์/เดือน)
+  final String? recurrenceType; // 'วัน', 'สัปดาห์', 'เดือน'
+  final List<String> daysOfWeek; // ['จันทร์', 'อังคาร', ...]
+  final List<int> recurringDates; // [1, 15, 28] วันที่ในเดือน
+
+  // History seen users (รายชื่อ user ที่เคยเห็น task นี้แล้ว)
+  final List<String> historySeenUsers;
+
+  // Resident special status (refer = ส่งต่อ/ย้ายออก)
+  final String? residentSpecialStatus;
 
   const TaskLog({
     required this.logId,
@@ -55,9 +69,17 @@ class TaskLog {
     this.sampleImageUrl,
     this.postponeFrom,
     this.postponeTo,
+    this.expectedDatePostponeFrom,
+    this.mustCompleteByPost = false,
     this.assignedRoleId,
     this.assignedRoleName,
     this.recurNote,
+    this.recurrenceInterval,
+    this.recurrenceType,
+    this.daysOfWeek = const [],
+    this.recurringDates = const [],
+    this.historySeenUsers = const [],
+    this.residentSpecialStatus,
   });
 
   /// Parse จาก Supabase response
@@ -87,10 +109,34 @@ class TaskLog {
       sampleImageUrl: json['sampleImageURL'] as String?,
       postponeFrom: json['postpone_from'] as int?,
       postponeTo: json['postpone_to'] as int?,
+      expectedDatePostponeFrom: _parseDateTime(json['expecteddate_postpone_from']),
+      mustCompleteByPost: json['mustCompleteByPost'] == true,
       assignedRoleId: json['assigned_role_id'] as int?,
       assignedRoleName: json['assigned_role_name'] as String?,
       recurNote: json['recurNote'] as String?,
+      recurrenceInterval: json['recurrence_interval'] as int?,
+      recurrenceType: json['recurrence_type'] as String?,
+      daysOfWeek: _parseStringList(json['days_of_week']),
+      recurringDates: _parseIntList(json['recurring_dates']),
+      historySeenUsers: _parseStringList(json['history_seen_users']),
+      residentSpecialStatus: json['s_special_status'] as String?,
     );
+  }
+
+  static List<String> _parseStringList(dynamic value) {
+    if (value == null) return [];
+    if (value is List) {
+      return value.map((e) => e.toString()).toList();
+    }
+    return [];
+  }
+
+  static List<int> _parseIntList(dynamic value) {
+    if (value == null) return [];
+    if (value is List) {
+      return value.map((e) => e is int ? e : int.tryParse(e.toString()) ?? 0).toList();
+    }
+    return [];
   }
 
   static DateTime? _parseDateTime(dynamic value) {
@@ -106,6 +152,27 @@ class TaskLog {
   bool get isPending => status == null;
   bool get isPostponed => status == 'postpone';
   bool get isReferred => status == 'refer';
+
+  /// ตรวจสอบว่า resident ถูก refer หรือ home (ส่งต่อ/กลับบ้าน) หรือไม่
+  /// ใช้สำหรับซ่อน tasks ของ residents ที่ไม่ได้อยู่แล้ว
+  bool get isResidentReferred =>
+      residentSpecialStatus == 'Refer' || residentSpecialStatus == 'Home';
+
+  /// ตรวจสอบว่า task ควรถูกซ่อนหรือไม่
+  /// - resident ถูก refer/home
+  bool get shouldBeHidden => isResidentReferred;
+
+  /// มีรูปตัวอย่างให้ดู
+  bool get hasSampleImage => sampleImageUrl != null && sampleImageUrl!.isNotEmpty;
+
+  /// ตรวจสอบว่า task นี้มีอัพเดตที่ user ยังไม่เคยเห็น
+  /// - ไม่ใช่งานจัดยา (taskType != 'จัดยา')
+  /// - user ยังไม่อยู่ใน historySeenUsers
+  bool hasUnseenUpdate(String? userId) {
+    if (userId == null) return false;
+    if (taskType == 'จัดยา') return false;
+    return !historySeenUsers.contains(userId);
+  }
 
   /// ตรวจสอบว่างานอยู่ภายในช่วงเวลาที่กำหนดหรือไม่
   bool isWithinTimeRange(DateTime start, DateTime end) {
