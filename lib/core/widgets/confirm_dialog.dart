@@ -29,22 +29,22 @@ class ConfirmDialogConfig {
   final String message;
   final String cancelText;
   final String confirmText;
-  final IconData? icon;
-  final Color? iconColor;
-  final Color? iconBackgroundColor;
-  final String? imageAsset; // รูปภาพแทน icon (เช่น 'assets/images/confirm_cat.png')
-  final double imageSize; // ขนาดรูปภาพ (default 120x120)
+  final IconData icon; // icon เล็กด้านบน
+  final Color iconColor;
+  final Color iconBackgroundColor;
+  final String imageAsset; // รูปแมว
+  final double imageSize;
 
   const ConfirmDialogConfig({
     required this.title,
     required this.message,
     this.cancelText = 'ยกเลิก',
     this.confirmText = 'ยืนยัน',
-    this.icon,
-    this.iconColor,
-    this.iconBackgroundColor,
-    this.imageAsset,
-    this.imageSize = 120,
+    this.icon = Iconsax.warning_2,
+    this.iconColor = AppColors.error,
+    this.iconBackgroundColor = AppColors.tagFailedBg,
+    this.imageAsset = 'assets/images/confirm_cat.webp',
+    this.imageSize = 100,
   });
 
   /// Get preset config based on dialog type
@@ -57,8 +57,6 @@ class ConfirmDialogConfig {
           cancelText: 'ยกเลิก',
           confirmText: 'ออกจากระบบ',
           icon: Iconsax.logout,
-          iconColor: AppColors.error,
-          iconBackgroundColor: AppColors.tagFailedBg,
         );
       case ConfirmDialogType.delete:
         return const ConfirmDialogConfig(
@@ -67,8 +65,6 @@ class ConfirmDialogConfig {
           cancelText: 'ยกเลิก',
           confirmText: 'ลบ',
           icon: Iconsax.trash,
-          iconColor: AppColors.error,
-          iconBackgroundColor: AppColors.tagFailedBg,
         );
       case ConfirmDialogType.exitQuiz:
         return const ConfirmDialogConfig(
@@ -77,8 +73,6 @@ class ConfirmDialogConfig {
           cancelText: 'ทำต่อ',
           confirmText: 'ออก',
           icon: Iconsax.close_square,
-          iconColor: AppColors.error,
-          iconBackgroundColor: AppColors.tagFailedBg,
         );
       case ConfirmDialogType.warning:
         return const ConfirmDialogConfig(
@@ -87,7 +81,7 @@ class ConfirmDialogConfig {
           cancelText: 'ยกเลิก',
           confirmText: 'ยืนยัน',
           icon: Iconsax.warning_2,
-          iconColor: Color(0xFFF59E0B), // Warning orange
+          iconColor: Color(0xFFF59E0B),
           iconBackgroundColor: AppColors.tagPendingBg,
         );
       case ConfirmDialogType.custom:
@@ -102,13 +96,11 @@ class ConfirmDialogConfig {
 /// Reusable confirmation dialog widget
 class ConfirmDialog extends StatelessWidget {
   final ConfirmDialogConfig config;
-  final bool showIcon;
   final bool isLoading;
 
   const ConfirmDialog({
     super.key,
     required this.config,
-    this.showIcon = true,
     this.isLoading = false,
   });
 
@@ -125,7 +117,6 @@ class ConfirmDialog extends StatelessWidget {
     Color? iconBackgroundColor,
     String? imageAsset,
     double? imageSize,
-    bool showIcon = true,
     bool barrierDismissible = true,
   }) async {
     // Get base config from type
@@ -147,10 +138,7 @@ class ConfirmDialog extends StatelessWidget {
     final result = await showDialog<bool>(
       context: context,
       barrierDismissible: barrierDismissible,
-      builder: (context) => ConfirmDialog(
-        config: config,
-        showIcon: showIcon,
-      ),
+      builder: (context) => ConfirmDialog(config: config),
     );
 
     return result ?? false;
@@ -169,51 +157,45 @@ class ConfirmDialog extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Icon header (optional)
-            if (showIcon && config.icon != null) ...[
-              SizedBox(height: AppSpacing.lg),
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: config.iconBackgroundColor ?? AppColors.tagFailedBg,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  config.icon,
-                  color: config.iconColor ?? AppColors.error,
-                  size: 28,
-                ),
-              ),
-              SizedBox(height: AppSpacing.md),
-            ] else ...[
-              SizedBox(height: AppSpacing.lg),
-            ],
+            SizedBox(height: AppSpacing.lg),
 
-            // Title
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-              child: Text(
-                config.title,
-                style: AppTypography.title.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-                textAlign: TextAlign.center,
+            // Icon เล็ก (ด้านบน)
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: config.iconBackgroundColor,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                config.icon,
+                color: config.iconColor,
+                size: 22,
               ),
             ),
 
-            // Image (optional) - แสดงระหว่าง title และ message
-            if (config.imageAsset != null) ...[
-              SizedBox(height: AppSpacing.md),
-              Image.asset(
-                config.imageAsset!,
-                width: config.imageSize,
-                height: config.imageSize,
-                fit: BoxFit.contain,
-              ),
-            ],
-
             SizedBox(height: AppSpacing.sm),
+
+            // Title
+            Text(
+              config.title,
+              style: AppTypography.title.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+              textAlign: TextAlign.center,
+            ),
+
+            SizedBox(height: AppSpacing.xs),
+
+            // Image (รูปแมว)
+            Image.asset(
+              config.imageAsset,
+              width: config.imageSize,
+              height: config.imageSize,
+              fit: BoxFit.contain,
+            ),
+
+            SizedBox(height: AppSpacing.xs),
 
             // Message
             Padding(
@@ -222,19 +204,21 @@ class ConfirmDialog extends StatelessWidget {
                 config.message,
                 style: AppTypography.body.copyWith(
                   color: AppColors.secondaryText,
+                  height: 1.0,
                 ),
                 textAlign: TextAlign.center,
               ),
             ),
-            SizedBox(height: AppSpacing.lg),
+
+            SizedBox(height: AppSpacing.md),
 
             // Action buttons
             Padding(
               padding: EdgeInsets.fromLTRB(
-                AppSpacing.md,
+                AppSpacing.lg,
                 0,
-                AppSpacing.md,
-                AppSpacing.md,
+                AppSpacing.lg,
+                AppSpacing.lg,
               ),
               child: Row(
                 children: [

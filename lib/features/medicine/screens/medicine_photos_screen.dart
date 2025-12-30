@@ -40,20 +40,21 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
   List<MealPhotoGroup> _mealGroups = [];
   bool _isLoading = true;
   int? _expandedIndex; // index ของมื้อที่ expand อยู่ (null = ไม่มีมื้อไหน expand)
-  bool _canQC = false; // สิทธิ์ QC (admin/superAdmin)
+  UserRole _userRole = const UserRole(displayName: 'พนักงาน'); // role ของ user ปัจจุบัน
+  bool _hasDataChanged = false; // track ว่ามีการเปลี่ยนแปลงข้อมูลยาหรือไม่
 
   @override
   void initState() {
     super.initState();
     _loadMealGroups();
-    _checkQCPermission();
+    _loadUserRole();
   }
 
-  /// ตรวจสอบว่า user มีสิทธิ์ QC หรือไม่
-  Future<void> _checkQCPermission() async {
-    final canQC = await UserService().canQC();
+  /// โหลด role ของ user ปัจจุบัน
+  Future<void> _loadUserRole() async {
+    final role = await UserService().getRole();
     if (mounted) {
-      setState(() => _canQC = canQC);
+      setState(() => _userRole = role);
     }
   }
 
@@ -126,7 +127,7 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
               backgroundColor: AppColors.secondaryBackground,
               elevation: 0,
               leading: IconButton(
-                onPressed: () => Navigator.pop(context),
+                onPressed: () => Navigator.pop(context, _hasDataChanged),
                 icon: Icon(
                   Iconsax.arrow_left,
                   color: AppColors.primaryText,
@@ -286,7 +287,7 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
           showFoiled: _showFoiled,
           showOverlay: _showOverlay,
           isExpanded: _expandedIndex == index,
-          canQC: _canQC,
+          userRole: _userRole,
           onExpandChanged: () => _onMealExpanded(index),
           onTakePhoto: _onTakePhoto,
           onDeletePhoto: _onDeletePhoto,
@@ -362,6 +363,9 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
       // รีโหลดข้อมูลเพื่อแสดงรูปใหม่ (เก็บสถานะ expand ไว้)
       await _loadMealGroups(forceRefresh: true, preserveExpanded: true);
 
+      // Mark ว่ามีการเปลี่ยนแปลงข้อมูล
+      _hasDataChanged = true;
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -429,6 +433,9 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
         if (success) {
           await _loadMealGroups(forceRefresh: true, preserveExpanded: true);
 
+          // Mark ว่ามีการเปลี่ยนแปลงข้อมูล
+          _hasDataChanged = true;
+
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -474,6 +481,9 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
       if (success) {
         // รีโหลดข้อมูลเพื่อแสดงสถานะใหม่ (เก็บสถานะ expand ไว้)
         await _loadMealGroups(forceRefresh: true, preserveExpanded: true);
+
+        // Mark ว่ามีการเปลี่ยนแปลงข้อมูล
+        _hasDataChanged = true;
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -521,6 +531,9 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
       if (success) {
         // รีโหลดข้อมูลเพื่อแสดงสถานะใหม่ (เก็บสถานะ expand ไว้)
         await _loadMealGroups(forceRefresh: true, preserveExpanded: true);
+
+        // Mark ว่ามีการเปลี่ยนแปลงข้อมูล
+        _hasDataChanged = true;
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

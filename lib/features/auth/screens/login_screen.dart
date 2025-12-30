@@ -763,11 +763,61 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  // Quick login for development
+  Future<void> _devLogin() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      await Supabase.instance.client.auth.signInWithPassword(
+        email: 'beautyheechul@gmail.com',
+        password: '123456789',
+      );
+
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+        );
+      }
+    } on AuthException catch (e) {
+      setState(() => _errorMessage = _getThaiErrorMessage(e.message));
+    } catch (e) {
+      setState(() => _errorMessage = 'เกิดข้อผิดพลาด กรุณาลองใหม่');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   Widget _buildFooter() {
     return Padding(
       padding: EdgeInsets.only(bottom: AppSpacing.xl),
       child: Column(
         children: [
+          // Dev Login button
+          SizedBox(
+            height: AppSpacing.buttonHeight,
+            child: OutlinedButton.icon(
+              onPressed: _isLoading ? null : _devLogin,
+              icon: Icon(Iconsax.code, size: 18),
+              label: Text(
+                'Dev Login',
+                style: AppTypography.bodySmall.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.warning,
+                side: BorderSide(color: AppColors.warning),
+                shape: RoundedRectangleBorder(
+                  borderRadius: AppRadius.smallRadius,
+                ),
+              ),
+            ),
+          ),
+          AppSpacing.verticalGapSm,
           // Forgot password link
           SizedBox(
             height: AppSpacing.buttonHeight,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart' hide Badge;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_colors.dart';
@@ -6,6 +7,8 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/confirm_dialog.dart';
 import '../../../core/services/user_service.dart';
+import '../../checklist/models/system_role.dart';
+import '../../checklist/providers/task_provider.dart';
 import '../../auth/screens/login_screen.dart';
 import '../../learning/screens/directory_screen.dart';
 import '../../learning/models/badge.dart';
@@ -16,16 +19,18 @@ import '../../learning/widgets/badge_info_dialog.dart';
 import '../models/user_profile.dart';
 import '../../../core/widgets/irene_app_bar.dart';
 
-class SettingsScreen extends StatefulWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   UserProfile? _userProfile;
   UserRole? _userRole;
+  SystemRole? _systemRole;
+  List<SystemRole> _allSystemRoles = [];
   String? _userEmail;
   // NOTE: _skillsData temporarily unused - skill visualization hidden for review
   // ignore: unused_field
@@ -49,6 +54,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await Future.wait([
       _loadUserProfile(),
       _loadUserRole(),
+      _loadSystemRole(),
       _loadThinkingSkills(),
       _loadBadges(),
     ]);
@@ -67,6 +73,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
     } catch (e) {
       debugPrint('Load user role error: $e');
+    }
+  }
+
+  Future<void> _loadSystemRole() async {
+    try {
+      final userService = UserService();
+      final results = await Future.wait([
+        userService.getSystemRole(forceRefresh: true),
+        userService.getAllSystemRoles(),
+      ]);
+
+      if (mounted) {
+        setState(() {
+          _systemRole = results[0] as SystemRole?;
+          _allSystemRoles = results[1] as List<SystemRole>;
+        });
+      }
+    } catch (e) {
+      debugPrint('Load system role error: $e');
     }
   }
 
@@ -306,6 +331,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             // Dev Role Selector - only for dev emails
             if (_isDevMode) ...[
               _buildDevRoleSelector(),
+              AppSpacing.verticalGapMd,
+              _buildDevSystemRoleSelector(),
               AppSpacing.verticalGapMd,
             ],
             // Badges Section - แสดงเสมอ
@@ -569,6 +596,161 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('ไม่สามารถเปลี่ยน role ได้'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
+  Widget _buildDevSystemRoleSelector() {
+    return Container(
+      width: double.infinity,
+      padding: AppSpacing.paddingMd,
+      decoration: BoxDecoration(
+        color: Colors.teal.shade50,
+        borderRadius: AppRadius.mediumRadius,
+        border: Border.all(color: Colors.teal.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Iconsax.user_tag, size: 16, color: Colors.teal.shade700),
+              AppSpacing.horizontalGapSm,
+              Text(
+                'Dev Mode - เลือก System Role (ตำแหน่ง)',
+                style: AppTypography.label.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.teal.shade700,
+                ),
+              ),
+            ],
+          ),
+          AppSpacing.verticalGapSm,
+          Text(
+            'ตำแหน่งปัจจุบัน: ${_systemRole?.name ?? "ไม่ระบุ"}',
+            style: AppTypography.bodySmall.copyWith(
+              color: Colors.teal.shade900,
+            ),
+          ),
+          AppSpacing.verticalGapMd,
+          if (_allSystemRoles.isEmpty)
+            Text(
+              'ไม่พบ system roles ในระบบ',
+              style: AppTypography.bodySmall.copyWith(
+                color: Colors.teal.shade600,
+              ),
+            )
+          else
+            Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.sm,
+              children: [
+                // Option: ไม่มี role
+                _buildSystemRoleChip(
+                  id: null,
+                  name: 'ไม่ระบุ',
+                  isSelected: _systemRole == null,
+                ),
+                // All available roles
+                ..._allSystemRoles.map((role) => _buildSystemRoleChip(
+                      id: role.id,
+                      name: role.name,
+                      isSelected: _systemRole?.id == role.id,
+                    )),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSystemRoleChip({
+    required int? id,
+    required String name,
+    required bool isSelected,
+  }) {
+    return InkWell(
+      onTap: () => _changeSystemRole(id),
+      borderRadius: AppRadius.smallRadius,
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? Colors.teal.withValues(alpha: 0.2)
+              : Colors.teal.withValues(alpha: 0.05),
+          borderRadius: AppRadius.smallRadius,
+          border: Border.all(
+            color: isSelected
+                ? Colors.teal
+                : Colors.teal.withValues(alpha: 0.3),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isSelected) ...[
+              Icon(
+                Iconsax.tick_circle,
+                size: 16,
+                color: Colors.teal,
+              ),
+              SizedBox(width: 4),
+            ],
+            Text(
+              name,
+              style: AppTypography.bodySmall.copyWith(
+                color: Colors.teal.shade700,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _changeSystemRole(int? roleId) async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) return;
+
+      await Supabase.instance.client
+          .from('user_info')
+          .update({'role_id': roleId})
+          .eq('id', user.id);
+
+      // Clear cached role in UserService
+      UserService().clearCache();
+
+      // Invalidate Riverpod providers to refresh role in other screens
+      ref.invalidate(currentUserSystemRoleProvider);
+      ref.invalidate(effectiveRoleFilterProvider);
+
+      // Reload system role for local state
+      await _loadSystemRole();
+      if (!mounted) return;
+
+      final roleName = roleId == null
+          ? 'ไม่ระบุ'
+          : _allSystemRoles.firstWhere((r) => r.id == roleId).name;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('เปลี่ยนตำแหน่งเป็น: $roleName'),
+          backgroundColor: AppColors.primary,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('ไม่สามารถเปลี่ยนตำแหน่งได้'),
           backgroundColor: AppColors.error,
         ),
       );

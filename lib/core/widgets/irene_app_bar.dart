@@ -37,7 +37,7 @@ class IreneAppBar extends StatelessWidget {
     return SliverAppBar(
       pinned: false,
       floating: true,
-      snap: false,
+      snap: true, // Snap back immediately when scrolling up
       backgroundColor: AppColors.secondaryBackground,
       automaticallyImplyLeading: false,
       elevation: 0,
@@ -167,26 +167,27 @@ class _FilterButton extends StatelessWidget {
             ),
           ),
         ),
-        // Badge count
-        if (isActive && count > 0)
+        // Badge count - งานค้างใน 2 ชม. (แดงพาสเทล)
+        if (count > 0)
           Positioned(
             top: -4,
             right: -4,
             child: Container(
-              width: 20,
-              height: 20,
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
               decoration: BoxDecoration(
-                color: AppColors.primary,
-                shape: BoxShape.circle,
+                color: AppColors.tagFailedBg, // แดงพาสเทล
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.surface, width: 1.5),
               ),
-              alignment: Alignment.center,
+              constraints: const BoxConstraints(minWidth: 18),
               child: Text(
-                '$count',
+                count > 99 ? '99+' : '$count',
                 style: AppTypography.caption.copyWith(
-                  color: AppColors.surface,
+                  color: AppColors.tagFailedText, // ตัวอักษรแดงเข้ม
                   fontWeight: FontWeight.w600,
-                  fontSize: 11,
+                  fontSize: 10,
                 ),
+                textAlign: TextAlign.center,
               ),
             ),
           ),

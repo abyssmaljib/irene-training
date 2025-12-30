@@ -119,6 +119,7 @@ class MedicineService {
       final stopwatch = Stopwatch()..start();
 
       // Query ตรงจาก A_Med_logs พร้อม nested select สำหรับ nicknames
+      // ดึง 2C_completed_by และ 3C_Compleated_by เพื่อใช้ตรวจสอบสิทธิ์ลบรูป
       final response = await _supabase
           .from('A_Med_logs')
           .select('''
@@ -130,6 +131,8 @@ class MedicineService {
             SecondCPictureUrl,
             ThirdCPictureUrl,
             3C_time_stamps,
+            2C_completed_by,
+            3C_Compleated_by,
             user_2c:2C_completed_by(nickname),
             user_3c:3C_Compleated_by(nickname)
           ''')
@@ -152,6 +155,9 @@ class MedicineService {
           '3C_time_stamps': json['3C_time_stamps'],
           'user_nickname_2c': json['user_2c']?['nickname'],
           'user_nickname_3c': json['user_3c']?['nickname'],
+          // User IDs สำหรับตรวจสอบสิทธิ์ลบรูป
+          '2C_completed_by': json['2C_completed_by'],
+          '3C_Compleated_by': json['3C_Compleated_by'],
         };
         return MedLog.fromJson(mapped);
       }).toList();

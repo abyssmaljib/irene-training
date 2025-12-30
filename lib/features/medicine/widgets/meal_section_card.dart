@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/confirm_dialog.dart';
+import '../../../core/services/user_service.dart';
 import '../models/med_log.dart';
 import '../models/med_error_log.dart';
 import '../models/meal_photo_group.dart';
@@ -17,7 +18,7 @@ class MealSectionCard extends StatefulWidget {
   final bool showFoiled; // true = แผง (2C), false = เม็ดยา (3C)
   final bool showOverlay; // แสดง overlay จำนวนเม็ดยา
   final bool isExpanded; // controlled from parent
-  final bool canQC; // ถ้า true แสดงปุ่ม QC (สำหรับ admin/superAdmin)
+  final UserRole userRole; // role ของ user ปัจจุบัน
   final VoidCallback? onExpandChanged; // callback when tapped
   final Future<void> Function(String mealKey, String photoType)? onTakePhoto; // callback สำหรับถ่ายรูป
   final Future<void> Function(String mealKey, String photoType)? onDeletePhoto; // callback สำหรับลบรูป
@@ -29,7 +30,7 @@ class MealSectionCard extends StatefulWidget {
     this.showFoiled = true,
     this.showOverlay = true,
     this.isExpanded = false,
-    this.canQC = false,
+    this.userRole = const UserRole(displayName: 'พนักงาน'),
     this.onExpandChanged,
     this.onTakePhoto,
     this.onDeletePhoto,
@@ -562,24 +563,34 @@ class _MealSectionCardState extends State<MealSectionCard>
   }
 
   /// ตรวจสอบว่าสามารถลบรูปได้หรือไม่
-  /// - ต้องถ่ายไม่เกิน 6 ชม.
-  /// - ต้องเป็นคนถ่ายรูปเอง (ยกเว้น admin)
+  /// สิทธิ์ตาม role:
+  /// - พนักงานทั่วไป: ลบรูปที่ตัวเองถ่าย ไม่เกิน 6 ชม.
+  /// - admin: ลบรูปของทุกคน ไม่เกิน 6 ชม.
+  /// - superAdmin: ลบรูปของทุกคน ตอนไหนก็ได้
   bool _canDeletePhoto({
     required DateTime? timestamp,
     required String? photographerUserId,
   }) {
     if (timestamp == null) return false;
 
-    // ตรวจสอบเวลา: ต้องถ่ายไม่เกิน 6 ชม.
+    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+    if (currentUserId == null) return false;
+
+    final role = widget.userRole;
+
+    // superAdmin: ลบได้ทุกรูป ไม่จำกัดเวลา
+    if (role.isSuperAdmin) return true;
+
+    // ตรวจสอบเวลา: ต้องถ่ายไม่เกิน 6 ชม. (สำหรับ admin และ user ทั่วไป)
     final now = DateTime.now();
     final difference = now.difference(timestamp);
     if (difference.inHours >= 6) return false;
 
-    // ตรวจสอบ user: ต้องเป็นคนถ่ายรูปเอง
-    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
-    if (currentUserId == null) return false;
-    if (photographerUserId == null) return false;
+    // admin: ลบรูปของทุกคนได้ (ภายใน 6 ชม.)
+    if (role.isAdmin) return true;
 
+    // พนักงานทั่วไป: ต้องเป็นคนถ่ายรูปเอง
+    if (photographerUserId == null) return false;
     return currentUserId == photographerUserId;
   }
 
@@ -704,7 +715,7 @@ class _MealSectionCardState extends State<MealSectionCard>
                   ),
 
                 // ปุ่ม QC (มุมซ้ายบน) - แสดงเฉพาะ admin/superAdmin
-                if (widget.canQC && widget.onQCPhoto != null)
+                if (widget.userRole.canQC && widget.onQCPhoto != null)
                   Positioned(
                     top: 8,
                     left: 8,

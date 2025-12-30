@@ -47,6 +47,9 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
   // Report completion status map (residentId -> status)
   Map<int, ReportCompletionStatus> _reportStatusMap = {};
 
+  // Loading state for med status refresh (ใช้เมื่อกลับมาจากหน้าจัดยา)
+  bool _isRefreshingMedStatus = false;
+
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
 
@@ -103,6 +106,10 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
     // รอให้โหลด residents เสร็จก่อน
     if (_residents.isEmpty) return;
 
+    if (mounted) {
+      setState(() => _isRefreshingMedStatus = true);
+    }
+
     try {
       // ใช้ logic เดียวกับ MedCompletionService สำหรับหา target date
       // หลัง 21:00 = ดูวันพรุ่งนี้ (กำลังจัดยาสำหรับพรุ่งนี้)
@@ -124,10 +131,14 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
       if (mounted) {
         setState(() {
           _medStatusMap = statusMap;
+          _isRefreshingMedStatus = false;
         });
       }
     } catch (e) {
       debugPrint('Load med completion status error: $e');
+      if (mounted) {
+        setState(() => _isRefreshingMedStatus = false);
+      }
     }
   }
 
@@ -699,9 +710,9 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
     );
   }
 
-  void _onSwipeMedicine(_ResidentItem resident) {
+  void _onSwipeMedicine(_ResidentItem resident) async {
     // ไปหน้ารูปตัวอย่างยาของ resident โดยตรง
-    Navigator.push(
+    final hasDataChanged = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (_) => MedicinePhotosScreen(
@@ -710,6 +721,11 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
         ),
       ),
     );
+
+    // ถ้ามีการเปลี่ยนแปลงข้อมูลยา ให้ refresh med status
+    if (hasDataChanged == true && mounted) {
+      _loadMedCompletionStatus();
+    }
   }
 
   void _onSwipeReport(_ResidentItem resident) {
@@ -885,6 +901,37 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
     );
   }
 
+  Widget _buildMedLoadingBadge() {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 12,
+            height: 12,
+            child: CircularProgressIndicator(
+              strokeWidth: 1.5,
+              color: AppColors.secondaryText,
+            ),
+          ),
+          SizedBox(width: 6),
+          Text(
+            'กำลังโหลด...',
+            style: AppTypography.caption.copyWith(
+              color: AppColors.secondaryText,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildMedBadge(
     String text,
     Color bgColor,
@@ -926,7 +973,10 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
 
     final List<Widget> badges = [];
 
-    if (medStatus != null && !medStatus.hasNoMedication) {
+    // แสดง loading indicator ขณะ refresh med status
+    if (_isRefreshingMedStatus) {
+      badges.add(_buildMedLoadingBadge());
+    } else if (medStatus != null && !medStatus.hasNoMedication) {
       final String text;
       final Color bgColor;
       final Color textColor;

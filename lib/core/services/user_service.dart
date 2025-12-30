@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../features/checklist/models/system_role.dart';
 
 /// User role enum matching database enum
 enum UserRoleType {
@@ -140,5 +141,64 @@ class UserService {
     _cachedNursinghomeId = null;
     _cachedUserId = null;
     _cachedRole = null;
+    _cachedSystemRole = null;
+  }
+
+  // ============================================================
+  // System Role (ตำแหน่งงาน: NA, Nurse, Incharge, etc.)
+  // ============================================================
+
+  SystemRole? _cachedSystemRole;
+
+  /// Get current user's system role (from user_system_roles table)
+  /// Returns null if user doesn't have a system role assigned
+  Future<SystemRole?> getSystemRole({bool forceRefresh = false}) async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return null;
+
+    // Return cached value if same user and not forcing refresh
+    if (!forceRefresh &&
+        _cachedUserId == user.id &&
+        _cachedSystemRole != null) {
+      return _cachedSystemRole;
+    }
+
+    try {
+      // Query user_info joined with user_system_roles
+      final response = await Supabase.instance.client
+          .from('user_info')
+          .select('role_id, user_system_roles(id, role_name)')
+          .eq('id', user.id)
+          .maybeSingle();
+
+      if (response == null || response['role_id'] == null) {
+        return null;
+      }
+
+      final roleData = response['user_system_roles'];
+      if (roleData != null) {
+        _cachedSystemRole = SystemRole.fromJson(roleData as Map<String, dynamic>);
+      }
+
+      return _cachedSystemRole;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Get all available system roles
+  Future<List<SystemRole>> getAllSystemRoles() async {
+    try {
+      final response = await Supabase.instance.client
+          .from('user_system_roles')
+          .select()
+          .order('id');
+
+      return (response as List)
+          .map((json) => SystemRole.fromJson(json as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      return [];
+    }
   }
 }

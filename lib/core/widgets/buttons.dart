@@ -150,10 +150,10 @@ class _SecondaryButtonState extends State<SecondaryButton> {
             minimumSize: Size(0, AppSpacing.buttonHeight),
             padding: AppSpacing.buttonPadding,
             side: BorderSide(
-              color: isEnabled 
+              color: isEnabled
                   ? (_isHovered ? AppColors.primaryHover : AppColors.primary)
                   : AppColors.primaryDisabled,
-              width: 1.5,
+              width: 1,
             ),
             shape: RoundedRectangleBorder(
               borderRadius: AppRadius.smallRadius,
