@@ -357,9 +357,19 @@ class _RoleFilterSection extends ConsumerWidget {
             if (userRole == null) {
               return Padding(
                 padding: EdgeInsets.all(AppSpacing.md),
-                child: Text(
-                  'ไม่พบข้อมูลตำแหน่ง',
-                  style: AppTypography.body.copyWith(color: AppColors.secondaryText),
+                child: Column(
+                  children: [
+                    Image.asset(
+                      'assets/images/not_found.webp',
+                      width: 80,
+                      height: 80,
+                    ),
+                    AppSpacing.verticalGapSm,
+                    Text(
+                      'ไม่พบข้อมูลตำแหน่ง',
+                      style: AppTypography.body.copyWith(color: AppColors.secondaryText),
+                    ),
+                  ],
                 ),
               );
             }
@@ -576,11 +586,21 @@ class _TaskTypeFilterSectionState extends ConsumerState<_TaskTypeFilterSection> 
         if (filteredTypes.isEmpty)
           Padding(
             padding: EdgeInsets.all(AppSpacing.md),
-            child: Text(
-              allTypes.isEmpty ? 'ไม่พบประเภทงาน' : 'ไม่พบผลการค้นหา',
-              style: AppTypography.body.copyWith(
-                color: AppColors.secondaryText,
-              ),
+            child: Column(
+              children: [
+                Image.asset(
+                  'assets/images/not_found.webp',
+                  width: 80,
+                  height: 80,
+                ),
+                AppSpacing.verticalGapSm,
+                Text(
+                  allTypes.isEmpty ? 'ไม่พบประเภทงาน' : 'ไม่พบผลการค้นหา',
+                  style: AppTypography.body.copyWith(
+                    color: AppColors.secondaryText,
+                  ),
+                ),
+              ],
             ),
           )
         else

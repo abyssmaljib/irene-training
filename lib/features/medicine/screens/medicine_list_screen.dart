@@ -371,10 +371,10 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Iconsax.health,
-              size: 64,
-              color: AppColors.textSecondary,
+            Image.asset(
+              'assets/images/not_found.webp',
+              width: 120,
+              height: 120,
             ),
             AppSpacing.verticalGapMd,
             Text(
@@ -396,7 +396,7 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
                   });
                   _applyFilters();
                 },
-                child: Text('ล้างตัวกรอง'),
+                child: const Text('ล้างตัวกรอง'),
               ),
             ],
           ],

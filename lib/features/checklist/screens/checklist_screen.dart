@@ -609,8 +609,8 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
         children: [
           Image.asset(
             'assets/images/relax_cat.webp',
-            width: 120,
-            height: 120,
+            width: 480,
+            height: 480,
           ),
           AppSpacing.verticalGapMd,
           Text(

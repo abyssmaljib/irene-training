@@ -190,8 +190,26 @@ class _DirectoryScreenState extends State<DirectoryScreen> {
     );
     if (_topicsByType.isEmpty) {
       slivers.add(
-        const SliverFillRemaining(
-          child: Center(child: Text('ไม่พบหัวข้อที่ค้นหา')),
+        SliverFillRemaining(
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Image.asset(
+                  'assets/images/not_found.webp',
+                  width: 120,
+                  height: 120,
+                ),
+                AppSpacing.verticalGapMd,
+                Text(
+                  'ไม่พบหัวข้อที่ค้นหา',
+                  style: AppTypography.body.copyWith(
+                    color: AppColors.secondaryText,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       );
       return RefreshIndicator(

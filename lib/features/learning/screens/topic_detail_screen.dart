@@ -496,7 +496,25 @@ class _TopicDetailScreenState extends State<TopicDetailScreen>
     }
 
     if (_topicDetail == null) {
-      return const Center(child: Text('ไม่พบข้อมูล'));
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Image.asset(
+              'assets/images/not_found.webp',
+              width: 120,
+              height: 120,
+            ),
+            AppSpacing.verticalGapMd,
+            Text(
+              'ไม่พบข้อมูล',
+              style: AppTypography.body.copyWith(
+                color: AppColors.secondaryText,
+              ),
+            ),
+          ],
+        ),
+      );
     }
 
     return TabBarView(

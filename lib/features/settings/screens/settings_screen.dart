@@ -640,11 +640,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           AppSpacing.verticalGapMd,
           if (_allSystemRoles.isEmpty)
-            Text(
-              'ไม่พบ system roles ในระบบ',
-              style: AppTypography.bodySmall.copyWith(
-                color: Colors.teal.shade600,
-              ),
+            Column(
+              children: [
+                Image.asset(
+                  'assets/images/not_found.webp',
+                  width: 80,
+                  height: 80,
+                ),
+                AppSpacing.verticalGapSm,
+                Text(
+                  'ไม่พบ system roles ในระบบ',
+                  style: AppTypography.bodySmall.copyWith(
+                    color: Colors.teal.shade600,
+                  ),
+                ),
+              ],
             )
           else
             Wrap(

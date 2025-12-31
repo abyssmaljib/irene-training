@@ -383,9 +383,22 @@ class _QuizScreenState extends State<QuizScreen> {
 
     if (_questions.isEmpty) {
       return Center(
-        child: Text(
-          'ไม่พบคำถาม',
-          style: AppTypography.body,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Image.asset(
+              'assets/images/not_found.webp',
+              width: 120,
+              height: 120,
+            ),
+            AppSpacing.verticalGapMd,
+            Text(
+              'ไม่พบคำถาม',
+              style: AppTypography.body.copyWith(
+                color: AppColors.secondaryText,
+              ),
+            ),
+          ],
         ),
       );
     }

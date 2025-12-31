@@ -22,10 +22,7 @@ import '../widgets/problem_input_sheet.dart';
 class TaskDetailScreen extends ConsumerStatefulWidget {
   final TaskLog task;
 
-  const TaskDetailScreen({
-    super.key,
-    required this.task,
-  });
+  const TaskDetailScreen({super.key, required this.task});
 
   @override
   ConsumerState<TaskDetailScreen> createState() => _TaskDetailScreenState();
@@ -80,7 +77,9 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
             value: logId,
           ),
           callback: (payload) {
-            debugPrint('TaskDetailScreen: received realtime update for task $logId');
+            debugPrint(
+              'TaskDetailScreen: received realtime update for task $logId',
+            );
             _refreshTaskData();
           },
         )
@@ -138,7 +137,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           prn: false,
         );
         debugPrint(
-            '_loadMedicines: total=${medicines.length}, filtered=${filtered.length}');
+          '_loadMedicines: total=${medicines.length}, filtered=${filtered.length}',
+        );
 
         setState(() {
           _medicines = filtered;
@@ -146,7 +146,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         });
       } else {
         debugPrint(
-            '_loadMedicines: no filter applied, showing all ${medicines.length} medicines');
+          '_loadMedicines: no filter applied, showing all ${medicines.length} medicines',
+        );
         setState(() {
           _medicines = medicines;
           _isLoadingMedicines = false;
@@ -416,9 +417,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
   Widget _buildTitle() {
     return Text(
       _task.title ?? 'ไม่ระบุชื่องาน',
-      style: AppTypography.heading2.copyWith(
-        fontWeight: FontWeight.w600,
-      ),
+      style: AppTypography.heading2.copyWith(fontWeight: FontWeight.w600),
     );
   }
 
@@ -543,10 +542,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
             ),
           ),
           AppSpacing.verticalGapSm,
-          Text(
-            _task.description!,
-            style: AppTypography.body,
-          ),
+          Text(_task.description!, style: AppTypography.body),
         ],
       ),
     );
@@ -594,7 +590,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                       if (loadingProgress == null) return child;
                       return _buildProfilePlaceholder();
                     },
-                    errorBuilder: (_, error, stackTrace) => _buildProfilePlaceholder(),
+                    errorBuilder: (_, error, stackTrace) =>
+                        _buildProfilePlaceholder(),
                   )
                 : _buildProfilePlaceholder(),
           ),
@@ -690,11 +687,20 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           borderRadius: BorderRadius.circular(12),
         ),
         child: Center(
-          child: Text(
-            'ไม่พบรายการยาสำหรับมื้อนี้',
-            style: AppTypography.body.copyWith(
-              color: AppColors.secondaryText,
-            ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset(
+                'assets/images/not_found.webp',
+                width: 120,
+                height: 120,
+              ),
+              AppSpacing.verticalGapSm,
+              Text(
+                'ไม่พบรายการยาสำหรับมื้อนี้',
+                style: AppTypography.body.copyWith(color: AppColors.secondaryText),
+              ),
+            ],
           ),
         ),
       );
@@ -705,9 +711,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       children: [
         Text(
           'รายการยา (${_medicines!.length} รายการ)',
-          style: AppTypography.subtitle.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
+          style: AppTypography.subtitle.copyWith(fontWeight: FontWeight.w600),
         ),
         AppSpacing.verticalGapSm,
         // ใช้ MedicinePhotoItem จากหน้าจัดยา
@@ -742,9 +746,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       children: [
         Text(
           'รูปตัวอย่าง',
-          style: AppTypography.subtitle.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
+          style: AppTypography.subtitle.copyWith(fontWeight: FontWeight.w600),
         ),
         AppSpacing.verticalGapSm,
         GestureDetector(
@@ -767,7 +769,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                 } else if (loaded < 1024 * 1024) {
                   loadedText = '${(loaded / 1024).toStringAsFixed(0)} KB';
                 } else {
-                  loadedText = '${(loaded / (1024 * 1024)).toStringAsFixed(1)} MB';
+                  loadedText =
+                      '${(loaded / (1024 * 1024)).toStringAsFixed(1)} MB';
                 }
                 return Container(
                   height: 300,
@@ -996,10 +999,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
             ],
           ),
           AppSpacing.verticalGapSm,
-          Text(
-            _task.descript!,
-            style: AppTypography.body,
-          ),
+          Text(_task.descript!, style: AppTypography.body),
         ],
       ),
     );
@@ -1063,7 +1063,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                   if (loadingProgress == null) return child;
                   final progress = loadingProgress.expectedTotalBytes != null
                       ? loadingProgress.cumulativeBytesLoaded /
-                          loadingProgress.expectedTotalBytes!
+                            loadingProgress.expectedTotalBytes!
                       : null;
                   return Center(
                     child: Column(
@@ -1107,11 +1107,15 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         ],
       ),
       child: SafeArea(
-        child: _task.isDone || _task.isPostponed || _task.isReferred || _task.isProblem
+        child:
+            _task.isDone ||
+                _task.isPostponed ||
+                _task.isReferred ||
+                _task.isProblem
             ? _buildCancelButton()
             : _isOptionOpen
-                ? _buildOptionsRow()
-                : _buildMainActionsRow(),
+            ? _buildOptionsRow()
+            : _buildMainActionsRow(),
       ),
     );
   }
@@ -1139,10 +1143,9 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                   // รูปแอบมอง
                   Image.asset(
                     'assets/images/peep2.webp',
-                    width: 64,
-                    height: 64,
+                    width: 100,
+                    height: 100,
                   ),
-                  AppSpacing.horizontalGapMd,
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1318,8 +1321,9 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                   icon: Icon(Iconsax.calendar_1, color: AppColors.warning),
                   label: Text(
                     'เลื่อนวันพรุ่งนี้',
-                    style:
-                        AppTypography.button.copyWith(color: AppColors.warning),
+                    style: AppTypography.button.copyWith(
+                      color: AppColors.warning,
+                    ),
                   ),
                 ),
               ),
@@ -1341,8 +1345,9 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                   icon: Icon(Iconsax.hospital, color: AppColors.secondary),
                   label: Text(
                     'ไม่อยู่ศูนย์',
-                    style: AppTypography.button
-                        .copyWith(color: AppColors.secondary),
+                    style: AppTypography.button.copyWith(
+                      color: AppColors.secondary,
+                    ),
                   ),
                 ),
               ),
@@ -1541,7 +1546,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
   Future<void> _handleTakePhoto() async {
     // DEV MODE: ถ้าเป็น debug mode บน desktop ใช้รูป dummy แทน
     const bool useDevDummy = kDebugMode;
-    final bool isDesktopOrWeb = kIsWeb ||
+    final bool isDesktopOrWeb =
+        kIsWeb ||
         (!kIsWeb &&
             (defaultTargetPlatform == TargetPlatform.windows ||
                 defaultTargetPlatform == TargetPlatform.macOS ||

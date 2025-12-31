@@ -519,7 +519,11 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Iconsax.user_remove, size: 48, color: AppColors.secondaryText),
+                Image.asset(
+                  'assets/images/not_found.webp',
+                  width: 120,
+                  height: 120,
+                ),
                 AppSpacing.verticalGapMd,
                 Text(
                   'ไม่พบรายชื่อผู้พัก',
@@ -543,10 +547,10 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Iconsax.search_normal,
-                  size: 48,
-                  color: AppColors.secondaryText,
+                Image.asset(
+                  'assets/images/not_found.webp',
+                  width: 120,
+                  height: 120,
                 ),
                 AppSpacing.verticalGapMd,
                 Text(
