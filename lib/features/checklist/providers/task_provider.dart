@@ -289,16 +289,21 @@ final selectedRoleFilterProvider = StateProvider<int?>((ref) {
 });
 
 /// Provider สำหรับ effective role filter (รวม default logic)
-/// null = แสดงทุก role (ไม่ filter)
-/// -1 = ดูทุก role (ไม่ filter)
-/// อื่นๆ = filter ตาม role_id นั้น
+/// null = ใช้ role ของ user เป็น default (NA เห็นงาน NA, หัวหน้าเวรเห็นงานหัวหน้าเวร)
+/// -1 = ดูทุก role (ไม่ filter) - ต้องเลือกเองใน filter
+/// อื่นๆ = filter ตาม role_id ที่เลือก
 final effectiveRoleFilterProvider = Provider<int?>((ref) {
   final selectedRole = ref.watch(selectedRoleFilterProvider);
-  // ถ้า null = ยังไม่ได้เลือก = แสดงทุก role (ไม่ filter)
+  final userRole = ref.watch(currentUserSystemRoleProvider).valueOrNull;
+
   // ถ้า -1 = เลือก "ดูทุก role" = ไม่ filter
-  // ถ้าเป็นค่าอื่น = filter ตาม role นั้น
-  if (selectedRole == null || selectedRole == -1) return null;
-  return selectedRole;
+  if (selectedRole == -1) return null;
+
+  // ถ้าเลือก role อื่น = ใช้ role ที่เลือก
+  if (selectedRole != null) return selectedRole;
+
+  // ถ้า null = ยังไม่ได้เลือก = ใช้ role ของ user เป็น default
+  return userRole?.id;
 });
 
 /// Provider สำหรับ ZoneService

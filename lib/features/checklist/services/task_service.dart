@@ -282,6 +282,27 @@ class TaskService {
     }
   }
 
+  /// ดึง task เดี่ยวจาก logId (สำหรับ realtime update)
+  Future<TaskLog?> getTaskByLogId(int logId) async {
+    try {
+      final response = await _supabase
+          .from('v2_task_logs_with_details')
+          .select()
+          .eq('log_id', logId)
+          .maybeSingle();
+
+      if (response == null) {
+        debugPrint('getTaskByLogId: task $logId not found');
+        return null;
+      }
+
+      return TaskLog.fromJson(response);
+    } catch (e) {
+      debugPrint('getTaskByLogId error: $e');
+      return null;
+    }
+  }
+
   /// เลื่อนงานไปวันพรุ่งนี้
   /// 1. Update log เดิม: status='postpone', completed_by, completed_at
   /// 2. Insert log ใหม่: postpone_from=logId, expectedDateTime+1day

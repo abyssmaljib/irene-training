@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
@@ -14,6 +15,7 @@ import '../../medicine/services/medicine_service.dart';
 import '../../medicine/widgets/medicine_photo_item.dart';
 import '../models/task_log.dart';
 import '../providers/task_provider.dart';
+import '../services/task_service.dart';
 import '../widgets/problem_input_sheet.dart';
 
 /// หน้ารายละเอียด Task แบบ Full Page
@@ -39,14 +41,77 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
   List<MedicineSummary>? _medicines;
   bool _isLoadingMedicines = false;
 
+  // Realtime subscription
+  RealtimeChannel? _taskChannel;
+
   @override
   void initState() {
     super.initState();
     _task = widget.task;
 
+    // Subscribe to realtime updates for this task
+    _subscribeToTaskUpdates();
+
     // ถ้าเป็นงานจัดยา ให้โหลดข้อมูลยา
     if (_task.taskType == 'จัดยา' && _task.residentId != null) {
       _loadMedicines();
+    }
+  }
+
+  @override
+  void dispose() {
+    _unsubscribeFromTaskUpdates();
+    super.dispose();
+  }
+
+  /// Subscribe to realtime updates สำหรับ task นี้
+  void _subscribeToTaskUpdates() {
+    final logId = _task.logId;
+
+    _taskChannel = Supabase.instance.client
+        .channel('task_detail_$logId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'A_Task_logs_ver2',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'id',
+            value: logId,
+          ),
+          callback: (payload) {
+            debugPrint('TaskDetailScreen: received realtime update for task $logId');
+            _refreshTaskData();
+          },
+        )
+        .subscribe();
+
+    debugPrint('TaskDetailScreen: subscribed to task $logId updates');
+  }
+
+  /// Unsubscribe from realtime updates
+  Future<void> _unsubscribeFromTaskUpdates() async {
+    if (_taskChannel != null) {
+      await _taskChannel!.unsubscribe();
+      _taskChannel = null;
+      debugPrint('TaskDetailScreen: unsubscribed from task updates');
+    }
+  }
+
+  /// Refresh task data จาก database
+  Future<void> _refreshTaskData() async {
+    final logId = _task.logId;
+
+    final updatedTask = await TaskService.instance.getTaskByLogId(logId);
+    if (updatedTask != null && mounted) {
+      setState(() {
+        _task = updatedTask;
+        // Clear uploaded image URL if task has been completed by someone else
+        if (_task.isDone && _uploadedImageUrl != null) {
+          _uploadedImageUrl = null;
+        }
+      });
+      debugPrint('TaskDetailScreen: task refreshed - status: ${_task.status}');
     }
   }
 
@@ -839,14 +904,14 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                 final total = loadingProgress.expectedTotalBytes;
                 final loaded = loadingProgress.cumulativeBytesLoaded;
                 final progress = total != null ? loaded / total : null;
-                // แสดงขนาดที่โหลดแล้ว (KB/MB)
                 String loadedText;
                 if (loaded < 1024) {
                   loadedText = '$loaded B';
                 } else if (loaded < 1024 * 1024) {
                   loadedText = '${(loaded / 1024).toStringAsFixed(0)} KB';
                 } else {
-                  loadedText = '${(loaded / (1024 * 1024)).toStringAsFixed(1)} MB';
+                  loadedText =
+                      '${(loaded / (1024 * 1024)).toStringAsFixed(1)} MB';
                 }
                 return Container(
                   height: 300,
@@ -1061,13 +1126,10 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
             padding: EdgeInsets.only(bottom: AppSpacing.sm),
             child: Container(
               width: double.infinity,
-              padding: EdgeInsets.symmetric(
-                horizontal: AppSpacing.md,
-                vertical: AppSpacing.sm,
-              ),
+              padding: EdgeInsets.all(AppSpacing.md),
               decoration: BoxDecoration(
                 color: AppColors.error.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                   color: AppColors.error.withValues(alpha: 0.3),
                 ),
@@ -1076,11 +1138,11 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                 children: [
                   // รูปแอบมอง
                   Image.asset(
-                    'assets/images/แอบมอง.webp',
-                    width: 40,
-                    height: 40,
+                    'assets/images/peek.webp',
+                    width: 64,
+                    height: 64,
                   ),
-                  AppSpacing.horizontalGapSm,
+                  AppSpacing.horizontalGapMd,
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1477,6 +1539,24 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
   }
 
   Future<void> _handleTakePhoto() async {
+    // DEV MODE: ถ้าเป็น debug mode บน desktop ใช้รูป dummy แทน
+    const bool useDevDummy = kDebugMode;
+    final bool isDesktopOrWeb = kIsWeb ||
+        (!kIsWeb &&
+            (defaultTargetPlatform == TargetPlatform.windows ||
+                defaultTargetPlatform == TargetPlatform.macOS ||
+                defaultTargetPlatform == TargetPlatform.linux));
+
+    if (useDevDummy && isDesktopOrWeb) {
+      // ใช้รูป dummy สำหรับทดสอบ (แมวแอบมอง)
+      const dummyUrl =
+          'https://cdn.pixabay.com/photo/2019/11/08/11/56/cat-4611189_640.jpg';
+      setState(() {
+        _uploadedImageUrl = dummyUrl;
+      });
+      return;
+    }
+
     final cameraService = CameraService.instance;
 
     // ถ่ายรูป

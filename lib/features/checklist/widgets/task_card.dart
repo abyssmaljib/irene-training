@@ -51,42 +51,37 @@ class TaskCard extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Checkbox หรือ Warning icon (สำหรับ problem tasks)
-                _buildLeadingWidget(),
-                AppSpacing.horizontalGapMd,
-                // Content
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Row 1: resident name + taskType + status badge
-                      Row(
-                        children: [
-                          if (showResident && task.residentName != null) ...[
-                            Icon(Iconsax.user,
-                                size: 12, color: AppColors.secondaryText),
-                            const SizedBox(width: 4),
-                            Flexible(
-                              child: Text(
-                                task.residentName!,
-                                style: AppTypography.caption.copyWith(
-                                  color: AppColors.secondaryText,
+                  // Checkbox หรือ Warning icon (สำหรับ problem tasks)
+                  _buildLeadingWidget(),
+                  AppSpacing.horizontalGapMd,
+                  // Content
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Row 1: resident name + taskType
+                        Row(
+                          children: [
+                            if (showResident && task.residentName != null) ...[
+                              Icon(Iconsax.user,
+                                  size: 12, color: AppColors.secondaryText),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  task.residentName!,
+                                  style: AppTypography.caption.copyWith(
+                                    color: AppColors.secondaryText,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                overflow: TextOverflow.ellipsis,
                               ),
-                            ),
+                            ],
+                            if (task.taskType != null && task.taskType!.isNotEmpty) ...[
+                              AppSpacing.horizontalGapSm,
+                              _buildTaskTypeBadge(),
+                            ],
                           ],
-                          if (task.taskType != null && task.taskType!.isNotEmpty) ...[
-                            AppSpacing.horizontalGapSm,
-                            _buildTaskTypeBadge(),
-                          ],
-                          const Spacer(),
-                          if (task.isProblem) ...[
-                            AppSpacing.horizontalGapSm,
-                            _buildStatusBadge(),
-                          ],
-                        ],
-                      ),
+                        ),
                       // Row 2: title only
                       AppSpacing.verticalGapXs,
                       Text(
@@ -151,13 +146,16 @@ class TaskCard extends StatelessWidget {
                         AppSpacing.verticalGapXs,
                         Row(
                           children: [
-                            Icon(Iconsax.tick_circle,
-                                size: 12, color: AppColors.tagPassedText),
+                            Icon(
+                              task.isReferred ? Iconsax.hospital : Iconsax.tick_circle,
+                              size: 12,
+                              color: task.isReferred ? AppColors.secondary : AppColors.tagPassedText,
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               'โดย ${task.completedByNickname}',
                               style: AppTypography.caption.copyWith(
-                                color: AppColors.tagPassedText,
+                                color: task.isReferred ? AppColors.secondary : AppColors.tagPassedText,
                               ),
                             ),
                             // เวลาที่ติ๊ก (สีตามความต่างจาก expectedDateTime)
@@ -166,7 +164,9 @@ class TaskCard extends StatelessWidget {
                               Text(
                                 _formatCompletedTime(task.completedAt!),
                                 style: AppTypography.caption.copyWith(
-                                  color: _getCompletedTimeColor(task.completedAt!, task.expectedDateTime),
+                                  color: task.isReferred
+                                      ? AppColors.secondary
+                                      : _getCompletedTimeColor(task.completedAt!, task.expectedDateTime),
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -222,8 +222,8 @@ class TaskCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                // Task type indicators (icons แสดงประเภทงาน)
-                _buildTaskTypeIcons(),
+                // Right side: status badge + task type icons
+                _buildRightColumn(),
               ],
             ),
           ),
@@ -293,6 +293,22 @@ class TaskCard extends StatelessWidget {
         ),
       );
     }
+    // ถ้าไม่อยู่ศูนย์ (refer) แสดง icon โรงพยาบาล
+    if (task.isReferred) {
+      return Container(
+        width: 24,
+        height: 24,
+        decoration: BoxDecoration(
+          color: AppColors.secondary,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: const Icon(
+          Iconsax.hospital,
+          color: Colors.white,
+          size: 16,
+        ),
+      );
+    }
     // ปกติแสดง checkbox
     return _buildCheckbox();
   }
@@ -300,18 +316,19 @@ class TaskCard extends StatelessWidget {
   Widget _buildCheckbox() {
     // Visual only - ไม่ให้ interaction จากหน้าการ์ด
     // ต้องกดเข้าไปหน้า detail เพื่อทำงาน
+    final isComplete = task.isComplete; // เฉพาะ complete ไม่รวม refer
     return Container(
       width: 24,
       height: 24,
       decoration: BoxDecoration(
-        color: task.isDone ? AppColors.primary : Colors.transparent,
+        color: isComplete ? AppColors.primary : Colors.transparent,
         borderRadius: BorderRadius.circular(6),
         border: Border.all(
-          color: task.isDone ? AppColors.primary : AppColors.alternate,
+          color: isComplete ? AppColors.primary : AppColors.alternate,
           width: 2,
         ),
       ),
-      child: task.isDone
+      child: isComplete
           ? const Icon(Icons.check, color: Colors.white, size: 16)
           : null,
     );
@@ -321,15 +338,23 @@ class TaskCard extends StatelessWidget {
     Color bgColor;
     Color textColor;
     String text;
+    IconData icon;
 
     if (task.isProblem) {
       bgColor = AppColors.tagFailedBg;
       textColor = AppColors.tagFailedText;
       text = 'ติดปัญหา';
+      icon = Iconsax.warning_2;
     } else if (task.isPostponed) {
       bgColor = AppColors.tagPendingBg;
       textColor = AppColors.tagPendingText;
       text = 'เลื่อน';
+      icon = Iconsax.calendar_1;
+    } else if (task.isReferred) {
+      bgColor = AppColors.secondary.withValues(alpha: 0.2);
+      textColor = AppColors.secondary;
+      text = 'ไม่อยู่ศูนย์';
+      icon = Iconsax.hospital;
     } else {
       return const SizedBox.shrink();
     }
@@ -340,12 +365,19 @@ class TaskCard extends StatelessWidget {
         color: bgColor,
         borderRadius: BorderRadius.circular(4),
       ),
-      child: Text(
-        text,
-        style: AppTypography.caption.copyWith(
-          color: textColor,
-          fontSize: 10,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 10, color: textColor),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: AppTypography.caption.copyWith(
+              color: textColor,
+              fontSize: 10,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -432,15 +464,20 @@ class TaskCard extends StatelessWidget {
     }
   }
 
-  /// สร้าง icons แสดงประเภทงาน (กล้อง, สี่เหลี่ยม)
-  Widget _buildTaskTypeIcons() {
-    final icons = <Widget>[];
+  /// สร้าง column ด้านขวา (status badge + task type icons)
+  Widget _buildRightColumn() {
+    final items = <Widget>[];
+
+    // Status badge (ติดปัญหา, เลื่อน, ไม่อยู่ศูนย์)
+    if (task.isProblem || task.isPostponed || task.isReferred) {
+      items.add(_buildStatusBadge());
+    }
 
     // กล้อง = งานที่มีรูปตัวอย่าง หรือต้องถ่ายรูป
     if (task.hasSampleImage || task.requireImage) {
-      icons.add(
+      items.add(
         Padding(
-          padding: const EdgeInsets.only(top: 6),
+          padding: EdgeInsets.only(top: items.isEmpty ? 0 : 6),
           child: Icon(
             Iconsax.camera,
             size: 18,
@@ -452,9 +489,9 @@ class TaskCard extends StatelessWidget {
 
     // สี่เหลี่ยม = งานที่ต้องทำหลังจากโพสต์
     if (task.mustCompleteByPost) {
-      icons.add(
+      items.add(
         Padding(
-          padding: const EdgeInsets.only(top: 6),
+          padding: EdgeInsets.only(top: items.isEmpty ? 0 : 6),
           child: Icon(
             Iconsax.document_text,
             size: 18,
@@ -464,11 +501,12 @@ class TaskCard extends StatelessWidget {
       );
     }
 
-    if (icons.isEmpty) return const SizedBox.shrink();
+    if (items.isEmpty) return const SizedBox.shrink();
 
     return Column(
       mainAxisSize: MainAxisSize.min,
-      children: icons,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: items,
     );
   }
 

@@ -76,13 +76,13 @@ class TaskFilterDrawer extends ConsumerWidget {
 
             const Divider(height: 32),
 
-            // Task Type Filter Section
-            _TaskTypeFilterSection(),
+            // Role Filter Section (กรองตามตำแหน่ง - ใช้บ่อย)
+            _RoleFilterSection(),
 
             const Divider(height: 32),
 
-            // Role Filter Section
-            _RoleFilterSection(),
+            // Task Type Filter Section
+            _TaskTypeFilterSection(),
 
             const Divider(height: 32),
 

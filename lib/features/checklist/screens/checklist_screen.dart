@@ -87,6 +87,7 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
                 MaterialPageRoute(builder: (_) => const SettingsScreen()),
               );
             },
+            trailing: _buildViewModeToggle(viewMode),
           ),
           // Zone filter chips - floating header
           SliverPersistentHeader(
@@ -415,6 +416,35 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
       case TaskViewMode.myDone:
         return Iconsax.tick_circle;
     }
+  }
+
+  /// Toggle button สำหรับเปลี่ยนมุมมอง (View Mode) ที่มุมขวาของ AppBar
+  /// กดแล้ววนไปมุมมองถัดไป: upcoming -> all -> problem -> myDone -> upcoming ...
+  Widget _buildViewModeToggle(TaskViewMode currentMode) {
+    return Material(
+      color: AppColors.accent1,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: () {
+          // วนไปมุมมองถัดไป
+          final modes = TaskViewMode.values;
+          final currentIndex = modes.indexOf(currentMode);
+          final nextIndex = (currentIndex + 1) % modes.length;
+          ref.read(taskViewModeProvider.notifier).state = modes[nextIndex];
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: 40,
+          height: 40,
+          alignment: Alignment.center,
+          child: Icon(
+            _getViewModeIcon(currentMode),
+            color: AppColors.primary,
+            size: 22,
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildFilteredTaskList(

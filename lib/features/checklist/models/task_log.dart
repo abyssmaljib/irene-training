@@ -182,10 +182,14 @@ class TaskLog {
   }
 
   // Helper getters
-  bool get isDone => status == 'complete';
+  /// งานเสร็จแล้ว (complete หรือ refer)
+  bool get isDone => status == 'complete' || status == 'refer';
+  /// งานเสร็จแบบปกติ (complete)
+  bool get isComplete => status == 'complete';
   bool get isProblem => status == 'problem';
   bool get isPending => status == null;
   bool get isPostponed => status == 'postpone';
+  /// งาน refer (ไม่อยู่ศูนย์)
   bool get isReferred => status == 'refer';
 
   /// ตรวจสอบว่า resident ถูก refer หรือ home (ส่งต่อ/กลับบ้าน) หรือไม่
