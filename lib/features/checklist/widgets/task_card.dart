@@ -59,48 +59,9 @@ class TaskCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Title + Status badge
+                      // Row 1: resident name + taskType + status badge
                       Row(
                         children: [
-                          Expanded(
-                            child: Text(
-                              task.title ?? 'ไม่มีชื่องาน',
-                              style: AppTypography.body.copyWith(
-                                decoration:
-                                    task.isDone ? TextDecoration.lineThrough : null,
-                                color: task.isDone
-                                    ? AppColors.secondaryText
-                                    : AppColors.textPrimary,
-                                fontWeight: FontWeight.w500,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          if (task.isProblem) ...[
-                            AppSpacing.horizontalGapSm,
-                            _buildStatusBadge(),
-                          ],
-                        ],
-                      ),
-                      AppSpacing.verticalGapXs,
-                      // Subtitle: time + resident + zone + role
-                      Row(
-                        children: [
-                          // เวลา - อยู่หน้าสุด (เน้นให้ชัดเจน)
-                          if (task.expectedDateTime != null) ...[
-                            Icon(Iconsax.clock,
-                                size: 12, color: AppColors.primary),
-                            const SizedBox(width: 4),
-                            Text(
-                              _formatTime(task.expectedDateTime!),
-                              style: AppTypography.caption.copyWith(
-                                color: AppColors.primaryText,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            AppSpacing.horizontalGapSm,
-                          ],
                           if (showResident && task.residentName != null) ...[
                             Icon(Iconsax.user,
                                 size: 12, color: AppColors.secondaryText),
@@ -112,6 +73,48 @@ class TaskCard extends StatelessWidget {
                                   color: AppColors.secondaryText,
                                 ),
                                 overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                          if (task.taskType != null && task.taskType!.isNotEmpty) ...[
+                            AppSpacing.horizontalGapSm,
+                            _buildTaskTypeBadge(),
+                          ],
+                          const Spacer(),
+                          if (task.isProblem) ...[
+                            AppSpacing.horizontalGapSm,
+                            _buildStatusBadge(),
+                          ],
+                        ],
+                      ),
+                      // Row 2: title only
+                      AppSpacing.verticalGapXs,
+                      Text(
+                        task.title ?? 'ไม่มีชื่องาน',
+                        style: AppTypography.body.copyWith(
+                          decoration:
+                              task.isDone ? TextDecoration.lineThrough : null,
+                          color: task.isDone
+                              ? AppColors.secondaryText
+                              : AppColors.textPrimary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      // Row 3: time + zone + role
+                      AppSpacing.verticalGapXs,
+                      Row(
+                        children: [
+                          if (task.expectedDateTime != null) ...[
+                            Icon(Iconsax.clock,
+                                size: 12, color: AppColors.primary),
+                            const SizedBox(width: 4),
+                            Text(
+                              _formatTime(task.expectedDateTime!),
+                              style: AppTypography.caption.copyWith(
+                                color: AppColors.primaryText,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                             AppSpacing.horizontalGapSm,
@@ -295,27 +298,22 @@ class TaskCard extends StatelessWidget {
   }
 
   Widget _buildCheckbox() {
-    return GestureDetector(
-      onTap: () {
-        if (onCheckChanged != null) {
-          onCheckChanged!(!task.isDone);
-        }
-      },
-      child: Container(
-        width: 24,
-        height: 24,
-        decoration: BoxDecoration(
-          color: task.isDone ? AppColors.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(
-            color: task.isDone ? AppColors.primary : AppColors.alternate,
-            width: 2,
-          ),
+    // Visual only - ไม่ให้ interaction จากหน้าการ์ด
+    // ต้องกดเข้าไปหน้า detail เพื่อทำงาน
+    return Container(
+      width: 24,
+      height: 24,
+      decoration: BoxDecoration(
+        color: task.isDone ? AppColors.primary : Colors.transparent,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: task.isDone ? AppColors.primary : AppColors.alternate,
+          width: 2,
         ),
-        child: task.isDone
-            ? const Icon(Icons.check, color: Colors.white, size: 16)
-            : null,
       ),
+      child: task.isDone
+          ? const Icon(Icons.check, color: Colors.white, size: 16)
+          : null,
     );
   }
 
@@ -373,18 +371,18 @@ class TaskCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: AppColors.accent3, // สีชมพูอ่อน
+        color: const Color(0xFFE8DEF8), // สีม่วงอ่อน pastel
         borderRadius: BorderRadius.circular(4),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Iconsax.user_tag, size: 10, color: AppColors.tertiary),
+          const Icon(Iconsax.user_tag, size: 10, color: Color(0xFF6750A4)),
           const SizedBox(width: 2),
           Text(
             task.assignedRoleName!,
             style: AppTypography.caption.copyWith(
-              color: AppColors.tertiary,
+              color: const Color(0xFF6750A4), // สีม่วงเข้ม
               fontSize: 10,
             ),
           ),
@@ -474,34 +472,30 @@ class TaskCard extends StatelessWidget {
     );
   }
 
-  /// ตรวจสอบว่ามี badges ที่ต้องแสดงหรือไม่
+  /// ตรวจสอบว่ามี badges ที่ต้องแสดงหรือไม่ (ไม่รวม taskType ที่ย้ายไป row บน)
   bool _hasAnyBadges() {
-    return (task.taskType != null && task.taskType!.isNotEmpty) ||
-        task.recurrenceInterval != null ||
+    return task.recurrenceInterval != null ||
         task.daysOfWeek.isNotEmpty ||
         task.recurringDates.isNotEmpty ||
         task.postponeFrom != null ||
         task.postponeTo != null;
   }
 
-  /// สร้าง row สำหรับแสดง badges ต่างๆ
+  /// สร้าง row สำหรับแสดง badges ต่างๆ (ไม่รวม taskType ที่ย้ายไป row บน)
   Widget _buildBadgesRow() {
     return Wrap(
       spacing: 6,
       runSpacing: 6,
       children: [
-        // 1. taskType badge (สีชมพู accent3) - ซ่อนถ้าเป็น null หรือ empty
-        if (task.taskType != null && task.taskType!.isNotEmpty)
-          _buildTaskTypeBadge(),
-        // 2. Recurrence badge (สีเหลือง)
+        // 1. Recurrence badge (สีเหลือง)
         if (task.recurrenceInterval != null) _buildRecurrenceBadge(),
-        // 3. Days of week (วงกลมสี)
+        // 2. Days of week (วงกลมสี)
         if (task.daysOfWeek.isNotEmpty) _buildDaysOfWeekBadges(),
-        // 4. Recurring dates (วงกลมเขียว)
+        // 3. Recurring dates (วงกลมเขียว)
         if (task.recurringDates.isNotEmpty) _buildRecurringDatesBadges(),
-        // 5. Postpone from badge (เลื่อนมาจาก)
+        // 4. Postpone from badge (เลื่อนมาจาก)
         if (task.postponeFrom != null) _buildPostponeFromBadge(),
-        // 6. Postpone to badge (ถูกเลื่อน)
+        // 5. Postpone to badge (ถูกเลื่อน)
         if (task.postponeTo != null) _buildPostponeToBadge(),
       ],
     );

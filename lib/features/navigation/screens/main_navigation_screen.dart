@@ -7,6 +7,7 @@ import '../../home/screens/home_screen.dart';
 import '../../checklist/screens/checklist_screen.dart';
 import '../../board/screens/board_screen.dart';
 import '../../residents/screens/residents_screen.dart';
+import '../../settings/screens/settings_screen.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
@@ -23,6 +24,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     const ChecklistScreen(),
     const BoardScreen(),
     const ResidentsScreen(),
+    const SettingsScreen(),
   ];
 
   @override
@@ -66,6 +68,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   icon: Iconsax.health,
                   activeIcon: Iconsax.health5,
                   label: 'คนไข้',
+                ),
+                _buildNavItem(
+                  index: 4,
+                  icon: Iconsax.user,
+                  activeIcon: Iconsax.user,
+                  label: 'โปรไฟล์',
                 ),
               ],
             ),

@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/medicine_summary.dart';
 import '../models/med_log.dart';
@@ -35,7 +34,6 @@ class MedicineService {
   void invalidateCache() {
     _cachedMedicines = null;
     _cacheTime = null;
-    debugPrint('MedicineService: cache invalidated');
   }
 
   /// 7 มื้อที่ต้องตรวจสอบ
@@ -60,7 +58,6 @@ class MedicineService {
   }) async {
     // ใช้ cache ถ้ายังใช้ได้และไม่ได้บังคับ refresh
     if (!forceRefresh && _isCacheValid(residentId)) {
-      debugPrint('getMedicinesByResident: using cached data (${_cachedMedicines!.length} medicines)');
       return _cachedMedicines!;
     }
 
@@ -80,13 +77,10 @@ class MedicineService {
       _cachedMedicines = medicines;
       _cacheTime = DateTime.now();
 
-      debugPrint('getMedicinesByResident: fetched ${medicines.length} medicines (cache updated)');
       return medicines;
     } catch (e) {
-      debugPrint('getMedicinesByResident error: $e');
       // Return cached data if available even on error
       if (_cachedResidentId == residentId && _cachedMedicines != null) {
-        debugPrint('getMedicinesByResident: returning stale cache on error');
         return _cachedMedicines!;
       }
       return [];
@@ -103,9 +97,7 @@ class MedicineService {
       residentId,
       forceRefresh: forceRefresh,
     );
-    final activeMedicines = allMedicines.where((m) => m.isActive).toList();
-    debugPrint('getActiveMedicines: ${activeMedicines.length} active out of ${allMedicines.length}');
-    return activeMedicines;
+    return allMedicines.where((m) => m.isActive).toList();
   }
 
   /// ดึง med logs ของวันที่กำหนด
@@ -140,7 +132,6 @@ class MedicineService {
           .eq('Created_Date', dateStr);
 
       stopwatch.stop();
-      debugPrint('getMedLogsForDate: got ${(response as List).length} logs for $dateStr in ${stopwatch.elapsedMilliseconds}ms');
 
       return (response as List).map((json) {
         // Map nested user data to flat structure for MedLog.fromJson
@@ -162,7 +153,6 @@ class MedicineService {
         return MedLog.fromJson(mapped);
       }).toList();
     } catch (e) {
-      debugPrint('getMedLogsForDate error: $e');
       return [];
     }
   }
@@ -178,17 +168,14 @@ class MedicineService {
     try {
       // ดึงยาทั้งหมดที่ active
       final medicines = await getActiveMedicines(residentId);
-      debugPrint('getMealStatusForDate: ${medicines.length} active medicines');
 
       // ดึง logs ของวันนี้
       final logs = await getMedLogsForDate(residentId, date);
-      debugPrint('getMealStatusForDate: ${logs.length} logs for today');
 
       // สร้าง map ของ logs โดย key เป็น meal
       final logsMap = <String, MedLog>{};
       for (final log in logs) {
         logsMap[log.meal] = log;
-        debugPrint('Log meal: "${log.meal}", has3C: ${log.hasPicture3C}');
       }
 
       // สร้าง result map
@@ -213,8 +200,6 @@ class MedicineService {
         final log = logsMap[mealKey];
         final hasPhoto = log?.hasPicture3C ?? false;
 
-        debugPrint('Slot "$mealKey": $count medicines (filtered by date), hasPhoto: $hasPhoto');
-
         result[mealKey] = MealStatus(
           mealKey: mealKey,
           label: slot['label']!,
@@ -226,7 +211,6 @@ class MedicineService {
 
       return result;
     } catch (e) {
-      debugPrint('getMealStatusForDate error: $e');
       return {};
     }
   }
@@ -237,7 +221,6 @@ class MedicineService {
       final medicines = await getActiveMedicines(residentId);
       return medicines.length;
     } catch (e) {
-      debugPrint('getActiveMedicineCount error: $e');
       return 0;
     }
   }
@@ -308,7 +291,6 @@ class MedicineService {
 
         for (final errorLog in errorLogs) {
           if (errorLog.meal == errorLogMealKey) {
-            debugPrint('  Matched errorLog for "$errorLogMealKey": 2C=${errorLog.field2CPicture}, 3C=${errorLog.field3CPicture}, reply=${errorLog.replyNurseMark}');
             if (errorLog.field2CPicture == true && errorLog.replyNurseMark != null) {
               nurseMark2C = NurseMarkStatusExtension.fromString(errorLog.replyNurseMark);
               reviewer2CName = errorLog.reviewerDisplayName;
@@ -318,10 +300,6 @@ class MedicineService {
               reviewer3CName = errorLog.reviewerDisplayName;
             }
           }
-        }
-
-        if (nurseMark2C != NurseMarkStatus.none || nurseMark3C != NurseMarkStatus.none) {
-          debugPrint('  -> nurseMark2C: $nurseMark2C, nurseMark3C: $nurseMark3C');
         }
 
         result.add(MealPhotoGroup(
@@ -338,7 +316,6 @@ class MedicineService {
 
       return result;
     } catch (e) {
-      debugPrint('getMedicinePhotosByMeal error: $e');
       return [];
     }
   }
@@ -349,7 +326,6 @@ class MedicineService {
       final medicines = await getMedicinePhotos(residentId);
       return medicines.where((m) => m.hasPhoto2C || m.hasPhoto3C).length;
     } catch (e) {
-      debugPrint('getMedicinePhotoCount error: $e');
       return 0;
     }
   }
@@ -456,7 +432,6 @@ extension MedicineServiceResidentStatus on MedicineService {
         completionStatus: status,
       );
     } catch (e) {
-      debugPrint('getMedCompletionStatusForResident error: $e');
       return null;
     }
   }
@@ -477,7 +452,6 @@ extension MedicineServiceResidentStatus on MedicineService {
       }
     }
 
-    debugPrint('getMedCompletionStatusForResidents: got ${result.length} statuses');
     return result;
   }
 }
@@ -503,18 +477,10 @@ extension MedicineServiceErrorLogs on MedicineService {
           .eq('resident_id', residentId)
           .eq('CalendarDate', dateStr);
 
-      debugPrint('getMedErrorLogsForDate: got ${(response as List).length} error logs for $dateStr');
-
-      // Debug: print meal values to check format
-      for (final json in response as List) {
-        debugPrint('  Error log meal: "${json['meal']}", reply: "${json['reply_nurseMark']}", 2C: ${json['2CPicture']}, 3C: ${json['3CPicture']}');
-      }
-
       return (response as List)
           .map((json) => MedErrorLog.fromJson(json))
           .toList();
     } catch (e) {
-      debugPrint('getMedErrorLogsForDate error: $e');
       return [];
     }
   }

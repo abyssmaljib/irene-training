@@ -111,10 +111,11 @@ class UserService {
     return role.name;
   }
 
-  /// Check if current user can QC medicine photos
+  /// Check if current user can QC medicine photos (หัวหน้าเวรขึ้นไป)
+  /// Uses SystemRole instead of UserRole (admin/superAdmin)
   Future<bool> canQC() async {
-    final role = await getRole();
-    return role.canQC;
+    final systemRole = await getSystemRole();
+    return systemRole?.canQC ?? false;
   }
 
   /// Update current user's role (for dev mode)
@@ -164,10 +165,10 @@ class UserService {
     }
 
     try {
-      // Query user_info joined with user_system_roles (รวม related_role_ids)
+      // Query user_info joined with user_system_roles (รวม level, related_role_ids)
       final response = await Supabase.instance.client
           .from('user_info')
-          .select('role_id, user_system_roles(id, role_name, abb, related_role_ids)')
+          .select('role_id, user_system_roles(id, role_name, abb, level, related_role_ids)')
           .eq('id', user.id)
           .maybeSingle();
 

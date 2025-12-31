@@ -72,9 +72,20 @@ final nursinghomeIdProvider = FutureProvider<int?>((ref) async {
   return userService.getNursinghomeId();
 });
 
-/// Provider สำหรับ selected date (default = today)
+/// คำนวณ "วันทำงาน" ตามรอบของแอพ (07:00-06:59 วันถัดไป)
+/// ถ้าเวลา 00:00-06:59 ให้ใช้วันเมื่อวาน
+DateTime getWorkingDate([DateTime? dateTime]) {
+  final now = dateTime ?? DateTime.now();
+  // ถ้าเวลาก่อน 07:00 น. ให้ใช้วันเมื่อวาน
+  if (now.hour < 7) {
+    return DateTime(now.year, now.month, now.day - 1);
+  }
+  return DateTime(now.year, now.month, now.day);
+}
+
+/// Provider สำหรับ selected date (default = working date)
 final selectedDateProvider = StateProvider<DateTime>((ref) {
-  return DateTime.now();
+  return getWorkingDate();
 });
 
 /// Provider สำหรับ view mode

@@ -199,8 +199,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.primaryBackground,
-      appBar: const IreneSecondaryAppBar(title: 'โปรไฟล์'),
-      body: _buildBody(),
+      body: CustomScrollView(
+        slivers: [
+          IreneAppBar(
+            title: 'โปรไฟล์',
+          ),
+          SliverToBoxAdapter(child: _buildBody()),
+        ],
+      ),
     );
   }
 
@@ -241,12 +247,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       );
     }
 
-    return SafeArea(
-      child: SingleChildScrollView(
-        padding: AppSpacing.screenPadding,
-        child: Column(
-          children: [
-            AppSpacing.verticalGapXl,
+    return Padding(
+      padding: AppSpacing.screenPadding,
+      child: Column(
+        children: [
+          AppSpacing.verticalGapMd,
             // Profile Picture
             Container(
               width: 80,
@@ -369,7 +374,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             AppSpacing.verticalGapLg,
           ],
         ),
-      ),
     );
   }
 

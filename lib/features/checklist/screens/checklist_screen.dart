@@ -13,6 +13,7 @@ import '../providers/task_provider.dart';
 import '../widgets/task_card.dart';
 import '../widgets/task_time_section.dart';
 import '../widgets/task_filter_drawer.dart';
+import 'task_detail_screen.dart';
 
 /// หน้าเช็คลิสต์ - รายการงาน
 /// แสดง Tasks ตาม view mode (งานถัดไป, ทั้งหมด, ติดปัญหา, ที่เราติ๊ก)
@@ -437,7 +438,6 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
                 task: task,
                 currentUserId: currentUserId,
                 onTap: () => _onTaskTap(task),
-                onCheckChanged: (checked) => _onTaskCheckChanged(task, checked),
               ),
             );
           },
@@ -509,7 +509,6 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
                   });
                 },
                 onTaskTap: _onTaskTap,
-                onTaskCheckChanged: _onTaskCheckChanged,
               ),
             );
           },
@@ -607,29 +606,12 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
   }
 
   void _onTaskTap(TaskLog task) {
-    // TODO: Navigate to task detail or show bottom sheet
-    debugPrint('Tapped task: ${task.title}');
-  }
-
-  void _onTaskCheckChanged(TaskLog task, bool? checked) async {
-    final service = ref.read(taskServiceProvider);
-    final userId = ref.read(currentUserIdProvider);
-
-    if (userId == null) return;
-
-    if (checked == true && !task.isDone) {
-      // Mark as complete
-      final success = await service.markTaskComplete(task.logId, userId);
-      if (success) {
-        refreshTasks(ref);
-      }
-    } else if (checked == false && task.isDone) {
-      // Unmark
-      final success = await service.unmarkTask(task.logId);
-      if (success) {
-        refreshTasks(ref);
-      }
-    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TaskDetailScreen(task: task),
+      ),
+    );
   }
 }
 

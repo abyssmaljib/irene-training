@@ -24,7 +24,7 @@ class IreneAppBar extends StatelessWidget {
     this.titleBadge,
     this.actions,
     this.showFilterButton = false,
-    this.showProfileButton = true,
+    this.showProfileButton = false,
     this.isFilterActive = false,
     this.filterCount = 0,
     this.onFilterTap,

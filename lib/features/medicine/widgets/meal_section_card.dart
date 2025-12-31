@@ -5,7 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/confirm_dialog.dart';
-import '../../../core/services/user_service.dart';
+import '../../checklist/models/system_role.dart';
 import '../models/med_log.dart';
 import '../models/med_error_log.dart';
 import '../models/meal_photo_group.dart';
@@ -18,7 +18,7 @@ class MealSectionCard extends StatefulWidget {
   final bool showFoiled; // true = แผง (2C), false = เม็ดยา (3C)
   final bool showOverlay; // แสดง overlay จำนวนเม็ดยา
   final bool isExpanded; // controlled from parent
-  final UserRole userRole; // role ของ user ปัจจุบัน
+  final SystemRole? systemRole; // system role ของ user ปัจจุบัน (สำหรับตรวจสิทธิ์ QC)
   final VoidCallback? onExpandChanged; // callback when tapped
   final Future<void> Function(String mealKey, String photoType)? onTakePhoto; // callback สำหรับถ่ายรูป
   final Future<void> Function(String mealKey, String photoType)? onDeletePhoto; // callback สำหรับลบรูป
@@ -30,7 +30,7 @@ class MealSectionCard extends StatefulWidget {
     this.showFoiled = true,
     this.showOverlay = true,
     this.isExpanded = false,
-    this.userRole = const UserRole(displayName: 'พนักงาน'),
+    this.systemRole,
     this.onExpandChanged,
     this.onTakePhoto,
     this.onDeletePhoto,
@@ -576,18 +576,18 @@ class _MealSectionCardState extends State<MealSectionCard>
     final currentUserId = Supabase.instance.client.auth.currentUser?.id;
     if (currentUserId == null) return false;
 
-    final role = widget.userRole;
+    final role = widget.systemRole;
 
-    // superAdmin: ลบได้ทุกรูป ไม่จำกัดเวลา
-    if (role.isSuperAdmin) return true;
+    // owner/manager: ลบได้ทุกรูป ไม่จำกัดเวลา
+    if (role != null && role.isAtLeastManager) return true;
 
-    // ตรวจสอบเวลา: ต้องถ่ายไม่เกิน 6 ชม. (สำหรับ admin และ user ทั่วไป)
+    // ตรวจสอบเวลา: ต้องถ่ายไม่เกิน 6 ชม. (สำหรับ shift_leader และ user ทั่วไป)
     final now = DateTime.now();
     final difference = now.difference(timestamp);
     if (difference.inHours >= 6) return false;
 
-    // admin: ลบรูปของทุกคนได้ (ภายใน 6 ชม.)
-    if (role.isAdmin) return true;
+    // หัวหน้าเวรขึ้นไป: ลบรูปของทุกคนได้ (ภายใน 6 ชม.)
+    if (role != null && role.canQC) return true;
 
     // พนักงานทั่วไป: ต้องเป็นคนถ่ายรูปเอง
     if (photographerUserId == null) return false;
@@ -714,8 +714,8 @@ class _MealSectionCardState extends State<MealSectionCard>
                     ),
                   ),
 
-                // ปุ่ม QC (มุมซ้ายบน) - แสดงเฉพาะ admin/superAdmin
-                if (widget.userRole.canQC && widget.onQCPhoto != null)
+                // ปุ่ม QC (มุมซ้ายบน) - แสดงเฉพาะหัวหน้าเวรขึ้นไป
+                if (widget.systemRole != null && widget.systemRole!.canQC && widget.onQCPhoto != null)
                   Positioned(
                     top: 8,
                     left: 8,
@@ -1120,7 +1120,7 @@ class _QCBottomSheet extends StatelessWidget {
       ),
       child: SafeArea(
         child: Padding(
-          padding: AppSpacing.paddingLg,
+          padding: AppSpacing.paddingMd,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1136,7 +1136,7 @@ class _QCBottomSheet extends StatelessWidget {
                   ),
                 ),
               ),
-              SizedBox(height: AppSpacing.md),
+              SizedBox(height: AppSpacing.sm),
 
               // Title
               Text(
@@ -1144,7 +1144,7 @@ class _QCBottomSheet extends StatelessWidget {
                 style: AppTypography.heading3,
                 textAlign: TextAlign.center,
               ),
-              SizedBox(height: AppSpacing.lg),
+              SizedBox(height: AppSpacing.md),
 
               // Options - 2x2 grid
               Row(
@@ -1199,7 +1199,7 @@ class _QCBottomSheet extends StatelessWidget {
                 ],
               ),
 
-              SizedBox(height: AppSpacing.lg),
+              SizedBox(height: AppSpacing.md),
 
               // Reset button - แสดงเฉพาะเมื่อมี status อยู่แล้ว
               if (currentStatus != NurseMarkStatus.none) ...[
@@ -1210,7 +1210,7 @@ class _QCBottomSheet extends StatelessWidget {
                     borderRadius: AppRadius.smallRadius,
                     child: Container(
                       width: double.infinity,
-                      padding: EdgeInsets.symmetric(vertical: 14),
+                      padding: EdgeInsets.symmetric(vertical: 12),
                       decoration: BoxDecoration(
                         color: AppColors.error.withValues(alpha: 0.08),
                         borderRadius: AppRadius.smallRadius,
@@ -1239,7 +1239,7 @@ class _QCBottomSheet extends StatelessWidget {
                     ),
                   ),
                 ),
-                SizedBox(height: AppSpacing.sm),
+                SizedBox(height: AppSpacing.xs),
               ],
 
               // Cancel button
@@ -1250,7 +1250,7 @@ class _QCBottomSheet extends StatelessWidget {
                   borderRadius: AppRadius.smallRadius,
                   child: Container(
                     width: double.infinity,
-                    padding: EdgeInsets.symmetric(vertical: 14),
+                    padding: EdgeInsets.symmetric(vertical: 12),
                     child: Center(
                       child: Text(
                         'ปิด',
@@ -1283,7 +1283,7 @@ class _QCBottomSheet extends StatelessWidget {
         onTap: () => Navigator.pop(context, status),
         borderRadius: AppRadius.smallRadius,
         child: Container(
-          padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
+          padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
           decoration: BoxDecoration(
             color: isSelected ? color.withValues(alpha: 0.15) : bgColor,
             borderRadius: AppRadius.smallRadius,
@@ -1297,10 +1297,10 @@ class _QCBottomSheet extends StatelessWidget {
             children: [
               Icon(
                 icon,
-                size: 32,
+                size: 28,
                 color: color,
               ),
-              SizedBox(height: AppSpacing.xs),
+              SizedBox(height: 4),
               Text(
                 status,
                 style: AppTypography.body.copyWith(

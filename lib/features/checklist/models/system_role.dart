@@ -4,12 +4,14 @@ class SystemRole {
   final int id;
   final String name; // 'na_fulltime', 'nurse', 'shift_leader', etc.
   final String? abb; // ชื่อย่อ เช่น 'NA', 'หน.เวร'
+  final int level; // ระดับสิทธิ์ (จาก database)
   final List<int> relatedRoleIds; // role ids ที่ role นี้เห็น task ได้ด้วย
 
   const SystemRole({
     required this.id,
     required this.name,
     this.abb,
+    this.level = 0,
     this.relatedRoleIds = const [],
   });
 
@@ -19,6 +21,7 @@ class SystemRole {
       id: json['id'] as int,
       name: json['role_name'] as String? ?? '',
       abb: json['abb'] as String?,
+      level: json['level'] as int? ?? 0,
       relatedRoleIds: _parseIntList(json['related_role_ids']),
     );
   }
@@ -37,6 +40,7 @@ class SystemRole {
       'id': id,
       'role_name': name,
       'abb': abb,
+      'level': level,
       'related_role_ids': relatedRoleIds,
     };
   }
@@ -56,7 +60,7 @@ class SystemRole {
 
   @override
   String toString() {
-    return 'SystemRole(id: $id, name: $name, abb: $abb, relatedRoleIds: $relatedRoleIds)';
+    return 'SystemRole(id: $id, name: $name, abb: $abb, level: $level, relatedRoleIds: $relatedRoleIds)';
   }
 
   @override
@@ -67,4 +71,26 @@ class SystemRole {
 
   @override
   int get hashCode => id.hashCode;
+
+  // ============================================================
+  // Permission Level Constants
+  // ============================================================
+
+  /// Level thresholds for permission checking
+  static const int shiftLeaderLevel = 30;
+  static const int nurseLevel = 25;
+  static const int managerLevel = 40;
+
+  /// Check if this role is at least shift leader level (หัวหน้าเวรขึ้นไป)
+  /// Used for QC permissions
+  bool get canQC => level >= shiftLeaderLevel;
+
+  /// Check if this role is at least nurse level
+  bool get isAtLeastNurse => level >= nurseLevel;
+
+  /// Check if this role is at least manager level
+  bool get isAtLeastManager => level >= managerLevel;
+
+  /// Check if this role is owner
+  bool get isOwner => name == 'owner';
 }

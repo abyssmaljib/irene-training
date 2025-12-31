@@ -222,6 +222,111 @@ class TaskService {
       return false;
     }
   }
+
+  /// Mark task เป็น refer (ไม่อยู่ศูนย์)
+  Future<bool> markTaskRefer(int logId, String userId) async {
+    try {
+      await _supabase.from('A_Task_logs_ver2').update({
+        'status': 'refer',
+        'completed_by': userId,
+        'completed_at': DateTime.now().toIso8601String(),
+        'Descript': 'อยู่ที่โรงพยาบาล (Refer)',
+      }).eq('id', logId);
+
+      invalidateCache();
+      debugPrint('markTaskRefer: log $logId marked as refer');
+      return true;
+    } catch (e) {
+      debugPrint('markTaskRefer error: $e');
+      return false;
+    }
+  }
+
+  /// Update confirm image URL
+  Future<bool> updateConfirmImage(int logId, String imageUrl) async {
+    try {
+      await _supabase.from('A_Task_logs_ver2').update({
+        'confirmImage': imageUrl,
+      }).eq('id', logId);
+
+      invalidateCache();
+      debugPrint('updateConfirmImage: log $logId image updated');
+      return true;
+    } catch (e) {
+      debugPrint('updateConfirmImage error: $e');
+      return false;
+    }
+  }
+
+  /// เลื่อนงานไปวันพรุ่งนี้
+  /// 1. Update log เดิม: status='postpone', completed_by, completed_at
+  /// 2. Insert log ใหม่: postpone_from=logId, expectedDateTime+1day
+  /// 3. Update log เดิม: postpone_to=newLogId
+  Future<bool> postponeTask(int logId, String userId, TaskLog task) async {
+    try {
+      final now = DateTime.now();
+
+      // 1. Update original log
+      await _supabase.from('A_Task_logs_ver2').update({
+        'status': 'postpone',
+        'completed_by': userId,
+        'completed_at': now.toIso8601String(),
+      }).eq('id', logId);
+
+      // 2. Insert new log for tomorrow
+      final tomorrow = task.expectedDateTime != null
+          ? task.expectedDateTime!.add(const Duration(days: 1))
+          : now.add(const Duration(days: 1));
+
+      final insertResponse = await _supabase
+          .from('A_Task_logs_ver2')
+          .insert({
+            'task_id': task.taskId,
+            'postpone_from': logId,
+            'created_at': now.toIso8601String(),
+            'ExpectedDateTime': tomorrow.toIso8601String(),
+          })
+          .select('id')
+          .single();
+
+      final newLogId = insertResponse['id'] as int;
+
+      // 3. Update original with postpone_to
+      await _supabase.from('A_Task_logs_ver2').update({
+        'postpone_to': newLogId,
+      }).eq('id', logId);
+
+      invalidateCache();
+      debugPrint('postponeTask: log $logId postponed to $newLogId');
+      return true;
+    } catch (e) {
+      debugPrint('postponeTask error: $e');
+      return false;
+    }
+  }
+
+  /// ยกเลิก postpone (ลบ log ที่ถูกเลื่อน และ reset log เดิม)
+  Future<bool> cancelPostpone(int originalLogId, int postponedLogId) async {
+    try {
+      // 1. Delete the postponed log
+      await _supabase.from('A_Task_logs_ver2').delete().eq('id', postponedLogId);
+
+      // 2. Reset original log
+      await _supabase.from('A_Task_logs_ver2').update({
+        'status': null,
+        'completed_by': null,
+        'completed_at': null,
+        'postpone_to': null,
+      }).eq('id', originalLogId);
+
+      invalidateCache();
+      debugPrint('cancelPostpone: cancelled postpone from $originalLogId to $postponedLogId');
+      return true;
+    } catch (e) {
+      debugPrint('cancelPostpone error: $e');
+      return false;
+    }
+  }
 }
 
 /// Extension สำหรับ filter tasks

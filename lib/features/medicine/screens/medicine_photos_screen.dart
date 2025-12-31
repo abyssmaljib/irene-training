@@ -5,6 +5,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/toggle_switch.dart';
 import '../../../core/services/user_service.dart';
+import '../../checklist/models/system_role.dart';
 import '../models/meal_photo_group.dart';
 import '../services/camera_service.dart';
 import '../services/medicine_service.dart';
@@ -40,7 +41,7 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
   List<MealPhotoGroup> _mealGroups = [];
   bool _isLoading = true;
   int? _expandedIndex; // index ของมื้อที่ expand อยู่ (null = ไม่มีมื้อไหน expand)
-  UserRole _userRole = const UserRole(displayName: 'พนักงาน'); // role ของ user ปัจจุบัน
+  SystemRole? _systemRole; // system role ของ user ปัจจุบัน (สำหรับตรวจสิทธิ์ QC)
   bool _hasDataChanged = false; // track ว่ามีการเปลี่ยนแปลงข้อมูลยาหรือไม่
 
   @override
@@ -50,11 +51,11 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
     _loadUserRole();
   }
 
-  /// โหลด role ของ user ปัจจุบัน
+  /// โหลด system role ของ user ปัจจุบัน (สำหรับตรวจสิทธิ์ QC)
   Future<void> _loadUserRole() async {
-    final role = await UserService().getRole();
+    final systemRole = await UserService().getSystemRole();
     if (mounted) {
-      setState(() => _userRole = role);
+      setState(() => _systemRole = systemRole);
     }
   }
 
@@ -287,7 +288,7 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
           showFoiled: _showFoiled,
           showOverlay: _showOverlay,
           isExpanded: _expandedIndex == index,
-          userRole: _userRole,
+          systemRole: _systemRole,
           onExpandChanged: () => _onMealExpanded(index),
           onTakePhoto: _onTakePhoto,
           onDeletePhoto: _onDeletePhoto,
