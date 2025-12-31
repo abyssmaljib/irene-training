@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
@@ -494,13 +493,16 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           ClipRRect(
             borderRadius: BorderRadius.circular(25),
             child: _task.residentPictureUrl != null
-                ? CachedNetworkImage(
-                    imageUrl: _task.residentPictureUrl!,
+                ? Image.network(
+                    _task.residentPictureUrl!,
                     width: 50,
                     height: 50,
                     fit: BoxFit.cover,
-                    placeholder: (_, __) => _buildProfilePlaceholder(),
-                    errorWidget: (_, __, ___) => _buildProfilePlaceholder(),
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return _buildProfilePlaceholder();
+                    },
+                    errorBuilder: (_, error, stackTrace) => _buildProfilePlaceholder(),
                   )
                 : _buildProfilePlaceholder(),
           ),
@@ -642,21 +644,109 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           onTap: () => _showExpandedImage(_task.sampleImageUrl!),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
-            child: CachedNetworkImage(
-              imageUrl: _task.sampleImageUrl!,
+            child: Image.network(
+              _task.sampleImageUrl!,
               width: double.infinity,
-              fit: BoxFit.contain, // แสดงตามสัดส่วนจริง ไม่ crop
-              placeholder: (_, __) => Container(
-                height: 300,
-                color: AppColors.background,
-                child: const Center(child: CircularProgressIndicator()),
-              ),
-              errorWidget: (_, __, ___) => Container(
-                height: 300,
-                color: AppColors.background,
-                child: const Icon(Iconsax.image, size: 48),
-              ),
+              fit: BoxFit.contain,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                final total = loadingProgress.expectedTotalBytes;
+                final loaded = loadingProgress.cumulativeBytesLoaded;
+                final progress = total != null ? loaded / total : null;
+                // แสดงขนาดที่โหลดแล้ว (KB/MB)
+                String loadedText;
+                if (loaded < 1024) {
+                  loadedText = '$loaded B';
+                } else if (loaded < 1024 * 1024) {
+                  loadedText = '${(loaded / 1024).toStringAsFixed(0)} KB';
+                } else {
+                  loadedText = '${(loaded / (1024 * 1024)).toStringAsFixed(1)} MB';
+                }
+                return Container(
+                  height: 300,
+                  color: AppColors.background,
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(
+                          value: progress,
+                          color: AppColors.primary,
+                          strokeWidth: 2,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          progress != null
+                              ? '${(progress * 100).toInt()}%'
+                              : 'กำลังโหลด... $loadedText',
+                          style: AppTypography.caption.copyWith(
+                            color: AppColors.secondaryText,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  height: 300,
+                  color: AppColors.background,
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Iconsax.image,
+                          size: 32,
+                          color: AppColors.secondaryText,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'โหลดรูปไม่สำเร็จ',
+                          style: AppTypography.caption.copyWith(
+                            color: AppColors.secondaryText,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
+          ),
+        ),
+        // คำแนะนำใต้รูปตัวอย่าง
+        AppSpacing.verticalGapSm,
+        Container(
+          padding: EdgeInsets.all(AppSpacing.sm),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0EA5E9).withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: const Color(0xFF0EA5E9).withValues(alpha: 0.4),
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(
+                Iconsax.info_circle,
+                color: Color(0xFF0284C7),
+                size: 16,
+              ),
+              AppSpacing.horizontalGapSm,
+              Expanded(
+                child: Text(
+                  'ศึกษาภาพตัวอย่าง แล้วถ่ายให้ใกล้เคียงที่สุด เพื่อผลลัพธ์ที่ดีที่สุด',
+                  style: AppTypography.caption.copyWith(
+                    color: const Color(0xFF0369A1),
+                    fontWeight: FontWeight.w500,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -698,20 +788,75 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           onTap: () => _showExpandedImage(imageUrl),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
-            child: CachedNetworkImage(
-              imageUrl: imageUrl,
+            child: Image.network(
+              imageUrl,
               width: double.infinity,
-              fit: BoxFit.contain, // แสดงตามสัดส่วนจริง ไม่ crop
-              placeholder: (_, __) => Container(
-                height: 300,
-                color: AppColors.background,
-                child: const Center(child: CircularProgressIndicator()),
-              ),
-              errorWidget: (_, __, ___) => Container(
-                height: 300,
-                color: AppColors.background,
-                child: const Icon(Iconsax.image, size: 48),
-              ),
+              fit: BoxFit.contain,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                final total = loadingProgress.expectedTotalBytes;
+                final loaded = loadingProgress.cumulativeBytesLoaded;
+                final progress = total != null ? loaded / total : null;
+                // แสดงขนาดที่โหลดแล้ว (KB/MB)
+                String loadedText;
+                if (loaded < 1024) {
+                  loadedText = '$loaded B';
+                } else if (loaded < 1024 * 1024) {
+                  loadedText = '${(loaded / 1024).toStringAsFixed(0)} KB';
+                } else {
+                  loadedText = '${(loaded / (1024 * 1024)).toStringAsFixed(1)} MB';
+                }
+                return Container(
+                  height: 300,
+                  color: AppColors.background,
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(
+                          value: progress,
+                          color: AppColors.primary,
+                          strokeWidth: 2,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          progress != null
+                              ? '${(progress * 100).toInt()}%'
+                              : 'กำลังโหลด... $loadedText',
+                          style: AppTypography.caption.copyWith(
+                            color: AppColors.secondaryText,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  height: 300,
+                  color: AppColors.background,
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Iconsax.image,
+                          size: 32,
+                          color: AppColors.secondaryText,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'โหลดรูปไม่สำเร็จ',
+                          style: AppTypography.caption.copyWith(
+                            color: AppColors.secondaryText,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         ),
@@ -804,9 +949,35 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           ),
           body: InteractiveViewer(
             child: Center(
-              child: CachedNetworkImage(
-                imageUrl: imageUrl,
+              child: Image.network(
+                imageUrl,
                 fit: BoxFit.contain,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  final progress = loadingProgress.expectedTotalBytes != null
+                      ? loadingProgress.cumulativeBytesLoaded /
+                          loadingProgress.expectedTotalBytes!
+                      : null;
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(
+                          value: progress,
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                        if (progress != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            '${(progress * 100).toInt()}%',
+                            style: const TextStyle(color: Colors.white70),
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                },
               ),
             ),
           ),
@@ -1213,6 +1384,29 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
   }
 
   Future<void> _handleCancel() async {
+    // แสดง confirmation dialog ก่อน
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('ยกเลิกการรับทราบ?'),
+        content: const Text('ต้องการยกเลิกสถานะงานนี้หรือไม่?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('ไม่'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('ยกเลิก'),
+          ),
+        ],
+      ),
+    );
+
+    // ถ้าไม่ได้กดยืนยัน ไม่ทำอะไร
+    if (confirmed != true) return;
+
     setState(() => _isLoading = true);
 
     final service = ref.read(taskServiceProvider);

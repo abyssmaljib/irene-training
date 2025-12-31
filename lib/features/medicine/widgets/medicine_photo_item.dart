@@ -49,7 +49,7 @@ class MedicinePhotoItem extends StatelessWidget {
                   hasPhoto
                       ? CachedNetworkImage(
                           imageUrl: photoUrl,
-                          fit: BoxFit.cover,
+                          fit: BoxFit.contain,
                           placeholder: (context, url) => Container(
                             color: AppColors.background,
                             child: Center(
