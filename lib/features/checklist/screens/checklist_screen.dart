@@ -587,24 +587,19 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
 
   Widget _buildEmptyState(TaskViewMode viewMode) {
     String message;
-    IconData icon;
 
     switch (viewMode) {
       case TaskViewMode.upcoming:
-        message = 'ไม่มีงานในช่วง 2 ชั่วโมงข้างหน้า';
-        icon = Iconsax.timer_1;
+        message = 'ไม่พบงานที่คุณกรองในอีก 2 ชั่วโมงข้างหน้า';
         break;
       case TaskViewMode.all:
         message = 'ไม่มีงานในวันนี้';
-        icon = Iconsax.task_square;
         break;
       case TaskViewMode.problem:
         message = 'ไม่มีงานที่ติดปัญหา';
-        icon = Iconsax.tick_circle;
         break;
       case TaskViewMode.myDone:
         message = 'คุณยังไม่ได้ทำงานใดๆ';
-        icon = Iconsax.task;
         break;
     }
 
@@ -612,14 +607,18 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon,
-              size: 64, color: AppColors.secondaryText.withValues(alpha: 0.3)),
+          Image.asset(
+            'assets/images/relax_cat.webp',
+            width: 120,
+            height: 120,
+          ),
           AppSpacing.verticalGapMd,
           Text(
             message,
             style: AppTypography.body.copyWith(
               color: AppColors.secondaryText,
             ),
+            textAlign: TextAlign.center,
           ),
           if (viewMode == TaskViewMode.upcoming) ...[
             AppSpacing.verticalGapSm,

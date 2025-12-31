@@ -1138,7 +1138,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                 children: [
                   // รูปแอบมอง
                   Image.asset(
-                    'assets/images/peek.webp',
+                    'assets/images/peep2.webp',
                     width: 64,
                     height: 64,
                   ),
@@ -1149,7 +1149,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                       children: [
                         Text(
                           'ตรวจสอบความถูกต้องก่อนส่งรายงาน',
-                          style: AppTypography.caption.copyWith(
+                          style: AppTypography.body.copyWith(
                             color: AppColors.error,
                             fontWeight: FontWeight.w600,
                           ),
@@ -1158,7 +1158,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                           'รูป ชื่อผู้ทำ และเวลา จะถูกส่งไปไลน์กลุ่มญาติ',
                           style: AppTypography.caption.copyWith(
                             color: AppColors.error.withValues(alpha: 0.8),
-                            fontSize: 11,
+                            fontSize: 13,
                           ),
                         ),
                       ],
