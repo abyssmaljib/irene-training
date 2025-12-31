@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/confirm_dialog.dart';
 import '../../medicine/models/medicine_summary.dart';
 import '../../medicine/screens/photo_preview_screen.dart';
 import '../../medicine/services/camera_service.dart';
@@ -1032,10 +1033,11 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
               ),
               child: Row(
                 children: [
-                  Icon(
-                    Iconsax.warning_2,
-                    color: AppColors.error,
-                    size: 18,
+                  // รูปแอบมอง
+                  Image.asset(
+                    'assets/images/แอบมอง.webp',
+                    width: 40,
+                    height: 40,
                   ),
                   AppSpacing.horizontalGapSm,
                   Expanded(
@@ -1385,27 +1387,17 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
 
   Future<void> _handleCancel() async {
     // แสดง confirmation dialog ก่อน
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('ยกเลิกการรับทราบ?'),
-        content: const Text('ต้องการยกเลิกสถานะงานนี้หรือไม่?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('ไม่'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('ยกเลิก'),
-          ),
-        ],
-      ),
+    final confirmed = await ConfirmDialog.show(
+      context,
+      type: ConfirmDialogType.warning,
+      title: 'ยกเลิกการรับทราบ?',
+      message: 'ต้องการยกเลิกสถานะงานนี้หรือไม่?',
+      cancelText: 'ไม่',
+      confirmText: 'ยกเลิก',
     );
 
     // ถ้าไม่ได้กดยืนยัน ไม่ทำอะไร
-    if (confirmed != true) return;
+    if (!confirmed) return;
 
     setState(() => _isLoading = true);
 
@@ -1477,29 +1469,19 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
   }
 
   /// ลบรูปที่ถ่ายไว้
-  void _handleDeletePhoto() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('ลบรูป?'),
-        content: const Text('ต้องการลบรูปที่ถ่ายไว้หรือไม่?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('ยกเลิก'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              setState(() {
-                _uploadedImageUrl = null;
-              });
-            },
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('ลบ'),
-          ),
-        ],
-      ),
+  Future<void> _handleDeletePhoto() async {
+    final confirmed = await ConfirmDialog.show(
+      context,
+      type: ConfirmDialogType.delete,
+      title: 'ลบรูป?',
+      message: 'ต้องการลบรูปที่ถ่ายไว้หรือไม่?',
+      confirmText: 'ลบ',
     );
+
+    if (confirmed) {
+      setState(() {
+        _uploadedImageUrl = null;
+      });
+    }
   }
 }
