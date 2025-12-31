@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:image/image.dart' as img;
@@ -49,11 +49,27 @@ class _PhotoPreviewScreenState extends State<PhotoPreviewScreen> {
   int _rotationAngle = 0; // 0, 90, 180, 270
   bool _isProcessing = false;
   late File _currentFile;
+  Uint8List? _imageBytes; // สำหรับ Web ที่ใช้ Image.file ไม่ได้
 
   @override
   void initState() {
     super.initState();
     _currentFile = widget.imageFile;
+    _loadImageBytes();
+  }
+
+  /// โหลด bytes จากไฟล์สำหรับแสดงบน Web
+  Future<void> _loadImageBytes() async {
+    // โหลด bytes สำหรับ Web (Image.file ไม่รองรับ)
+    // และเก็บไว้ใช้กับทุก platform เผื่อมีปัญหา
+    try {
+      final bytes = await _currentFile.readAsBytes();
+      if (mounted) {
+        setState(() => _imageBytes = bytes);
+      }
+    } catch (e) {
+      debugPrint('PhotoPreviewScreen: Failed to load image bytes: $e');
+    }
   }
 
   void _rotateRight() {
@@ -133,12 +149,45 @@ class _PhotoPreviewScreenState extends State<PhotoPreviewScreen> {
     return newFile;
   }
 
+  /// สร้าง Image widget ที่รองรับทั้ง Web และ Mobile/Desktop
+  Widget _buildImageWidget() {
+    // ใช้ Image.memory เป็นหลักเพราะรองรับทุก platform
+    // Image.file ไม่รองรับ Web
+    if (_imageBytes != null) {
+      return Image.memory(
+        _imageBytes!,
+        fit: BoxFit.contain,
+      );
+    }
+
+    // กำลังโหลด bytes
+    return const Center(
+      child: CircularProgressIndicator(color: Colors.white),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final borderColor = widget.photoType == '2C'
-        ? const Color(0xFF0EA5E9)
-        : const Color(0xFF10B981);
-    final typeLabel = widget.photoType == '2C' ? 'จัดยา' : 'เสิร์ฟยา';
+    // กำหนดสีและ label ตาม photoType
+    Color borderColor;
+    String typeLabel;
+    switch (widget.photoType) {
+      case '2C':
+        borderColor = const Color(0xFF0EA5E9);
+        typeLabel = 'จัดยา';
+        break;
+      case '3C':
+        borderColor = const Color(0xFF10B981);
+        typeLabel = 'เสิร์ฟยา';
+        break;
+      case 'task':
+        borderColor = const Color(0xFF0D9488); // Primary teal
+        typeLabel = 'ถ่ายรูปงาน';
+        break;
+      default:
+        borderColor = const Color(0xFF0D9488);
+        typeLabel = 'ถ่ายรูป';
+    }
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -162,10 +211,7 @@ class _PhotoPreviewScreenState extends State<PhotoPreviewScreen> {
               child: Center(
                 child: Transform.rotate(
                   angle: _rotationAngle * 3.14159 / 180,
-                  child: Image.file(
-                    _currentFile,
-                    fit: BoxFit.contain,
-                  ),
+                  child: _buildImageWidget(),
                 ),
               ),
             ),

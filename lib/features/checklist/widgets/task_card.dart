@@ -474,11 +474,22 @@ class TaskCard extends StatelessWidget {
 
   /// ตรวจสอบว่ามี badges ที่ต้องแสดงหรือไม่ (ไม่รวม taskType ที่ย้ายไป row บน)
   bool _hasAnyBadges() {
-    return task.recurrenceInterval != null ||
+    return _shouldShowRecurrence() ||
         task.daysOfWeek.isNotEmpty ||
         task.recurringDates.isNotEmpty ||
         task.postponeFrom != null ||
         task.postponeTo != null;
+  }
+
+  /// ตรวจสอบว่าควรแสดง recurrence badge หรือไม่
+  /// ซ่อน "ทุก 1 วัน" เพราะเป็นค่า default
+  bool _shouldShowRecurrence() {
+    if (task.recurrenceInterval == null) return false;
+    // ซ่อนถ้าเป็น "ทุก 1 วัน"
+    if (task.recurrenceInterval == 1 && (task.recurrenceType == 'วัน' || task.recurrenceType == null)) {
+      return false;
+    }
+    return true;
   }
 
   /// สร้าง row สำหรับแสดง badges ต่างๆ (ไม่รวม taskType ที่ย้ายไป row บน)
@@ -487,8 +498,8 @@ class TaskCard extends StatelessWidget {
       spacing: 6,
       runSpacing: 6,
       children: [
-        // 1. Recurrence badge (สีเหลือง)
-        if (task.recurrenceInterval != null) _buildRecurrenceBadge(),
+        // 1. Recurrence badge (สีเหลือง) - ซ่อน "ทุก 1 วัน"
+        if (_shouldShowRecurrence()) _buildRecurrenceBadge(),
         // 2. Days of week (วงกลมสี)
         if (task.daysOfWeek.isNotEmpty) _buildDaysOfWeekBadges(),
         // 3. Recurring dates (วงกลมเขียว)

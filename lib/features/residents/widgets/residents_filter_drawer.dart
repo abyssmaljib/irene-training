@@ -3,6 +3,7 @@ import 'package:iconsax/iconsax.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/filter_drawer_shell.dart';
 import '../../../core/widgets/tags_badges.dart';
 import '../../home/models/zone.dart';
 
@@ -94,116 +95,24 @@ class _ResidentsFilterDrawerState extends State<ResidentsFilterDrawer> {
     final sortedZones = List<Zone>.from(widget.zones)
       ..sort((a, b) => a.name.compareTo(b.name));
 
-    // Golden ratio width (~61.8%) with minimum 52px margin from left edge
-    final screenWidth = MediaQuery.of(context).size.width;
-    final goldenRatioWidth = screenWidth * 0.618;
-    final maxWidth = screenWidth - 52;
-    final drawerWidth = goldenRatioWidth.clamp(0.0, maxWidth);
-
-    return Drawer(
-      backgroundColor: AppColors.surface,
-      width: drawerWidth,
-      child: Column(
+    return FilterDrawerShell(
+      title: 'ตัวกรอง',
+      filterCount: _filterCount,
+      onClear: _hasFilters ? _clearAll : null,
+      content: ListView(
+        padding: EdgeInsets.zero,
         children: [
-          // Header
-          _buildHeader(),
+          // Zone Section
+          _buildZoneSection(sortedZones),
 
-          // Content
-          Expanded(
-            child: ListView(
-              padding: EdgeInsets.zero,
-              children: [
-                // Zone Section
-                _buildZoneSection(sortedZones),
+          // Divider
+          Divider(height: 1, color: AppColors.alternate),
 
-                // Divider
-                Divider(height: 1, color: AppColors.alternate),
+          // Spatial Status Section
+          _buildSpatialStatusSection(),
 
-                // Spatial Status Section
-                _buildSpatialStatusSection(),
-
-                // Extra space at bottom
-                SizedBox(height: AppSpacing.lg),
-              ],
-            ),
-          ),
-
-          // Footer - Clear button only (shows when has filters)
-          if (_hasFilters) _buildFooter(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Container(
-      padding: EdgeInsets.fromLTRB(
-        AppSpacing.lg,
-        MediaQuery.of(context).padding.top + AppSpacing.md,
-        AppSpacing.md,
-        AppSpacing.md,
-      ),
-      child: Row(
-        children: [
-          // Filter icon with badge
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: AppColors.accent1,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(Iconsax.filter, color: AppColors.primary, size: 22),
-              ),
-              if (_hasFilters)
-                Positioned(
-                  top: -4,
-                  right: -4,
-                  child: Container(
-                    width: 20,
-                    height: 20,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      '$_filterCount',
-                      style: AppTypography.caption.copyWith(
-                        color: AppColors.surface,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          AppSpacing.horizontalGapMd,
-          // Title
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'ตัวกรอง',
-                  style: AppTypography.heading3.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                if (_hasFilters)
-                  Text(
-                    'เลือก $_filterCount รายการ',
-                    style: AppTypography.caption.copyWith(
-                      color: AppColors.primary,
-                    ),
-                  ),
-              ],
-            ),
-          ),
+          // Extra space at bottom
+          SizedBox(height: AppSpacing.lg),
         ],
       ),
     );
@@ -383,46 +292,6 @@ class _ResidentsFilterDrawerState extends State<ResidentsFilterDrawer> {
             }).toList(),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildFooter() {
-    return Container(
-      padding: EdgeInsets.fromLTRB(
-        AppSpacing.lg,
-        AppSpacing.sm,
-        AppSpacing.lg,
-        MediaQuery.of(context).padding.bottom + AppSpacing.md,
-      ),
-      child: GestureDetector(
-        onTap: _clearAll,
-        child: Container(
-          height: 40,
-          decoration: BoxDecoration(
-            color: AppColors.error.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          alignment: Alignment.center,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Iconsax.trash,
-                size: 16,
-                color: AppColors.error,
-              ),
-              SizedBox(width: 6),
-              Text(
-                'ล้างตัวกรอง',
-                style: AppTypography.body.copyWith(
-                  color: AppColors.error,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

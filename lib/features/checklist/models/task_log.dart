@@ -45,6 +45,18 @@ class TaskLog {
   // Resident special status (refer = ส่งต่อ/ย้ายออก)
   final String? residentSpecialStatus;
 
+  // Resident underlying disease list (โรคประจำตัว)
+  final String? residentUnderlyingDiseaseList;
+
+  // Creator info (ผู้สร้าง task)
+  final String? creatorId;
+  final String? creatorNickname;
+  final String? creatorPhotoUrl;
+  final String? creatorGroupName;
+
+  // Task start date (วันที่เริ่มต้น task)
+  final DateTime? startDate;
+
   const TaskLog({
     required this.logId,
     this.taskId,
@@ -80,6 +92,12 @@ class TaskLog {
     this.recurringDates = const [],
     this.historySeenUsers = const [],
     this.residentSpecialStatus,
+    this.residentUnderlyingDiseaseList,
+    this.creatorId,
+    this.creatorNickname,
+    this.creatorPhotoUrl,
+    this.creatorGroupName,
+    this.startDate,
   });
 
   /// Parse จาก Supabase response
@@ -114,12 +132,18 @@ class TaskLog {
       assignedRoleId: json['assigned_role_id'] as int?,
       assignedRoleName: json['assigned_role_name'] as String?,
       recurNote: json['recurNote'] as String?,
-      recurrenceInterval: json['recurrence_interval'] as int?,
-      recurrenceType: json['recurrence_type'] as String?,
-      daysOfWeek: _parseStringList(json['days_of_week']),
+      recurrenceInterval: json['recurrenceInterval'] as int?,
+      recurrenceType: json['recurrenceType'] as String?,
+      daysOfWeek: _parseStringList(json['daysOfWeek']),
       recurringDates: _parseIntList(json['recurring_dates']),
       historySeenUsers: _parseStringList(json['history_seen_users']),
       residentSpecialStatus: json['s_special_status'] as String?,
+      residentUnderlyingDiseaseList: _parseUnderlyingDiseaseList(json['resident_underlying_disease_list']),
+      creatorId: json['creator_id'] as String?,
+      creatorNickname: json['creator_nickname'] as String?,
+      creatorPhotoUrl: json['creator_photo_url'] as String?,
+      creatorGroupName: json['creator_group_name'] as String?,
+      startDate: _parseDateTime(json['start_Date']),
     );
   }
 
@@ -137,6 +161,17 @@ class TaskLog {
       return value.map((e) => e is int ? e : int.tryParse(e.toString()) ?? 0).toList();
     }
     return [];
+  }
+
+  /// Parse underlying disease list (text[] from Postgres) to comma-separated string
+  static String? _parseUnderlyingDiseaseList(dynamic value) {
+    if (value == null) return null;
+    if (value is String) return value.isEmpty ? null : value;
+    if (value is List) {
+      final diseases = value.map((e) => e.toString()).where((s) => s.isNotEmpty).toList();
+      return diseases.isEmpty ? null : diseases.join(', ');
+    }
+    return null;
   }
 
   static DateTime? _parseDateTime(dynamic value) {

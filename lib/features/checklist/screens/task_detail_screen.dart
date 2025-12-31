@@ -172,6 +172,12 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
 
                     // Title
                     _buildTitle(),
+
+                    // Creator info (ผู้สร้าง task) - อยู่ใต้ title
+                    if (_task.creatorNickname != null) ...[
+                      AppSpacing.verticalGapSm,
+                      _buildCreatorInfo(),
+                    ],
                     AppSpacing.verticalGapMd,
 
                     // Info badges
@@ -481,6 +487,26 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     );
   }
 
+  Widget _buildCreatorInfo() {
+    // Format: "ประกาศ โดย ชื่อ กลุ่ม - วันที่"
+    final creatorName = _task.creatorNickname ?? '-';
+    final groupName = _task.creatorGroupName ?? '-';
+
+    String dateText = '-';
+    if (_task.startDate != null) {
+      final dt = _task.startDate!;
+      dateText = '${dt.day}/${dt.month}/${dt.year}';
+    }
+
+    return Text(
+      'ประกาศ โดย $creatorName $groupName - $dateText',
+      style: AppTypography.caption.copyWith(
+        color: AppColors.secondaryText,
+        fontSize: 12,
+      ),
+    );
+  }
+
   Widget _buildResidentCard() {
     return Container(
       padding: EdgeInsets.all(AppSpacing.md),
@@ -525,6 +551,21 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                     _task.zoneName!,
                     style: AppTypography.caption.copyWith(
                       color: AppColors.secondaryText,
+                    ),
+                  ),
+                // โรคประจำตัว
+                if (_task.residentUnderlyingDiseaseList != null &&
+                    _task.residentUnderlyingDiseaseList!.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      'โรคประจำตัว: ${_task.residentUnderlyingDiseaseList}',
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.error,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
               ],
@@ -1001,7 +1042,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         ],
       ),
       child: SafeArea(
-        child: _task.isDone || _task.isPostponed || _task.isReferred
+        child: _task.isDone || _task.isPostponed || _task.isReferred || _task.isProblem
             ? _buildCancelButton()
             : _isOptionOpen
                 ? _buildOptionsRow()
@@ -1386,12 +1427,18 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
   }
 
   Future<void> _handleCancel() async {
+    // สร้าง message ตามสถานะ
+    String message = 'ต้องการยกเลิกสถานะงานนี้หรือไม่?';
+    if (_task.isPostponed && _task.postponeTo != null) {
+      message = 'การยกเลิกนี้ จะลบงานที่ถูกเลื่อนออกไปด้วยนะ แน่ใจมั้ย?';
+    }
+
     // แสดง confirmation dialog ก่อน
     final confirmed = await ConfirmDialog.show(
       context,
       type: ConfirmDialogType.warning,
       title: 'ยกเลิกการรับทราบ?',
-      message: 'ต้องการยกเลิกสถานะงานนี้หรือไม่?',
+      message: message,
       cancelText: 'ไม่',
       confirmText: 'ยกเลิก',
     );
@@ -1402,7 +1449,19 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     setState(() => _isLoading = true);
 
     final service = ref.read(taskServiceProvider);
-    final success = await service.unmarkTask(_task.logId);
+    bool success;
+
+    // ถ้าเป็น postpone ต้องลบ postponed log ก่อน
+    if (_task.isPostponed && _task.postponeTo != null) {
+      success = await service.cancelPostpone(_task.logId, _task.postponeTo!);
+    } else {
+      // ส่ง confirmImage URL ไปด้วยเพื่อลบจาก storage
+      final imageUrl = _task.confirmImage ?? _uploadedImageUrl;
+      success = await service.unmarkTask(
+        _task.logId,
+        confirmImageUrl: imageUrl,
+      );
+    }
 
     if (success) {
       refreshTasks(ref);

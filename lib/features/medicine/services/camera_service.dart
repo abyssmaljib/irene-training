@@ -3,6 +3,12 @@ import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+/// ตรวจสอบว่ารันบน desktop หรือไม่ (Windows, macOS, Linux)
+bool get _isDesktop {
+  if (kIsWeb) return false;
+  return Platform.isWindows || Platform.isMacOS || Platform.isLinux;
+}
+
 /// Service สำหรับจัดการการถ่ายรูปยาและ upload ไป Supabase Storage
 class CameraService {
   static final instance = CameraService._();
@@ -14,12 +20,15 @@ class CameraService {
   /// ชื่อ bucket ใน Supabase Storage
   static const _bucketName = 'med-photos';
 
-  /// ถ่ายรูปจากกล้อง
+  /// ถ่ายรูปจากกล้อง (หรือเลือกจาก gallery ถ้าเป็น desktop)
   /// Returns File path หรือ null ถ้ายกเลิก
   Future<File?> takePhoto() async {
     try {
+      // บน desktop ใช้ gallery แทน camera เพราะกล้องมักไม่พร้อมใช้งาน
+      final source = _isDesktop ? ImageSource.gallery : ImageSource.camera;
+
       final XFile? photo = await _picker.pickImage(
-        source: ImageSource.camera,
+        source: source,
         imageQuality: 85, // ลดขนาดเพื่อ upload เร็วขึ้น
         maxWidth: 1920,
         maxHeight: 1920,

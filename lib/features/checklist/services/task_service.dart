@@ -206,12 +206,36 @@ class TaskService {
   }
 
   /// Untick task (ลบ completion)
-  Future<bool> unmarkTask(int logId) async {
+  /// - Clear status, completed_by, completed_at, confirmImage, Descript
+  /// - ลบรูป confirmImage จาก storage (ถ้ามี)
+  Future<bool> unmarkTask(int logId, {String? confirmImageUrl}) async {
     try {
+      // ลบรูป confirmImage จาก storage (ถ้ามี)
+      if (confirmImageUrl != null && confirmImageUrl.isNotEmpty) {
+        try {
+          // Extract path จาก URL
+          // URL format: https://xxx.supabase.co/storage/v1/object/public/med-photos/task_confirms/xxx.jpg
+          final uri = Uri.parse(confirmImageUrl);
+          final pathSegments = uri.pathSegments;
+          // หา index ของ bucket name แล้วเอา path หลังจากนั้น
+          final bucketIndex = pathSegments.indexOf('med-photos');
+          if (bucketIndex != -1 && bucketIndex < pathSegments.length - 1) {
+            final storagePath = pathSegments.sublist(bucketIndex + 1).join('/');
+            await _supabase.storage.from('med-photos').remove([storagePath]);
+            debugPrint('unmarkTask: deleted image $storagePath');
+          }
+        } catch (e) {
+          // ไม่ให้ error การลบรูปทำให้ cancel ไม่ได้
+          debugPrint('unmarkTask: failed to delete image: $e');
+        }
+      }
+
       await _supabase.from('A_Task_logs_ver2').update({
         'status': null,
         'completed_by': null,
         'completed_at': null,
+        'confirmImage': null,
+        'Descript': null,
       }).eq('id', logId);
 
       invalidateCache();
