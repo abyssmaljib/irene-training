@@ -692,8 +692,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
             children: [
               Image.asset(
                 'assets/images/not_found.webp',
-                width: 120,
-                height: 120,
+                width: 240,
+                height: 240,
               ),
               AppSpacing.verticalGapSm,
               Text(
@@ -826,6 +826,142 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
             ),
           ),
         ),
+        // ผู้ถ่ายรูปตัวอย่าง (ถ้ามี) - Badge เกียรติยศ
+        if (_task.sampleImageCreatorId != null &&
+            _task.sampleImageCreatorId!.isNotEmpty) ...[
+          AppSpacing.verticalGapMd,
+          Container(
+            padding: EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  const Color(0xFFFFF7ED), // orange-50
+                  const Color(0xFFFFFBEB), // amber-50
+                  const Color(0xFFFEFCE8), // yellow-50
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: const Color(0xFFFBBF24).withValues(alpha: 0.5), // amber-400
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFFBBF24).withValues(alpha: 0.15),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                // Profile picture with golden ring
+                Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(
+                      colors: [
+                        Color(0xFFFBBF24), // amber-400
+                        Color(0xFFF59E0B), // amber-500
+                        Color(0xFFD97706), // amber-600
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFF59E0B).withValues(alpha: 0.4),
+                        blurRadius: 6,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(18),
+                    child: _task.sampleImageCreatorPhotoUrl != null
+                        ? Image.network(
+                            _task.sampleImageCreatorPhotoUrl!,
+                            width: 36,
+                            height: 36,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                _buildCreatorPlaceholderGold(),
+                          )
+                        : _buildCreatorPlaceholderGold(),
+                  ),
+                ),
+                AppSpacing.horizontalGapMd,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Text(
+                            '✨ ',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                          Text(
+                            'ผู้สร้างสรรค์รูปตัวอย่าง',
+                            style: AppTypography.caption.copyWith(
+                              color: const Color(0xFFB45309), // amber-700
+                              fontWeight: FontWeight.w500,
+                              fontSize: 11,
+                            ),
+                          ),
+                          const Text(
+                            ' ✨',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _task.sampleImageCreatorNickname ?? 'ไม่ระบุ',
+                        style: AppTypography.subtitle.copyWith(
+                          color: const Color(0xFF92400E), // amber-800
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Medal icon
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(
+                      colors: [
+                        Color(0xFFFCD34D), // amber-300
+                        Color(0xFFFBBF24), // amber-400
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFF59E0B).withValues(alpha: 0.3),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Iconsax.medal_star5,
+                    color: Color(0xFF92400E), // amber-800
+                    size: 20,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+
         // คำแนะนำใต้รูปตัวอย่าง
         AppSpacing.verticalGapSm,
         Container(
@@ -863,12 +999,49 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     );
   }
 
+  /// Placeholder สำหรับรูป profile ผู้ถ่ายรูปตัวอย่าง (Gold theme)
+  Widget _buildCreatorPlaceholderGold() {
+    return Container(
+      width: 36,
+      height: 36,
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          colors: [
+            Color(0xFFFEF3C7), // amber-100
+            Color(0xFFFDE68A), // amber-200
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: const Icon(
+        Iconsax.user,
+        size: 18,
+        color: Color(0xFFB45309), // amber-700
+      ),
+    );
+  }
+
   Widget _buildConfirmImage() {
     final imageUrl = _uploadedImageUrl ?? _task.confirmImage;
     if (imageUrl == null) return const SizedBox.shrink();
 
     // รูปที่เพิ่งถ่าย (ยังไม่ได้ save) สามารถลบได้
     final canDelete = _uploadedImageUrl != null && !_task.isDone;
+
+    // ปุ่มแทนที่ตัวอย่าง: แสดงเมื่อ
+    // 1. task type ไม่ใช่ 'จัดยา'
+    // 2. user เป็นหัวหน้าเวรขึ้นไป (canQC)
+    // 3. task complete แล้ว (มี confirmImage จาก DB)
+    // 4. task มี taskRepeatId
+    final systemRole = ref.watch(currentUserSystemRoleProvider).valueOrNull;
+    final canReplaceSample = !_isJudYa &&
+        systemRole != null &&
+        systemRole.canQC &&
+        _task.isDone &&
+        _task.confirmImage != null &&
+        _task.taskRepeatId != null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -970,6 +1143,41 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
             ),
           ),
         ),
+
+        // ปุ่มแทนที่ตัวอย่าง (สำหรับหัวหน้าเวรขึ้นไป)
+        if (canReplaceSample) ...[
+          AppSpacing.verticalGapMd,
+          SizedBox(
+            width: double.infinity,
+            height: 44,
+            child: ElevatedButton.icon(
+              onPressed: _isLoading ? null : _handleReplaceSampleImage,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              icon: _isLoading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation(Colors.white),
+                      ),
+                    )
+                  : const Icon(Iconsax.gallery_edit, size: 20),
+              label: Text(
+                'แทนที่ตัวอย่าง',
+                style: AppTypography.button.copyWith(
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -1627,6 +1835,63 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       setState(() {
         _uploadedImageUrl = null;
       });
+    }
+  }
+
+  /// แทนที่รูปตัวอย่างด้วยรูป confirm ที่ถ่ายเสร็จแล้ว (สำหรับหัวหน้าเวรขึ้นไป)
+  Future<void> _handleReplaceSampleImage() async {
+    final taskRepeatId = _task.taskRepeatId;
+    final confirmImage = _task.confirmImage;
+
+    if (taskRepeatId == null || confirmImage == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ไม่สามารถแทนที่รูปตัวอย่างได้')),
+      );
+      return;
+    }
+
+    // แสดง confirmation dialog
+    final confirmed = await ConfirmDialog.show(
+      context,
+      type: ConfirmDialogType.warning,
+      title: 'แทนที่รูปตัวอย่าง?',
+      message: 'รูปยืนยันนี้จะถูกใช้เป็นรูปตัวอย่างใหม่สำหรับงานนี้',
+      confirmText: 'แทนที่',
+    );
+
+    if (!confirmed) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      // ดึง uuid ของ current user
+      final userId = ref.read(currentUserIdProvider);
+
+      // Update A_Repeated_Task.sampleImageURL และ sampleImage_creator (uuid)
+      await Supabase.instance.client.from('A_Repeated_Task').update({
+        'sampleImageURL': confirmImage,
+        'sampleImage_creator': userId,
+      }).eq('id', taskRepeatId);
+
+      // Refresh task data
+      await _refreshTaskData();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('แทนที่รูปตัวอย่างเรียบร้อย')),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error replacing sample image: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('ไม่สามารถแทนที่รูปตัวอย่างได้ กรุณาลองใหม่')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 }

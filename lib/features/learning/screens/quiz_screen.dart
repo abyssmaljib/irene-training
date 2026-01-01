@@ -388,8 +388,8 @@ class _QuizScreenState extends State<QuizScreen> {
           children: [
             Image.asset(
               'assets/images/not_found.webp',
-              width: 120,
-              height: 120,
+              width: 240,
+              height: 240,
             ),
             AppSpacing.verticalGapMd,
             Text(

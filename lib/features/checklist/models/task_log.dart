@@ -30,6 +30,14 @@ class TaskLog {
   final int? assignedRoleId;
   final String? assignedRoleName;
 
+  // Task repeat ID (FK to A_Repeated_Task) - ใช้สำหรับ update sampleImageURL
+  final int? taskRepeatId;
+
+  // Sample image creator (ผู้ถ่ายรูปตัวอย่าง - uuid)
+  final String? sampleImageCreatorId;
+  final String? sampleImageCreatorNickname;
+  final String? sampleImageCreatorPhotoUrl;
+
   // Recurrence note (ข้อความกำกับสำคัญจาก A_Repeated_Task)
   final String? recurNote;
 
@@ -85,6 +93,10 @@ class TaskLog {
     this.mustCompleteByPost = false,
     this.assignedRoleId,
     this.assignedRoleName,
+    this.taskRepeatId,
+    this.sampleImageCreatorId,
+    this.sampleImageCreatorNickname,
+    this.sampleImageCreatorPhotoUrl,
     this.recurNote,
     this.recurrenceInterval,
     this.recurrenceType,
@@ -131,6 +143,10 @@ class TaskLog {
       mustCompleteByPost: json['mustCompleteByPost'] == true,
       assignedRoleId: json['assigned_role_id'] as int?,
       assignedRoleName: json['assigned_role_name'] as String?,
+      taskRepeatId: json['Task_Repeat_Id'] as int?,
+      sampleImageCreatorId: json['sampleimage_creator'] as String?,
+      sampleImageCreatorNickname: json['sample_image_creator_nickname'] as String?,
+      sampleImageCreatorPhotoUrl: json['sample_image_creator_photo_url'] as String?,
       recurNote: json['recurNote'] as String?,
       recurrenceInterval: json['recurrenceInterval'] as int?,
       recurrenceType: json['recurrenceType'] as String?,

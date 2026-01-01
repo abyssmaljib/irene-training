@@ -22,8 +22,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   final List<Widget> _screens = [
     const HomeScreen(),
     const ChecklistScreen(),
-    const BoardScreen(),
     const ResidentsScreen(),
+    const BoardScreen(),
     const SettingsScreen(),
   ];
 
@@ -59,15 +59,15 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 ),
                 _buildNavItem(
                   index: 2,
-                  icon: Iconsax.document_text,
-                  activeIcon: Iconsax.document_text_1,
-                  label: 'กระดานข่าว',
-                ),
-                _buildNavItem(
-                  index: 3,
                   icon: Iconsax.health,
                   activeIcon: Iconsax.health5,
                   label: 'คนไข้',
+                ),
+                _buildNavItem(
+                  index: 3,
+                  icon: Iconsax.clipboard_text,
+                  activeIcon: Iconsax.clipboard_text5,
+                  label: 'กระดานข่าว',
                 ),
                 _buildNavItem(
                   index: 4,

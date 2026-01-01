@@ -6,6 +6,7 @@ import '../../../../core/theme/app_typography.dart';
 import '../../models/resident_detail.dart';
 import '../../models/vital_sign.dart';
 import 'vital_sign_snapshot.dart';
+import 'activity_log_section.dart';
 
 /// Care Dashboard View - หน้าหลักสำหรับ NA
 class CareDashboardView extends StatelessWidget {
@@ -50,8 +51,8 @@ class CareDashboardView extends StatelessWidget {
 
           AppSpacing.verticalGapLg,
 
-          // Action Timeline Placeholder
-          _buildTimelinePlaceholder(),
+          // Activity Log Section - V3: แสดง posts ของ resident
+          ActivityLogSection(residentId: resident.id),
 
           // Bottom padding for FAB
           SizedBox(height: 100),
@@ -158,69 +159,6 @@ class CareDashboardView extends StatelessWidget {
             style: AppTypography.bodySmall.copyWith(
               color: status.color,
               fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTimelinePlaceholder() {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('รายการงานวันนี้', style: AppTypography.title),
-          AppSpacing.verticalGapSm,
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.all(AppSpacing.xl),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: AppRadius.mediumRadius,
-              boxShadow: AppShadows.cardShadow,
-              border: Border.all(
-                color: AppColors.alternate,
-                style: BorderStyle.solid,
-              ),
-            ),
-            child: Column(
-              children: [
-                Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    color: AppColors.background,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Iconsax.task_square,
-                    size: 32,
-                    color: AppColors.secondaryText,
-                  ),
-                ),
-                AppSpacing.verticalGapMd,
-                Text(
-                  'Coming Soon',
-                  style: AppTypography.heading3.copyWith(
-                    color: AppColors.secondaryText,
-                  ),
-                ),
-                AppSpacing.verticalGapXs,
-                Text(
-                  'ระบบ Checklist กำลังพัฒนา',
-                  style: AppTypography.body.copyWith(
-                    color: AppColors.secondaryText,
-                  ),
-                ),
-                Text(
-                  'จะแสดงงานที่ต้องทำ: ยา, อาหาร, PT session',
-                  style: AppTypography.caption.copyWith(
-                    color: AppColors.secondaryText,
-                  ),
-                ),
-              ],
             ),
           ),
         ],
