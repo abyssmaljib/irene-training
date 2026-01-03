@@ -226,22 +226,54 @@ class Post {
   /// Check if post has quiz
   bool get hasQuiz => qaId != null;
 
-  /// Check if post has images
-  bool get hasImages => multiImgUrl.isNotEmpty || (imgUrl?.isNotEmpty ?? false);
+  /// Video file extensions
+  static const _videoExtensions = ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.m4v'];
 
-  /// Check if post has video
-  bool get hasVideo => youtubeUrl?.isNotEmpty ?? false;
+  /// ตรวจสอบว่า URL เป็น video หรือไม่
+  static bool _isVideoUrl(String url) {
+    final lowerUrl = url.toLowerCase();
+    return _videoExtensions.any((ext) => lowerUrl.contains(ext));
+  }
 
-  /// Get all image URLs (combining single and multi)
+  /// Get video URLs from multiImgUrl
+  List<String> get videoUrls {
+    return multiImgUrl.where((url) => _isVideoUrl(url)).toList();
+  }
+
+  /// Get image URLs only (excluding videos) from multiImgUrl
+  List<String> get imageUrlsOnly {
+    return multiImgUrl.where((url) => !_isVideoUrl(url)).toList();
+  }
+
+  /// Check if post has images (excluding videos)
+  bool get hasImages {
+    if (imgUrl?.isNotEmpty ?? false) return true;
+    return imageUrlsOnly.isNotEmpty;
+  }
+
+  /// Check if post has video (YouTube or uploaded video in multiImgUrl)
+  bool get hasVideo {
+    if (youtubeUrl?.isNotEmpty ?? false) return true;
+    return videoUrls.isNotEmpty;
+  }
+
+  /// Check if post has uploaded video (not YouTube)
+  bool get hasUploadedVideo => videoUrls.isNotEmpty;
+
+  /// Get first video URL (for preview)
+  String? get firstVideoUrl => videoUrls.isNotEmpty ? videoUrls.first : null;
+
+  /// Get all image URLs (combining single and multi, excluding videos)
   List<String> get allImageUrls {
     final urls = <String>[];
     if (imgUrl?.isNotEmpty ?? false) urls.add(imgUrl!);
-    urls.addAll(multiImgUrl);
+    urls.addAll(imageUrlsOnly);
     return urls;
   }
 
   /// Get total like count
-  int get likeCount => likeCountMinusOne + 1;
+  /// ใช้ likeUserIds.length เพราะ like_count_minus_one จาก DB ไม่ถูกต้อง
+  int get likeCount => likeUserIds.length;
 
   /// Check if current user has liked the post
   bool hasUserLiked(String? currentUserId) {

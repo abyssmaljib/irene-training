@@ -56,6 +56,10 @@ dependencies:
   # Camera & Image
   image_picker: ^1.1.2
   image: ^4.3.0
+  video_thumbnail: ^0.5.3
+  # Video Player
+  video_player: ^2.9.2
+  chewie: ^1.8.5
 
 
 dev_dependencies:

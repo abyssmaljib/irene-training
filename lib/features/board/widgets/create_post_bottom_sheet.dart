@@ -1,9 +1,9 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:video_thumbnail/video_thumbnail.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
@@ -18,6 +18,7 @@ import 'tag_picker_widget.dart';
 import 'resident_picker_widget.dart';
 import 'image_picker_bar.dart';
 import 'image_preview_grid.dart';
+import '../services/post_media_service.dart';
 
 /// Bottom Sheet สำหรับสร้างโพสแบบรวดเร็ว
 class CreatePostBottomSheet extends ConsumerStatefulWidget {
@@ -1014,12 +1015,19 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
         throw Exception('ไม่พบข้อมูลผู้ใช้');
       }
 
-      // Upload images first if any
-      List<String> imageUrls = [...state.uploadedImageUrls];
-      if (state.selectedImages.isNotEmpty) {
+      // Upload images and video
+      List<String> mediaUrls = [...state.uploadedImageUrls];
+
+      if (state.selectedImages.isNotEmpty || state.selectedVideo != null) {
         setState(() => _isUploading = true);
-        final uploadedUrls = await _uploadImages(state.selectedImages);
-        imageUrls.addAll(uploadedUrls);
+
+        final uploadedUrls = await PostMediaService.instance.uploadAllMedia(
+          images: state.selectedImages,
+          video: state.selectedVideo,
+          userId: userId,
+        );
+        mediaUrls.addAll(uploadedUrls);
+
         setState(() => _isUploading = false);
       }
 
@@ -1032,7 +1040,7 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
         tagName: state.selectedTag?.name,
         isHandover: state.isHandover,
         residentId: state.selectedResidentId,
-        imageUrls: imageUrls.isNotEmpty ? imageUrls : null,
+        imageUrls: mediaUrls.isNotEmpty ? mediaUrls : null,
       );
 
       if (postId != null) {
@@ -1077,13 +1085,6 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
     } finally {
       ref.read(createPostProvider.notifier).setSubmitting(false);
     }
-  }
-
-  Future<List<String>> _uploadImages(List<File> files) async {
-    // TODO: Implement actual image upload to Supabase Storage
-    // For now, return empty list
-    // This should be implemented in a service
-    return [];
   }
 }
 
@@ -1474,35 +1475,111 @@ class _ResidentSuggestionsPopupState extends State<_ResidentSuggestionsPopup> {
   }
 }
 
-/// Widget สำหรับแสดง thumbnail ของวีดีโอ (แสดง placeholder)
-class _VideoThumbnailWidget extends StatelessWidget {
+/// Widget สำหรับแสดง thumbnail ของวีดีโอ
+class _VideoThumbnailWidget extends StatefulWidget {
   final String videoPath;
 
   const _VideoThumbnailWidget({required this.videoPath});
 
   @override
+  State<_VideoThumbnailWidget> createState() => _VideoThumbnailWidgetState();
+}
+
+class _VideoThumbnailWidgetState extends State<_VideoThumbnailWidget> {
+  Uint8List? _thumbnailData;
+  bool _isLoading = true;
+  bool _hasError = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _generateThumbnail();
+  }
+
+  @override
+  void didUpdateWidget(covariant _VideoThumbnailWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.videoPath != widget.videoPath) {
+      _generateThumbnail();
+    }
+  }
+
+  Future<void> _generateThumbnail() async {
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+    });
+
+    try {
+      final data = await VideoThumbnail.thumbnailData(
+        video: widget.videoPath,
+        imageFormat: ImageFormat.JPEG,
+        maxWidth: 512,
+        quality: 75,
+      );
+
+      if (mounted) {
+        setState(() {
+          _thumbnailData = data;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error generating video thumbnail: $e');
+      if (mounted) {
+        setState(() {
+          _hasError = true;
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      color: AppColors.background,
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Iconsax.video,
-              size: 48,
-              color: AppColors.secondaryText,
-            ),
-            SizedBox(height: 8),
-            Text(
-              'วิดีโอ',
-              style: AppTypography.caption.copyWith(
+    if (_isLoading) {
+      return Container(
+        color: AppColors.background,
+        child: Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: AppColors.primary,
+          ),
+        ),
+      );
+    }
+
+    if (_hasError || _thumbnailData == null) {
+      // Fallback to placeholder
+      return Container(
+        color: AppColors.background,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Iconsax.video,
+                size: 48,
                 color: AppColors.secondaryText,
               ),
-            ),
-          ],
+              SizedBox(height: 8),
+              Text(
+                'วิดีโอ',
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.secondaryText,
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
+      );
+    }
+
+    return Image.memory(
+      _thumbnailData!,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
     );
   }
 }

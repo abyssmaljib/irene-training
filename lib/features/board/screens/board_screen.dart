@@ -19,6 +19,7 @@ import '../widgets/post_search_bar.dart';
 import '../widgets/pinned_post_card.dart';
 import '../widgets/post_filter_drawer.dart';
 import '../widgets/create_post_bottom_sheet.dart';
+import '../widgets/video_player_widget.dart';
 
 /// Navigate to post detail screen
 void navigateToPostDetail(BuildContext context, int postId) {
@@ -620,6 +621,12 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
                   AppSpacing.verticalGapLg,
                 ],
 
+                // Video player
+                if (post.hasUploadedVideo) ...[
+                  _buildVideoSection(post),
+                  AppSpacing.verticalGapLg,
+                ],
+
                 Divider(color: AppColors.alternate),
                 AppSpacing.verticalGapMd,
 
@@ -899,6 +906,35 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
     );
   }
 
+  /// สร้าง Video Section สำหรับแสดงวิดีโอที่อัพโหลด
+  Widget _buildVideoSection(Post post) {
+    final videoUrls = post.videoUrls;
+    if (videoUrls.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'วิดีโอ',
+          style: AppTypography.title.copyWith(fontSize: 16),
+        ),
+        AppSpacing.verticalGapSm,
+        ...videoUrls.map((url) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: VideoThumbnailPlayer(
+                    videoUrl: url,
+                  ),
+                ),
+              ),
+            )),
+      ],
+    );
+  }
+
   Widget _buildQuizSection(Post post) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1071,23 +1107,21 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
                 : null,
             icon: Icon(
               isLiked ? Iconsax.heart5 : Iconsax.heart,
-              color: isLiked ? Colors.white : AppColors.primary,
+              color: isLiked ? AppColors.error : Colors.white,
             ),
             label: Text(
-              isLiked ? '🤔 ยกเลิกการรับทราบ' : '🫡 รับทราบ',
+              isLiked ? 'ยกเลิกการรับทราบ' : 'รับทราบ',
               style: AppTypography.body.copyWith(
                 fontWeight: FontWeight.w600,
-                color: canAcknowledge
-                    ? (isLiked ? Colors.white : AppColors.primary)
-                    : AppColors.secondaryText,
+                color: isLiked ? AppColors.error : Colors.white,
               ),
             ),
             style: ElevatedButton.styleFrom(
               backgroundColor: isLiked
-                  ? (canAcknowledge ? AppColors.error : AppColors.alternate)
-                  : (canAcknowledge ? AppColors.primary : AppColors.alternate),
-              foregroundColor: isLiked ? Colors.white : AppColors.primary,
+                  ? AppColors.tagFailedBg
+                  : AppColors.primary,
               disabledBackgroundColor: AppColors.alternate,
+              disabledForegroundColor: AppColors.secondaryText,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
