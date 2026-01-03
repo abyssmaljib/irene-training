@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:fc_native_video_thumbnail/fc_native_video_thumbnail.dart';
+
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -1474,139 +1474,35 @@ class _ResidentSuggestionsPopupState extends State<_ResidentSuggestionsPopup> {
   }
 }
 
-/// Widget สำหรับแสดง thumbnail ของวีดีโอ
-class _VideoThumbnailWidget extends StatefulWidget {
+/// Widget สำหรับแสดง thumbnail ของวีดีโอ (แสดง placeholder)
+class _VideoThumbnailWidget extends StatelessWidget {
   final String videoPath;
 
   const _VideoThumbnailWidget({required this.videoPath});
 
   @override
-  State<_VideoThumbnailWidget> createState() => _VideoThumbnailWidgetState();
-}
-
-class _VideoThumbnailWidgetState extends State<_VideoThumbnailWidget> {
-  String? _thumbnailPath;
-  bool _isLoading = true;
-  bool _hasError = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _generateThumbnail();
-  }
-
-  @override
-  void didUpdateWidget(covariant _VideoThumbnailWidget oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.videoPath != widget.videoPath) {
-      _generateThumbnail();
-    }
-  }
-
-  Future<void> _generateThumbnail() async {
-    setState(() {
-      _isLoading = true;
-      _hasError = false;
-    });
-
-    try {
-      final plugin = FcNativeVideoThumbnail();
-
-      // สร้าง temp file path สำหรับ thumbnail
-      final tempDir = Directory.systemTemp;
-      final thumbnailPath =
-          '${tempDir.path}/thumb_${DateTime.now().millisecondsSinceEpoch}.jpg';
-
-      final success = await plugin.getVideoThumbnail(
-        srcFile: widget.videoPath,
-        destFile: thumbnailPath,
-        width: 512,
-        height: 512,
-        format: 'jpeg',
-        quality: 75,
-        keepAspectRatio: true,
-      );
-
-      if (mounted) {
-        if (success == true && File(thumbnailPath).existsSync()) {
-          setState(() {
-            _thumbnailPath = thumbnailPath;
-            _isLoading = false;
-          });
-        } else {
-          setState(() {
-            _hasError = true;
-            _isLoading = false;
-          });
-        }
-      }
-    } catch (e) {
-      debugPrint('Error generating thumbnail: $e');
-      if (mounted) {
-        setState(() {
-          _hasError = true;
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return Container(
-        color: AppColors.background,
-        child: Center(
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            color: AppColors.primary,
-          ),
-        ),
-      );
-    }
-
-    if (_hasError || _thumbnailPath == null) {
-      return Container(
-        color: AppColors.background,
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Iconsax.video,
-                size: 48,
-                color: AppColors.secondaryText,
-              ),
-              SizedBox(height: 8),
-              Text(
-                'ไม่สามารถโหลด thumbnail',
-                style: AppTypography.caption.copyWith(
-                  color: AppColors.secondaryText,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return Image.file(
-      File(_thumbnailPath!),
-      fit: BoxFit.cover,
-      width: double.infinity,
-      height: double.infinity,
-      errorBuilder: (context, error, stackTrace) {
-        return Container(
-          color: AppColors.background,
-          child: Center(
-            child: Icon(
+    return Container(
+      color: AppColors.background,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
               Iconsax.video,
               size: 48,
               color: AppColors.secondaryText,
             ),
-          ),
-        );
-      },
+            SizedBox(height: 8),
+            Text(
+              'วิดีโอ',
+              style: AppTypography.caption.copyWith(
+                color: AppColors.secondaryText,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
