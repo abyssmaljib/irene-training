@@ -13,16 +13,20 @@ class ResidentsFilterDrawer extends StatefulWidget {
   final List<Zone> zones;
   final Set<int> selectedZoneIds;
   final Set<SpatialStatus> selectedSpatialStatuses;
+  final bool isSearchEnabled;
   final ValueChanged<Set<int>> onZoneSelectionChanged;
   final ValueChanged<Set<SpatialStatus>> onSpatialStatusChanged;
+  final void Function(bool enabled)? onSearchToggle;
 
   const ResidentsFilterDrawer({
     super.key,
     required this.zones,
     required this.selectedZoneIds,
     required this.selectedSpatialStatuses,
+    this.isSearchEnabled = true,
     required this.onZoneSelectionChanged,
     required this.onSpatialStatusChanged,
+    this.onSearchToggle,
   });
 
   @override
@@ -102,6 +106,12 @@ class _ResidentsFilterDrawerState extends State<ResidentsFilterDrawer> {
       content: ListView(
         padding: EdgeInsets.zero,
         children: [
+          // Search toggle section
+          if (widget.onSearchToggle != null) ...[
+            _buildSearchToggleSection(),
+            Divider(height: 1, color: AppColors.alternate),
+          ],
+
           // Zone Section
           _buildZoneSection(sortedZones),
 
@@ -114,6 +124,46 @@ class _ResidentsFilterDrawerState extends State<ResidentsFilterDrawer> {
           // Extra space at bottom
           SizedBox(height: AppSpacing.lg),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSearchToggleSection() {
+    return Container(
+      color: AppColors.surface,
+      padding: EdgeInsets.all(AppSpacing.lg),
+      child: GestureDetector(
+        onTap: () {
+          widget.onSearchToggle?.call(true);
+          Navigator.pop(context);
+        },
+        child: Container(
+          height: 40,
+          padding: EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: AppRadius.smallRadius,
+            border: Border.all(color: AppColors.inputBorder),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Iconsax.search_normal,
+                size: 22,
+                color: AppColors.secondaryText,
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'ค้นหาชื่อผู้พัก...',
+                  style: AppTypography.body.copyWith(
+                    color: AppColors.secondaryText.withValues(alpha: 0.6),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

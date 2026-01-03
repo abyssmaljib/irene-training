@@ -113,6 +113,38 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
     setState(() => _showFoiled = index == 0);
   }
 
+  /// Toggle button สำหรับสลับไปหน้ารายการยา (styled like checklist view toggle)
+  Widget _buildViewToggle() {
+    return Material(
+      color: AppColors.accent1,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: () {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => MedicineListScreen(
+                residentId: widget.residentId,
+                residentName: widget.residentName,
+              ),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: 40,
+          height: 40,
+          alignment: Alignment.center,
+          child: Icon(
+            Iconsax.clipboard_text,
+            color: AppColors.primary,
+            size: 22,
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -152,25 +184,6 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
               ),
               centerTitle: false,
               actions: [
-                // Shortcut to medicine list
-                IconButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => MedicineListScreen(
-                          residentId: widget.residentId,
-                          residentName: widget.residentName,
-                        ),
-                      ),
-                    );
-                  },
-                  icon: Icon(
-                    Iconsax.clipboard_text,
-                    color: AppColors.textSecondary,
-                  ),
-                  tooltip: 'รายการยา',
-                ),
                 // Toggle overlay button
                 IconButton(
                   onPressed: () {
@@ -182,7 +195,9 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
                   ),
                   tooltip: _showOverlay ? 'ซ่อนจำนวนเม็ดยา' : 'แสดงจำนวนเม็ดยา',
                 ),
-                SizedBox(width: 8),
+                // Toggle to medicine list (styled like checklist view toggle)
+                _buildViewToggle(),
+                SizedBox(width: AppSpacing.md), // Padding เท่ากับหน้า post/task
               ],
               expandedHeight: 270,
               flexibleSpace: FlexibleSpaceBar(

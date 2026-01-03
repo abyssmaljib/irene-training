@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/irene_app_bar.dart';
+import '../../../core/widgets/input_fields.dart';
 import '../../home/models/zone.dart';
 import '../../home/services/zone_service.dart';
 import '../../medicine/screens/medicine_photos_screen.dart';
@@ -51,7 +52,9 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
   bool _isRefreshingMedStatus = false;
 
   String _searchQuery = '';
+  bool _isSearchEnabled = false;
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
 
   // Scroll controller
   final ScrollController _scrollController = ScrollController();
@@ -284,6 +287,7 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _searchFocusNode.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -310,6 +314,7 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
         zones: _zones,
         selectedZoneIds: _selectedZoneIds,
         selectedSpatialStatuses: _selectedSpatialStatuses,
+        isSearchEnabled: _isSearchEnabled,
         onZoneSelectionChanged: (zones) {
           setState(() {
             _selectedZoneIds = zones;
@@ -321,6 +326,22 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
             _selectedSpatialStatuses = statuses;
             _invalidateCache();
           });
+        },
+        onSearchToggle: (enabled) {
+          setState(() {
+            _isSearchEnabled = enabled;
+            if (!enabled) {
+              _searchQuery = '';
+              _searchController.clear();
+              _invalidateCache();
+            }
+          });
+          if (enabled) {
+            // Request focus after drawer closes and widget rebuilds
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _searchFocusNode.requestFocus();
+            });
+          }
         },
       ),
       body: RefreshIndicator(
@@ -345,19 +366,20 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
               },
             ),
 
-            // Search bar
-            SliverToBoxAdapter(
-              child: Container(
-                color: AppColors.surface,
-                padding: EdgeInsets.fromLTRB(
-                  AppSpacing.md,
-                  AppSpacing.sm,
-                  AppSpacing.md,
-                  AppSpacing.sm,
+            // Search bar (show when enabled)
+            if (_isSearchEnabled)
+              SliverToBoxAdapter(
+                child: Container(
+                  color: AppColors.surface,
+                  padding: EdgeInsets.fromLTRB(
+                    AppSpacing.md,
+                    AppSpacing.sm,
+                    AppSpacing.md,
+                    AppSpacing.sm,
+                  ),
+                  child: _buildSearchBar(),
                 ),
-                child: _buildSearchBar(),
               ),
-            ),
 
             // Active filter chips (show when filters are active)
             if (_hasActiveFilters)
@@ -377,52 +399,23 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
   }
 
   Widget _buildSearchBar() {
-    return Container(
-      height: 44,
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: TextField(
-        controller: _searchController,
-        onChanged: (value) {
-          setState(() {
-            _searchQuery = value;
-            _invalidateCache();
-          });
-        },
-        style: AppTypography.body.copyWith(color: AppColors.primaryText),
-        decoration: InputDecoration(
-          hintText: 'ค้นหาชื่อผู้พัก...',
-          hintStyle: AppTypography.body.copyWith(color: AppColors.secondaryText),
-          prefixIcon: Icon(
-            Iconsax.search_normal,
-            color: AppColors.secondaryText,
-            size: 20,
-          ),
-          suffixIcon: _searchQuery.isNotEmpty
-              ? GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _searchQuery = '';
-                      _searchController.clear();
-                      _invalidateCache();
-                    });
-                  },
-                  child: Icon(
-                    Icons.close,
-                    color: AppColors.secondaryText,
-                    size: 20,
-                  ),
-                )
-              : null,
-          border: InputBorder.none,
-          contentPadding: EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: 12,
-          ),
-        ),
-      ),
+    return SearchField(
+      controller: _searchController,
+      focusNode: _searchFocusNode,
+      hintText: 'ค้นหาชื่อผู้พัก...',
+      isDense: true,
+      onChanged: (value) {
+        setState(() {
+          _searchQuery = value;
+          _invalidateCache();
+        });
+      },
+      onClear: () {
+        setState(() {
+          _searchQuery = '';
+          _invalidateCache();
+        });
+      },
     );
   }
 

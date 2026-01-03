@@ -3,8 +3,8 @@ import 'package:iconsax/iconsax.dart';
 
 /// Main tabs for the board screen - V3: เหลือ 2 tabs
 enum PostMainTab {
-  announcement, // ประกาศ (Critical + Policy)
-  handover, // ส่งเวร
+  announcement, // นโยบาย (Policy only)
+  handover, // ส่งเวร (is_handover = true + Critical)
 }
 
 /// Extension for PostMainTab
@@ -12,7 +12,7 @@ extension PostMainTabExtension on PostMainTab {
   String get label {
     switch (this) {
       case PostMainTab.announcement:
-        return 'ประกาศ';
+        return 'นโยบาย';
       case PostMainTab.handover:
         return 'ส่งเวร';
     }
@@ -21,7 +21,7 @@ extension PostMainTabExtension on PostMainTab {
   IconData get icon {
     switch (this) {
       case PostMainTab.announcement:
-        return Iconsax.notification;
+        return Iconsax.document_text;
       case PostMainTab.handover:
         return Iconsax.refresh;
     }
@@ -31,16 +31,13 @@ extension PostMainTabExtension on PostMainTab {
   List<String> get dbTabValues {
     switch (this) {
       case PostMainTab.announcement:
-        return [
-          'Announcements-Critical',
-          'Announcements-Policy',
-        ];
+        // นโยบาย = Policy เท่านั้น
+        return ['Announcements-Policy'];
       case PostMainTab.handover:
         // ส่งเวร tab ใช้ logic พิเศษใน post_service
-        // - Posts จากหัวหน้าเวร
-        // - Calendar posts
-        // - Posts ที่มี is_handover = true (future)
-        return ['Calendar']; // fallback สำหรับ legacy
+        // - is_handover = true
+        // - Critical posts (รวมมาด้วย)
+        return ['Announcements-Critical']; // fallback
     }
   }
 }

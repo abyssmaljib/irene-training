@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/input_fields.dart';
 
 /// Bottom Sheet สำหรับกรอกหมายเหตุเมื่อแจ้งติดปัญหา
 class ProblemInputSheet extends StatefulWidget {
@@ -112,30 +113,13 @@ class _ProblemInputSheetState extends State<ProblemInputSheet> {
               AppSpacing.verticalGapMd,
 
               // Text field
-              TextField(
+              AppTextField(
                 controller: _controller,
                 focusNode: _focusNode,
+                hintText: 'เช่น ผู้พักอาศัยไม่อยู่ห้อง, อุปกรณ์ไม่พร้อม...',
                 maxLines: 3,
-                minLines: 2,
                 textInputAction: TextInputAction.done,
                 onSubmitted: (_) => _handleSubmit(),
-                decoration: InputDecoration(
-                  hintText: 'เช่น ผู้พักอาศัยไม่อยู่ห้อง, อุปกรณ์ไม่พร้อม...',
-                  hintStyle: AppTypography.body.copyWith(
-                    color: AppColors.secondaryText.withValues(alpha: 0.5),
-                  ),
-                  filled: true,
-                  fillColor: AppColors.background,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: AppColors.error, width: 1.5),
-                  ),
-                  contentPadding: EdgeInsets.all(AppSpacing.md),
-                ),
               ),
               AppSpacing.verticalGapLg,
 

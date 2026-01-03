@@ -170,6 +170,7 @@ class TaskService {
     int logId,
     String userId, {
     String? imageUrl,
+    int? postId,
   }) async {
     try {
       await _supabase.from('A_Task_logs_ver2').update({
@@ -177,10 +178,11 @@ class TaskService {
         'completed_by': userId,
         'completed_at': DateTime.now().toIso8601String(),
         if (imageUrl != null) 'confirmImage': imageUrl,
+        if (postId != null) 'post_id': postId,
       }).eq('id', logId);
 
       invalidateCache();
-      debugPrint('markTaskComplete: log $logId marked as complete');
+      debugPrint('markTaskComplete: log $logId marked as complete (postId: $postId)');
       return true;
     } catch (e) {
       debugPrint('markTaskComplete error: $e');

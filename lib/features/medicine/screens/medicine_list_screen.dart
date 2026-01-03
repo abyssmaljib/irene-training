@@ -152,6 +152,38 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
     _applyFilters();
   }
 
+  /// Toggle button สำหรับสลับไปหน้ารูปตัวอย่างยา (styled like checklist view toggle)
+  Widget _buildViewToggle() {
+    return Material(
+      color: AppColors.accent1,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: () {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => MedicinePhotosScreen(
+                residentId: widget.residentId,
+                residentName: widget.residentName,
+              ),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: 40,
+          height: 40,
+          alignment: Alignment.center,
+          child: Icon(
+            Iconsax.image,
+            color: AppColors.primary,
+            size: 22,
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -191,26 +223,9 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
               ),
               centerTitle: false,
               actions: [
-                // Shortcut to medicine photos
-                IconButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => MedicinePhotosScreen(
-                          residentId: widget.residentId,
-                          residentName: widget.residentName,
-                        ),
-                      ),
-                    );
-                  },
-                  icon: Icon(
-                    Iconsax.image,
-                    color: AppColors.textSecondary,
-                  ),
-                  tooltip: 'รูปตัวอย่างยา',
-                ),
-                SizedBox(width: 8),
+                // Toggle to medicine photos (styled like checklist view toggle)
+                _buildViewToggle(),
+                SizedBox(width: AppSpacing.md), // Padding เท่ากับหน้า post/task
               ],
               expandedHeight: _availableGroups.isNotEmpty ? 168 : 120,
               flexibleSpace: FlexibleSpaceBar(
@@ -230,6 +245,7 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
                           SearchField(
                             controller: _searchController,
                             hintText: 'ค้นหายา...',
+                            isDense: true,
                             onChanged: _onSearchChanged,
                           ),
                           SizedBox(height: AppSpacing.sm),

@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
@@ -6,6 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/irene_app_bar.dart';
+import '../../../core/widgets/input_fields.dart';
 import '../../settings/screens/settings_screen.dart';
 import '../models/post.dart';
 import '../models/post_tab.dart';
@@ -13,10 +15,10 @@ import '../providers/post_provider.dart';
 import '../providers/post_filter_provider.dart';
 import '../widgets/post_card.dart';
 import '../widgets/post_tab_bar.dart';
-import '../widgets/post_filter_chips.dart';
 import '../widgets/post_search_bar.dart';
 import '../widgets/pinned_post_card.dart';
 import '../widgets/post_filter_drawer.dart';
+import '../widgets/create_post_bottom_sheet.dart';
 
 /// หน้ากระดานข่าว - Posts
 /// แสดงข่าว ประกาศ และปฏิทิน
@@ -29,6 +31,7 @@ class BoardScreen extends ConsumerStatefulWidget {
 
 class _BoardScreenState extends ConsumerState<BoardScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final FocusNode _searchFocusNode = FocusNode();
   bool _isSearching = false;
   List<ResidentOption> _residents = [];
 
@@ -36,6 +39,12 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
   void initState() {
     super.initState();
     _loadResidents();
+  }
+
+  @override
+  void dispose() {
+    _searchFocusNode.dispose();
+    super.dispose();
   }
 
   Future<void> _loadResidents() async {
@@ -71,13 +80,31 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: AppColors.background,
-      endDrawer: PostFilterDrawer(
+      drawer: PostFilterDrawer(
         selectedResidentId: selectedResidentId,
         selectedResidentName: selectedResidentName,
         residents: _residents,
+        isSearchEnabled: _isSearching,
+        filterType: filterType,
         onResidentChanged: (residentId, residentName) {
           ref.read(selectedResidentIdProvider.notifier).state = residentId;
           ref.read(selectedResidentNameProvider.notifier).state = residentName;
+        },
+        onSearchToggle: (enabled) {
+          setState(() => _isSearching = enabled);
+          if (!enabled) {
+            ref.read(postSearchQueryProvider.notifier).state = '';
+          }
+          Navigator.pop(context);
+          if (enabled) {
+            // Request focus after drawer closes and widget rebuilds
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _searchFocusNode.requestFocus();
+            });
+          }
+        },
+        onFilterTypeChanged: (type) {
+          PostFilterNotifier(ref).setFilterType(type);
         },
         onClearFilters: () {
           PostFilterNotifier(ref).resetSecondaryFilters();
@@ -94,9 +121,10 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
             IreneAppBar(
               title: 'กระดานข่าว',
               showFilterButton: true,
+              isFilterActive: filterType != PostFilterType.all,
               filterCount: activeFilterCount,
               onFilterTap: () {
-                _scaffoldKey.currentState?.openEndDrawer();
+                _scaffoldKey.currentState?.openDrawer();
               },
               onProfileTap: () {
                 Navigator.push(
@@ -104,29 +132,23 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
                   MaterialPageRoute(builder: (_) => const SettingsScreen()),
                 );
               },
+              trailing: _buildViewModeToggle(filterType),
             ),
 
-            // Search bar (collapsible)
+            // Search bar (collapsible) - full width
             SliverToBoxAdapter(
               child: _isSearching
-                  ? Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        AppSpacing.md,
-                        AppSpacing.sm,
-                        AppSpacing.md,
-                        0,
-                      ),
-                      child: PostSearchBar(
-                        initialQuery: searchQuery,
-                        onSearch: (query) {
-                          ref.read(postSearchQueryProvider.notifier).state =
-                              query;
-                        },
-                        onClear: () {
-                          ref.read(postSearchQueryProvider.notifier).state = '';
-                          setState(() => _isSearching = false);
-                        },
-                      ),
+                  ? PostSearchBar(
+                      initialQuery: searchQuery,
+                      focusNode: _searchFocusNode,
+                      onSearch: (query) {
+                        ref.read(postSearchQueryProvider.notifier).state =
+                            query;
+                      },
+                      onClear: () {
+                        ref.read(postSearchQueryProvider.notifier).state = '';
+                        setState(() => _isSearching = false);
+                      },
                     )
                   : SizedBox.shrink(),
             ),
@@ -142,51 +164,23 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
               ),
             ),
 
-            // Filter chips row - full width with white background
-            SliverToBoxAdapter(
-              child: Container(
-                color: AppColors.surface,
-                width: double.infinity,
-                padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: PostFilterChips(
-                        selectedFilter: filterType,
-                        onFilterChanged: (filter) {
-                          PostFilterNotifier(ref).setFilterType(filter);
-                        },
-                      ),
-                    ),
-                    // Resident filter chip (if selected)
-                    if (selectedResidentName != null) ...[
-                      SizedBox(width: 8),
+            // Resident filter chip (if selected)
+            if (selectedResidentName != null)
+              SliverToBoxAdapter(
+                child: Container(
+                  color: AppColors.surface,
+                  width: double.infinity,
+                  padding: EdgeInsets.symmetric(
+                    vertical: AppSpacing.sm,
+                    horizontal: AppSpacing.md,
+                  ),
+                  child: Row(
+                    children: [
                       _buildResidentChip(selectedResidentName),
                     ],
-                    // Search toggle button
-                    IconButton(
-                      icon: Icon(
-                        _isSearching
-                            ? Iconsax.close_circle
-                            : Iconsax.search_normal,
-                        color: _isSearching
-                            ? AppColors.primary
-                            : AppColors.secondaryText,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _isSearching = !_isSearching;
-                          if (!_isSearching) {
-                            ref.read(postSearchQueryProvider.notifier).state =
-                                '';
-                          }
-                        });
-                      },
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            ),
 
             // Pinned Critical post
             if (mainTab == PostMainTab.announcement) _buildPinnedPost(),
@@ -233,6 +227,46 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
         ],
       ),
     );
+  }
+
+  /// Toggle button สำหรับเปลี่ยนมุมมอง (View Mode) ที่มุมขวาของ AppBar
+  /// กดแล้ววนไปมุมมองถัดไป: all -> unacknowledged -> myPosts -> all ...
+  Widget _buildViewModeToggle(PostFilterType currentMode) {
+    return Material(
+      color: AppColors.accent1,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: () {
+          // วนไปมุมมองถัดไป
+          final modes = PostFilterType.values;
+          final currentIndex = modes.indexOf(currentMode);
+          final nextIndex = (currentIndex + 1) % modes.length;
+          ref.read(postFilterTypeProvider.notifier).state = modes[nextIndex];
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: 40,
+          height: 40,
+          alignment: Alignment.center,
+          child: Icon(
+            _getViewModeIcon(currentMode),
+            color: AppColors.primary,
+            size: 22,
+          ),
+        ),
+      ),
+    );
+  }
+
+  IconData _getViewModeIcon(PostFilterType mode) {
+    switch (mode) {
+      case PostFilterType.all:
+        return Iconsax.document_text;
+      case PostFilterType.unacknowledged:
+        return Iconsax.notification_bing;
+      case PostFilterType.myPosts:
+        return Iconsax.user_edit;
+    }
   }
 
   Widget _buildPinnedPost() {
@@ -407,11 +441,18 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
   }
 
   void _showCreatePostScreen() {
-    Navigator.push(
+    showCreatePostBottomSheet(
       context,
-      MaterialPageRoute(
-        builder: (_) => const _CreatePostScreen(),
-      ),
+      onPostCreated: () {
+        refreshPosts(ref);
+      },
+      onAdvancedTap: () {
+        // ใช้ expand animation จาก bottom sheet ไป full page
+        navigateToAdvancedPostScreen(
+          context,
+          advancedScreen: const _CreatePostScreen(),
+        );
+      },
     );
   }
 
@@ -764,32 +805,86 @@ class _PostDetailScreenState extends ConsumerState<_PostDetailScreen> {
   }
 
   Widget _buildImageGallery(List<String> urls) {
-    if (urls.isEmpty) return SizedBox.shrink();
+    // กรอง URL ที่ valid เท่านั้น
+    final validUrls = urls
+        .map((url) => url.trim())
+        .where((url) =>
+            url.isNotEmpty &&
+            url.length > 10 &&
+            (url.startsWith('http://') || url.startsWith('https://')))
+        .toList();
+
+    if (validUrls.isEmpty) return SizedBox.shrink();
 
     return SizedBox(
       height: 200,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        itemCount: urls.length,
+        itemCount: validUrls.length,
         itemBuilder: (context, index) {
           return Padding(
             padding: EdgeInsets.only(right: 8),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.network(
-                urls[index],
-                height: 200,
-                fit: BoxFit.cover,
-                errorBuilder: (ctx, err, st) => Container(
+            child: GestureDetector(
+              onTap: () => _showFullScreenImage(context, validUrls, index),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: CachedNetworkImage(
+                  imageUrl: validUrls[index],
                   height: 200,
-                  width: 200,
-                  color: AppColors.background,
-                  child: Icon(Iconsax.image, color: AppColors.secondaryText),
+                  fit: BoxFit.cover,
+                  progressIndicatorBuilder: (context, url, progress) =>
+                      Container(
+                    height: 200,
+                    width: 200,
+                    color: AppColors.background,
+                    child: Center(
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          CircularProgressIndicator(
+                            value: progress.progress,
+                            color: AppColors.primary,
+                            strokeWidth: 3,
+                            backgroundColor: AppColors.alternate,
+                          ),
+                          if (progress.progress != null)
+                            Text(
+                              '${(progress.progress! * 100).toInt()}%',
+                              style: AppTypography.caption.copyWith(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 10,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  errorWidget: (context, url, error) => Container(
+                    height: 200,
+                    width: 200,
+                    color: AppColors.background,
+                    child: Icon(Iconsax.image, color: AppColors.secondaryText),
+                  ),
                 ),
               ),
             ),
           );
         },
+      ),
+    );
+  }
+
+  /// แสดงรูปเต็มจอพร้อม zoom และ swipe ดูรูปอื่น
+  void _showFullScreenImage(
+      BuildContext context, List<String> urls, int initialIndex) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _FullScreenImageViewer(
+          imageUrls: urls,
+          initialIndex: initialIndex,
+        ),
       ),
     );
   }
@@ -1172,43 +1267,19 @@ class _CreatePostScreenState extends ConsumerState<_CreatePostScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Title field
-            Text('หัวข้อ', style: AppTypography.title),
-            AppSpacing.verticalGapSm,
-            TextField(
+            AppTextField(
+              label: 'หัวข้อ',
               controller: _titleController,
-              decoration: InputDecoration(
-                hintText: 'ใส่หัวข้อ...',
-                hintStyle:
-                    AppTypography.body.copyWith(color: AppColors.secondaryText),
-                filled: true,
-                fillColor: AppColors.surface,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-              style: AppTypography.body,
+              hintText: 'ใส่หัวข้อ...',
             ),
             AppSpacing.verticalGapLg,
 
             // Content field
-            Text('เนื้อหา', style: AppTypography.title),
-            AppSpacing.verticalGapSm,
-            TextField(
+            AppTextField(
+              label: 'เนื้อหา',
               controller: _contentController,
+              hintText: 'เขียนเนื้อหา...',
               maxLines: 8,
-              decoration: InputDecoration(
-                hintText: 'เขียนเนื้อหา...',
-                hintStyle:
-                    AppTypography.body.copyWith(color: AppColors.secondaryText),
-                filled: true,
-                fillColor: AppColors.surface,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-              style: AppTypography.body,
             ),
             AppSpacing.verticalGapLg,
 
@@ -1290,5 +1361,109 @@ class _CreatePostScreenState extends ConsumerState<_CreatePostScreen> {
         setState(() => _isLoading = false);
       }
     }
+  }
+}
+
+/// Full screen image viewer with zoom and swipe
+class _FullScreenImageViewer extends StatefulWidget {
+  final List<String> imageUrls;
+  final int initialIndex;
+
+  const _FullScreenImageViewer({
+    required this.imageUrls,
+    required this.initialIndex,
+  });
+
+  @override
+  State<_FullScreenImageViewer> createState() => _FullScreenImageViewerState();
+}
+
+class _FullScreenImageViewerState extends State<_FullScreenImageViewer> {
+  late PageController _pageController;
+  late int _currentIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        leading: IconButton(
+          icon: Icon(Iconsax.arrow_left, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: widget.imageUrls.length > 1
+            ? Text(
+                '${_currentIndex + 1} / ${widget.imageUrls.length}',
+                style: AppTypography.body.copyWith(color: Colors.white),
+              )
+            : null,
+        centerTitle: true,
+      ),
+      body: PageView.builder(
+        controller: _pageController,
+        itemCount: widget.imageUrls.length,
+        onPageChanged: (index) {
+          setState(() => _currentIndex = index);
+        },
+        itemBuilder: (context, index) {
+          return InteractiveViewer(
+            minScale: 0.5,
+            maxScale: 4.0,
+            child: Center(
+              child: CachedNetworkImage(
+                imageUrl: widget.imageUrls[index],
+                fit: BoxFit.contain,
+                progressIndicatorBuilder: (context, url, progress) => Center(
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      CircularProgressIndicator(
+                        value: progress.progress,
+                        color: AppColors.primary,
+                        strokeWidth: 3,
+                        backgroundColor: Colors.white24,
+                      ),
+                      if (progress.progress != null)
+                        Text(
+                          '${(progress.progress! * 100).toInt()}%',
+                          style: AppTypography.caption.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                errorWidget: (context, url, error) => Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Iconsax.image, size: 48, color: Colors.white54),
+                    SizedBox(height: 8),
+                    Text(
+                      'ไม่สามารถโหลดรูปได้',
+                      style: AppTypography.body.copyWith(color: Colors.white54),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 }

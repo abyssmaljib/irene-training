@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/filter_drawer_shell.dart';
+import '../../../core/widgets/input_fields.dart';
 import '../../medicine/widgets/day_picker.dart';
 import '../providers/task_provider.dart';
 
@@ -534,49 +535,16 @@ class _TaskTypeFilterSectionState extends ConsumerState<_TaskTypeFilterSection> 
         if (allTypes.length > 5)
           Padding(
             padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
-            child: Container(
-              height: 40,
-              decoration: BoxDecoration(
-                color: AppColors.background,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: TextField(
-                controller: _searchController,
-                onChanged: (value) {
-                  ref.read(taskTypeSearchQueryProvider.notifier).state = value;
-                },
-                style: AppTypography.body.copyWith(fontSize: 14),
-                decoration: InputDecoration(
-                  hintText: 'ค้นหาประเภทงาน...',
-                  hintStyle: AppTypography.body.copyWith(
-                    color: AppColors.secondaryText,
-                    fontSize: 14,
-                  ),
-                  prefixIcon: Icon(
-                    Iconsax.search_normal,
-                    color: AppColors.secondaryText,
-                    size: 18,
-                  ),
-                  suffixIcon: _searchController.text.isNotEmpty
-                      ? GestureDetector(
-                          onTap: () {
-                            _searchController.clear();
-                            ref.read(taskTypeSearchQueryProvider.notifier).state = '';
-                          },
-                          child: Icon(
-                            Icons.close,
-                            color: AppColors.secondaryText,
-                            size: 18,
-                          ),
-                        )
-                      : null,
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: AppSpacing.sm,
-                    vertical: 10,
-                  ),
-                ),
-              ),
+            child: SearchField(
+              controller: _searchController,
+              hintText: 'ค้นหาประเภทงาน...',
+              isDense: true,
+              onChanged: (value) {
+                ref.read(taskTypeSearchQueryProvider.notifier).state = value;
+              },
+              onClear: () {
+                ref.read(taskTypeSearchQueryProvider.notifier).state = '';
+              },
             ),
           ),
 

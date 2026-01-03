@@ -4,13 +4,19 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/filter_drawer_shell.dart';
+import '../../../core/widgets/input_fields.dart';
+import '../models/post_tab.dart';
 
 /// Filter drawer สำหรับกรอง posts (ตามชื่อคนไข้)
 class PostFilterDrawer extends StatefulWidget {
   final int? selectedResidentId;
   final String? selectedResidentName;
   final List<ResidentOption> residents;
+  final bool isSearchEnabled;
+  final PostFilterType filterType;
   final void Function(int? residentId, String? residentName) onResidentChanged;
+  final void Function(bool enabled) onSearchToggle;
+  final void Function(PostFilterType filterType) onFilterTypeChanged;
   final VoidCallback onClearFilters;
 
   const PostFilterDrawer({
@@ -18,7 +24,11 @@ class PostFilterDrawer extends StatefulWidget {
     this.selectedResidentId,
     this.selectedResidentName,
     this.residents = const [],
+    this.isSearchEnabled = false,
+    this.filterType = PostFilterType.all,
     required this.onResidentChanged,
+    required this.onSearchToggle,
+    required this.onFilterTypeChanged,
     required this.onClearFilters,
   });
 
@@ -37,135 +47,356 @@ class _PostFilterDrawerState extends State<PostFilterDrawer> {
         .toList();
   }
 
+  bool get _hasFilters =>
+      widget.selectedResidentId != null ||
+      widget.filterType != PostFilterType.all;
+
+  int get _filterCount {
+    int count = 0;
+    if (widget.selectedResidentId != null) count++;
+    if (widget.filterType != PostFilterType.all) count++;
+    return count;
+  }
+
   @override
   Widget build(BuildContext context) {
     return FilterDrawerShell(
-      title: 'กรองโพส',
-      filterCount: widget.selectedResidentId != null ? 1 : 0,
-      onClear: widget.onClearFilters,
-      content: Column(
+      title: 'ตัวกรอง',
+      filterCount: _filterCount,
+      onClear: _hasFilters ? widget.onClearFilters : null,
+      content: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          // Search toggle section
+          _buildSearchToggleSection(),
+
+          Divider(height: 1, color: AppColors.alternate),
+
+          // View mode section (ทั้งหมด, รอรับทราบ, โพสต์ของฉัน)
+          _buildViewModeSection(),
+
+          Divider(height: 1, color: AppColors.alternate),
+
+          // Resident filter section
+          _buildResidentSection(),
+
+          // Extra space at bottom
+          SizedBox(height: AppSpacing.lg),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildViewModeSection() {
+    return Container(
+      color: AppColors.surface,
+      padding: EdgeInsets.all(AppSpacing.lg),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Resident filter section
-          Text(
-            'กรองตามชื่อคนไข้',
-            style: AppTypography.title,
+          // Section header
+          Row(
+            children: [
+              Icon(Iconsax.eye, size: 18, color: AppColors.secondaryText),
+              AppSpacing.horizontalGapSm,
+              Text(
+                'มุมมอง',
+                style: AppTypography.body.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.secondaryText,
+                ),
+              ),
+            ],
           ),
           AppSpacing.verticalGapMd,
-          // Search field
-          TextField(
-            decoration: InputDecoration(
-              hintText: 'ค้นหาชื่อคนไข้...',
-              hintStyle:
-                  AppTypography.body.copyWith(color: AppColors.secondaryText),
-              prefixIcon:
-                  Icon(Iconsax.search_normal, color: AppColors.secondaryText),
-              filled: true,
-              fillColor: AppColors.background,
-              contentPadding:
-                  EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
+
+          // View mode options
+          ...PostFilterType.values.map((type) => _buildViewModeOption(type)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildViewModeOption(PostFilterType type) {
+    final isSelected = widget.filterType == type;
+
+    IconData icon;
+    switch (type) {
+      case PostFilterType.all:
+        icon = Iconsax.document_text;
+        break;
+      case PostFilterType.unacknowledged:
+        icon = Iconsax.notification_bing;
+        break;
+      case PostFilterType.myPosts:
+        icon = Iconsax.user_edit;
+        break;
+    }
+
+    return InkWell(
+      onTap: () {
+        widget.onFilterTypeChanged(type);
+        Navigator.pop(context);
+      },
+      borderRadius: AppRadius.mediumRadius,
+      child: AnimatedContainer(
+        duration: Duration(milliseconds: 200),
+        margin: EdgeInsets.only(bottom: 8),
+        padding: EdgeInsets.all(AppSpacing.sm),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.accent1 : Colors.transparent,
+          borderRadius: AppRadius.mediumRadius,
+          border: Border.all(
+            color: isSelected ? AppColors.primary : AppColors.alternate,
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              size: 20,
+              color: isSelected ? AppColors.primary : AppColors.secondaryText,
+            ),
+            AppSpacing.horizontalGapMd,
+            Expanded(
+              child: Text(
+                type.label,
+                style: AppTypography.body.copyWith(
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                  color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                ),
               ),
             ),
-            style: AppTypography.body,
-            onChanged: (value) => setState(() => _searchQuery = value),
+            if (isSelected)
+              Icon(
+                Iconsax.tick_circle,
+                size: 20,
+                color: AppColors.primary,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchToggleSection() {
+    return Container(
+      color: AppColors.surface,
+      padding: EdgeInsets.all(AppSpacing.lg),
+      child: GestureDetector(
+        onTap: () => widget.onSearchToggle(true),
+        child: Container(
+          height: 40,
+          padding: EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: AppRadius.smallRadius,
+            border: Border.all(color: AppColors.inputBorder),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Iconsax.search_normal,
+                size: 22,
+                color: AppColors.secondaryText,
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'ค้นหาโพส...',
+                  style: AppTypography.body.copyWith(
+                    color: AppColors.secondaryText.withValues(alpha: 0.6),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildResidentSection() {
+    return Container(
+      color: AppColors.surface,
+      padding: EdgeInsets.all(AppSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Section header
+          Row(
+            children: [
+              Icon(Iconsax.user, size: 18, color: AppColors.secondaryText),
+              AppSpacing.horizontalGapSm,
+              Text(
+                'ผู้พักอาศัย',
+                style: AppTypography.body.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.secondaryText,
+                ),
+              ),
+            ],
           ),
           AppSpacing.verticalGapMd,
-          // Selected resident chip (if any)
-          if (widget.selectedResidentId != null) ...[
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.primary),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Iconsax.user, size: 16, color: AppColors.primary),
-                  AppSpacing.horizontalGapSm,
-                  Flexible(
-                    child: Text(
-                      widget.selectedResidentName ?? 'Unknown',
-                      style: AppTypography.body
-                          .copyWith(color: AppColors.primary),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  AppSpacing.horizontalGapSm,
-                  GestureDetector(
-                    onTap: () => widget.onResidentChanged(null, null),
-                    child: Icon(Iconsax.close_circle,
-                        size: 18, color: AppColors.primary),
-                  ),
-                ],
-              ),
+
+          // Search field (show if many residents)
+          if (widget.residents.length > 5) ...[
+            SearchField(
+              hintText: 'ค้นหาชื่อ...',
+              isDense: true,
+              onChanged: (value) => setState(() => _searchQuery = value),
             ),
             AppSpacing.verticalGapMd,
           ],
-          // Resident list
-          Expanded(
-            child: _filteredResidents.isEmpty
-                ? Center(
-                    child: Text(
-                      _searchQuery.isEmpty
-                          ? 'ไม่มีรายชื่อคนไข้'
-                          : 'ไม่พบผลลัพธ์',
-                      style: AppTypography.body
-                          .copyWith(color: AppColors.secondaryText),
-                    ),
-                  )
-                : ListView.builder(
-                    itemCount: _filteredResidents.length,
-                    itemBuilder: (context, index) {
-                      final resident = _filteredResidents[index];
-                      final isSelected =
-                          resident.id == widget.selectedResidentId;
 
-                      return ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: AppColors.accent1,
-                          backgroundImage: resident.pictureUrl != null
-                              ? NetworkImage(resident.pictureUrl!)
-                              : null,
-                          child: resident.pictureUrl == null
-                              ? Icon(Iconsax.user,
-                                  color: AppColors.primary, size: 20)
-                              : null,
-                        ),
-                        title: Text(
-                          resident.name,
-                          style: AppTypography.body.copyWith(
-                            fontWeight: isSelected
-                                ? FontWeight.w600
-                                : FontWeight.normal,
-                            color: isSelected
-                                ? AppColors.primary
-                                : AppColors.textPrimary,
-                          ),
-                        ),
-                        subtitle: resident.zone != null
-                            ? Text(
-                                resident.zone!,
-                                style: AppTypography.caption
-                                    .copyWith(color: AppColors.secondaryText),
-                              )
-                            : null,
-                        trailing: isSelected
-                            ? Icon(Iconsax.tick_circle5,
-                                color: AppColors.primary)
-                            : null,
-                        onTap: () {
-                          widget.onResidentChanged(resident.id, resident.name);
-                          Navigator.pop(context);
-                        },
-                      );
-                    },
+          // Selected resident chip (if any)
+          if (widget.selectedResidentId != null) ...[
+            GestureDetector(
+              onTap: () => widget.onResidentChanged(null, null),
+              child: AnimatedContainer(
+                duration: Duration(milliseconds: 200),
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.accent1,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: AppColors.primary,
+                    width: 1.5,
                   ),
-          ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Iconsax.tick_circle,
+                      size: 14,
+                      color: AppColors.primary,
+                    ),
+                    SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        widget.selectedResidentName ?? 'Unknown',
+                        style: AppTypography.label.copyWith(
+                          color: AppColors.primary,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    SizedBox(width: 6),
+                    Icon(
+                      Iconsax.close_circle,
+                      size: 16,
+                      color: AppColors.primary,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            AppSpacing.verticalGapMd,
+            Divider(height: 1, color: AppColors.alternate),
+            AppSpacing.verticalGapMd,
+          ],
+
+          // Resident list
+          if (_filteredResidents.isEmpty)
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
+              child: Center(
+                child: Column(
+                  children: [
+                    Image.asset(
+                      'assets/images/not_found.webp',
+                      width: 120,
+                      height: 120,
+                    ),
+                    AppSpacing.verticalGapSm,
+                    Text(
+                      _searchQuery.isEmpty
+                          ? 'ไม่มีรายชื่อผู้พักอาศัย'
+                          : 'ไม่พบผลการค้นหา',
+                      style: AppTypography.body.copyWith(
+                        color: AppColors.secondaryText,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            // แสดงเป็น list tiles แบบเดิมเพราะมี avatar
+            ...(_filteredResidents.map((resident) {
+              final isSelected = resident.id == widget.selectedResidentId;
+              return InkWell(
+                onTap: () {
+                  widget.onResidentChanged(resident.id, resident.name);
+                  Navigator.pop(context);
+                },
+                borderRadius: AppRadius.mediumRadius,
+                child: AnimatedContainer(
+                  duration: Duration(milliseconds: 200),
+                  margin: EdgeInsets.only(bottom: 8),
+                  padding: EdgeInsets.all(AppSpacing.sm),
+                  decoration: BoxDecoration(
+                    color: isSelected ? AppColors.accent1 : Colors.transparent,
+                    borderRadius: AppRadius.mediumRadius,
+                    border: Border.all(
+                      color: isSelected ? AppColors.primary : AppColors.alternate,
+                      width: isSelected ? 1.5 : 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      // Avatar
+                      CircleAvatar(
+                        radius: 18,
+                        backgroundColor: AppColors.accent1,
+                        backgroundImage: resident.pictureUrl != null
+                            ? NetworkImage(resident.pictureUrl!)
+                            : null,
+                        child: resident.pictureUrl == null
+                            ? Icon(Iconsax.user,
+                                color: AppColors.primary, size: 18)
+                            : null,
+                      ),
+                      AppSpacing.horizontalGapMd,
+                      // Name & Zone
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              resident.name,
+                              style: AppTypography.body.copyWith(
+                                fontWeight:
+                                    isSelected ? FontWeight.w600 : FontWeight.normal,
+                                color: isSelected
+                                    ? AppColors.primary
+                                    : AppColors.textPrimary,
+                              ),
+                            ),
+                            if (resident.zone != null)
+                              Text(
+                                resident.zone!,
+                                style: AppTypography.caption.copyWith(
+                                  color: AppColors.secondaryText,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      // Check icon
+                      if (isSelected)
+                        Icon(
+                          Iconsax.tick_circle,
+                          size: 20,
+                          color: AppColors.primary,
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList()),
         ],
       ),
     );

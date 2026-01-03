@@ -79,18 +79,13 @@ class PostService {
       // Apply nursinghome filter
       query = query.eq('nursinghome_id', nursinghomeId);
 
-      // Apply tab filter - V3: special logic for handover tab
+      // Apply tab filter - V3: นโยบาย vs ส่งเวร
       if (filter.isHandoverTab) {
-        // ส่งเวร tab: Calendar หรือ จากหัวหน้าเวร
-        query = query.or('tab.eq.Calendar,user_group.eq.หัวหน้าเวร');
+        // ส่งเวร tab: is_handover = true หรือ Critical (รวมมาด้วย)
+        query = query.or('is_handover.eq.true,tab.eq.Announcements-Critical');
       } else {
-        // ประกาศ tab: Critical + Policy เท่านั้น
-        final tabValues = filter.dbTabValues;
-        if (tabValues.length == 1) {
-          query = query.eq('tab', tabValues.first);
-        } else {
-          query = query.inFilter('tab', tabValues);
-        }
+        // นโยบาย tab: Policy เท่านั้น
+        query = query.eq('tab', 'Announcements-Policy');
       }
 
       // Apply resident filter
@@ -197,7 +192,7 @@ class PostService {
       // This view has posts from last 14 days with like info
       final response = await _supabase
           .from('post_tab_likes_14d')
-          .select('tab, like_user_ids, user_group')
+          .select('tab, like_user_ids, is_handover')
           .eq('nursinghome_id', nursinghomeId);
 
       final counts = <PostMainTab, int>{
@@ -208,20 +203,20 @@ class PostService {
       for (final row in response as List) {
         final tab = row['tab'] as String?;
         final likeUserIds = row['like_user_ids'] as List?;
-        final userGroup = row['user_group'] as String?;
+        final isHandover = row['is_handover'] as bool? ?? false;
 
         // Check if user has NOT liked this post
         final hasLiked = likeUserIds?.contains(userId) ?? false;
         if (hasLiked) continue;
 
         // Increment count for appropriate tab - V3 logic
-        // ประกาศ = Critical + Policy เท่านั้น
-        if (tab == 'Announcements-Critical' || tab == 'Announcements-Policy') {
+        // นโยบาย = Policy เท่านั้น
+        if (tab == 'Announcements-Policy') {
           counts[PostMainTab.announcement] =
               (counts[PostMainTab.announcement] ?? 0) + 1;
         }
-        // ส่งเวร = Calendar + หัวหน้าเวร
-        else if (tab == 'Calendar' || userGroup == 'หัวหน้าเวร') {
+        // ส่งเวร = is_handover = true หรือ Critical
+        else if (isHandover || tab == 'Announcements-Critical') {
           counts[PostMainTab.handover] =
               (counts[PostMainTab.handover] ?? 0) + 1;
         }
@@ -306,21 +301,29 @@ class PostService {
   }
 
   /// ดึงรายชื่อ residents สำหรับ filter
+  /// ใช้ table residents และ filter เฉพาะ s_status = 'Stay'
   Future<List<Map<String, dynamic>>> getResidents(int nursinghomeId) async {
     try {
       final response = await _supabase
-          .from('Resident')
-          .select('id, Name, i_Picture_url, zone:Zone(name)')
+          .from('residents')
+          .select('''
+            id,
+            i_Name_Surname,
+            i_picture_url,
+            s_zone,
+            nursinghome_zone(id, zone)
+          ''')
           .eq('nursinghome_id', nursinghomeId)
-          .eq('is_archived', false)
-          .order('Name');
+          .eq('s_status', 'Stay')
+          .order('i_Name_Surname');
 
       return (response as List).map((r) {
+        final zoneData = r['nursinghome_zone'] as Map<String, dynamic>?;
         return {
           'id': r['id'],
-          'Name': r['Name'],
-          'i_Picture_url': r['i_Picture_url'],
-          'zone_name': r['zone']?['name'],
+          'Name': r['i_Name_Surname'],
+          'i_Picture_url': r['i_picture_url'],
+          'zone_name': zoneData?['zone'],
         };
       }).toList();
     } catch (e) {

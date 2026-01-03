@@ -6,6 +6,10 @@ import '../../core/theme/app_spacing.dart';
 
 /// App Text Field - Standard input field
 /// States: Default, Focused, Error, Disabled
+///
+/// Sizes:
+/// - Default: ~48px height (with padding 12px vertical)
+/// - Dense: ~40px height (with padding 8px vertical)
 class AppTextField extends StatefulWidget {
   final String? label;
   final String? hintText;
@@ -20,6 +24,13 @@ class AppTextField extends StatefulWidget {
   final VoidCallback? onTap;
   final int maxLines;
   final TextCapitalization textCapitalization;
+  final FocusNode? focusNode;
+  final TextInputAction? textInputAction;
+  final ValueChanged<String>? onSubmitted;
+  /// Use dense mode for smaller height (~40px vs ~48px)
+  final bool isDense;
+  /// Auto focus when widget is mounted
+  final bool autofocus;
 
   const AppTextField({
     super.key,
@@ -36,6 +47,11 @@ class AppTextField extends StatefulWidget {
     this.onTap,
     this.maxLines = 1,
     this.textCapitalization = TextCapitalization.none,
+    this.focusNode,
+    this.textInputAction,
+    this.onSubmitted,
+    this.isDense = false,
+    this.autofocus = false,
   });
 
   @override
@@ -43,21 +59,35 @@ class AppTextField extends StatefulWidget {
 }
 
 class _AppTextFieldState extends State<AppTextField> {
-  late FocusNode _focusNode;
+  FocusNode? _internalFocusNode;
   bool _isFocused = false;
+
+  FocusNode get _focusNode => widget.focusNode ?? (_internalFocusNode ??= FocusNode());
 
   @override
   void initState() {
     super.initState();
-    _focusNode = FocusNode();
-    _focusNode.addListener(() {
-      setState(() => _isFocused = _focusNode.hasFocus);
-    });
+    _focusNode.addListener(_handleFocusChange);
+  }
+
+  @override
+  void didUpdateWidget(AppTextField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.focusNode != oldWidget.focusNode) {
+      oldWidget.focusNode?.removeListener(_handleFocusChange);
+      _internalFocusNode?.removeListener(_handleFocusChange);
+      _focusNode.addListener(_handleFocusChange);
+    }
+  }
+
+  void _handleFocusChange() {
+    setState(() => _isFocused = _focusNode.hasFocus);
   }
 
   @override
   void dispose() {
-    _focusNode.dispose();
+    _focusNode.removeListener(_handleFocusChange);
+    _internalFocusNode?.dispose();
     super.dispose();
   }
 
@@ -88,6 +118,9 @@ class _AppTextFieldState extends State<AppTextField> {
           onTap: widget.onTap,
           maxLines: widget.maxLines,
           textCapitalization: widget.textCapitalization,
+          textInputAction: widget.textInputAction,
+          onSubmitted: widget.onSubmitted,
+          autofocus: widget.autofocus,
           style: AppTypography.body.copyWith(
             color: widget.enabled ? AppColors.textPrimary : AppColors.textSecondary,
           ),
@@ -99,37 +132,37 @@ class _AppTextFieldState extends State<AppTextField> {
             prefixIcon: widget.prefixIcon != null
                 ? Icon(
                     widget.prefixIcon,
-                    color: _isFocused 
-                        ? AppColors.primary 
+                    color: _isFocused
+                        ? AppColors.primary
                         : AppColors.textSecondary,
                     size: 22,
                   )
                 : null,
             suffixIcon: widget.suffixIcon,
+            isDense: widget.isDense,
             filled: true,
-            fillColor: widget.enabled 
-                ? AppColors.surface 
-                : AppColors.background,
-            contentPadding: AppSpacing.inputPadding,
+            fillColor: widget.enabled
+                ? AppColors.background
+                : AppColors.background.withValues(alpha: 0.5),
+            contentPadding: widget.isDense
+                ? EdgeInsets.symmetric(horizontal: 12, vertical: 12)
+                : AppSpacing.inputPadding,
+            // Minimal style: no border, only filled background
             border: OutlineInputBorder(
               borderRadius: AppRadius.smallRadius,
-              borderSide: BorderSide(
-                color: AppColors.inputBorder,
-                width: 1,
-              ),
+              borderSide: BorderSide.none,
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: AppRadius.smallRadius,
-              borderSide: BorderSide(
-                color: hasError ? AppColors.error : AppColors.inputBorder,
-                width: 1,
-              ),
+              borderSide: hasError
+                  ? BorderSide(color: AppColors.error, width: 1)
+                  : BorderSide.none,
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: AppRadius.smallRadius,
               borderSide: BorderSide(
                 color: hasError ? AppColors.error : AppColors.primary,
-                width: 2,
+                width: 1.5,
               ),
             ),
             errorBorder: OutlineInputBorder(
@@ -148,10 +181,7 @@ class _AppTextFieldState extends State<AppTextField> {
             ),
             disabledBorder: OutlineInputBorder(
               borderRadius: AppRadius.smallRadius,
-              borderSide: BorderSide(
-                color: AppColors.inputBorder.withValues(alpha: 0.5),
-                width: 1,
-              ),
+              borderSide: BorderSide.none,
             ),
           ),
         ),
@@ -189,6 +219,9 @@ class PasswordField extends StatefulWidget {
   final TextEditingController? controller;
   final bool enabled;
   final ValueChanged<String>? onChanged;
+  final FocusNode? focusNode;
+  final TextInputAction? textInputAction;
+  final ValueChanged<String>? onSubmitted;
 
   const PasswordField({
     super.key,
@@ -198,6 +231,9 @@ class PasswordField extends StatefulWidget {
     this.controller,
     this.enabled = true,
     this.onChanged,
+    this.focusNode,
+    this.textInputAction,
+    this.onSubmitted,
   });
 
   @override
@@ -217,6 +253,9 @@ class _PasswordFieldState extends State<PasswordField> {
       enabled: widget.enabled,
       obscureText: _obscureText,
       onChanged: widget.onChanged,
+      focusNode: widget.focusNode,
+      textInputAction: widget.textInputAction,
+      onSubmitted: widget.onSubmitted,
       prefixIcon: Iconsax.lock,
       suffixIcon: IconButton(
         icon: Icon(
@@ -238,6 +277,12 @@ class SearchField extends StatefulWidget {
   final TextEditingController? controller;
   final ValueChanged<String>? onChanged;
   final VoidCallback? onClear;
+  /// Use dense mode for smaller height (~40px vs ~48px)
+  final bool isDense;
+  /// Auto focus when widget is mounted
+  final bool autofocus;
+  /// Focus node for programmatic focus control
+  final FocusNode? focusNode;
 
   const SearchField({
     super.key,
@@ -245,6 +290,9 @@ class SearchField extends StatefulWidget {
     this.controller,
     this.onChanged,
     this.onClear,
+    this.isDense = false,
+    this.autofocus = false,
+    this.focusNode,
   });
 
   @override
@@ -276,6 +324,9 @@ class _SearchFieldState extends State<SearchField> {
       hintText: widget.hintText,
       prefixIcon: Iconsax.search_normal,
       onChanged: widget.onChanged,
+      isDense: widget.isDense,
+      autofocus: widget.autofocus,
+      focusNode: widget.focusNode,
       suffixIcon: _controller.text.isNotEmpty
           ? IconButton(
               icon: Icon(

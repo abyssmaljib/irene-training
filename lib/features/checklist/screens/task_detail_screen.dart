@@ -17,6 +17,7 @@ import '../models/task_log.dart';
 import '../providers/task_provider.dart';
 import '../services/task_service.dart';
 import '../widgets/problem_input_sheet.dart';
+import '../../board/widgets/create_post_bottom_sheet.dart';
 
 /// หน้ารายละเอียด Task แบบ Full Page
 class TaskDetailScreen extends ConsumerStatefulWidget {
@@ -214,7 +215,18 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
 
   /// แสดงปุ่ม "เรียบร้อย" หรือไม่
   /// ถ้าต้องถ่ายรูป → ต้องมีรูปก่อนจึงจะแสดงปุ่ม
-  bool get _showCompleteButton => !_requiresPhoto || _hasConfirmImage;
+  /// ถ้าเป็น mustCompleteByPost → ไม่แสดงปุ่มเรียบร้อย (ต้องโพสแทน)
+  bool get _showCompleteButton =>
+      !_task.mustCompleteByPost && (!_requiresPhoto || _hasConfirmImage);
+
+  /// แสดงปุ่ม "สำเร็จด้วยโพส" หรือไม่
+  /// แสดงเมื่อ: mustCompleteByPost = true และ (ไม่มี sampleImage หรือ ถ่ายรูปแล้ว)
+  bool get _showCompleteByPostButton =>
+      _task.mustCompleteByPost && (!_task.hasSampleImage || _hasConfirmImage);
+
+  /// แสดงปุ่มกล้องสำหรับ mustCompleteByPost (ถ่ายรูปก่อนโพส)
+  bool get _showCameraForPostButton =>
+      _task.mustCompleteByPost && _task.hasSampleImage && !_hasConfirmImage;
 
   @override
   Widget build(BuildContext context) {
@@ -1401,7 +1413,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
             ),
             AppSpacing.horizontalGapSm,
 
-            // Camera button (ถ้าต้องถ่ายรูป)
+            // Camera button (ถ้าต้องถ่ายรูป - สำหรับงานปกติ)
             if (_showCameraButton)
               Expanded(
                 child: SizedBox(
@@ -1426,6 +1438,35 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                           )
                         : const Icon(Iconsax.camera),
                     label: Text('ถ่ายรูปงาน', style: AppTypography.button),
+                  ),
+                ),
+              ),
+
+            // Camera button (สำหรับ mustCompleteByPost - ต้องถ่ายรูปก่อนโพส)
+            if (_showCameraForPostButton)
+              Expanded(
+                child: SizedBox(
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    onPressed: _isLoading ? null : _handleTakePhoto,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.tertiary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: _isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation(Colors.white),
+                            ),
+                          )
+                        : const Icon(Iconsax.camera),
+                    label: Text('ถ่ายรูปก่อนโพส', style: AppTypography.button),
                   ),
                 ),
               ),
@@ -1455,6 +1496,26 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                           )
                         : const Icon(Iconsax.tick_circle),
                     label: Text('เรียบร้อย', style: AppTypography.button),
+                  ),
+                ),
+              ),
+
+            // Complete by post button (สำหรับ task ที่ต้องสำเร็จด้วยโพส)
+            if (_showCompleteByPostButton)
+              Expanded(
+                child: SizedBox(
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    onPressed: _isLoading ? null : _handleCompleteByPost,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.tertiary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: const Icon(Iconsax.document_text),
+                    label: Text('สำเร็จด้วยโพส', style: AppTypography.button),
                   ),
                 ),
               ),
@@ -1836,6 +1897,25 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         _uploadedImageUrl = null;
       });
     }
+  }
+
+  /// เปิด CreatePostBottomSheet พร้อมข้อมูลจาก task
+  void _handleCompleteByPost() {
+    showCreatePostBottomSheet(
+      context,
+      initialText: _task.title ?? '',
+      initialResidentId: _task.residentId,
+      initialResidentName: _task.residentName,
+      initialTagName: 'งานเช็คลิสต์', // ใช้ tag "งานเช็คลิสต์" สำหรับทุก task
+      taskLogId: _task.logId,
+      taskConfirmImageUrl: _uploadedImageUrl, // รูปที่ถ่ายไว้ (ถ้ามี)
+      onPostCreated: () {
+        // เมื่อโพสสำเร็จ task จะถูก complete โดย CreatePostBottomSheet แล้ว
+        // เพียงแค่ refresh tasks และกลับไปหน้า checklist
+        refreshTasks(ref);
+        if (mounted) Navigator.pop(context);
+      },
+    );
   }
 
   /// แทนที่รูปตัวอย่างด้วยรูป confirm ที่ถ่ายเสร็จแล้ว (สำหรับหัวหน้าเวรขึ้นไป)

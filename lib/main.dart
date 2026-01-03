@@ -15,7 +15,13 @@ import 'firebase_options.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await dotenv.load(fileName: '.env');
+  try {
+    await dotenv.load(fileName: '.env');
+    debugPrint('Dotenv loaded successfully');
+    debugPrint('SUPABASE_URL: ${dotenv.env['SUPABASE_URL'] ?? 'NOT FOUND'}');
+  } catch (e) {
+    debugPrint('Failed to load .env file: $e');
+  }
 
   // Initialize Firebase
   await Firebase.initializeApp(
@@ -34,9 +40,17 @@ void main() async {
     };
   }
 
+  final supabaseUrl = SupabaseConfig.url;
+  final supabaseKey = SupabaseConfig.anonKey;
+
+  if (supabaseUrl.isEmpty || supabaseKey.isEmpty) {
+    debugPrint('ERROR: Supabase configuration is missing!');
+    debugPrint('URL empty: ${supabaseUrl.isEmpty}, Key empty: ${supabaseKey.isEmpty}');
+  }
+
   await Supabase.initialize(
-    url: SupabaseConfig.url,
-    anonKey: SupabaseConfig.anonKey,
+    url: supabaseUrl,
+    anonKey: supabaseKey,
   );
 
   runApp(const ProviderScope(child: MyApp()));

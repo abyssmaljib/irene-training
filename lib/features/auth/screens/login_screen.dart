@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:pin_code_fields/pin_code_fields.dart';
 import 'package:iconsax/iconsax.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/widgets/input_fields.dart';
 import '../../navigation/screens/main_navigation_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -29,7 +31,6 @@ class _LoginScreenState extends State<LoginScreen> {
   // States
   bool _isPasswordMode = true;  // true = password, false = OTP
   bool _isLoading = false;
-  bool _obscurePassword = true;
   bool _otpSent = false;
   String? _errorMessage;
 
@@ -75,9 +76,12 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
     } on AuthException catch (e) {
+      debugPrint('AuthException: ${e.message}');
       setState(() => _errorMessage = _getThaiErrorMessage(e.message));
-    } catch (e) {
-      setState(() => _errorMessage = 'เกิดข้อผิดพลาด กรุณาลองใหม่');
+    } catch (e, stackTrace) {
+      debugPrint('Login error: $e');
+      debugPrint('Stack trace: $stackTrace');
+      setState(() => _errorMessage = 'เกิดข้อผิดพลาด: ${e.toString()}');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -256,16 +260,7 @@ class _LoginScreenState extends State<LoginScreen> {
           AppSpacing.verticalGapLg,
 
             // Email field
-            _buildTextField(
-            controller: _emailController,
-            label: 'อีเมล',
-            hintText: 'example@ireneplus.com',
-            prefixIcon: Iconsax.user,
-            keyboardType: TextInputType.emailAddress,
-            focusNode: _emailFocusNode,
-            nextFocusNode: _isPasswordMode ? _passwordFocusNode : null,
-            onSubmitted: _isPasswordMode ? null : (_otpSent ? null : _sendOtp),
-          ),
+            _buildEmailField(),
           AppSpacing.verticalGapMd,
 
           // Password or OTP fields
@@ -366,100 +361,35 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildTextField({
-  required TextEditingController controller,
-  required String label,
-  required String hintText,
-  required IconData prefixIcon,
-  TextInputType? keyboardType,
-  bool obscureText = false,
-  Widget? suffixIcon,
-  FocusNode? focusNode,
-  FocusNode? nextFocusNode,
-  VoidCallback? onSubmitted,
-}) {
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(
-        label,
-        style: AppTypography.bodySmall.copyWith(
-          fontWeight: FontWeight.w500,
-          color: AppColors.textSecondary,
-        ),
-      ),
-      SizedBox(height: AppSpacing.xs + 2), // 6px
-      SizedBox(
-        height: AppSpacing.buttonHeight,
-        child: TextField(
-          controller: controller,
-          focusNode: focusNode,
-          keyboardType: keyboardType,
-          obscureText: obscureText,
-          textInputAction: nextFocusNode != null ? TextInputAction.next : TextInputAction.done,
-          onSubmitted: (_) {
-            if (nextFocusNode != null) {
-              nextFocusNode.requestFocus();
-            } else if (onSubmitted != null) {
-              onSubmitted();
-            }
-          },
-          style: AppTypography.body.copyWith(
-            fontSize: 15,
-            color: AppColors.textPrimary,
-          ),
-          decoration: InputDecoration(
-            hintText: hintText,
-            hintStyle: AppTypography.body.copyWith(
-              fontSize: 15,
-              color: AppColors.textSecondary.withValues(alpha: 0.5),
-            ),
-            prefixIcon: Icon(
-              prefixIcon,
-              color: AppColors.textSecondary,
-              size: 22,
-            ),
-            suffixIcon: suffixIcon,
-            filled: true,
-            fillColor: AppColors.surface,
-            contentPadding: EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 0),
-            border: OutlineInputBorder(
-              borderRadius: AppRadius.smallRadius,
-              borderSide: BorderSide(color: AppColors.inputBorder),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: AppRadius.smallRadius,
-              borderSide: BorderSide(color: AppColors.inputBorder),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: AppRadius.smallRadius,
-              borderSide: BorderSide(color: AppColors.primary, width: 2),
-            ),
-          ),
-        ),
-      ),
-    ],
-  );
-}
-
-    Widget _buildPasswordField() {
-    return _buildTextField(
-        controller: _passwordController,
-        label: 'รหัสผ่าน',
-        hintText: '••••••••',
-        prefixIcon: Iconsax.lock,
-        obscureText: _obscurePassword,
-        focusNode: _passwordFocusNode,
-        onSubmitted: _loginWithPassword,
-        suffixIcon: IconButton(
-        icon: Icon(
-            _obscurePassword ? Iconsax.eye_slash : Iconsax.eye,
-            color: AppColors.textSecondary,
-        ),
-        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-        ),
+  Widget _buildEmailField() {
+    return AppTextField(
+      controller: _emailController,
+      label: 'อีเมล',
+      hintText: 'example@ireneplus.com',
+      prefixIcon: Iconsax.user,
+      keyboardType: TextInputType.emailAddress,
+      focusNode: _emailFocusNode,
+      textInputAction: _isPasswordMode ? TextInputAction.next : TextInputAction.done,
+      onSubmitted: (_) {
+        if (_isPasswordMode) {
+          _passwordFocusNode.requestFocus();
+        } else if (!_otpSent) {
+          _sendOtp();
+        }
+      },
     );
-    }
+  }
+
+  Widget _buildPasswordField() {
+    return PasswordField(
+      controller: _passwordController,
+      label: 'รหัสผ่าน',
+      hintText: '••••••••',
+      focusNode: _passwordFocusNode,
+      textInputAction: TextInputAction.done,
+      onSubmitted: (_) => _loginWithPassword(),
+    );
+  }
 
   Widget _buildOtpSection() {
     return Column(
@@ -623,54 +553,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 AppSpacing.verticalGapMd,
-                SizedBox(
-                  height: AppSpacing.buttonHeight,
-                  child: TextField(
-                    controller: forgotEmailController,
-                    keyboardType: TextInputType.emailAddress,
-                    style: AppTypography.body.copyWith(
-                      fontSize: 15,
-                      color: AppColors.textPrimary,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: 'example@ireneplus.com',
-                      hintStyle: AppTypography.body.copyWith(
-                        fontSize: 15,
-                        color: AppColors.textSecondary.withValues(alpha: 0.5),
-                      ),
-                      prefixIcon: Icon(
-                        Iconsax.sms,
-                        color: AppColors.textSecondary,
-                        size: 22,
-                      ),
-                      filled: true,
-                      fillColor: AppColors.background,
-                      contentPadding: EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 0),
-                      border: OutlineInputBorder(
-                        borderRadius: AppRadius.smallRadius,
-                        borderSide: BorderSide.none,
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: AppRadius.smallRadius,
-                        borderSide: BorderSide.none,
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: AppRadius.smallRadius,
-                        borderSide: BorderSide(color: AppColors.primary, width: 2),
-                      ),
-                    ),
-                  ),
+                AppTextField(
+                  controller: forgotEmailController,
+                  hintText: 'example@ireneplus.com',
+                  prefixIcon: Iconsax.sms,
+                  keyboardType: TextInputType.emailAddress,
+                  errorText: errorMessage,
                 ),
-                if (errorMessage != null) ...[
-                  AppSpacing.verticalGapSm,
-                  Text(
-                    errorMessage!,
-                    style: AppTypography.bodySmall.copyWith(
-                      fontSize: 13,
-                      color: AppColors.error,
-                    ),
-                  ),
-                ],
               ],
             ),
             actions: [
@@ -839,6 +728,53 @@ class _LoginScreenState extends State<LoginScreen> {
             style: AppTypography.caption.copyWith(
               color: AppColors.textSecondary,
             ),
+          ),
+          AppSpacing.verticalGapLg,
+          // Debug Info
+          _buildDebugInfo(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDebugInfo() {
+    final supabaseUrl = Supabase.instance.client.rest.url;
+    final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
+    final isAndroid = defaultTargetPlatform == TargetPlatform.android;
+
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+      padding: AppSpacing.paddingSm,
+      decoration: BoxDecoration(
+        color: AppColors.error.withValues(alpha: 0.1),
+        borderRadius: AppRadius.smallRadius,
+        border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '🔧 Debug Info',
+            style: AppTypography.bodySmall.copyWith(
+              fontWeight: FontWeight.bold,
+              color: AppColors.error,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Platform: ${kIsWeb ? "Web" : isIOS ? "iOS" : isAndroid ? "Android" : "Other"}',
+            style: AppTypography.caption.copyWith(fontSize: 10),
+          ),
+          Text(
+            'Supabase URL: ${supabaseUrl.isNotEmpty ? "${supabaseUrl.substring(0, 30)}..." : "EMPTY!"}',
+            style: AppTypography.caption.copyWith(
+              fontSize: 10,
+              color: supabaseUrl.isEmpty ? AppColors.error : AppColors.textSecondary,
+            ),
+          ),
+          Text(
+            'Has Session: ${Supabase.instance.client.auth.currentSession != null}',
+            style: AppTypography.caption.copyWith(fontSize: 10),
           ),
         ],
       ),

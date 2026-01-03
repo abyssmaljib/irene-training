@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/topic_with_progress.dart';
 import '../widgets/topic_card.dart';
@@ -7,6 +6,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/irene_app_bar.dart';
+import '../../../core/widgets/input_fields.dart';
 import 'topic_detail_screen.dart';
 
 class DirectoryScreen extends StatefulWidget {
@@ -280,55 +280,16 @@ class _SearchBarDelegate extends SliverPersistentHeaderDelegate {
     double shrinkOffset,
     bool overlapsContent,
   ) {
-    // Search Bar Container
     return Container(
-      height: 52, // ความสูงของกล่อง search bar (ต้องตรงกับ maxExtent/minExtent)
+      height: 52,
       color: AppColors.secondaryBackground,
-      // padding: ซ้าย 16px, บน 0, ขวา 16px, ล่าง 0 (ให้ตรงกับ titleSpacing ของ AppBar)
-      padding: EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, 0),
-      child: TextField(
+      padding: EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.xs, AppSpacing.md, AppSpacing.xs),
+      child: SearchField(
         controller: controller,
+        hintText: 'ค้นหาหัวข้อ...',
+        isDense: true,
         onChanged: onChanged,
-        textCapitalization: TextCapitalization.sentences,
-        style: Theme.of(context).textTheme.bodyMedium,
-        decoration: InputDecoration(
-          isDense: true,
-          labelText: 'ค้นหาหัวข้อ',
-          labelStyle: Theme.of(context).textTheme.labelMedium,
-          hintStyle: Theme.of(context).textTheme.labelMedium,
-          filled: true,
-          fillColor: AppColors.primaryBackground,
-          prefixIcon: const Icon(
-            Iconsax.search_normal,
-            size: 26,
-            color: AppColors.secondaryText,
-          ),
-          suffixIcon: hasText
-              ? InkWell(
-                  onTap: () {
-                    controller.clear();
-                    onChanged('');
-                  },
-                  child: const Icon(
-                    Iconsax.close_circle,
-                    color: AppColors.secondaryText,
-                    size: 24,
-                  ),
-                )
-              : null,
-          enabledBorder: OutlineInputBorder(
-            borderSide: const BorderSide(color: Colors.transparent, width: 2),
-            borderRadius: AppRadius.smallRadius,
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderSide: const BorderSide(color: AppColors.primary, width: 2),
-            borderRadius: AppRadius.smallRadius,
-          ),
-          contentPadding: EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.sm + 4,
-          ),
-        ),
+        onClear: () => onChanged(''),
       ),
     );
   }

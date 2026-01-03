@@ -88,21 +88,43 @@ class PostActionService {
     }
   }
 
-  /// Create a new post (Admin only)
+  /// Create a new post
+  ///
+  /// Supports both legacy params (tagTopics, residentIds) and new params (tagId, tagName, residentId)
   Future<int?> createPost({
     required String userId,
     required int nursinghomeId,
     required String text,
     String? title,
+    // New tag system (single tag)
+    int? tagId,
+    String? tagName,
+    bool isHandover = false,
+    // Single resident (new)
+    int? residentId,
+    // Multiple residents (legacy)
     List<int>? residentIds,
     List<String>? taggedUserIds,
+    // Legacy tag topics
     List<String>? tagTopics,
     String? imgUrl,
+    // New: imageUrls parameter
+    List<String>? imageUrls,
+    // Legacy: multiImgUrl parameter
     List<String>? multiImgUrl,
     String? youtubeUrl,
     bool visibleToRelative = false,
   }) async {
     try {
+      // Build Tag_Topics from tagName if provided
+      List<String>? finalTagTopics = tagTopics;
+      if (tagName != null && tagName.isNotEmpty) {
+        finalTagTopics = [tagName];
+      }
+
+      // Use imageUrls if provided, otherwise use multiImgUrl
+      final finalImageUrls = imageUrls ?? multiImgUrl;
+
       // Insert post
       final response = await _supabase.from('Post').insert({
         'user_id': userId,
@@ -110,28 +132,36 @@ class PostActionService {
         'Text': text,
         'title': title,
         'imgUrl': imgUrl,
-        'multi_img_url': multiImgUrl,
+        'multi_img_url': finalImageUrls,
         'youtubeUrl': youtubeUrl,
         'tagged_user': taggedUserIds,
-        'Tag_Topics': tagTopics,
+        'Tag_Topics': finalTagTopics,
         'visible_to_relative': visibleToRelative,
+        'is_handover': isHandover,
       }).select('id').single();
 
       final postId = response['id'] as int;
 
-      // Link to residents if provided
-      if (residentIds != null && residentIds.isNotEmpty) {
+      // Link to single resident if provided (new)
+      if (residentId != null) {
+        await _supabase.from('Post_Resident_id').insert({
+          'Post_id': postId,
+          'resident_id': residentId,
+        });
+      }
+      // Link to multiple residents if provided (legacy)
+      else if (residentIds != null && residentIds.isNotEmpty) {
         final residentLinks = residentIds
-            .map((residentId) => {
+            .map((rid) => {
                   'Post_id': postId,
-                  'resident_id': residentId,
+                  'resident_id': rid,
                 })
             .toList();
 
         await _supabase.from('Post_Resident_id').insert(residentLinks);
       }
 
-      debugPrint('PostActionService: created post $postId');
+      debugPrint('PostActionService: created post $postId (handover: $isHandover)');
       return postId;
     } catch (e) {
       debugPrint('createPost error: $e');

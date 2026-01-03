@@ -73,6 +73,9 @@ class Post {
   final String? logLineStatus;
   final int? logLineQueueId;
 
+  // Handover flag
+  final bool isHandover;
+
   const Post({
     required this.id,
     required this.createdAt,
@@ -122,6 +125,7 @@ class Post {
     this.prnQueueId,
     this.logLineStatus,
     this.logLineQueueId,
+    this.isHandover = false,
   });
 
   /// Factory constructor from JSON (postwithuserinfo view)
@@ -177,6 +181,7 @@ class Post {
       prnQueueId: json['prn_queue_id'] as int?,
       logLineStatus: json['log_line_status'] as String?,
       logLineQueueId: json['log_line_queue_id'] as int?,
+      isHandover: json['is_handover'] as bool? ?? false,
     );
   }
 
@@ -257,11 +262,13 @@ class Post {
   }
 
   /// Get the main tab type - V3: 2 tabs only
+  /// นโยบาย = Policy only
+  /// ส่งเวร = is_handover = true (รวม Critical)
   PostMainTab get mainTab {
-    // ประกาศ = Critical + Policy เท่านั้น
-    if (isCritical || isPolicy) return PostMainTab.announcement;
-    // Calendar + หัวหน้าเวร + is_handover = ส่งเวร
-    if (isCalendar) return PostMainTab.handover;
+    // นโยบาย = Policy เท่านั้น
+    if (isPolicy) return PostMainTab.announcement;
+    // ส่งเวร = is_handover = true (รวม Critical และทุกอย่างที่สำคัญ)
+    if (isHandover || isCritical) return PostMainTab.handover;
     // ที่เหลือ (FYI, Info) จะไม่แสดงใน Board แต่แสดงใน Activity Log
     return PostMainTab.handover; // fallback
   }
@@ -326,6 +333,7 @@ class Post {
     int? prnQueueId,
     String? logLineStatus,
     int? logLineQueueId,
+    bool? isHandover,
   }) {
     return Post(
       id: id ?? this.id,
@@ -376,6 +384,7 @@ class Post {
       prnQueueId: prnQueueId ?? this.prnQueueId,
       logLineStatus: logLineStatus ?? this.logLineStatus,
       logLineQueueId: logLineQueueId ?? this.logLineQueueId,
+      isHandover: isHandover ?? this.isHandover,
     );
   }
 
