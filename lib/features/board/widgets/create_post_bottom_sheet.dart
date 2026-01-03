@@ -1058,10 +1058,11 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
           );
 
           if (mounted) {
+            final error = PostMediaService.instance.lastError;
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('DEBUG: videoUrl=${result.videoUrl != null}, thumbUrl=${result.thumbnailUrl != null}'),
-                duration: Duration(seconds: 3),
+                content: Text('DEBUG: videoUrl=${result.videoUrl != null}, thumbUrl=${result.thumbnailUrl != null}, error=$error'),
+                duration: Duration(seconds: 5),
               ),
             );
           }
