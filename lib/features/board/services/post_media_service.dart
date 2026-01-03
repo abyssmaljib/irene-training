@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:video_thumbnail/video_thumbnail.dart';
+import 'package:path_provider/path_provider.dart';
 
 /// Service สำหรับ upload รูปภาพและวิดีโอสำหรับ Posts
 class PostMediaService {
@@ -104,6 +106,90 @@ class PostMediaService {
       debugPrint('PostMediaService uploadVideo error: $e');
       return null;
     }
+  }
+
+  /// Generate thumbnail จาก video file
+  /// Returns File ของ thumbnail หรือ null ถ้า error
+  Future<File?> generateVideoThumbnail(File videoFile) async {
+    try {
+      // ไม่ support web
+      if (kIsWeb) {
+        debugPrint('PostMediaService: thumbnail generation not supported on web');
+        return null;
+      }
+
+      debugPrint('PostMediaService: generating thumbnail for ${videoFile.path}');
+
+      final tempDir = await getTemporaryDirectory();
+      final thumbnailPath = await VideoThumbnail.thumbnailFile(
+        video: videoFile.path,
+        thumbnailPath: tempDir.path,
+        imageFormat: ImageFormat.JPEG,
+        maxHeight: 512,
+        quality: 75,
+      );
+
+      if (thumbnailPath == null) {
+        debugPrint('PostMediaService: failed to generate thumbnail');
+        return null;
+      }
+
+      debugPrint('PostMediaService: thumbnail generated at $thumbnailPath');
+      return File(thumbnailPath);
+    } catch (e) {
+      debugPrint('PostMediaService generateVideoThumbnail error: $e');
+      return null;
+    }
+  }
+
+  /// Upload thumbnail ไป Supabase Storage
+  /// Returns URL ของ thumbnail หรือ null ถ้า error
+  Future<String?> uploadThumbnail(File file, {String? userId}) async {
+    try {
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileName = '${userId ?? 'unknown'}_thumb_$timestamp.jpg';
+      final filePath = 'thumbnails/$fileName';
+
+      debugPrint('PostMediaService: uploading thumbnail $filePath');
+
+      await _supabase.storage.from(_bucketName).upload(filePath, file);
+
+      final url = _supabase.storage.from(_bucketName).getPublicUrl(filePath);
+
+      debugPrint('PostMediaService: uploaded thumbnail successfully, URL: $url');
+      return url;
+    } catch (e) {
+      debugPrint('PostMediaService uploadThumbnail error: $e');
+      return null;
+    }
+  }
+
+  /// Upload video พร้อม generate และ upload thumbnail
+  /// Returns ({videoUrl, thumbnailUrl}) หรือ null ถ้า video upload failed
+  Future<({String? videoUrl, String? thumbnailUrl})> uploadVideoWithThumbnail(
+    File videoFile, {
+    String? userId,
+  }) async {
+    // Generate thumbnail ก่อน upload video
+    final thumbnailFile = await generateVideoThumbnail(videoFile);
+
+    // Upload video
+    final videoUrl = await uploadVideo(videoFile, userId: userId);
+    if (videoUrl == null) {
+      return (videoUrl: null, thumbnailUrl: null);
+    }
+
+    // Upload thumbnail (ถ้ามี)
+    String? thumbnailUrl;
+    if (thumbnailFile != null) {
+      thumbnailUrl = await uploadThumbnail(thumbnailFile, userId: userId);
+      // ลบ temp file
+      try {
+        await thumbnailFile.delete();
+      } catch (_) {}
+    }
+
+    return (videoUrl: videoUrl, thumbnailUrl: thumbnailUrl);
   }
 
   /// ดึง file extension จาก path

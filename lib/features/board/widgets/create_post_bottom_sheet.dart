@@ -1017,16 +1017,31 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
 
       // Upload images and video
       List<String> mediaUrls = [...state.uploadedImageUrls];
+      String? thumbnailUrl; // สำหรับเก็บ video thumbnail
 
       if (state.selectedImages.isNotEmpty || state.selectedVideo != null) {
         setState(() => _isUploading = true);
 
-        final uploadedUrls = await PostMediaService.instance.uploadAllMedia(
-          images: state.selectedImages,
-          video: state.selectedVideo,
-          userId: userId,
-        );
-        mediaUrls.addAll(uploadedUrls);
+        // Upload images
+        if (state.selectedImages.isNotEmpty) {
+          final imageUrls = await PostMediaService.instance.uploadImages(
+            state.selectedImages,
+            userId: userId,
+          );
+          mediaUrls.addAll(imageUrls);
+        }
+
+        // Upload video พร้อม thumbnail
+        if (state.selectedVideo != null) {
+          final result = await PostMediaService.instance.uploadVideoWithThumbnail(
+            state.selectedVideo!,
+            userId: userId,
+          );
+          if (result.videoUrl != null) {
+            mediaUrls.add(result.videoUrl!);
+            thumbnailUrl = result.thumbnailUrl;
+          }
+        }
 
         setState(() => _isUploading = false);
       }
@@ -1041,6 +1056,7 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
         isHandover: state.isHandover,
         residentId: state.selectedResidentId,
         imageUrls: mediaUrls.isNotEmpty ? mediaUrls : null,
+        imgUrl: thumbnailUrl, // ส่ง thumbnail URL ไปเก็บที่ imgUrl
       );
 
       if (postId != null) {
