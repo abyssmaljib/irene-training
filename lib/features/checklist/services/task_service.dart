@@ -166,6 +166,7 @@ class TaskService {
   }
 
   /// Mark task เป็น complete
+  /// video จะดึงจาก Post ผ่าน post_id ใน view แทน
   Future<bool> markTaskComplete(
     int logId,
     String userId, {

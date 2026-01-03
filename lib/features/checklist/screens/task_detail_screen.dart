@@ -18,6 +18,7 @@ import '../providers/task_provider.dart';
 import '../services/task_service.dart';
 import '../widgets/problem_input_sheet.dart';
 import '../../board/widgets/create_post_bottom_sheet.dart';
+import '../../board/widgets/video_player_widget.dart';
 
 /// หน้ารายละเอียด Task แบบ Full Page
 class TaskDetailScreen extends ConsumerStatefulWidget {
@@ -293,6 +294,12 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                         _uploadedImageUrl != null) ...[
                       AppSpacing.verticalGapMd,
                       _buildConfirmImage(),
+                    ],
+
+                    // Confirm video (ถ้ามี)
+                    if (_task.hasConfirmVideo) ...[
+                      AppSpacing.verticalGapMd,
+                      _buildConfirmVideo(),
                     ],
 
                     // Descript (หมายเหตุ) - ถ้า task มีปัญหา
@@ -1191,6 +1198,118 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           ),
         ],
       ],
+    );
+  }
+
+  Widget _buildConfirmVideo() {
+    final videoUrl = _task.confirmVideoUrl;
+    if (videoUrl == null || videoUrl.isEmpty) return const SizedBox.shrink();
+
+    final thumbnailUrl = _task.confirmVideoThumbnail;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'วิดีโอยืนยัน',
+          style: AppTypography.subtitle.copyWith(
+            fontWeight: FontWeight.w600,
+            color: AppColors.tagPassedText,
+          ),
+        ),
+        AppSpacing.verticalGapSm,
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: GestureDetector(
+            onTap: () => FullScreenVideoPlayer.show(context, videoUrl),
+            child: Stack(
+              children: [
+                // Thumbnail หรือ placeholder
+                if (thumbnailUrl != null && thumbnailUrl.isNotEmpty)
+                  Image.network(
+                    thumbnailUrl,
+                    width: double.infinity,
+                    height: 200,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, error, stackTrace) => _buildVideoPlaceholder(),
+                  )
+                else
+                  _buildVideoPlaceholder(),
+
+                // Play button overlay
+                Positioned.fill(
+                  child: Container(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.9),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.2),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Iconsax.play5,
+                          size: 32,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+                // Video label
+                Positioned(
+                  bottom: 8,
+                  left: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.6),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Iconsax.video, size: 14, color: Colors.white),
+                        const SizedBox(width: 4),
+                        Text(
+                          'แตะเพื่อเล่น',
+                          style: AppTypography.caption.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildVideoPlaceholder() {
+    return Container(
+      width: double.infinity,
+      height: 200,
+      color: AppColors.background,
+      child: Center(
+        child: Icon(
+          Iconsax.video,
+          size: 64,
+          color: AppColors.secondaryText.withValues(alpha: 0.5),
+        ),
+      ),
     );
   }
 

@@ -19,6 +19,8 @@ class TaskLog {
   final String? timeBlock; // "07:00 - 09:00", "09:00 - 11:00", etc.
   final bool requireImage;
   final String? confirmImage;
+  final String? confirmVideoUrl;
+  final String? confirmVideoThumbnail;
   final String? formUrl;
   final String? sampleImageUrl;
   final int? postponeFrom;
@@ -85,6 +87,8 @@ class TaskLog {
     this.timeBlock,
     this.requireImage = false,
     this.confirmImage,
+    this.confirmVideoUrl,
+    this.confirmVideoThumbnail,
     this.formUrl,
     this.sampleImageUrl,
     this.postponeFrom,
@@ -135,6 +139,8 @@ class TaskLog {
       requireImage: json['reaquire_image'] == true ||
           json['must_complete_by_image'] == true,
       confirmImage: json['confirmImage'] as String?,
+      confirmVideoUrl: json['confirm_video_url'] as String?,
+      confirmVideoThumbnail: json['confirm_video_thumbnail'] as String?,
       formUrl: json['form_url'] as String?,
       sampleImageUrl: json['sampleImageURL'] as String?,
       postponeFrom: json['postpone_from'] as int?,
@@ -219,6 +225,9 @@ class TaskLog {
 
   /// มีรูปตัวอย่างให้ดู
   bool get hasSampleImage => sampleImageUrl != null && sampleImageUrl!.isNotEmpty;
+
+  /// มีวิดีโอยืนยันหรือไม่
+  bool get hasConfirmVideo => confirmVideoUrl != null && confirmVideoUrl!.isNotEmpty;
 
   /// ตรวจสอบว่า task นี้มีอัพเดตที่ user ยังไม่เคยเห็น
   /// - ไม่ใช่งานจัดยา (taskType != 'จัดยา')

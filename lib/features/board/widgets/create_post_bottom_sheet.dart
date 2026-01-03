@@ -1039,7 +1039,6 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
           );
           if (result.videoUrl != null) {
             mediaUrls.add(result.videoUrl!);
-            // เก็บ thumbnail URL สำหรับใส่ใน imgUrl
             videoThumbnailUrl = result.thumbnailUrl;
           }
         }
@@ -1062,6 +1061,7 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
 
       if (postId != null) {
         // ถ้ามี taskLogId ให้ complete task ด้วย
+        // video จะดึงจาก Post ผ่าน post_id ใน view แทน
         if (widget.taskLogId != null) {
           await TaskService.instance.markTaskComplete(
             widget.taskLogId!,
