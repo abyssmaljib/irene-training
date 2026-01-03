@@ -20,6 +20,16 @@ import '../widgets/pinned_post_card.dart';
 import '../widgets/post_filter_drawer.dart';
 import '../widgets/create_post_bottom_sheet.dart';
 
+/// Navigate to post detail screen
+void navigateToPostDetail(BuildContext context, int postId) {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => PostDetailScreen(postId: postId),
+    ),
+  );
+}
+
 /// หน้ากระดานข่าว - Posts
 /// แสดงข่าว ประกาศ และปฏิทิน
 class BoardScreen extends ConsumerStatefulWidget {
@@ -460,7 +470,7 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => _PostDetailScreen(postId: post.id),
+        builder: (_) => PostDetailScreen(postId: post.id),
       ),
     );
   }
@@ -526,16 +536,16 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
 }
 
 /// หน้ารายละเอียดโพส
-class _PostDetailScreen extends ConsumerStatefulWidget {
+class PostDetailScreen extends ConsumerStatefulWidget {
   final int postId;
 
-  const _PostDetailScreen({required this.postId});
+  const PostDetailScreen({super.key, required this.postId});
 
   @override
-  ConsumerState<_PostDetailScreen> createState() => _PostDetailScreenState();
+  ConsumerState<PostDetailScreen> createState() => _PostDetailScreenState();
 }
 
-class _PostDetailScreenState extends ConsumerState<_PostDetailScreen> {
+class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
   String? _selectedChoice;
 
   @override

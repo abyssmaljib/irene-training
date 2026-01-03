@@ -6,6 +6,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../board/models/post.dart';
 import '../../../board/providers/post_provider.dart';
+import '../../../board/screens/board_screen.dart';
 
 /// Provider สำหรับ activity posts ของ resident
 final residentActivityPostsProvider =
@@ -64,7 +65,7 @@ class ActivityLogSection extends ConsumerWidget {
             loading: () => _buildLoading(),
             error: (e, s) => _buildError(e.toString()),
             data: (posts) =>
-                posts.isEmpty ? _buildEmpty() : _buildPostsList(posts),
+                posts.isEmpty ? _buildEmpty() : _buildPostsList(context, posts),
           ),
         ],
       ),
@@ -168,91 +169,103 @@ class ActivityLogSection extends ConsumerWidget {
     );
   }
 
-  Widget _buildPostsList(List<Post> posts) {
+  Widget _buildPostsList(BuildContext context, List<Post> posts) {
     return Column(
-      children: posts.take(5).map((post) => _buildPostItem(post)).toList(),
+      children: posts.take(5).map((post) => _buildPostItem(context, post)).toList(),
     );
   }
 
-  Widget _buildPostItem(Post post) {
-    return Container(
-      margin: EdgeInsets.only(bottom: AppSpacing.sm),
-      padding: EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: AppRadius.smallRadius,
-        boxShadow: [AppShadows.subtle],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Tag icon
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: _getTagColor(post).withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
+  Widget _buildPostItem(BuildContext context, Post post) {
+    return GestureDetector(
+      onTap: () => navigateToPostDetail(context, post.id),
+      child: Container(
+        margin: EdgeInsets.only(bottom: AppSpacing.sm),
+        padding: EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: AppRadius.smallRadius,
+          boxShadow: [AppShadows.subtle],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Tag icon
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: _getTagColor(post).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                _getTagIcon(post),
+                size: 18,
+                color: _getTagColor(post),
+              ),
             ),
-            child: Icon(
-              _getTagIcon(post),
-              size: 18,
-              color: _getTagColor(post),
-            ),
-          ),
-          AppSpacing.horizontalGapSm,
-          // Content
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Tag label
-                Text(
-                  _getTagLabel(post),
-                  style: AppTypography.caption.copyWith(
-                    color: _getTagColor(post),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                // Content
-                if (post.displayText.isNotEmpty)
+            AppSpacing.horizontalGapSm,
+            // Content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Tag label
                   Text(
-                    post.displayText,
-                    style: AppTypography.bodySmall,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                    _getTagLabel(post),
+                    style: AppTypography.caption.copyWith(
+                      color: _getTagColor(post),
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                AppSpacing.verticalGapXs,
-                // Author & time
-                Row(
-                  children: [
+                  // Content
+                  if (post.displayText.isNotEmpty)
                     Text(
-                      post.postUserNickname ?? '',
-                      style: AppTypography.caption.copyWith(
-                        color: AppColors.secondaryText,
-                      ),
+                      post.displayText,
+                      style: AppTypography.bodySmall,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    Text(
-                      ' • ',
-                      style: AppTypography.caption.copyWith(
-                        color: AppColors.secondaryText,
+                  AppSpacing.verticalGapXs,
+                  // Author & time
+                  Row(
+                    children: [
+                      Text(
+                        post.postUserNickname ?? '',
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.secondaryText,
+                        ),
                       ),
-                    ),
-                    Text(
-                      _formatTimeAgo(post.createdAt),
-                      style: AppTypography.caption.copyWith(
-                        color: AppColors.secondaryText,
+                      Text(
+                        ' • ',
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.secondaryText,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
+                      Text(
+                        _formatTimeAgo(post.createdAt),
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.secondaryText,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            // Image indicator & arrow
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (post.hasImages)
+                  Padding(
+                    padding: EdgeInsets.only(right: AppSpacing.xs),
+                    child: Icon(Iconsax.image, size: 16, color: AppColors.secondaryText),
+                  ),
+                Icon(Iconsax.arrow_right_3, size: 16, color: AppColors.secondaryText),
               ],
             ),
-          ),
-          // Image indicator
-          if (post.hasImages)
-            Icon(Iconsax.image, size: 16, color: AppColors.secondaryText),
-        ],
+          ],
+        ),
       ),
     );
   }

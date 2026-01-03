@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:fc_native_video_thumbnail/fc_native_video_thumbnail.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -610,6 +611,7 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
                           onResidentCleared: () {
                             ref.read(createPostProvider.notifier).clearResident();
                           },
+                          disabled: widget.isFromTask, // ล็อกเมื่อมาจาก task
                         ),
                         const SizedBox(width: 8),
                         // Tag picker
@@ -625,6 +627,7 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
                           onHandoverChanged: (value) {
                             ref.read(createPostProvider.notifier).setHandover(value);
                           },
+                          disabled: widget.isFromTask, // ล็อกเมื่อมาจาก task
                         ),
                       ],
                     ),
@@ -650,6 +653,10 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
                               .removeUploadedImage(index);
                         },
                       ),
+
+                    // Video preview
+                    if (state.hasVideo)
+                      _buildVideoPreview(state),
 
                     // Error message
                     if (state.error != null) ...[
@@ -814,9 +821,10 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
           // Image picker buttons
           ImagePickerBar(
             isLoading: _isUploading,
-            disabled: state.isSubmitting,
+            disabled: state.isSubmitting || state.hasVideo,
             onCameraTap: _pickFromCamera,
             onGalleryTap: _pickFromGallery,
+            onVideoTap: state.hasImages ? null : _pickVideo,
           ),
 
           const Spacer(),
@@ -883,6 +891,112 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
     if (files.isNotEmpty) {
       ref.read(createPostProvider.notifier).addImages(files);
     }
+  }
+
+  Future<void> _pickVideo() async {
+    final file = await ImagePickerHelper.pickVideoFromGallery();
+    if (file != null) {
+      ref.read(createPostProvider.notifier).setVideo(file);
+    }
+  }
+
+  Widget _buildVideoPreview(CreatePostState state) {
+    final videoFile = state.selectedVideo;
+
+    return Container(
+      margin: EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Stack(
+        children: [
+          // Thumbnail
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: SizedBox(
+              width: double.infinity,
+              height: 180,
+              child: videoFile != null
+                  ? _VideoThumbnailWidget(videoPath: videoFile.path)
+                  : Container(
+                      color: AppColors.background,
+                      child: Center(
+                        child: Icon(
+                          Iconsax.video,
+                          size: 48,
+                          color: AppColors.secondaryText,
+                        ),
+                      ),
+                    ),
+            ),
+          ),
+          // Play icon overlay
+          Positioned.fill(
+            child: Center(
+              child: Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.6),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Iconsax.video_play5,
+                  color: Colors.white,
+                  size: 28,
+                ),
+              ),
+            ),
+          ),
+          // Remove button
+          Positioned(
+            top: 8,
+            right: 8,
+            child: GestureDetector(
+              onTap: () {
+                ref.read(createPostProvider.notifier).clearVideo();
+              },
+              child: Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.6),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Iconsax.close_circle5,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+            ),
+          ),
+          // Video label
+          Positioned(
+            bottom: 8,
+            left: 8,
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Iconsax.video, size: 14, color: Colors.white),
+                  SizedBox(width: 4),
+                  Text(
+                    'วีดีโอ',
+                    style: AppTypography.caption.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _handleSubmit(CreatePostState state) async {
@@ -1356,6 +1470,143 @@ class _ResidentSuggestionsPopupState extends State<_ResidentSuggestionsPopup> {
                 );
               },
             ),
+    );
+  }
+}
+
+/// Widget สำหรับแสดง thumbnail ของวีดีโอ
+class _VideoThumbnailWidget extends StatefulWidget {
+  final String videoPath;
+
+  const _VideoThumbnailWidget({required this.videoPath});
+
+  @override
+  State<_VideoThumbnailWidget> createState() => _VideoThumbnailWidgetState();
+}
+
+class _VideoThumbnailWidgetState extends State<_VideoThumbnailWidget> {
+  String? _thumbnailPath;
+  bool _isLoading = true;
+  bool _hasError = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _generateThumbnail();
+  }
+
+  @override
+  void didUpdateWidget(covariant _VideoThumbnailWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.videoPath != widget.videoPath) {
+      _generateThumbnail();
+    }
+  }
+
+  Future<void> _generateThumbnail() async {
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+    });
+
+    try {
+      final plugin = FcNativeVideoThumbnail();
+
+      // สร้าง temp file path สำหรับ thumbnail
+      final tempDir = Directory.systemTemp;
+      final thumbnailPath =
+          '${tempDir.path}/thumb_${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+      final success = await plugin.getVideoThumbnail(
+        srcFile: widget.videoPath,
+        destFile: thumbnailPath,
+        width: 512,
+        height: 512,
+        format: 'jpeg',
+        quality: 75,
+        keepAspectRatio: true,
+      );
+
+      if (mounted) {
+        if (success == true && File(thumbnailPath).existsSync()) {
+          setState(() {
+            _thumbnailPath = thumbnailPath;
+            _isLoading = false;
+          });
+        } else {
+          setState(() {
+            _hasError = true;
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error generating thumbnail: $e');
+      if (mounted) {
+        setState(() {
+          _hasError = true;
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Container(
+        color: AppColors.background,
+        child: Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: AppColors.primary,
+          ),
+        ),
+      );
+    }
+
+    if (_hasError || _thumbnailPath == null) {
+      return Container(
+        color: AppColors.background,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Iconsax.video,
+                size: 48,
+                color: AppColors.secondaryText,
+              ),
+              SizedBox(height: 8),
+              Text(
+                'ไม่สามารถโหลด thumbnail',
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.secondaryText,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Image.file(
+      File(_thumbnailPath!),
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+      errorBuilder: (context, error, stackTrace) {
+        return Container(
+          color: AppColors.background,
+          child: Center(
+            child: Icon(
+              Iconsax.video,
+              size: 48,
+              color: AppColors.secondaryText,
+            ),
+          ),
+        );
+      },
     );
   }
 }

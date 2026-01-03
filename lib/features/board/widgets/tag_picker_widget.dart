@@ -192,6 +192,7 @@ class TagPickerCompact extends ConsumerWidget {
   final ValueChanged<NewTag> onTagSelected;
   final VoidCallback? onTagCleared;
   final ValueChanged<bool> onHandoverChanged;
+  final bool disabled; // ถ้า true จะไม่สามารถเปลี่ยนได้
 
   const TagPickerCompact({
     super.key,
@@ -200,6 +201,7 @@ class TagPickerCompact extends ConsumerWidget {
     required this.onTagSelected,
     this.onTagCleared,
     required this.onHandoverChanged,
+    this.disabled = false,
   });
 
   @override
@@ -208,6 +210,8 @@ class TagPickerCompact extends ConsumerWidget {
     if (selectedTag != null) {
       return _buildSelectedTagChip(context);
     } else {
+      // ถ้า disabled และยังไม่เลือก ไม่แสดงอะไร
+      if (disabled) return const SizedBox.shrink();
       return _buildSelectTagButton(context);
     }
   }
@@ -215,13 +219,15 @@ class TagPickerCompact extends ConsumerWidget {
   /// แสดง tag ที่เลือกแล้ว
   Widget _buildSelectedTagChip(BuildContext context) {
     return GestureDetector(
-      onTap: () => _showTagPicker(context),
+      onTap: disabled ? null : () => _showTagPicker(context),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: AppColors.accent1,
+          color: disabled ? AppColors.alternate : AppColors.accent1,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.primary),
+          border: Border.all(
+            color: disabled ? AppColors.secondaryText : AppColors.primary,
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -233,11 +239,12 @@ class TagPickerCompact extends ConsumerWidget {
             Text(
               selectedTag!.name,
               style: AppTypography.bodySmall.copyWith(
-                color: AppColors.primary,
+                color: disabled ? AppColors.secondaryText : AppColors.primary,
                 fontWeight: FontWeight.w500,
               ),
             ),
-            if (onTagCleared != null) ...[
+            // ไม่แสดงปุ่มลบเมื่อ disabled
+            if (onTagCleared != null && !disabled) ...[
               const SizedBox(width: 6),
               GestureDetector(
                 onTap: onTagCleared,

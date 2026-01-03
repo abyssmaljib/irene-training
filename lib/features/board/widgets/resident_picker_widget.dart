@@ -48,6 +48,7 @@ class ResidentPickerWidget extends ConsumerWidget {
   final String? selectedResidentName;
   final void Function(int id, String name) onResidentSelected;
   final VoidCallback? onResidentCleared;
+  final bool disabled; // ถ้า true จะไม่สามารถเปลี่ยนได้
 
   const ResidentPickerWidget({
     super.key,
@@ -55,6 +56,7 @@ class ResidentPickerWidget extends ConsumerWidget {
     this.selectedResidentName,
     required this.onResidentSelected,
     this.onResidentCleared,
+    this.disabled = false,
   });
 
   @override
@@ -64,7 +66,10 @@ class ResidentPickerWidget extends ConsumerWidget {
       return _buildSelectedChip();
     }
 
-    // ไม่เลือก แสดงปุ่มเลือก
+    // ไม่เลือก แสดงปุ่มเลือก (ถ้าไม่ disabled)
+    if (disabled) {
+      return const SizedBox.shrink();
+    }
     return _buildSelectButton(context);
   }
 
@@ -72,23 +77,30 @@ class ResidentPickerWidget extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: AppColors.accent1,
+        color: disabled ? AppColors.alternate : AppColors.accent1,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.primary),
+        border: Border.all(
+          color: disabled ? AppColors.secondaryText : AppColors.primary,
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Iconsax.user, size: 16, color: AppColors.primary),
+          Icon(
+            Iconsax.user,
+            size: 16,
+            color: disabled ? AppColors.secondaryText : AppColors.primary,
+          ),
           const SizedBox(width: 6),
           Text(
             selectedResidentName ?? 'ผู้พักอาศัย',
             style: AppTypography.bodySmall.copyWith(
-              color: AppColors.primary,
+              color: disabled ? AppColors.secondaryText : AppColors.primary,
               fontWeight: FontWeight.w500,
             ),
           ),
-          if (onResidentCleared != null) ...[
+          // ไม่แสดงปุ่มลบเมื่อ disabled
+          if (onResidentCleared != null && !disabled) ...[
             const SizedBox(width: 6),
             GestureDetector(
               onTap: onResidentCleared,

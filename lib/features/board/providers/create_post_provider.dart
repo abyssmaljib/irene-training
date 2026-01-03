@@ -12,6 +12,8 @@ class CreatePostState {
   final String? selectedResidentName;
   final List<File> selectedImages;
   final List<String> uploadedImageUrls;
+  final File? selectedVideo;
+  final String? uploadedVideoUrl;
   final bool isSubmitting;
   final String? error;
 
@@ -23,6 +25,8 @@ class CreatePostState {
     this.selectedResidentName,
     this.selectedImages = const [],
     this.uploadedImageUrls = const [],
+    this.selectedVideo,
+    this.uploadedVideoUrl,
     this.isSubmitting = false,
     this.error,
   });
@@ -35,6 +39,8 @@ class CreatePostState {
 
   bool get hasImages => selectedImages.isNotEmpty || uploadedImageUrls.isNotEmpty;
 
+  bool get hasVideo => selectedVideo != null || uploadedVideoUrl != null;
+
   CreatePostState copyWith({
     String? text,
     NewTag? selectedTag,
@@ -45,6 +51,9 @@ class CreatePostState {
     String? selectedResidentName,
     List<File>? selectedImages,
     List<String>? uploadedImageUrls,
+    File? selectedVideo,
+    bool? clearVideo,
+    String? uploadedVideoUrl,
     bool? isSubmitting,
     String? error,
     bool? clearError,
@@ -61,6 +70,8 @@ class CreatePostState {
           : (selectedResidentName ?? this.selectedResidentName),
       selectedImages: selectedImages ?? this.selectedImages,
       uploadedImageUrls: uploadedImageUrls ?? this.uploadedImageUrls,
+      selectedVideo: clearVideo == true ? null : (selectedVideo ?? this.selectedVideo),
+      uploadedVideoUrl: clearVideo == true ? null : (uploadedVideoUrl ?? this.uploadedVideoUrl),
       isSubmitting: isSubmitting ?? this.isSubmitting,
       error: clearError == true ? null : (error ?? this.error),
     );
@@ -184,6 +195,21 @@ class CreatePostNotifier extends StateNotifier<CreatePostState> {
   /// Clear images after successful upload
   void clearLocalImages() {
     state = state.copyWith(selectedImages: []);
+  }
+
+  /// เพิ่มวีดีโอ
+  void setVideo(File video) {
+    state = state.copyWith(selectedVideo: video, clearError: true);
+  }
+
+  /// ลบวีดีโอ
+  void clearVideo() {
+    state = state.copyWith(clearVideo: true, clearError: true);
+  }
+
+  /// Set uploaded video URL
+  void setUploadedVideoUrl(String url) {
+    state = state.copyWith(uploadedVideoUrl: url);
   }
 }
 

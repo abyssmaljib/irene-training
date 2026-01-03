@@ -56,6 +56,7 @@ dependencies:
   # Camera & Image
   image_picker: ^1.1.2
   image: ^4.3.0
+  fc_native_video_thumbnail: ^0.5.0
 
 
 dev_dependencies:

@@ -4,10 +4,11 @@ import 'package:image_picker/image_picker.dart';
 import 'package:iconsax/iconsax.dart';
 import '../../../core/theme/app_colors.dart';
 
-/// Bottom bar สำหรับเลือกรูปภาพ (Camera + Gallery)
+/// Bottom bar สำหรับเลือกรูปภาพ/วีดีโอ (Camera + Gallery + Video)
 class ImagePickerBar extends StatelessWidget {
   final VoidCallback? onCameraTap;
   final VoidCallback? onGalleryTap;
+  final VoidCallback? onVideoTap;
   final bool isLoading;
   final bool disabled;
 
@@ -15,6 +16,7 @@ class ImagePickerBar extends StatelessWidget {
     super.key,
     this.onCameraTap,
     this.onGalleryTap,
+    this.onVideoTap,
     this.isLoading = false,
     this.disabled = false,
   });
@@ -36,6 +38,14 @@ class ImagePickerBar extends StatelessWidget {
           icon: Iconsax.gallery,
           onTap: disabled || isLoading ? null : onGalleryTap,
           tooltip: 'เลือกจากแกลเลอรี่',
+        ),
+        const SizedBox(width: 8),
+
+        // Video button
+        _buildIconButton(
+          icon: Iconsax.video,
+          onTap: disabled || isLoading ? null : onVideoTap,
+          tooltip: 'เลือกวีดีโอ',
         ),
 
         // Loading indicator
@@ -139,6 +149,42 @@ class ImagePickerHelper {
       }
     } catch (e) {
       debugPrint('Error picking image from gallery: $e');
+    }
+    return null;
+  }
+
+  /// เลือกวีดีโอจาก gallery
+  static Future<File?> pickVideoFromGallery({
+    Duration maxDuration = const Duration(minutes: 3),
+  }) async {
+    try {
+      final XFile? video = await _picker.pickVideo(
+        source: ImageSource.gallery,
+        maxDuration: maxDuration,
+      );
+      if (video != null) {
+        return File(video.path);
+      }
+    } catch (e) {
+      debugPrint('Error picking video from gallery: $e');
+    }
+    return null;
+  }
+
+  /// ถ่ายวีดีโอจากกล้อง
+  static Future<File?> pickVideoFromCamera({
+    Duration maxDuration = const Duration(minutes: 1),
+  }) async {
+    try {
+      final XFile? video = await _picker.pickVideo(
+        source: ImageSource.camera,
+        maxDuration: maxDuration,
+      );
+      if (video != null) {
+        return File(video.path);
+      }
+    } catch (e) {
+      debugPrint('Error recording video: $e');
     }
     return null;
   }
