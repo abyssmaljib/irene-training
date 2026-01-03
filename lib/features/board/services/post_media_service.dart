@@ -55,7 +55,14 @@ class PostMediaService {
 
       debugPrint('PostMediaService: uploading image $filePath');
 
-      await _supabase.storage.from(_bucketName).upload(filePath, file);
+      // อ่านเป็น bytes สำหรับ upload (รองรับทั้ง mobile และ web)
+      final bytes = await file.readAsBytes();
+
+      await _supabase.storage.from(_bucketName).uploadBinary(
+        filePath,
+        bytes,
+        fileOptions: FileOptions(contentType: 'image/jpeg'),
+      );
 
       final url = _supabase.storage.from(_bucketName).getPublicUrl(filePath);
 
@@ -92,11 +99,15 @@ class PostMediaService {
 
       debugPrint('PostMediaService: uploading video $filePath');
 
-      // Get file size for logging
-      final fileSize = await file.length();
-      debugPrint('PostMediaService: video size: ${(fileSize / 1024 / 1024).toStringAsFixed(2)} MB');
+      // อ่านเป็น bytes สำหรับ upload (รองรับทั้ง mobile และ web)
+      final bytes = await file.readAsBytes();
+      debugPrint('PostMediaService: video size: ${(bytes.length / 1024 / 1024).toStringAsFixed(2)} MB');
 
-      await _supabase.storage.from(_bucketName).upload(filePath, file);
+      await _supabase.storage.from(_bucketName).uploadBinary(
+        filePath,
+        bytes,
+        fileOptions: FileOptions(contentType: 'video/mp4'),
+      );
 
       final url = _supabase.storage.from(_bucketName).getPublicUrl(filePath);
 
@@ -152,7 +163,14 @@ class PostMediaService {
 
       debugPrint('PostMediaService: uploading thumbnail $filePath');
 
-      await _supabase.storage.from(_bucketName).upload(filePath, file);
+      // อ่านเป็น bytes สำหรับ upload
+      final bytes = await file.readAsBytes();
+
+      await _supabase.storage.from(_bucketName).uploadBinary(
+        filePath,
+        bytes,
+        fileOptions: FileOptions(contentType: 'image/jpeg'),
+      );
 
       final url = _supabase.storage.from(_bucketName).getPublicUrl(filePath);
 

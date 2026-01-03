@@ -1019,6 +1019,16 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
       List<String> mediaUrls = [...state.uploadedImageUrls];
       String? thumbnailUrl; // สำหรับเก็บ video thumbnail
 
+      // DEBUG: แสดง state
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('DEBUG: images=${state.selectedImages.length}, video=${state.selectedVideo != null}'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+
       if (state.selectedImages.isNotEmpty || state.selectedVideo != null) {
         setState(() => _isUploading = true);
 
@@ -1033,10 +1043,29 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
 
         // Upload video พร้อม thumbnail
         if (state.selectedVideo != null) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('DEBUG: uploading video...'),
+                duration: Duration(seconds: 1),
+              ),
+            );
+          }
+
           final result = await PostMediaService.instance.uploadVideoWithThumbnail(
             state.selectedVideo!,
             userId: userId,
           );
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('DEBUG: videoUrl=${result.videoUrl != null}, thumbUrl=${result.thumbnailUrl != null}'),
+                duration: Duration(seconds: 3),
+              ),
+            );
+          }
+
           if (result.videoUrl != null) {
             mediaUrls.add(result.videoUrl!);
             thumbnailUrl = result.thumbnailUrl;
@@ -1044,6 +1073,16 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
         }
 
         setState(() => _isUploading = false);
+      }
+
+      // DEBUG: แสดงผลลัพธ์
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('DEBUG: final urls=${mediaUrls.length}, thumb=${thumbnailUrl != null}'),
+            duration: Duration(seconds: 3),
+          ),
+        );
       }
 
       // Create post
