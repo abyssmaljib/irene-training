@@ -87,14 +87,10 @@ class PostMediaService {
     return urls;
   }
 
-  /// เก็บ error ล่าสุดสำหรับ debug
-  String? lastError;
-
   /// Upload วิดีโอไป Supabase Storage
   /// Returns URL ของวิดีโอที่ upload แล้ว หรือ null ถ้า error
   Future<String?> uploadVideo(File file, {String? userId}) async {
     try {
-      lastError = null;
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final extension = _getFileExtension(file.path);
       final safeExt = extension.isNotEmpty ? extension : '.mp4';
@@ -118,7 +114,6 @@ class PostMediaService {
       debugPrint('PostMediaService: uploaded video successfully, URL: $url');
       return url;
     } catch (e) {
-      lastError = e.toString();
       debugPrint('PostMediaService uploadVideo error: $e');
       return null;
     }

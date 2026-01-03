@@ -1017,17 +1017,7 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
 
       // Upload images and video
       List<String> mediaUrls = [...state.uploadedImageUrls];
-      String? thumbnailUrl; // สำหรับเก็บ video thumbnail
-
-      // DEBUG: แสดง state
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('DEBUG: images=${state.selectedImages.length}, video=${state.selectedVideo != null}'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
+      String? videoThumbnailUrl; // สำหรับเก็บ video thumbnail ใน imgUrl
 
       if (state.selectedImages.isNotEmpty || state.selectedVideo != null) {
         setState(() => _isUploading = true);
@@ -1043,47 +1033,18 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
 
         // Upload video พร้อม thumbnail
         if (state.selectedVideo != null) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('DEBUG: uploading video...'),
-                duration: Duration(seconds: 1),
-              ),
-            );
-          }
-
           final result = await PostMediaService.instance.uploadVideoWithThumbnail(
             state.selectedVideo!,
             userId: userId,
           );
-
-          if (mounted) {
-            final error = PostMediaService.instance.lastError;
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('DEBUG: videoUrl=${result.videoUrl != null}, thumbUrl=${result.thumbnailUrl != null}, error=$error'),
-                duration: Duration(seconds: 5),
-              ),
-            );
-          }
-
           if (result.videoUrl != null) {
             mediaUrls.add(result.videoUrl!);
-            thumbnailUrl = result.thumbnailUrl;
+            // เก็บ thumbnail URL สำหรับใส่ใน imgUrl
+            videoThumbnailUrl = result.thumbnailUrl;
           }
         }
 
         setState(() => _isUploading = false);
-      }
-
-      // DEBUG: แสดงผลลัพธ์
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('DEBUG: final urls=${mediaUrls.length}, thumb=${thumbnailUrl != null}'),
-            duration: Duration(seconds: 3),
-          ),
-        );
       }
 
       // Create post
@@ -1096,7 +1057,7 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
         isHandover: state.isHandover,
         residentId: state.selectedResidentId,
         imageUrls: mediaUrls.isNotEmpty ? mediaUrls : null,
-        imgUrl: thumbnailUrl, // ส่ง thumbnail URL ไปเก็บที่ imgUrl
+        imgUrl: videoThumbnailUrl, // เก็บ video thumbnail ใน imgUrl
       );
 
       if (postId != null) {

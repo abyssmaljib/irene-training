@@ -245,8 +245,10 @@ class Post {
     return multiImgUrl.where((url) => !_isVideoUrl(url)).toList();
   }
 
-  /// Check if post has images (excluding videos)
+  /// Check if post has images (excluding videos and video thumbnails)
   bool get hasImages {
+    // ถ้ามี video แสดงว่า imgUrl คือ thumbnail ไม่นับเป็นรูป
+    if (hasUploadedVideo) return imageUrlsOnly.isNotEmpty;
     if (imgUrl?.isNotEmpty ?? false) return true;
     return imageUrlsOnly.isNotEmpty;
   }
@@ -264,11 +266,23 @@ class Post {
   String? get firstVideoUrl => videoUrls.isNotEmpty ? videoUrls.first : null;
 
   /// Get all image URLs (combining single and multi, excluding videos)
+  /// ถ้ามี uploaded video จะไม่รวม imgUrl เพราะมันคือ thumbnail
   List<String> get allImageUrls {
     final urls = <String>[];
-    if (imgUrl?.isNotEmpty ?? false) urls.add(imgUrl!);
+    // ถ้ามี video แสดงว่า imgUrl คือ thumbnail ไม่เอามาแสดง
+    if (!hasUploadedVideo && (imgUrl?.isNotEmpty ?? false)) {
+      urls.add(imgUrl!);
+    }
     urls.addAll(imageUrlsOnly);
     return urls;
+  }
+
+  /// Get video thumbnail URL (imgUrl when post has video)
+  String? get videoThumbnailUrl {
+    if (hasUploadedVideo && (imgUrl?.isNotEmpty ?? false)) {
+      return imgUrl;
+    }
+    return null;
   }
 
   /// Get total like count
