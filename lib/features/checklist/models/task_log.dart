@@ -22,6 +22,10 @@ class TaskLog {
   final String? confirmVideoUrl;
   final String? confirmVideoThumbnail;
   final String? formUrl;
+
+  // Post images (จาก multi_img_url ของ Post ที่เชื่อมกับ task นี้)
+  final List<String> postImageUrls;
+  final String? postThumbnailUrl; // imgUrl จาก Post (video thumbnail)
   final String? sampleImageUrl;
   final int? postponeFrom;
   final int? postponeTo;
@@ -90,6 +94,8 @@ class TaskLog {
     this.confirmVideoUrl,
     this.confirmVideoThumbnail,
     this.formUrl,
+    this.postImageUrls = const [],
+    this.postThumbnailUrl,
     this.sampleImageUrl,
     this.postponeFrom,
     this.postponeTo,
@@ -142,6 +148,8 @@ class TaskLog {
       confirmVideoUrl: json['confirm_video_url'] as String?,
       confirmVideoThumbnail: json['confirm_video_thumbnail'] as String?,
       formUrl: json['form_url'] as String?,
+      postImageUrls: _parseStringList(json['multi_img_url']),
+      postThumbnailUrl: json['imgurl'] as String?,
       sampleImageUrl: json['sampleImageURL'] as String?,
       postponeFrom: json['postpone_from'] as int?,
       postponeTo: json['postpone_to'] as int?,
@@ -228,6 +236,33 @@ class TaskLog {
 
   /// มีวิดีโอยืนยันหรือไม่
   bool get hasConfirmVideo => confirmVideoUrl != null && confirmVideoUrl!.isNotEmpty;
+
+  /// Video file extensions
+  static const _videoExtensions = ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.m4v'];
+
+  /// ตรวจสอบว่า URL เป็น video หรือไม่
+  static bool _isVideoUrl(String url) {
+    final lowerUrl = url.toLowerCase();
+    return _videoExtensions.any((ext) => lowerUrl.contains(ext));
+  }
+
+  /// มี post images หรือไม่ (ไม่รวม video)
+  bool get hasPostImages => postImagesOnly.isNotEmpty;
+
+  /// มี post video หรือไม่
+  bool get hasPostVideo => postVideoUrls.isNotEmpty;
+
+  /// ดึงเฉพาะ image URLs จาก postImageUrls (ไม่รวม video)
+  List<String> get postImagesOnly =>
+      postImageUrls.where((url) => !_isVideoUrl(url)).toList();
+
+  /// ดึงเฉพาะ video URLs จาก postImageUrls
+  List<String> get postVideoUrls =>
+      postImageUrls.where((url) => _isVideoUrl(url)).toList();
+
+  /// URL ของ video แรกจาก Post (ถ้ามี)
+  String? get firstPostVideoUrl =>
+      postVideoUrls.isNotEmpty ? postVideoUrls.first : null;
 
   /// ตรวจสอบว่า task นี้มีอัพเดตที่ user ยังไม่เคยเห็น
   /// - ไม่ใช่งานจัดยา (taskType != 'จัดยา')

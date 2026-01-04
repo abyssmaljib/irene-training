@@ -720,7 +720,7 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
         controller: _textController,
         focusNode: _focusNode,
         maxLines: 4,
-        minLines: 2,
+        minLines: 3,
         readOnly: isFromTask, // ถ้ามาจาก task ให้แก้ไขไม่ได้
         enabled: !isFromTask,
         decoration: InputDecoration(
@@ -809,8 +809,11 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
   }
 
   Widget _buildBottomBar(CreatePostState state) {
+    // รับค่า keyboard padding
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      padding: EdgeInsets.fromLTRB(16, 8, 16, 8 + bottomInset),
       decoration: BoxDecoration(
         color: AppColors.surface,
         border: Border(
@@ -818,17 +821,35 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
         ),
       ),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Image picker buttons
-          ImagePickerBar(
-            isLoading: _isUploading,
-            disabled: state.isSubmitting || state.hasVideo,
-            onCameraTap: _pickFromCamera,
-            onGalleryTap: _pickFromGallery,
-            onVideoTap: state.hasImages ? null : _pickVideo,
+          // Image picker buttons (Wrap เพื่อรองรับหลายปุ่ม)
+          Wrap(
+            spacing: 8,
+            children: [
+              _buildIconButton(
+                icon: Iconsax.camera,
+                onTap: _isUploading || state.isSubmitting || state.hasVideo
+                    ? null
+                    : _pickFromCamera,
+                tooltip: 'ถ่ายรูป',
+              ),
+              _buildIconButton(
+                icon: Iconsax.gallery,
+                onTap: _isUploading || state.isSubmitting || state.hasVideo
+                    ? null
+                    : _pickFromGallery,
+                tooltip: 'เลือกจากแกลเลอรี่',
+              ),
+              _buildIconButton(
+                icon: Iconsax.video,
+                onTap: _isUploading || state.isSubmitting || state.hasImages
+                    ? null
+                    : _pickVideo,
+                tooltip: 'เลือกวีดีโอ',
+              ),
+            ],
           ),
-
-          const Spacer(),
 
           // Submit button
           ElevatedButton(
@@ -862,6 +883,36 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
                   ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildIconButton({
+    required IconData icon,
+    VoidCallback? onTap,
+    String? tooltip,
+  }) {
+    final isDisabled = onTap == null;
+
+    return Tooltip(
+      message: tooltip ?? '',
+      child: Material(
+        color: isDisabled ? AppColors.alternate : AppColors.accent1,
+        borderRadius: BorderRadius.circular(8),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            width: 44,
+            height: 44,
+            alignment: Alignment.center,
+            child: Icon(
+              icon,
+              color: isDisabled ? AppColors.secondaryText : AppColors.primary,
+              size: 22,
+            ),
+          ),
+        ),
       ),
     );
   }

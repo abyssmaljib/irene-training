@@ -7,7 +7,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/irene_app_bar.dart';
-import '../../../core/widgets/input_fields.dart';
 import '../../settings/screens/settings_screen.dart';
 import '../models/post.dart';
 import '../models/post_tab.dart';
@@ -19,7 +18,10 @@ import '../widgets/post_search_bar.dart';
 import '../widgets/pinned_post_card.dart';
 import '../widgets/post_filter_drawer.dart';
 import '../widgets/create_post_bottom_sheet.dart';
+import '../widgets/edit_post_bottom_sheet.dart' show showEditPostBottomSheet, navigateToAdvancedEditPostScreen;
 import '../widgets/video_player_widget.dart';
+import '../../checklist/providers/task_provider.dart' show currentUserSystemRoleProvider;
+import 'advanced_create_post_screen.dart';
 
 /// Navigate to post detail screen
 void navigateToPostDetail(BuildContext context, int postId) {
@@ -461,7 +463,7 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
         // ใช้ expand animation จาก bottom sheet ไป full page
         navigateToAdvancedPostScreen(
           context,
-          advancedScreen: const _CreatePostScreen(),
+          advancedScreen: const AdvancedCreatePostScreen(),
         );
       },
     );
@@ -549,10 +551,36 @@ class PostDetailScreen extends ConsumerStatefulWidget {
 class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
   String? _selectedChoice;
 
+  void _openEditPost(BuildContext context, WidgetRef ref, Post post) {
+    void onUpdated() {
+      ref.invalidate(postDetailProvider(widget.postId));
+      refreshPosts(ref);
+    }
+
+    // Route based on post content
+    if (post.hasAdvancedContent) {
+      // Has title or quiz -> go directly to advanced screen
+      navigateToAdvancedEditPostScreen(
+        context,
+        post,
+        onPostUpdated: onUpdated,
+      );
+    } else {
+      // Basic post -> show bottom sheet with option to go advanced
+      showEditPostBottomSheet(
+        context,
+        post,
+        onPostUpdated: onUpdated,
+        onAdvancedTap: () {}, // Enables the advanced button
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final postAsync = ref.watch(postDetailProvider(widget.postId));
     final currentUserId = ref.watch(currentUserIdProvider);
+    final systemRoleAsync = ref.watch(currentUserSystemRoleProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -563,6 +591,30 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
           icon: Icon(Iconsax.arrow_left, color: AppColors.primaryText),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          // Edit button - show only if user can edit
+          postAsync.maybeWhen(
+            data: (post) {
+              if (post == null) return const SizedBox.shrink();
+
+              final userRoleLevel = systemRoleAsync.valueOrNull?.level;
+              final canEdit = Post.canEdit(
+                post: post,
+                currentUserId: currentUserId,
+                userRoleLevel: userRoleLevel,
+              );
+
+              if (!canEdit) return const SizedBox.shrink();
+
+              return IconButton(
+                icon: Icon(Iconsax.edit, color: AppColors.primary),
+                onPressed: () => _openEditPost(context, ref, post),
+                tooltip: 'แก้ไขโพส',
+              );
+            },
+            orElse: () => const SizedBox.shrink(),
+          ),
+        ],
       ),
       body: postAsync.when(
         data: (post) {
@@ -1258,153 +1310,6 @@ class _WrongAnswerDialogContentState extends State<_WrongAnswerDialogContent>
         ),
       ),
     );
-  }
-}
-
-/// หน้าสร้างโพส (Placeholder - จะแยกไฟล์ทีหลัง)
-class _CreatePostScreen extends ConsumerStatefulWidget {
-  const _CreatePostScreen();
-
-  @override
-  ConsumerState<_CreatePostScreen> createState() => _CreatePostScreenState();
-}
-
-class _CreatePostScreenState extends ConsumerState<_CreatePostScreen> {
-  final _titleController = TextEditingController();
-  final _contentController = TextEditingController();
-  bool _isLoading = false;
-
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _contentController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.secondaryBackground,
-        title: Text('สร้างโพสใหม่', style: AppTypography.title),
-        leading: IconButton(
-          icon: Icon(Iconsax.arrow_left, color: AppColors.primaryText),
-          onPressed: () => Navigator.pop(context),
-        ),
-        actions: [
-          TextButton(
-            onPressed: _isLoading ? null : _handlePost,
-            child: Text(
-              'โพส',
-              style: AppTypography.body.copyWith(
-                color: _isLoading ? AppColors.secondaryText : AppColors.primary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Title field
-            AppTextField(
-              label: 'หัวข้อ',
-              controller: _titleController,
-              hintText: 'ใส่หัวข้อ...',
-            ),
-            AppSpacing.verticalGapLg,
-
-            // Content field
-            AppTextField(
-              label: 'เนื้อหา',
-              controller: _contentController,
-              hintText: 'เขียนเนื้อหา...',
-              maxLines: 8,
-            ),
-            AppSpacing.verticalGapLg,
-
-            // Note
-            Container(
-              padding: EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.tagPendingBg,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  Icon(Iconsax.info_circle, color: AppColors.tagPendingText),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'โพสจะถูกตั้งเป็นโพสทั่วไป (FYI)\nหากต้องการสร้างประกาศ กรุณาติดต่อผู้ดูแลระบบ',
-                      style: AppTypography.caption
-                          .copyWith(color: AppColors.tagPendingText),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _handlePost() async {
-    final title = _titleController.text.trim();
-    final content = _contentController.text.trim();
-
-    if (content.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('กรุณาใส่เนื้อหา')),
-      );
-      return;
-    }
-
-    setState(() => _isLoading = true);
-
-    try {
-      final actionService = ref.read(postActionServiceProvider);
-      final userId = ref.read(currentUserIdProvider);
-      final nursinghomeId = await ref.read(nursinghomeIdProvider.future);
-
-      if (userId == null || nursinghomeId == null) {
-        throw Exception('ไม่พบข้อมูลผู้ใช้');
-      }
-
-      final postId = await actionService.createPost(
-        userId: userId,
-        nursinghomeId: nursinghomeId,
-        text: content,
-        title: title.isEmpty ? null : title,
-      );
-
-      if (postId != null) {
-        refreshPosts(ref);
-        if (mounted) {
-          Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('โพสสำเร็จ')),
-          );
-        }
-      } else {
-        throw Exception('ไม่สามารถสร้างโพสได้');
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('เกิดข้อผิดพลาด: $e')),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
   }
 }
 

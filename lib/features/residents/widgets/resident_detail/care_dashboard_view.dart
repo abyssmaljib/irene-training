@@ -52,7 +52,10 @@ class CareDashboardView extends StatelessWidget {
           AppSpacing.verticalGapLg,
 
           // Activity Log Section - V3: แสดง posts ของ resident
-          ActivityLogSection(residentId: resident.id),
+          ActivityLogSection(
+            residentId: resident.id,
+            residentName: resident.name,
+          ),
 
           // Bottom padding for FAB
           SizedBox(height: 100),

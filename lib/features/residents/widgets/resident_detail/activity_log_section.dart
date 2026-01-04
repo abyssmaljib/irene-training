@@ -7,6 +7,7 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../board/models/post.dart';
 import '../../../board/providers/post_provider.dart';
 import '../../../board/screens/board_screen.dart';
+import '../../screens/activity_log_screen.dart';
 
 /// Provider สำหรับ activity posts ของ resident
 final residentActivityPostsProvider =
@@ -25,10 +26,12 @@ final residentActivityPostsProvider =
 /// Activity Log Section - แสดง posts ที่เกี่ยวข้องกับ resident
 class ActivityLogSection extends ConsumerWidget {
   final int residentId;
+  final String residentName;
 
   const ActivityLogSection({
     super.key,
     required this.residentId,
+    required this.residentName,
   });
 
   @override
@@ -47,7 +50,11 @@ class ActivityLogSection extends ConsumerWidget {
               Text('บันทึกกิจกรรม', style: AppTypography.title),
               TextButton(
                 onPressed: () {
-                  // TODO: Navigate to full activity log
+                  navigateToActivityLog(
+                    context,
+                    residentId: residentId,
+                    residentName: residentName,
+                  );
                 },
                 child: Text(
                   'ดูทั้งหมด',

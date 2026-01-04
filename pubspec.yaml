@@ -61,6 +61,8 @@ dependencies:
   # Video Player
   video_player: ^2.9.2
   chewie: ^1.8.5
+  # HTTP
+  http: ^1.2.2
 
 
 dev_dependencies:

@@ -17,6 +17,24 @@ class CreatePostState {
   final bool isSubmitting;
   final String? error;
 
+  // Advanced fields (for advanced create post screen)
+  final String? title;
+  final String? qaQuestion;
+  final String? qaChoiceA;
+  final String? qaChoiceB;
+  final String? qaChoiceC;
+  final String? qaAnswer; // 'A', 'B', or 'C'
+  final String? aiSummary;
+  final bool isLoadingAI;
+
+  // AI-generated quiz preview (before applying to form)
+  final String? aiQuizQuestion;
+  final String? aiQuizChoiceA;
+  final String? aiQuizChoiceB;
+  final String? aiQuizChoiceC;
+  final String? aiQuizAnswer;
+  final bool isLoadingQuizAI;
+
   const CreatePostState({
     this.text = '',
     this.selectedTag,
@@ -29,6 +47,22 @@ class CreatePostState {
     this.uploadedVideoUrl,
     this.isSubmitting = false,
     this.error,
+    // Advanced fields
+    this.title,
+    this.qaQuestion,
+    this.qaChoiceA,
+    this.qaChoiceB,
+    this.qaChoiceC,
+    this.qaAnswer,
+    this.aiSummary,
+    this.isLoadingAI = false,
+    // AI quiz preview
+    this.aiQuizQuestion,
+    this.aiQuizChoiceA,
+    this.aiQuizChoiceB,
+    this.aiQuizChoiceC,
+    this.aiQuizAnswer,
+    this.isLoadingQuizAI = false,
   });
 
   bool get isValid => text.trim().isNotEmpty;
@@ -40,6 +74,22 @@ class CreatePostState {
   bool get hasImages => selectedImages.isNotEmpty || uploadedImageUrls.isNotEmpty;
 
   bool get hasVideo => selectedVideo != null || uploadedVideoUrl != null;
+
+  bool get hasQuiz =>
+      qaQuestion != null &&
+      qaQuestion!.trim().isNotEmpty &&
+      qaChoiceA != null &&
+      qaChoiceA!.trim().isNotEmpty &&
+      qaChoiceB != null &&
+      qaChoiceB!.trim().isNotEmpty &&
+      qaChoiceC != null &&
+      qaChoiceC!.trim().isNotEmpty &&
+      qaAnswer != null;
+
+  bool get hasTitle => title != null && title!.trim().isNotEmpty;
+
+  bool get hasAiQuizPreview =>
+      aiQuizQuestion != null && aiQuizQuestion!.trim().isNotEmpty;
 
   CreatePostState copyWith({
     String? text,
@@ -57,6 +107,26 @@ class CreatePostState {
     bool? isSubmitting,
     String? error,
     bool? clearError,
+    // Advanced fields
+    String? title,
+    bool? clearTitle,
+    String? qaQuestion,
+    String? qaChoiceA,
+    String? qaChoiceB,
+    String? qaChoiceC,
+    String? qaAnswer,
+    bool? clearQuiz,
+    String? aiSummary,
+    bool? clearAiSummary,
+    bool? isLoadingAI,
+    // AI quiz preview
+    String? aiQuizQuestion,
+    String? aiQuizChoiceA,
+    String? aiQuizChoiceB,
+    String? aiQuizChoiceC,
+    String? aiQuizAnswer,
+    bool? clearAiQuizPreview,
+    bool? isLoadingQuizAI,
   }) {
     return CreatePostState(
       text: text ?? this.text,
@@ -70,10 +140,40 @@ class CreatePostState {
           : (selectedResidentName ?? this.selectedResidentName),
       selectedImages: selectedImages ?? this.selectedImages,
       uploadedImageUrls: uploadedImageUrls ?? this.uploadedImageUrls,
-      selectedVideo: clearVideo == true ? null : (selectedVideo ?? this.selectedVideo),
-      uploadedVideoUrl: clearVideo == true ? null : (uploadedVideoUrl ?? this.uploadedVideoUrl),
+      selectedVideo:
+          clearVideo == true ? null : (selectedVideo ?? this.selectedVideo),
+      uploadedVideoUrl: clearVideo == true
+          ? null
+          : (uploadedVideoUrl ?? this.uploadedVideoUrl),
       isSubmitting: isSubmitting ?? this.isSubmitting,
       error: clearError == true ? null : (error ?? this.error),
+      // Advanced fields
+      title: clearTitle == true ? null : (title ?? this.title),
+      qaQuestion: clearQuiz == true ? null : (qaQuestion ?? this.qaQuestion),
+      qaChoiceA: clearQuiz == true ? null : (qaChoiceA ?? this.qaChoiceA),
+      qaChoiceB: clearQuiz == true ? null : (qaChoiceB ?? this.qaChoiceB),
+      qaChoiceC: clearQuiz == true ? null : (qaChoiceC ?? this.qaChoiceC),
+      qaAnswer: clearQuiz == true ? null : (qaAnswer ?? this.qaAnswer),
+      aiSummary:
+          clearAiSummary == true ? null : (aiSummary ?? this.aiSummary),
+      isLoadingAI: isLoadingAI ?? this.isLoadingAI,
+      // AI quiz preview
+      aiQuizQuestion: clearAiQuizPreview == true
+          ? null
+          : (aiQuizQuestion ?? this.aiQuizQuestion),
+      aiQuizChoiceA: clearAiQuizPreview == true
+          ? null
+          : (aiQuizChoiceA ?? this.aiQuizChoiceA),
+      aiQuizChoiceB: clearAiQuizPreview == true
+          ? null
+          : (aiQuizChoiceB ?? this.aiQuizChoiceB),
+      aiQuizChoiceC: clearAiQuizPreview == true
+          ? null
+          : (aiQuizChoiceC ?? this.aiQuizChoiceC),
+      aiQuizAnswer: clearAiQuizPreview == true
+          ? null
+          : (aiQuizAnswer ?? this.aiQuizAnswer),
+      isLoadingQuizAI: isLoadingQuizAI ?? this.isLoadingQuizAI,
     );
   }
 
@@ -210,6 +310,110 @@ class CreatePostNotifier extends StateNotifier<CreatePostState> {
   /// Set uploaded video URL
   void setUploadedVideoUrl(String url) {
     state = state.copyWith(uploadedVideoUrl: url);
+  }
+
+  // === Advanced Post Methods ===
+
+  /// Set title
+  void setTitle(String? value) {
+    state = state.copyWith(
+      title: value?.isEmpty == true ? null : value,
+      clearTitle: value?.isEmpty == true,
+      clearError: true,
+    );
+  }
+
+  /// Set quiz question
+  void setQaQuestion(String? value) {
+    state = state.copyWith(qaQuestion: value, clearError: true);
+  }
+
+  /// Set quiz choice A
+  void setQaChoiceA(String? value) {
+    state = state.copyWith(qaChoiceA: value, clearError: true);
+  }
+
+  /// Set quiz choice B
+  void setQaChoiceB(String? value) {
+    state = state.copyWith(qaChoiceB: value, clearError: true);
+  }
+
+  /// Set quiz choice C
+  void setQaChoiceC(String? value) {
+    state = state.copyWith(qaChoiceC: value, clearError: true);
+  }
+
+  /// Set quiz answer ('A', 'B', or 'C')
+  void setQaAnswer(String? value) {
+    state = state.copyWith(qaAnswer: value, clearError: true);
+  }
+
+  /// Clear all quiz fields
+  void clearQuiz() {
+    state = state.copyWith(clearQuiz: true, clearError: true);
+  }
+
+  /// Set AI summary result
+  void setAiSummary(String? value) {
+    state = state.copyWith(
+      aiSummary: value,
+      clearAiSummary: value == null,
+      isLoadingAI: false,
+    );
+  }
+
+  /// Set AI loading state
+  void setLoadingAI(bool value) {
+    state = state.copyWith(isLoadingAI: value);
+  }
+
+  /// Clear AI summary
+  void clearAiSummary() {
+    state = state.copyWith(clearAiSummary: true);
+  }
+
+  // === AI Quiz Preview Methods ===
+
+  /// Set AI-generated quiz preview
+  void setAiQuizPreview({
+    required String question,
+    required String choiceA,
+    required String choiceB,
+    required String choiceC,
+    required String answer,
+  }) {
+    state = state.copyWith(
+      aiQuizQuestion: question,
+      aiQuizChoiceA: choiceA,
+      aiQuizChoiceB: choiceB,
+      aiQuizChoiceC: choiceC,
+      aiQuizAnswer: answer,
+      isLoadingQuizAI: false,
+    );
+  }
+
+  /// Set AI quiz loading state
+  void setLoadingQuizAI(bool value) {
+    state = state.copyWith(isLoadingQuizAI: value);
+  }
+
+  /// Clear AI quiz preview
+  void clearAiQuizPreview() {
+    state = state.copyWith(clearAiQuizPreview: true);
+  }
+
+  /// Apply AI quiz preview to form fields (keep preview visible)
+  void applyAiQuizToForm() {
+    if (!state.hasAiQuizPreview) return;
+
+    state = state.copyWith(
+      qaQuestion: state.aiQuizQuestion,
+      qaChoiceA: state.aiQuizChoiceA,
+      qaChoiceB: state.aiQuizChoiceB,
+      qaChoiceC: state.aiQuizChoiceC,
+      qaAnswer: state.aiQuizAnswer,
+      // Don't clear preview - keep it visible
+    );
   }
 }
 

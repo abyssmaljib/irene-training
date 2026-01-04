@@ -114,6 +114,12 @@ class PostActionService {
     List<String>? multiImgUrl,
     String? youtubeUrl,
     bool visibleToRelative = false,
+    // Quiz fields (for advanced post)
+    String? qaQuestion,
+    String? qaChoiceA,
+    String? qaChoiceB,
+    String? qaChoiceC,
+    String? qaAnswer,
   }) async {
     try {
       // Build Tag_Topics from tagName if provided
@@ -124,6 +130,25 @@ class PostActionService {
 
       // Use imageUrls if provided, otherwise use multiImgUrl
       final finalImageUrls = imageUrls ?? multiImgUrl;
+
+      // Create QA entry if quiz data is provided
+      int? qaId;
+      if (qaQuestion != null &&
+          qaQuestion.trim().isNotEmpty &&
+          qaChoiceA != null &&
+          qaChoiceB != null &&
+          qaChoiceC != null &&
+          qaAnswer != null) {
+        final qaResponse = await _supabase.from('QATable').insert({
+          'question': qaQuestion,
+          'choiceA': qaChoiceA,
+          'choiceB': qaChoiceB,
+          'choiceC': qaChoiceC,
+          'answer': qaAnswer,
+        }).select('id').single();
+        qaId = qaResponse['id'] as int;
+        debugPrint('PostActionService: created QA entry $qaId');
+      }
 
       // Insert post
       final response = await _supabase.from('Post').insert({
@@ -138,6 +163,7 @@ class PostActionService {
         'Tag_Topics': finalTagTopics,
         'visible_to_relative': visibleToRelative,
         'is_handover': isHandover,
+        'qa_id': qaId,
       }).select('id').single();
 
       final postId = response['id'] as int;
@@ -169,11 +195,13 @@ class PostActionService {
     }
   }
 
-  /// Update post text/title
+  /// Update post text/title and images
   Future<bool> updatePost({
     required int postId,
     String? text,
     String? title,
+    String? imgUrl,
+    List<String>? multiImgUrl,
   }) async {
     try {
       final updates = <String, dynamic>{
@@ -181,6 +209,8 @@ class PostActionService {
       };
       if (text != null) updates['Text'] = text;
       if (title != null) updates['title'] = title;
+      if (imgUrl != null) updates['imgUrl'] = imgUrl;
+      if (multiImgUrl != null) updates['multi_img_url'] = multiImgUrl;
 
       await _supabase.from('Post').update(updates).eq('id', postId);
       debugPrint('PostActionService: updated post $postId');

@@ -302,6 +302,18 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                       _buildConfirmVideo(),
                     ],
 
+                    // Post images (รูปจากโพสที่ complete task)
+                    if (_task.hasPostImages) ...[
+                      AppSpacing.verticalGapMd,
+                      _buildPostImages(),
+                    ],
+
+                    // Post video (วิดีโอจากโพสที่ complete task)
+                    if (_task.hasPostVideo) ...[
+                      AppSpacing.verticalGapMd,
+                      _buildPostVideo(),
+                    ],
+
                     // Descript (หมายเหตุ) - ถ้า task มีปัญหา
                     if (_task.descript != null &&
                         _task.descript!.isNotEmpty) ...[
@@ -1308,6 +1320,187 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           Iconsax.video,
           size: 64,
           color: AppColors.secondaryText.withValues(alpha: 0.5),
+        ),
+      ),
+    );
+  }
+
+  /// แสดงรูปจาก Post ที่ complete task นี้
+  Widget _buildPostImages() {
+    final images = _task.postImagesOnly;
+    if (images.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'รูปจากโพส (${images.length} รูป)',
+          style: AppTypography.subtitle.copyWith(
+            fontWeight: FontWeight.w600,
+            color: AppColors.tagPassedText,
+          ),
+        ),
+        AppSpacing.verticalGapSm,
+        // ถ้ามี 1 รูป แสดงเต็มความกว้าง
+        if (images.length == 1)
+          GestureDetector(
+            onTap: () => _showExpandedImage(images.first),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.network(
+                images.first,
+                width: double.infinity,
+                fit: BoxFit.contain,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Container(
+                    height: 200,
+                    color: AppColors.background,
+                    child: const Center(child: CircularProgressIndicator()),
+                  );
+                },
+                errorBuilder: (_, __, ___) => _buildImageErrorPlaceholder(),
+              ),
+            ),
+          )
+        // ถ้ามีหลายรูป แสดงเป็น grid
+        else
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+              childAspectRatio: 1,
+            ),
+            itemCount: images.length,
+            itemBuilder: (context, index) {
+              return GestureDetector(
+                onTap: () => _showExpandedImage(images[index]),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(
+                    images[index],
+                    fit: BoxFit.cover,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return Container(
+                        color: AppColors.background,
+                        child: const Center(
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      );
+                    },
+                    errorBuilder: (_, __, ___) => _buildImageErrorPlaceholder(),
+                  ),
+                ),
+              );
+            },
+          ),
+      ],
+    );
+  }
+
+  /// แสดง video จาก Post ที่ complete task นี้
+  Widget _buildPostVideo() {
+    final videoUrl = _task.firstPostVideoUrl;
+    if (videoUrl == null) return const SizedBox.shrink();
+
+    final thumbnailUrl = _task.postThumbnailUrl;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'วิดีโอจากโพส',
+          style: AppTypography.subtitle.copyWith(
+            fontWeight: FontWeight.w600,
+            color: AppColors.tagPassedText,
+          ),
+        ),
+        AppSpacing.verticalGapSm,
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: GestureDetector(
+            onTap: () => FullScreenVideoPlayer.show(context, videoUrl),
+            child: Stack(
+              children: [
+                // Thumbnail หรือ placeholder
+                if (thumbnailUrl != null && thumbnailUrl.isNotEmpty)
+                  Image.network(
+                    thumbnailUrl,
+                    width: double.infinity,
+                    height: 200,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => _buildVideoPlaceholder(),
+                  )
+                else
+                  _buildVideoPlaceholder(),
+
+                // Play button overlay
+                Positioned.fill(
+                  child: Container(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.9),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Iconsax.play5,
+                          size: 32,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+                // Video label
+                Positioned(
+                  bottom: 8,
+                  left: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.6),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Iconsax.video, size: 14, color: Colors.white),
+                        const SizedBox(width: 4),
+                        Text(
+                          'แตะเพื่อเล่น',
+                          style: AppTypography.caption.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildImageErrorPlaceholder() {
+    return Container(
+      color: AppColors.background,
+      child: Center(
+        child: Icon(
+          Iconsax.image,
+          size: 32,
+          color: AppColors.secondaryText,
         ),
       ),
     );

@@ -226,6 +226,11 @@ class Post {
   /// Check if post has quiz
   bool get hasQuiz => qaId != null;
 
+  /// Check if post has advanced content (quiz)
+  /// Used to determine if edit should open advanced screen
+  /// Note: title ไม่นับเพราะโพสทุกอันอาจมี title ได้
+  bool get hasAdvancedContent => hasQuiz;
+
   /// Video file extensions
   static const _videoExtensions = ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.m4v'];
 
@@ -471,4 +476,24 @@ class Post {
 
   @override
   int get hashCode => id.hashCode;
+
+  /// Check if a user can edit this post
+  /// Returns true if:
+  /// - User is the post author (userId == currentUserId), OR
+  /// - User has edit_content permission (shift_leader, manager, owner - level >= 30)
+  static bool canEdit({
+    required Post post,
+    required String? currentUserId,
+    required int? userRoleLevel,
+  }) {
+    if (currentUserId == null) return false;
+
+    // Author can always edit their own post
+    if (post.isUserAuthor(currentUserId)) return true;
+
+    // Shift leader and above (level >= 30) can edit any post
+    if (userRoleLevel != null && userRoleLevel >= 30) return true;
+
+    return false;
+  }
 }

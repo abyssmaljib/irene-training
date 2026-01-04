@@ -3,6 +3,7 @@ import 'package:iconsax/iconsax.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/filter_drawer_shell.dart';
 import '../../../core/widgets/input_fields.dart';
 import '../../../core/widgets/toggle_switch.dart';
 import '../models/medicine_summary.dart';
@@ -41,16 +42,18 @@ class MedicineListScreen extends StatefulWidget {
 }
 
 class _MedicineListScreenState extends State<MedicineListScreen> {
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
   final _medicineService = MedicineService.instance;
   final _searchController = TextEditingController();
 
   List<MedicineSummary> _allMedicines = [];
   List<MedicineSummary> _filteredMedicines = [];
-  List<_GroupInfo> _availableGroups = []; // Sorted by active count
+  List<_GroupInfo> _availableGroups = [];
   String? _selectedGroup;
-  bool _showOnlyActive = true; // 0 = On, 1 = All
+  bool _showOnlyActive = true;
   bool _isLoading = true;
   String _searchQuery = '';
+  bool _showSearch = false;
 
   @override
   void initState() {
@@ -68,7 +71,8 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final medicines = await _medicineService.getMedicinesByResident(widget.residentId);
+      final medicines =
+          await _medicineService.getMedicinesByResident(widget.residentId);
 
       // Extract groups with active/total counts
       final groupStats = <String, Map<String, int>>{};
@@ -76,19 +80,23 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
         final groupName = med.displayGroup;
         if (groupName.isNotEmpty && groupName != 'ไม่ระบุประเภท') {
           groupStats.putIfAbsent(groupName, () => {'active': 0, 'total': 0});
-          groupStats[groupName]!['total'] = groupStats[groupName]!['total']! + 1;
+          groupStats[groupName]!['total'] =
+              groupStats[groupName]!['total']! + 1;
           if (med.isActive) {
-            groupStats[groupName]!['active'] = groupStats[groupName]!['active']! + 1;
+            groupStats[groupName]!['active'] =
+                groupStats[groupName]!['active']! + 1;
           }
         }
       }
 
       // Convert to list and sort by active count (descending)
-      final groupList = groupStats.entries.map((e) => _GroupInfo(
-        name: e.key,
-        activeCount: e.value['active']!,
-        totalCount: e.value['total']!,
-      )).toList();
+      final groupList = groupStats.entries
+          .map((e) => _GroupInfo(
+                name: e.key,
+                activeCount: e.value['active']!,
+                totalCount: e.value['total']!,
+              ))
+          .toList();
 
       // Sort: groups with active items first, then by active count
       groupList.sort((a, b) {
@@ -118,7 +126,7 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
       result = result.where((m) => m.isActive).toList();
     }
 
-    // Filter by group (uses displayGroup which prefers ATC Level 2, fallback to group)
+    // Filter by group
     if (_selectedGroup != null) {
       result = result.where((m) => m.displayGroup == _selectedGroup).toList();
     }
@@ -130,7 +138,9 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
         final name = m.displayName.toLowerCase();
         final brand = m.displayBrand.toLowerCase();
         final group = m.displayGroup.toLowerCase();
-        return name.contains(query) || brand.contains(query) || group.contains(query);
+        return name.contains(query) ||
+            brand.contains(query) ||
+            group.contains(query);
       }).toList();
     }
 
@@ -152,213 +162,205 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
     _applyFilters();
   }
 
-  /// Toggle button สำหรับสลับไปหน้ารูปตัวอย่างยา (styled like checklist view toggle)
-  Widget _buildViewToggle() {
-    return Material(
-      color: AppColors.accent1,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: () {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => MedicinePhotosScreen(
-                residentId: widget.residentId,
-                residentName: widget.residentName,
-              ),
-            ),
-          );
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          width: 40,
-          height: 40,
-          alignment: Alignment.center,
-          child: Icon(
-            Iconsax.image,
-            color: AppColors.primary,
-            size: 22,
-          ),
-        ),
-      ),
-    );
+  void _toggleSearch() {
+    setState(() {
+      _showSearch = !_showSearch;
+      if (!_showSearch) {
+        _searchController.clear();
+        _searchQuery = '';
+        _applyFilters();
+      }
+    });
+  }
+
+  int get _filterCount {
+    int count = 0;
+    if (_selectedGroup != null) count++;
+    return count;
+  }
+
+  void _clearFilters() {
+    setState(() {
+      _selectedGroup = null;
+    });
+    _applyFilters();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: AppColors.background,
-      body: NestedScrollView(
-        headerSliverBuilder: (context, innerBoxIsScrolled) {
-          return [
-            // Collapsible header with back button, title, search, and filter chips
-            SliverAppBar(
-              pinned: true,
-              floating: true,
-              snap: true,
-              backgroundColor: AppColors.secondaryBackground,
-              elevation: 0,
-              leading: IconButton(
-                onPressed: () => Navigator.pop(context),
-                icon: Icon(
-                  Iconsax.arrow_left,
-                  color: AppColors.primaryText,
-                ),
-              ),
-              title: Column(
+      endDrawer: _MedicineFilterDrawer(
+        availableGroups: _availableGroups,
+        selectedGroup: _selectedGroup,
+        showOnlyActive: _showOnlyActive,
+        onGroupSelected: _onGroupSelected,
+        onClearFilters: _clearFilters,
+        filterCount: _filterCount,
+      ),
+      appBar: AppBar(
+        backgroundColor: AppColors.surface,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: AppColors.textPrimary),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: _showSearch
+            ? SearchField(
+                controller: _searchController,
+                hintText: 'ค้นหายา...',
+                isDense: true,
+                autofocus: true,
+                onChanged: _onSearchChanged,
+                onClear: () {
+                  _searchController.clear();
+                  _onSearchChanged('');
+                },
+              )
+            : Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     widget.residentName,
-                    style: AppTypography.title,
+                    style: AppTypography.title.copyWith(
+                      color: AppColors.textPrimary,
+                    ),
                   ),
                   Text(
                     'รายการยา',
                     style: AppTypography.caption.copyWith(
-                      color: AppColors.textSecondary,
+                      color: AppColors.secondaryText,
                     ),
                   ),
                 ],
               ),
-              centerTitle: false,
-              actions: [
-                // Toggle to medicine photos (styled like checklist view toggle)
-                _buildViewToggle(),
-                SizedBox(width: AppSpacing.md), // Padding เท่ากับหน้า post/task
-              ],
-              expandedHeight: _availableGroups.isNotEmpty ? 168 : 120,
-              flexibleSpace: FlexibleSpaceBar(
-                background: Container(
-                  color: AppColors.secondaryBackground,
-                  child: SafeArea(
-                    child: Padding(
-                      padding: EdgeInsets.only(
-                        left: AppSpacing.md,
-                        right: AppSpacing.md,
-                        top: kToolbarHeight + 8,
+        actions: [
+          // Search toggle
+          IconButton(
+            icon: Icon(
+              _showSearch ? Icons.close : Iconsax.search_normal,
+              color: _showSearch ? AppColors.error : AppColors.textPrimary,
+            ),
+            onPressed: _toggleSearch,
+          ),
+          // Filter button
+          Padding(
+            padding: EdgeInsets.only(right: 8),
+            child: Stack(
+              children: [
+                IconButton(
+                  icon: Icon(Iconsax.filter, color: AppColors.textPrimary),
+                  onPressed: () {
+                    _scaffoldKey.currentState?.openEndDrawer();
+                  },
+                ),
+                if (_filterCount > 0)
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Container(
+                      width: 16,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        shape: BoxShape.circle,
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Search field
-                          SearchField(
-                            controller: _searchController,
-                            hintText: 'ค้นหายา...',
-                            isDense: true,
-                            onChanged: _onSearchChanged,
-                          ),
-                          SizedBox(height: AppSpacing.sm),
-
-                          // Group filter chips
-                          if (_availableGroups.isNotEmpty)
-                            SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.start,
-                                children: [
-                                  _buildGroupChip(null, 'ทั้งหมด', true),
-                                  ..._availableGroups.map((group) => _buildGroupChip(
-                                    group.name,
-                                    group.name,
-                                    group.hasActiveItems,
-                                  )),
-                                ],
-                              ),
-                            ),
-                        ],
+                      alignment: Alignment.center,
+                      child: Text(
+                        '$_filterCount',
+                        style: AppTypography.caption.copyWith(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ),
+              ],
             ),
-
-            // Sticky toggle control + count
-            SliverPersistentHeader(
-              pinned: true,
-              delegate: _StickyToggleDelegate(
-                height: 64,
-                child: Container(
-                  height: 64,
-                  color: AppColors.secondaryBackground,
-                  padding: EdgeInsets.symmetric(
-                    horizontal: AppSpacing.md,
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: SegmentedControl(
-                          options: const ['ใช้อยู่', 'ทั้งหมด'],
-                          selectedIndex: _showOnlyActive ? 0 : 1,
-                          onChanged: _onToggleChanged,
-                        ),
-                      ),
-                      AppSpacing.horizontalGapMd,
-                      // Medicine count
-                      Container(
-                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: AppColors.accent1,
-                          borderRadius: AppRadius.smallRadius,
-                        ),
-                        child: Text(
-                          '${_filteredMedicines.length} รายการ',
-                          style: AppTypography.buttonSmall.copyWith(
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ];
-        },
-        body: RefreshIndicator(
-          onRefresh: _loadMedicines,
-          color: AppColors.primary,
-          child: _buildMedicineList(),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGroupChip(String? group, String label, bool hasActiveItems) {
-    final isSelected = _selectedGroup == group;
-    // Dim the chip if it has no active items
-    final isDimmed = !hasActiveItems && !isSelected;
-
-    return Padding(
-      padding: EdgeInsets.only(right: 8),
-      child: FilterChip(
-        label: Text(label),
-        selected: isSelected,
-        onSelected: (_) => _onGroupSelected(isSelected ? null : group),
-        selectedColor: AppColors.accent1,
-        checkmarkColor: AppColors.primary,
-        backgroundColor: isDimmed
-            ? AppColors.background.withValues(alpha: 0.5)
-            : AppColors.background,
-        labelStyle: AppTypography.bodySmall.copyWith(
-          color: isSelected
-              ? AppColors.primary
-              : isDimmed
-                  ? AppColors.textSecondary.withValues(alpha: 0.5)
-                  : AppColors.textSecondary,
-          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-        ),
-        shape: RoundedRectangleBorder(
-          borderRadius: AppRadius.smallRadius,
-          side: BorderSide(
-            color: isSelected
-                ? AppColors.primary
-                : isDimmed
-                    ? AppColors.inputBorder.withValues(alpha: 0.5)
-                    : AppColors.inputBorder,
           ),
-        ),
+          // Toggle to medicine photos
+          Padding(
+            padding: EdgeInsets.only(right: 8),
+            child: Material(
+              color: AppColors.accent1,
+              borderRadius: BorderRadius.circular(12),
+              child: InkWell(
+                onTap: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => MedicinePhotosScreen(
+                        residentId: widget.residentId,
+                        residentName: widget.residentName,
+                      ),
+                    ),
+                  );
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  alignment: Alignment.center,
+                  child: Icon(
+                    Iconsax.image,
+                    color: AppColors.primary,
+                    size: 22,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // Toggle & count row
+          Container(
+            color: AppColors.surface,
+            padding: EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.sm,
+              AppSpacing.md,
+              AppSpacing.md,
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: SegmentedControl(
+                    options: const ['ใช้อยู่', 'ทั้งหมด'],
+                    selectedIndex: _showOnlyActive ? 0 : 1,
+                    onChanged: _onToggleChanged,
+                  ),
+                ),
+                AppSpacing.horizontalGapMd,
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.accent1,
+                    borderRadius: AppRadius.smallRadius,
+                  ),
+                  child: Text(
+                    '${_filteredMedicines.length} รายการ',
+                    style: AppTypography.buttonSmall.copyWith(
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Medicine list
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: _loadMedicines,
+              color: AppColors.primary,
+              child: _buildMedicineList(),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -389,8 +391,8 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
           children: [
             Image.asset(
               'assets/images/not_found.webp',
-              width: 240,
-              height: 240,
+              width: 200,
+              height: 200,
             ),
             AppSpacing.verticalGapMd,
             Text(
@@ -403,7 +405,7 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
             ),
             if (_searchQuery.isNotEmpty || _selectedGroup != null) ...[
               AppSpacing.verticalGapSm,
-              TextButton(
+              TextButton.icon(
                 onPressed: () {
                   _searchController.clear();
                   setState(() {
@@ -412,7 +414,11 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
                   });
                   _applyFilters();
                 },
-                child: const Text('ล้างตัวกรอง'),
+                icon: Icon(Iconsax.trash, size: 18),
+                label: const Text('ล้างตัวกรอง'),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.error,
+                ),
               ),
             ],
           ],
@@ -489,9 +495,9 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
 
             // Medicine cards
             ...medicines.map((med) => Padding(
-              padding: EdgeInsets.only(bottom: AppSpacing.sm),
-              child: MedicineCard(medicine: med),
-            )),
+                  padding: EdgeInsets.only(bottom: AppSpacing.sm),
+                  child: MedicineCard(medicine: med),
+                )),
           ],
         );
       },
@@ -499,43 +505,140 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
   }
 }
 
-/// Delegate สำหรับ sticky toggle control
-class _StickyToggleDelegate extends SliverPersistentHeaderDelegate {
-  final Widget child;
-  final double height;
+/// Filter drawer สำหรับหน้ารายการยา
+class _MedicineFilterDrawer extends StatelessWidget {
+  final List<_GroupInfo> availableGroups;
+  final String? selectedGroup;
+  final bool showOnlyActive;
+  final ValueChanged<String?> onGroupSelected;
+  final VoidCallback onClearFilters;
+  final int filterCount;
 
-  _StickyToggleDelegate({
-    required this.child,
-    this.height = 64,
+  const _MedicineFilterDrawer({
+    required this.availableGroups,
+    required this.selectedGroup,
+    required this.showOnlyActive,
+    required this.onGroupSelected,
+    required this.onClearFilters,
+    required this.filterCount,
   });
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.secondaryBackground,
-        boxShadow: overlapsContent
-            ? [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
-                  blurRadius: 4,
-                  offset: Offset(0, 2),
+  Widget build(BuildContext context) {
+    return FilterDrawerShell(
+      title: 'ตัวกรอง',
+      filterCount: filterCount,
+      onClear: filterCount > 0 ? onClearFilters : null,
+      content: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Group Section
+            Padding(
+              padding: EdgeInsets.all(AppSpacing.md),
+              child: Row(
+                children: [
+                  Text(
+                    'ประเภทยา',
+                    style: AppTypography.title.copyWith(
+                      color: AppColors.secondaryText,
+                    ),
+                  ),
+                  if (selectedGroup != null) ...[
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: () => onGroupSelected(null),
+                      child: Text(
+                        'ล้าง',
+                        style: AppTypography.body.copyWith(
+                          color: AppColors.error,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+
+            if (availableGroups.isEmpty)
+              Padding(
+                padding: EdgeInsets.all(AppSpacing.md),
+                child: Text(
+                  'ไม่พบประเภทยา',
+                  style: AppTypography.body.copyWith(
+                    color: AppColors.secondaryText,
+                  ),
                 ),
-              ]
-            : null,
+              )
+            else
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: availableGroups.map((group) {
+                    final isSelected = selectedGroup == group.name;
+                    final isDimmed = !group.hasActiveItems && showOnlyActive;
+                    return GestureDetector(
+                      onTap: () =>
+                          onGroupSelected(isSelected ? null : group.name),
+                      child: AnimatedContainer(
+                        duration: Duration(milliseconds: 200),
+                        padding:
+                            EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? AppColors.accent1
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isSelected
+                                ? AppColors.primary
+                                : isDimmed
+                                    ? AppColors.inputBorder
+                                        .withValues(alpha: 0.5)
+                                    : AppColors.inputBorder,
+                            width: isSelected ? 1.5 : 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (isSelected) ...[
+                              Icon(
+                                Iconsax.tick_circle,
+                                size: 14,
+                                color: AppColors.primary,
+                              ),
+                              SizedBox(width: 4),
+                            ],
+                            Text(
+                              group.name,
+                              style: AppTypography.body.copyWith(
+                                color: isSelected
+                                    ? AppColors.primary
+                                    : isDimmed
+                                        ? AppColors.textPrimary
+                                            .withValues(alpha: 0.5)
+                                        : AppColors.textPrimary,
+                                fontWeight: isSelected
+                                    ? FontWeight.w500
+                                    : FontWeight.normal,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+
+            // Bottom padding
+            AppSpacing.verticalGapLg,
+          ],
+        ),
       ),
-      child: child,
     );
-  }
-
-  @override
-  double get maxExtent => height;
-
-  @override
-  double get minExtent => height;
-
-  @override
-  bool shouldRebuild(covariant _StickyToggleDelegate oldDelegate) {
-    return child != oldDelegate.child || height != oldDelegate.height;
   }
 }
