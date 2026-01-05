@@ -287,7 +287,7 @@ class TaskCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(6),
         ),
         child: const Icon(
-          Icons.priority_high,
+          Iconsax.danger,
           color: AppColors.tagPendingText,
           size: 18,
         ),
@@ -329,7 +329,7 @@ class TaskCard extends StatelessWidget {
         ),
       ),
       child: isComplete
-          ? const Icon(Icons.check, color: Colors.white, size: 16)
+          ? const Icon(Iconsax.tick_square, color: Colors.white, size: 16)
           : null,
     );
   }

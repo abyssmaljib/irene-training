@@ -501,7 +501,7 @@ class _ShiftDetailRowState extends ConsumerState<ShiftDetailRow>
                   color: AppColors.background,
                   child: Center(
                     child: Icon(
-                      Icons.broken_image,
+                      Iconsax.gallery_slash,
                       color: AppColors.secondaryText,
                     ),
                   ),

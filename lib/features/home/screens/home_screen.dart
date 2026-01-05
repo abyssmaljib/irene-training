@@ -31,6 +31,7 @@ import '../models/tarot_card.dart';
 import '../widgets/tarot_core_value_card.dart';
 import '../../dd_handover/widgets/dd_summary_card.dart';
 import '../../dd_handover/screens/dd_list_screen.dart';
+import '../../dd_handover/services/dd_service.dart';
 
 /// หน้าหลัก - Dashboard with Clock-in/Clock-out
 class HomeScreen extends StatefulWidget {
@@ -130,6 +131,7 @@ class _HomeScreenState extends State<HomeScreen> {
     // Reload all data when user changes
     _homeService.invalidateCache();
     _clockService.invalidateCache();
+    DDService.instance.invalidateCache();
     _loadInitialData();
   }
 

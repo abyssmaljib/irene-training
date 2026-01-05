@@ -216,7 +216,7 @@ class _MedicinePhotosCardState extends State<MedicinePhotosCard> {
     } else if (status.isCompleted) {
       // ให้ยาแล้ว (มีรูป 3C)
       statusIcon = Icon(
-        Icons.check_circle,
+        Iconsax.tick_circle,
         size: 16,
         color: AppColors.tagPassedText,
       );

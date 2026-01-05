@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:iconsax/iconsax.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -119,6 +120,8 @@ class _ShiftSummaryScreenState extends ConsumerState<ShiftSummaryScreen> {
           _buildHeaderCell('S'),
           _buildHeaderCell('A'),
           _buildHeaderCell('Sup'),
+          _buildHeaderCell('+'),
+          _buildHeaderCell('-'),
         ],
       ),
     );
@@ -175,7 +178,7 @@ class _ShiftSummaryScreenState extends ConsumerState<ShiftSummaryScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            Icons.calendar_today_outlined,
+            Iconsax.calendar,
             size: 64,
             color: AppColors.secondaryText.withValues(alpha: 0.5),
           ),
@@ -197,7 +200,7 @@ class _ShiftSummaryScreenState extends ConsumerState<ShiftSummaryScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            Icons.error_outline,
+            Iconsax.warning_2,
             size: 64,
             color: AppColors.error,
           ),

@@ -28,8 +28,13 @@ class MonthlySummary {
   // DD record counts
   final int ddCount;
 
+  // Previous month carry-over (ยกมาจากเดือนก่อน)
+  final int? pdd; // Previous DD
+  final int? pot; // Previous OT
+
   // Workday info
   final int? workdayTotal;
+  final int? requiredWorkdays26To25; // WD - จำนวนวันทำงานที่ต้องทำในรอบเงินเดือน
 
   const MonthlySummary({
     required this.userId,
@@ -50,7 +55,10 @@ class MonthlySummary {
     this.totalAdditional,
     this.totalDeduction,
     required this.ddCount,
+    this.pdd,
+    this.pot,
     this.workdayTotal,
+    this.requiredWorkdays26To25,
   });
 
   /// Create from Supabase row
@@ -74,7 +82,10 @@ class MonthlySummary {
       totalAdditional: (json['total_additional'] as num?)?.toInt(),
       totalDeduction: (json['total_deduction'] as num?)?.toDouble(),
       ddCount: (json['dd_count_26_to_25'] as num?)?.toInt() ?? 0,
+      pdd: (json['pdd'] as num?)?.toInt(),
+      pot: (json['pot'] as num?)?.toInt(),
       workdayTotal: (json['workday_total'] as num?)?.toInt(),
+      requiredWorkdays26To25: (json['required_workdays_26_to_25'] as num?)?.toInt(),
     );
   }
 

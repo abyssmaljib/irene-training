@@ -658,7 +658,7 @@ class _RoleOption extends StatelessWidget {
             child: Row(
               children: [
                 Icon(
-                  isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+                  isSelected ? Iconsax.record_circle : Iconsax.record,
                   color: isSelected ? AppColors.primary : AppColors.secondaryText,
                   size: 20,
                 ),

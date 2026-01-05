@@ -106,7 +106,7 @@ class CareDashboardView extends StatelessWidget {
     if (resident.status == 'Stay') {
       statuses.add(_StatusItem(
         iconData: Iconsax.tick_circle,
-        label: 'Active',
+        label: 'พักอยู่',
         color: AppColors.tagPassedText,
         bgColor: AppColors.tagPassedBg,
       ));
@@ -115,7 +115,7 @@ class CareDashboardView extends StatelessWidget {
     if (resident.isFallRisk) {
       statuses.add(_StatusItem(
         iconData: Iconsax.warning_2,
-        label: 'Fall Risk',
+        label: 'เสี่ยงล้ม',
         color: AppColors.tagPendingText,
         bgColor: AppColors.tagPendingBg,
       ));
@@ -178,7 +178,7 @@ class CareDashboardView extends StatelessWidget {
   void _showVitalDetail(BuildContext context, String type) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('ดูกราฟ $type - Coming Soon'),
+        content: Text('ดูกราฟ $type - เร็วๆ นี้'),
         backgroundColor: AppColors.primary,
         behavior: SnackBarBehavior.floating,
       ),
@@ -188,7 +188,7 @@ class CareDashboardView extends StatelessWidget {
   void _showAddVitalSign(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('เพิ่มสัญญาณชีพ - Coming Soon'),
+        content: Text('เพิ่มสัญญาณชีพ - เร็วๆ นี้'),
         backgroundColor: AppColors.primary,
         behavior: SnackBarBehavior.floating,
       ),

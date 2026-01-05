@@ -5,7 +5,10 @@ import '../models/dd_record.dart';
 /// Service สำหรับจัดการข้อมูล DD (เวรพาคนไข้ไปหาหมอ)
 class DDService {
   static final DDService instance = DDService._();
-  DDService._();
+  DDService._() {
+    // Listen for user changes (impersonation)
+    _userService.userChangedNotifier.addListener(_onUserChanged);
+  }
 
   final _supabase = Supabase.instance.client;
   final _userService = UserService();
@@ -13,20 +16,26 @@ class DDService {
   // Cache
   List<DDRecord>? _cachedRecords;
   DateTime? _cacheTime;
+  String? _cachedUserId;
   static const _cacheDuration = Duration(minutes: 5);
+
+  void _onUserChanged() {
+    invalidateCache();
+  }
 
   /// ดึงรายการ DD ทั้งหมดของ user ปัจจุบัน
   Future<List<DDRecord>> getMyDDRecords({bool forceRefresh = false}) async {
-    // Check cache
+    final userId = _userService.effectiveUserId;
+    if (userId == null) return [];
+
+    // Check cache (must be same user)
     if (!forceRefresh &&
         _cachedRecords != null &&
         _cacheTime != null &&
+        _cachedUserId == userId &&
         DateTime.now().difference(_cacheTime!) < _cacheDuration) {
       return _cachedRecords!;
     }
-
-    final userId = _userService.effectiveUserId;
-    if (userId == null) return [];
 
     final response = await _supabase
         .from('ddRecordWithCalendar_Clock')
@@ -41,6 +50,7 @@ class DDService {
     // Update cache
     _cachedRecords = records;
     _cacheTime = DateTime.now();
+    _cachedUserId = userId;
 
     return records;
   }

@@ -204,7 +204,7 @@ class _ClockOutSurveyFormState extends State<ClockOutSurveyForm> {
               child: Padding(
                 padding: EdgeInsets.symmetric(horizontal: AppSpacing.xs),
                 child: Icon(
-                  isSelected ? Icons.star_rounded : Icons.star_outline_rounded,
+                  isSelected ? Iconsax.star1 : Iconsax.star,
                   color: isSelected ? AppColors.warning : AppColors.secondaryText,
                   size: 40,
                 ),

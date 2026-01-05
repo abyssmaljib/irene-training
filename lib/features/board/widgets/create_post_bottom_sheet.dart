@@ -769,7 +769,7 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
       title: Row(
         children: [
           Icon(
-            Icons.swap_horiz,
+            Iconsax.arrow_swap_horizontal,
             size: 20,
             color: isHandover ? AppColors.success : AppColors.secondaryText,
           ),

@@ -20,7 +20,7 @@ class QuickActionFab extends StatelessWidget {
     return FloatingActionButton(
       onPressed: () => _showQuickActionSheet(context),
       backgroundColor: AppColors.primary,
-      child: Icon(Icons.add, color: Colors.white),
+      child: Icon(Iconsax.add, color: Colors.white),
     );
   }
 
@@ -74,13 +74,13 @@ class _QuickActionSheet extends StatelessWidget {
               child: Row(
                 children: [
                   Text(
-                    'Quick Actions',
+                    'ทำงานด่วน',
                     style: AppTypography.heading3,
                   ),
                   Spacer(),
                   IconButton(
                     onPressed: () => Navigator.pop(context),
-                    icon: Icon(Icons.close, color: AppColors.secondaryText),
+                    icon: Icon(Iconsax.close_circle, color: AppColors.secondaryText),
                   ),
                 ],
               ),
@@ -186,7 +186,7 @@ class _QuickActionSheet extends StatelessWidget {
                 ),
               ),
               Icon(
-                Icons.chevron_right,
+                Iconsax.arrow_right_3,
                 color: AppColors.secondaryText,
               ),
             ],
@@ -203,19 +203,19 @@ class _QuickActionSheet extends StatelessWidget {
     String message;
     switch (action) {
       case 'vital_sign':
-        message = 'วัดสัญญาณชีพ - Coming Soon';
+        message = 'วัดสัญญาณชีพ - เร็วๆ นี้';
         break;
       case 'bowel_movement':
-        message = 'บันทึกการขับถ่าย - Coming Soon';
+        message = 'บันทึกการขับถ่าย - เร็วๆ นี้';
         break;
       case 'photo':
-        message = 'ถ่ายรูป - Coming Soon';
+        message = 'ถ่ายรูป - เร็วๆ นี้';
         break;
       case 'quick_note':
-        message = 'โน้ตด่วน - Coming Soon';
+        message = 'โน้ตด่วน - เร็วๆ นี้';
         break;
       default:
-        message = 'Coming Soon';
+        message = 'เร็วๆ นี้';
     }
 
     ScaffoldMessenger.of(context).showSnackBar(

@@ -453,7 +453,7 @@ class _ShiftSummaryScreenState extends State<ShiftSummaryScreen> {
           const SizedBox(height: 8),
           _SimpleRatingBar(
             value: _selfScore,
-            icon: Icons.star_rounded,
+            icon: Iconsax.star1,
             color: AppColors.primary,
             onChanged: (v) => setState(() => _selfScore = v),
           ),

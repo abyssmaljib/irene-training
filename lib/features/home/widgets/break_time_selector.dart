@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:iconsax/iconsax.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -237,7 +238,7 @@ class BreakTimeSelector extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.developer_mode, size: 16, color: Colors.purple),
+          Icon(Iconsax.code, size: 16, color: Colors.purple),
           const SizedBox(width: 8),
           Text(
             'DEV:',
@@ -425,8 +426,8 @@ class _BreakTimeRow extends StatelessWidget {
                         children: [
                           Icon(
                             isSelected
-                                ? Icons.check_circle
-                                : Icons.radio_button_unchecked,
+                                ? Iconsax.tick_circle
+                                : Iconsax.record,
                             size: 16,
                             color: isSelected ? Colors.white : AppColors.primary,
                           ),
@@ -554,7 +555,7 @@ class _PersonChip extends StatelessWidget {
               color: isCurrentUser ? AppColors.primary : AppColors.tertiary,
             ),
             child: const Icon(
-              Icons.person,
+              Iconsax.user,
               size: 10,
               color: Colors.white,
             ),

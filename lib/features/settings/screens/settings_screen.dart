@@ -23,6 +23,9 @@ import '../../shift_summary/services/shift_summary_service.dart';
 import '../../shift_summary/providers/shift_summary_provider.dart';
 import '../../home/services/home_service.dart';
 import '../../home/services/clock_service.dart';
+import '../../dd_handover/screens/dd_list_screen.dart';
+import '../../dd_handover/providers/dd_provider.dart';
+import '../../dd_handover/services/dd_service.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -413,7 +416,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       height: 80,
       color: AppColors.accent1,
       child: const Icon(
-        Icons.person,
+        Iconsax.user,
         size: 40,
         color: AppColors.primary,
       ),
@@ -441,6 +444,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           Divider(height: 1, color: AppColors.alternate),
           _buildShiftMenuItem(),
+          Divider(height: 1, color: AppColors.alternate),
+          _buildDDMenuItem(),
           Divider(height: 1, color: AppColors.alternate),
           _buildMenuItem(
             icon: Iconsax.warning_2,
@@ -478,6 +483,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const ShiftSummaryScreen()),
+        );
+      },
+    );
+  }
+
+  /// Build DD menu item with badge for pending DD tasks
+  Widget _buildDDMenuItem() {
+    final pendingDDAsync = ref.watch(pendingDDCountProvider);
+    final badgeCount = pendingDDAsync.maybeWhen(
+      data: (count) => count,
+      orElse: () => 0,
+    );
+
+    return _buildMenuItem(
+      icon: Iconsax.hospital,
+      label: 'งาน DD',
+      badgeCount: badgeCount,
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const DDListScreen()),
         );
       },
     );
@@ -643,6 +669,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     HomeService.instance.invalidateCache();
     ClockService.instance.invalidateCache();
     ShiftSummaryService.instance.invalidateCache();
+    DDService.instance.invalidateCache();
   }
 
   Widget _buildDevUserSelector() {
@@ -899,7 +926,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             // Check icon
             if (isSelected)
               Icon(
-                Iconsax.tick_circle5,
+                Iconsax.tick_circle,
                 size: 20,
                 color: Colors.purple,
               ),
@@ -1248,7 +1275,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           Row(
             children: [
               const Icon(
-                Icons.workspace_premium,
+                Iconsax.medal_star,
                 color: AppColors.primary,
                 size: 20,
               ),

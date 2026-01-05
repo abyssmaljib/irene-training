@@ -203,7 +203,7 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
         backgroundColor: AppColors.surface,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: AppColors.textPrimary),
+          icon: Icon(Iconsax.arrow_left, color: AppColors.textPrimary),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: _showSearch
@@ -239,7 +239,7 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
           // Search toggle
           IconButton(
             icon: Icon(
-              _showSearch ? Icons.close : Iconsax.search_normal,
+              _showSearch ? Iconsax.close_circle : Iconsax.search_normal,
               color: _showSearch ? AppColors.error : AppColors.textPrimary,
             ),
             onPressed: _toggleSearch,

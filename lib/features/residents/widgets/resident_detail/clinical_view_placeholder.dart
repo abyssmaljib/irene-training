@@ -31,14 +31,14 @@ class ClinicalViewPlaceholder extends StatelessWidget {
             ),
             AppSpacing.verticalGapLg,
             Text(
-              'Clinical View',
+              'มุมมองคลินิก',
               style: AppTypography.heading2.copyWith(
                 color: AppColors.secondaryText,
               ),
             ),
             AppSpacing.verticalGapSm,
             Text(
-              'Coming Soon',
+              'เร็วๆ นี้',
               style: AppTypography.title.copyWith(
                 color: AppColors.primary,
               ),

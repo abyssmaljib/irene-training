@@ -489,7 +489,7 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
           AppSpacing.horizontalGapXs,
           GestureDetector(
             onTap: onRemove,
-            child: Icon(Icons.close, size: 14, color: AppColors.primary),
+            child: Icon(Iconsax.close_circle, size: 14, color: AppColors.primary),
           ),
         ],
       ),
@@ -947,7 +947,7 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
         children: [
           if (showCheck) ...[
             Icon(
-              Icons.check_circle_outline,
+              Iconsax.tick_circle,
               size: 14,
               color: textColor,
             ),
@@ -1053,7 +1053,7 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
         children: [
           if (isCompleted) ...[
             Icon(
-              Icons.check_circle_outline,
+              Iconsax.tick_circle,
               size: 14,
               color: textColor,
             ),

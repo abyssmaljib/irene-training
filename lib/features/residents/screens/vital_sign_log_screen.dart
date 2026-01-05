@@ -100,7 +100,7 @@ class _VitalSignLogScreenState extends ConsumerState<VitalSignLogScreen> {
         backgroundColor: AppColors.surface,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: AppColors.textPrimary),
+          icon: Icon(Iconsax.arrow_left, color: AppColors.textPrimary),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Column(
@@ -225,7 +225,7 @@ class _VitalSignLogScreenState extends ConsumerState<VitalSignLogScreen> {
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                Icons.monitor_heart_outlined,
+                Iconsax.heart,
                 size: 40,
                 color: AppColors.primary,
               ),

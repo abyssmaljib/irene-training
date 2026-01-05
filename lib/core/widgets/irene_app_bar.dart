@@ -38,86 +38,112 @@ class IreneAppBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final rightActions = _buildRightActions(context);
+
     return SliverAppBar(
       pinned: false,
       floating: true,
-      snap: true, // Snap back immediately when scrolling up
+      snap: true,
       backgroundColor: AppColors.secondaryBackground,
       automaticallyImplyLeading: false,
       elevation: 0,
-      title: Row(
-        children: [
-          // Left: Filter button
-          if (showFilterButton)
-            _FilterButton(
-              isActive: isFilterActive,
-              count: filterCount,
-              onTap: onFilterTap,
-            )
-          else
-            SizedBox(width: 40), // Placeholder for balance
-
-          // Center: Title with optional badge
-          Expanded(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Spacer to offset the badge width for visual centering
-                if (titleBadge != null || showDevBadge) SizedBox(width: 20),
-                Text(
-                  title,
-                  style: AppTypography.heading2,
-                ),
-                // Dev mode badge
-                if (showDevBadge) ...[
-                  SizedBox(width: 6),
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFE082), // Amber light
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
-                        color: const Color(0xFFFFB300), // Amber
-                        width: 1,
-                      ),
-                    ),
-                    child: Text(
-                      'DEV',
-                      style: AppTypography.caption.copyWith(
-                        color: const Color(0xFFE65100), // Deep orange
-                        fontWeight: FontWeight.w700,
-                        fontSize: 9,
-                      ),
+      titleSpacing: 0,
+      title: SizedBox(
+        height: kToolbarHeight,
+        child: Stack(
+          children: [
+            // Center: Title อยู่ตรงกลางหน้าจอเสมอ (badge อยู่ข้างๆ ไม่นับรวม)
+            Positioned.fill(
+              child: Row(
+                children: [
+                  // Spacer ซ้าย - ขยายเท่ากับฝั่งขวา
+                  Expanded(child: SizedBox.shrink()),
+                  // Title ตรงกลาง
+                  Text(
+                    title,
+                    style: AppTypography.heading2,
+                  ),
+                  // Spacer ขวา + badges
+                  Expanded(
+                    child: Row(
+                      children: [
+                        // Dev mode badge
+                        if (showDevBadge) ...[
+                          SizedBox(width: 6),
+                          Container(
+                            padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFE082),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: const Color(0xFFFFB300),
+                                width: 1,
+                              ),
+                            ),
+                            child: Text(
+                              'DEV',
+                              style: AppTypography.caption.copyWith(
+                                color: const Color(0xFFE65100),
+                                fontWeight: FontWeight.w700,
+                                fontSize: 9,
+                              ),
+                            ),
+                          ),
+                        ],
+                        // Title badge (count)
+                        if (titleBadge != null) ...[
+                          SizedBox(width: 8),
+                          Container(
+                            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.background,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              titleBadge!,
+                              style: AppTypography.body.copyWith(
+                                color: AppColors.secondaryText,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                 ],
-                if (titleBadge != null) ...[
-                  SizedBox(width: 8),
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.background,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      titleBadge!,
-                      style: AppTypography.body.copyWith(
-                        color: AppColors.secondaryText,
-                      ),
-                    ),
-                  ),
-                ],
-              ],
+              ),
             ),
-          ),
 
-          // Right: Actions (custom actions + profile)
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: _buildRightActions(context),
-          ),
-        ],
+            // Left: Filter button (padding 8px จากขอบ)
+            if (showFilterButton)
+              Positioned(
+                left: AppSpacing.sm,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: _FilterButton(
+                    isActive: isFilterActive,
+                    count: filterCount,
+                    onTap: onFilterTap,
+                  ),
+                ),
+              ),
+
+            // Right: Actions (padding 8px จากขอบ)
+            if (rightActions.isNotEmpty)
+              Positioned(
+                right: AppSpacing.sm,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: rightActions,
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
       centerTitle: false,
     );

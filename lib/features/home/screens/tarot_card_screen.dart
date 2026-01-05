@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:confetti/confetti.dart';
+import 'package:iconsax/iconsax.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../models/tarot_card.dart';
@@ -291,7 +292,7 @@ class _TarotCardScreenState extends State<TarotCardScreen>
         break;
       case _AnimationPhase.reveal:
         title = '🔮 ไพ่ของคุณวันนี้ 🔮';
-        subtitle = _isFlipped ? 'Core Value ประจำวัน' : 'กำลังเปิดไพ่...';
+        subtitle = _isFlipped ? 'ค่านิยมหลักประจำวัน' : 'กำลังเปิดไพ่...';
         break;
     }
 
@@ -727,7 +728,7 @@ class _TarotCardScreenState extends State<TarotCardScreen>
               color: const Color(0xFF2C1654),
               child: Center(
                 child: Icon(
-                  Icons.auto_awesome,
+                  Iconsax.magic_star,
                   color: const Color(0xFFFFD700),
                   size: 40,
                 ),

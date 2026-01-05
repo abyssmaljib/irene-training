@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
+import '../../../core/services/user_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -8,7 +9,7 @@ import '../models/dd_record.dart';
 import '../providers/dd_provider.dart';
 
 /// Summary Card สำหรับแสดงบน Home - แสดงจำนวน DD ที่รอทำ
-class DDSummaryCard extends ConsumerWidget {
+class DDSummaryCard extends ConsumerStatefulWidget {
   final VoidCallback? onTap;
 
   const DDSummaryCard({
@@ -16,12 +17,36 @@ class DDSummaryCard extends ConsumerWidget {
     this.onTap,
   });
 
+  @override
+  ConsumerState<DDSummaryCard> createState() => _DDSummaryCardState();
+}
+
+class _DDSummaryCardState extends ConsumerState<DDSummaryCard> {
+  final _userService = UserService();
+
   // สีพิเศษสำหรับ DD Card
   static const _backgroundColor = Color(0xFFFFFFD9);
   static const _borderColor = Color(0xFFF1EF99);
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  void initState() {
+    super.initState();
+    _userService.userChangedNotifier.addListener(_onUserChanged);
+  }
+
+  @override
+  void dispose() {
+    _userService.userChangedNotifier.removeListener(_onUserChanged);
+    super.dispose();
+  }
+
+  void _onUserChanged() {
+    // Invalidate provider when user changes (impersonation)
+    ref.invalidate(ddRecordsProvider);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final pendingRecordsAsync = ref.watch(pendingDDRecordsProvider);
 
     return pendingRecordsAsync.when(
@@ -65,7 +90,7 @@ class DDSummaryCard extends ConsumerWidget {
     final firstRecord = records.first;
 
     return GestureDetector(
-      onTap: onTap,
+      onTap: widget.onTap,
       child: Container(
         margin: EdgeInsets.only(bottom: AppSpacing.md),
         decoration: BoxDecoration(

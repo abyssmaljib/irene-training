@@ -134,7 +134,7 @@ class TagPickerWidget extends ConsumerWidget {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
-              isHandover ? Icons.swap_horiz : Icons.swap_horiz_outlined,
+              isHandover ? Iconsax.arrow_swap_horizontal : Iconsax.arrow_swap_horizontal,
               color: isHandover ? AppColors.success : AppColors.secondaryText,
               size: 20,
             ),

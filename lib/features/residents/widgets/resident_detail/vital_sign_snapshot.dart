@@ -311,7 +311,7 @@ class EmptyVitalSign extends StatelessWidget {
       child: Column(
         children: [
           Icon(
-            Icons.monitor_heart_outlined,
+            Iconsax.heart,
             size: 48,
             color: AppColors.secondaryText,
           ),
@@ -326,7 +326,7 @@ class EmptyVitalSign extends StatelessWidget {
             AppSpacing.verticalGapMd,
             TextButton.icon(
               onPressed: onAdd,
-              icon: Icon(Icons.add, size: 18),
+              icon: Icon(Iconsax.add, size: 18),
               label: Text('เพิ่มสัญญาณชีพ'),
               style: TextButton.styleFrom(
                 foregroundColor: AppColors.primary,

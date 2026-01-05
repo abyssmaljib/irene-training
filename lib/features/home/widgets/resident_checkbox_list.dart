@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:iconsax/iconsax.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -103,7 +104,7 @@ class ResidentCheckboxList extends StatelessWidget {
             child: Column(
               children: [
                 Icon(
-                  Icons.person_off_outlined,
+                  Iconsax.user_remove,
                   size: 48,
                   color: AppColors.secondaryText,
                 ),
@@ -224,14 +225,14 @@ class _ResidentListItem extends StatelessWidget {
                           placeholder: (context, url) => Container(
                             color: AppColors.alternate,
                             child: Icon(
-                              Icons.person,
+                              Iconsax.user,
                               color: AppColors.secondaryText,
                             ),
                           ),
                           errorWidget: (context, url, error) => Container(
                             color: AppColors.alternate,
                             child: Icon(
-                              Icons.person,
+                              Iconsax.user,
                               color: AppColors.secondaryText,
                             ),
                           ),
@@ -239,7 +240,7 @@ class _ResidentListItem extends StatelessWidget {
                       : Container(
                           color: AppColors.alternate,
                           child: Icon(
-                            Icons.person,
+                            Iconsax.user,
                             color: AppColors.secondaryText,
                           ),
                         ),

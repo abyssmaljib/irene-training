@@ -384,25 +384,25 @@ class _MealSectionCardState extends State<MealSectionCard>
         // เขียว - รูปตรง
         bgColor = const Color(0xFFDCFCE7); // green-100
         textColor = const Color(0xFF166534); // green-800
-        icon = Icons.check_circle;
+        icon = Iconsax.tick_circle;
         break;
       case NurseMarkStatus.incorrect:
         // แดง - รูปไม่ตรง
         bgColor = const Color(0xFFFEE2E2); // red-100
         textColor = const Color(0xFFDC2626); // red-600
-        icon = Icons.cancel;
+        icon = Iconsax.close_circle;
         break;
       case NurseMarkStatus.noPhoto:
         // เทา - ไม่มีรูป
         bgColor = const Color(0xFFF3F4F6); // gray-100
         textColor = const Color(0xFF6B7280); // gray-500
-        icon = Icons.image_not_supported;
+        icon = Iconsax.gallery_slash;
         break;
       case NurseMarkStatus.swapped:
         // เหลือง - ตำแหน่งสลับ
         bgColor = const Color(0xFFFEF3C7); // amber-100
         textColor = const Color(0xFFD97706); // amber-600
-        icon = Icons.swap_horiz;
+        icon = Iconsax.arrow_swap_horizontal;
         break;
       case NurseMarkStatus.none:
         return const SizedBox.shrink();
@@ -954,35 +954,35 @@ class _QCButtonState extends State<_QCButton>
         return (
           color: const Color(0xFF166534), // green-800
           bgColor: const Color(0xFFDCFCE7), // green-100
-          icon: Icons.check_circle,
+          icon: Iconsax.tick_circle,
           label: 'รูปตรง',
         );
       case NurseMarkStatus.incorrect:
         return (
           color: const Color(0xFFDC2626), // red-600
           bgColor: const Color(0xFFFEE2E2), // red-100
-          icon: Icons.cancel,
+          icon: Iconsax.close_circle,
           label: 'รูปไม่ตรง',
         );
       case NurseMarkStatus.noPhoto:
         return (
           color: const Color(0xFF6B7280), // gray-500
           bgColor: const Color(0xFFF3F4F6), // gray-100
-          icon: Icons.image_not_supported,
+          icon: Iconsax.gallery_slash,
           label: 'ไม่มีรูป',
         );
       case NurseMarkStatus.swapped:
         return (
           color: const Color(0xFFD97706), // amber-600
           bgColor: const Color(0xFFFEF3C7), // amber-100
-          icon: Icons.swap_horiz,
+          icon: Iconsax.arrow_swap_horizontal,
           label: 'ตำแหน่งสลับ',
         );
       case NurseMarkStatus.none:
         return (
           color: Colors.white,
           bgColor: Colors.transparent,
-          icon: Icons.touch_app,
+          icon: Iconsax.finger_scan,
           label: 'ตรวจสอบ',
         );
     }
@@ -1078,7 +1078,7 @@ class _QCButtonState extends State<_QCButton>
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                Icons.touch_app,
+                Iconsax.finger_scan,
                 size: 16,
                 color: Colors.white,
               ),
@@ -1153,7 +1153,7 @@ class _QCBottomSheet extends StatelessWidget {
                     child: _buildOption(
                       context,
                       status: 'รูปตรง',
-                      icon: Icons.check_circle,
+                      icon: Iconsax.tick_circle,
                       color: const Color(0xFF22C55E), // green-500
                       bgColor: const Color(0xFFDCFCE7), // green-100
                       isSelected: currentStatus == NurseMarkStatus.correct,
@@ -1164,7 +1164,7 @@ class _QCBottomSheet extends StatelessWidget {
                     child: _buildOption(
                       context,
                       status: 'รูปไม่ตรง',
-                      icon: Icons.cancel,
+                      icon: Iconsax.close_circle,
                       color: const Color(0xFFEF4444), // red-500
                       bgColor: const Color(0xFFFEE2E2), // red-100
                       isSelected: currentStatus == NurseMarkStatus.incorrect,
@@ -1179,7 +1179,7 @@ class _QCBottomSheet extends StatelessWidget {
                     child: _buildOption(
                       context,
                       status: 'ไม่มีรูป',
-                      icon: Icons.image_not_supported,
+                      icon: Iconsax.gallery_slash,
                       color: const Color(0xFF6B7280), // gray-500
                       bgColor: const Color(0xFFF3F4F6), // gray-100
                       isSelected: currentStatus == NurseMarkStatus.noPhoto,
@@ -1190,7 +1190,7 @@ class _QCBottomSheet extends StatelessWidget {
                     child: _buildOption(
                       context,
                       status: 'ตำแหน่งสลับ',
-                      icon: Icons.swap_horiz,
+                      icon: Iconsax.arrow_swap_horizontal,
                       color: const Color(0xFFD97706), // amber-600
                       bgColor: const Color(0xFFFEF3C7), // amber-100
                       isSelected: currentStatus == NurseMarkStatus.swapped,
@@ -1223,7 +1223,7 @@ class _QCBottomSheet extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
-                            Icons.refresh,
+                            Iconsax.refresh,
                             size: 18,
                             color: AppColors.error,
                           ),

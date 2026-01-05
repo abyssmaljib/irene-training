@@ -221,7 +221,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
             Text(
-              'Healthcare Management System',
+              'ระบบบริหารจัดการสุขภาพ',
               style: AppTypography.caption.copyWith(
                 color: AppColors.surface.withValues(alpha: 0.7),
               ),
@@ -346,7 +346,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   borderRadius: BorderRadius.circular(AppSpacing.xs + 2), // 6px for inner toggle
                 ),
                 child: Text(
-                  'OTP',
+                  'รหัสครั้งเดียว (OTP)',
                   textAlign: TextAlign.center,
                   style: AppTypography.bodySmall.copyWith(
                     fontWeight: FontWeight.w600,

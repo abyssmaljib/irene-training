@@ -86,7 +86,7 @@ class _BadgeInfoDialogState extends State<BadgeInfoDialog>
                 child: Row(
                   children: [
                     const Icon(
-                      Icons.workspace_premium,
+                      Iconsax.medal_star,
                       color: AppColors.primary,
                       size: 24,
                     ),
@@ -137,7 +137,7 @@ class _BadgeInfoDialogState extends State<BadgeInfoDialog>
                       width: 48,
                       height: 48,
                       child: IconButton(
-                        icon: const Icon(Icons.close),
+                        icon: const Icon(Iconsax.close_circle),
                         onPressed: () => Navigator.pop(context),
                       ),
                     ),
@@ -399,7 +399,7 @@ class _BadgeInfoDialogState extends State<BadgeInfoDialog>
                       border: Border.all(color: AppColors.surface, width: 2),
                     ),
                     child: const Icon(
-                      Icons.check,
+                      Iconsax.tick_circle,
                       size: 12,
                       color: Colors.white,
                     ),
@@ -508,7 +508,7 @@ class _BadgeInfoDialogState extends State<BadgeInfoDialog>
                     ),
                     const Spacer(),
                     Icon(
-                      Icons.stars_rounded,
+                      Iconsax.star1,
                       size: 14,
                       color: AppColors.warning,
                     ),

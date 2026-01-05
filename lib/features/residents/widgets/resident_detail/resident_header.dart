@@ -157,7 +157,7 @@ class ResidentHeader extends StatelessWidget {
     // Special status badges
     if (resident.isFallRisk) {
       badges.add(_buildBadge(
-        label: 'Fall Risk',
+        label: 'เสี่ยงล้ม',
         backgroundColor: AppColors.tagFailedBg,
         textColor: AppColors.tagFailedText,
         icon: Iconsax.warning_2,

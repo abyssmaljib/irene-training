@@ -62,19 +62,19 @@ class MonthlySummaryCard extends StatelessWidget {
                 color: AppColors.primary,
                 fontWeight: FontWeight.w600,
               ),
-              // WD (Workday)
-              _buildCell('${summary.workdayTotal ?? "-"}'),
-              // OT (Additional)
+              // WD (Required Workdays 26-25)
+              _buildCell('${summary.requiredWorkdays26To25 ?? "-"}'),
+              // OT (Previous OT - ยกมาจากเดือนก่อน)
               _buildCell(
-                '${summary.totalAdditional ?? 0}',
-                color: (summary.totalAdditional ?? 0) > 0
+                '${summary.pot ?? 0}',
+                color: (summary.pot ?? 0) > 0
                     ? AppColors.success
                     : null,
               ),
-              // DD
+              // DD (Previous DD - ยกมาจากเดือนก่อน)
               _buildCell(
-                '${summary.ddCount}',
-                color: summary.ddCount > 0 ? AppColors.info : null,
+                '${summary.pdd ?? 0}',
+                color: (summary.pdd ?? 0) > 0 ? const Color(0xFFE67E22) : null, // Orange สีเข้ม
               ),
               // Inc (Incharge)
               _buildCell(
@@ -96,6 +96,16 @@ class MonthlySummaryCard extends StatelessWidget {
               _buildCell(
                 '${summary.supportCount}',
                 color: summary.supportCount > 0 ? AppColors.warning : null,
+              ),
+              // (+) Total Additional
+              _buildCell(
+                '${summary.totalAdditional ?? 0}',
+                color: (summary.totalAdditional ?? 0) > 0 ? AppColors.success : null,
+              ),
+              // (-) Total Deduction
+              _buildCell(
+                '${summary.totalDeduction?.toInt() ?? 0}',
+                color: (summary.totalDeduction ?? 0) > 0 ? AppColors.error : null,
               ),
             ],
           ),

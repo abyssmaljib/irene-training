@@ -200,7 +200,7 @@ class _PhotoPreviewScreenState extends State<PhotoPreviewScreen> {
         ),
         leading: IconButton(
           onPressed: () => Navigator.pop(context, null),
-          icon: const Icon(Icons.close),
+          icon: const Icon(Iconsax.close_circle),
         ),
       ),
       body: SafeArea(
@@ -256,7 +256,7 @@ class _PhotoPreviewScreenState extends State<PhotoPreviewScreen> {
                           onPressed: _isProcessing
                               ? null
                               : () => Navigator.pop(context, null),
-                          icon: const Icon(Icons.close),
+                          icon: const Icon(Iconsax.close_circle),
                           label: const Text('ถ่ายใหม่'),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: Colors.white70,
@@ -280,7 +280,7 @@ class _PhotoPreviewScreenState extends State<PhotoPreviewScreen> {
                                     color: Colors.white,
                                   ),
                                 )
-                              : const Icon(Icons.check),
+                              : const Icon(Iconsax.tick_square),
                           label: Text(_isProcessing ? 'กำลังประมวลผล...' : 'ยืนยัน'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: borderColor,

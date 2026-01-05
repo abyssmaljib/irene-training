@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:iconsax/iconsax.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../models/tarot_card.dart';
@@ -59,7 +60,7 @@ class TarotCoreValueCard extends StatelessWidget {
                       const Text('✨', style: TextStyle(fontSize: 14)),
                       AppSpacing.horizontalGapXs,
                       Text(
-                        'Core Value วันนี้',
+                        'ค่านิยมหลักวันนี้',
                         style: AppTypography.caption.copyWith(
                           color: const Color(0xFFFFD700),
                           fontWeight: FontWeight.w600,
@@ -100,7 +101,7 @@ class TarotCoreValueCard extends StatelessWidget {
             ),
             // Tap hint
             Icon(
-              Icons.touch_app_outlined,
+              Iconsax.finger_scan,
               color: Colors.white.withValues(alpha: 0.4),
               size: 20,
             ),

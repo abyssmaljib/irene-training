@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:iconsax/iconsax.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -74,7 +75,7 @@ class _SickLeaveClaimSheetState extends ConsumerState<SickLeaveClaimSheet> {
                   ),
                   IconButton(
                     onPressed: () => Navigator.pop(context),
-                    icon: Icon(Icons.close),
+                    icon: Icon(Iconsax.close_circle),
                     padding: EdgeInsets.zero,
                     constraints: BoxConstraints(minWidth: 32, minHeight: 32),
                   ),
@@ -211,7 +212,7 @@ class _SickLeaveClaimSheetState extends ConsumerState<SickLeaveClaimSheet> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
-                  _fileBytes != null ? Icons.check_circle : Icons.upload_file,
+                  _fileBytes != null ? Iconsax.tick_circle : Iconsax.document_upload,
                   color: _fileBytes != null
                       ? AppColors.success
                       : AppColors.secondaryText,

@@ -17,9 +17,9 @@ class ViewSegmentedControl extends StatelessWidget {
   });
 
   static const _segments = [
-    (label: 'CARE', icon: Iconsax.heart, type: DetailViewType.care),
-    (label: 'CLINICAL', icon: Iconsax.health, type: DetailViewType.clinical),
-    (label: 'INFO', icon: Iconsax.user, type: DetailViewType.info),
+    (label: 'ดูแล', icon: Iconsax.heart, type: DetailViewType.care),
+    (label: 'คลินิก', icon: Iconsax.health, type: DetailViewType.clinical),
+    (label: 'ข้อมูล', icon: Iconsax.user, type: DetailViewType.info),
   ];
 
   @override
