@@ -5,6 +5,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../models/resident_detail.dart';
 import '../../models/vital_sign.dart';
+import '../../screens/vital_sign_log_screen.dart';
 import 'vital_sign_snapshot.dart';
 import 'activity_log_section.dart';
 
@@ -38,6 +39,11 @@ class CareDashboardView extends StatelessWidget {
               onTapPulse: () => _showVitalDetail(context, 'Pulse'),
               onTapSpO2: () => _showVitalDetail(context, 'SpO2'),
               onTapTemp: () => _showVitalDetail(context, 'Temp'),
+              onTapViewAll: () => navigateToVitalSignLog(
+                context,
+                residentId: resident.id,
+                residentName: resident.name,
+              ),
             )
           else
             EmptyVitalSign(

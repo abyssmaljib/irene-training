@@ -327,7 +327,7 @@ class _ResidentPickerSheetState extends ConsumerState<ResidentPickerSheet> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    resident.name,
+                    'คุณ${resident.name}',
                     style: AppTypography.body.copyWith(
                       fontWeight: FontWeight.w500,
                     ),

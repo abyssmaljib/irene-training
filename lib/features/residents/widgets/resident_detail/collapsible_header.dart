@@ -92,7 +92,7 @@ class CollapsibleResidentHeader extends StatelessWidget {
             ),
             SizedBox(width: 8),
             Text(
-              resident.name,
+              'คุณ${resident.name}',
               style: AppTypography.title.copyWith(
                 color: AppColors.textPrimary,
                 fontSize: 16,
@@ -173,7 +173,7 @@ class CollapsibleResidentHeader extends StatelessWidget {
       children: [
         // Name
         Text(
-          resident.name,
+          'คุณ${resident.name}',
           style: AppTypography.title.copyWith(
             color: AppColors.textPrimary,
             fontWeight: FontWeight.w600,

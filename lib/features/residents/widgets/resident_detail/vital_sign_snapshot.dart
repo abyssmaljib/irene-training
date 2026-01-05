@@ -12,6 +12,7 @@ class VitalSignSnapshot extends StatelessWidget {
   final VoidCallback? onTapPulse;
   final VoidCallback? onTapSpO2;
   final VoidCallback? onTapTemp;
+  final VoidCallback? onTapViewAll;
 
   const VitalSignSnapshot({
     super.key,
@@ -20,6 +21,7 @@ class VitalSignSnapshot extends StatelessWidget {
     this.onTapPulse,
     this.onTapSpO2,
     this.onTapTemp,
+    this.onTapViewAll,
   });
 
   @override
@@ -44,6 +46,30 @@ class VitalSignSnapshot extends StatelessWidget {
                     color: AppColors.secondaryText,
                   ),
                 ),
+              if (onTapViewAll != null) ...[
+                SizedBox(width: 8),
+                GestureDetector(
+                  onTap: onTapViewAll,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'ดูทั้งหมด',
+                        style: AppTypography.bodySmall.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      SizedBox(width: 2),
+                      Icon(
+                        Iconsax.arrow_right_3,
+                        size: 14,
+                        color: AppColors.primary,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
         ),

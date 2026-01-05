@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../core/services/user_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -156,8 +157,8 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
 
   Future<void> _loadResidents() async {
     try {
-      final user = Supabase.instance.client.auth.currentUser;
-      if (user == null) {
+      final userId = UserService().effectiveUserId;
+      if (userId == null) {
         setState(() => _isLoadingResidents = false);
         return;
       }
@@ -165,7 +166,7 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
       final userInfo = await Supabase.instance.client
           .from('user_info')
           .select('nursinghome_id')
-          .eq('id', user.id)
+          .eq('id', userId)
           .maybeSingle();
 
       final nursinghomeId = userInfo?['nursinghome_id'] as int?;
@@ -729,7 +730,7 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
     // ไปหน้าสร้างรายงานของ resident โดยตรง
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('ไปหน้าสร้างรายงานของ ${resident.name} - Coming Soon'),
+        content: Text('ไปหน้าสร้างรายงานของ คุณ${resident.name} - Coming Soon'),
         backgroundColor: AppColors.tagPendingText,
         duration: Duration(seconds: 2),
       ),
@@ -770,7 +771,7 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
                       children: [
                         // Name
                         Text(
-                          resident.name,
+                          'คุณ${resident.name}',
                           style: AppTypography.title.copyWith(
                             color: AppColors.primaryText,
                           ),

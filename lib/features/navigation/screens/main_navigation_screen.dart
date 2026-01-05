@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -8,16 +9,37 @@ import '../../checklist/screens/checklist_screen.dart';
 import '../../board/screens/board_screen.dart';
 import '../../residents/screens/residents_screen.dart';
 import '../../settings/screens/settings_screen.dart';
+import '../../shift_summary/providers/shift_summary_provider.dart';
 
-class MainNavigationScreen extends StatefulWidget {
-  const MainNavigationScreen({super.key});
+class MainNavigationScreen extends ConsumerStatefulWidget {
+  final int initialIndex;
+
+  const MainNavigationScreen({super.key, this.initialIndex = 0});
+
+  /// Navigate to a specific tab
+  static void navigateToTab(BuildContext context, int index) {
+    final state = context.findAncestorStateOfType<_MainNavigationScreenState>();
+    state?.setTab(index);
+  }
 
   @override
-  State<MainNavigationScreen> createState() => _MainNavigationScreenState();
+  ConsumerState<MainNavigationScreen> createState() => _MainNavigationScreenState();
 }
 
-class _MainNavigationScreenState extends State<MainNavigationScreen> {
+class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
   int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+  }
+
+  void setTab(int index) {
+    setState(() {
+      _currentIndex = index;
+    });
+  }
 
   final List<Widget> _screens = [
     const HomeScreen(),
@@ -69,12 +91,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   activeIcon: Iconsax.clipboard_text5,
                   label: 'กระดานข่าว',
                 ),
-                _buildNavItem(
-                  index: 4,
-                  icon: Iconsax.user,
-                  activeIcon: Iconsax.user,
-                  label: 'โปรไฟล์',
-                ),
+                _buildProfileNavItem(),
               ],
             ),
           ),
@@ -112,6 +129,73 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             AppSpacing.verticalGapXs,
             Text(
               label,
+              textAlign: TextAlign.center,
+              style: AppTypography.caption.copyWith(
+                fontSize: 10,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                color: isSelected ? AppColors.primary : AppColors.secondaryText,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Build profile nav item with notification badge for pending absences
+  Widget _buildProfileNavItem() {
+    final pendingAbsenceAsync = ref.watch(pendingAbsenceCountProvider);
+    final hasPendingAbsence = pendingAbsenceAsync.maybeWhen(
+      data: (count) => count > 0,
+      orElse: () => false,
+    );
+
+    final isSelected = _currentIndex == 4;
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _currentIndex = 4;
+        });
+      },
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        width: 72,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(
+                  isSelected ? Iconsax.user : Iconsax.user,
+                  color: isSelected ? AppColors.primary : AppColors.secondaryText,
+                  size: 24,
+                ),
+                // Red notification dot for pending absences
+                if (hasPendingAbsence)
+                  Positioned(
+                    right: -4,
+                    top: -4,
+                    child: Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: AppColors.error,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: AppColors.secondaryBackground,
+                          width: 1.5,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            AppSpacing.verticalGapXs,
+            Text(
+              'โปรไฟล์',
               textAlign: TextAlign.center,
               style: AppTypography.caption.copyWith(
                 fontSize: 10,

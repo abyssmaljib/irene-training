@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../core/services/user_service.dart';
 
 /// ตรวจสอบว่ารันบน desktop หรือไม่ (Windows, macOS, Linux)
 bool get _isDesktop {
@@ -108,7 +109,7 @@ class CameraService {
           .eq('meal', mealKey)
           .eq('Created_Date', dateStr);
 
-      final userId = _supabase.auth.currentUser?.id;
+      final userId = UserService().effectiveUserId;
 
       if ((existingLogs as List).isNotEmpty) {
         // Update log ที่มีอยู่

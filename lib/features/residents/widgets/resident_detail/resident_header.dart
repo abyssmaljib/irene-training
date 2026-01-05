@@ -76,7 +76,7 @@ class ResidentHeader extends StatelessWidget {
       children: [
         // Name
         Text(
-          resident.name,
+          'คุณ${resident.name}',
           style: AppTypography.title.copyWith(
             color: AppColors.textPrimary,
             fontWeight: FontWeight.w600,

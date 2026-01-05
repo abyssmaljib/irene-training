@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/services/user_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -113,14 +114,14 @@ class _AdvancedCreatePostScreenState
     setState(() => _isSubmitting = true);
 
     try {
-      final user = Supabase.instance.client.auth.currentUser;
-      if (user == null) throw Exception('Not authenticated');
+      final userId = UserService().effectiveUserId;
+      if (userId == null) throw Exception('Not authenticated');
 
       // Get user's nursinghome_id
       final userInfo = await Supabase.instance.client
           .from('user_info')
           .select('nursinghome_id')
-          .eq('id', user.id)
+          .eq('id', userId)
           .single();
       final nursinghomeId = userInfo['nursinghome_id'] as int;
 
@@ -138,19 +139,29 @@ class _AdvancedCreatePostScreenState
       if (state.selectedVideo != null) {
         videoUrl = await PostMediaService.instance.uploadVideo(
           state.selectedVideo!,
-          userId: user.id,
+          userId: userId,
         );
+      }
+
+      // Build tag topics list
+      List<String>? tagTopics;
+      if (state.selectedTag != null) {
+        tagTopics = [state.selectedTag!.name];
+      }
+      // เพิ่ม "ส่งให้ญาติ" ถ้าเลือก
+      if (state.sendToFamily) {
+        tagTopics = [...?tagTopics, 'ส่งให้ญาติ'];
       }
 
       // Create post
       final postId = await PostActionService.instance.createPost(
-        userId: user.id,
+        userId: userId,
         nursinghomeId: nursinghomeId,
         text: text,
         title: _titleController.text.trim().isEmpty
             ? null
             : _titleController.text.trim(),
-        tagName: state.selectedTag?.name,
+        tagTopics: tagTopics,
         isHandover: state.isHandover,
         residentId: state.selectedResidentId,
         imageUrls: imageUrls.isEmpty ? null : imageUrls,
@@ -345,6 +356,12 @@ class _AdvancedCreatePostScreenState
                 _buildHandoverToggle(state),
               ],
 
+              // Send to family toggle (แสดงเมื่อเลือก resident แล้ว)
+              if (state.selectedResidentId != null) ...[
+                AppSpacing.verticalGapSm,
+                _buildSendToFamilyToggle(state),
+              ],
+
               AppSpacing.verticalGapLg,
 
               // Image preview
@@ -537,6 +554,44 @@ class _AdvancedCreatePostScreenState
             : isHandover
                 ? 'โพสนี้จะถูกส่งต่อให้เวรถัดไป'
                 : 'โพสนี้จะไม่ถูกส่งต่อ',
+        style: AppTypography.caption.copyWith(
+          color: AppColors.secondaryText,
+        ),
+      ),
+      activeTrackColor: AppColors.primary,
+      contentPadding: EdgeInsets.zero,
+      dense: true,
+    );
+  }
+
+  Widget _buildSendToFamilyToggle(CreatePostState state) {
+    final sendToFamily = state.sendToFamily;
+
+    return SwitchListTile(
+      value: sendToFamily,
+      onChanged: (value) {
+        ref.read(createPostProvider.notifier).setSendToFamily(value);
+      },
+      title: Row(
+        children: [
+          Icon(
+            Iconsax.people,
+            size: 20,
+            color: sendToFamily ? AppColors.primary : AppColors.secondaryText,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'ส่งให้ญาติ',
+            style: AppTypography.body.copyWith(
+              color: AppColors.primaryText,
+            ),
+          ),
+        ],
+      ),
+      subtitle: Text(
+        sendToFamily
+            ? 'จะแจ้งเตือนไปยังญาติของผู้พักอาศัย'
+            : 'เลือกถ้าต้องการแจ้งญาติ',
         style: AppTypography.caption.copyWith(
           color: AppColors.secondaryText,
         ),

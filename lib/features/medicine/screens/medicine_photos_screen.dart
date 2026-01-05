@@ -171,7 +171,7 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    widget.residentName,
+                    'คุณ${widget.residentName}',
                     style: AppTypography.title,
                   ),
                   Text(

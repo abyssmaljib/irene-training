@@ -18,6 +18,9 @@ class IreneAppBar extends StatelessWidget {
   final VoidCallback? onProfileTap;
   final Widget? trailing;
 
+  /// แสดง DEV badge ข้างๆ title (สำหรับ dev mode)
+  final bool showDevBadge;
+
   const IreneAppBar({
     super.key,
     required this.title,
@@ -30,6 +33,7 @@ class IreneAppBar extends StatelessWidget {
     this.onFilterTap,
     this.onProfileTap,
     this.trailing,
+    this.showDevBadge = false,
   });
 
   @override
@@ -60,11 +64,34 @@ class IreneAppBar extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 // Spacer to offset the badge width for visual centering
-                if (titleBadge != null) SizedBox(width: 20),
+                if (titleBadge != null || showDevBadge) SizedBox(width: 20),
                 Text(
                   title,
                   style: AppTypography.heading2,
                 ),
+                // Dev mode badge
+                if (showDevBadge) ...[
+                  SizedBox(width: 6),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFE082), // Amber light
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: const Color(0xFFFFB300), // Amber
+                        width: 1,
+                      ),
+                    ),
+                    child: Text(
+                      'DEV',
+                      style: AppTypography.caption.copyWith(
+                        color: const Color(0xFFE65100), // Deep orange
+                        fontWeight: FontWeight.w700,
+                        fontSize: 9,
+                      ),
+                    ),
+                  ),
+                ],
                 if (titleBadge != null) ...[
                   SizedBox(width: 8),
                   Container(

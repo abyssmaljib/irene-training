@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../core/services/user_service.dart';
 import '../models/med_error_log.dart';
 import '../models/meal_photo_group.dart';
 
@@ -84,7 +85,7 @@ class MedErrorLogService {
     required String replyNurseMark,
   }) async {
     try {
-      final userId = _supabase.auth.currentUser?.id;
+      final userId = UserService().effectiveUserId;
       if (userId == null) return false;
 
       final dateStr = _formatDate(date);

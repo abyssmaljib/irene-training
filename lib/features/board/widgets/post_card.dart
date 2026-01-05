@@ -173,7 +173,7 @@ class PostCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
-        post.residentName!,
+        'คุณ${post.residentName!}',
         style: AppTypography.caption.copyWith(color: AppColors.tagReadText),
       ),
     );

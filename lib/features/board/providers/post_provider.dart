@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/services/user_service.dart';
 import '../models/post.dart';
 import '../models/post_tab.dart';
@@ -17,9 +16,9 @@ final postActionServiceProvider = Provider<PostActionService>((ref) {
   return PostActionService.instance;
 });
 
-/// Provider สำหรับ current user ID
+/// Provider สำหรับ current user ID (uses effectiveUserId for dev mode)
 final currentUserIdProvider = Provider<String?>((ref) {
-  return Supabase.instance.client.auth.currentUser?.id;
+  return UserService().effectiveUserId;
 });
 
 /// Provider สำหรับ nursinghome ID

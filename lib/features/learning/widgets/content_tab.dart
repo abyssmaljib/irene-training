@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/services/user_service.dart';
 import '../models/topic_detail.dart';
 
 class ContentTab extends StatefulWidget {
@@ -80,8 +81,8 @@ class _ContentTabState extends State<ContentTab> {
     setState(() => _isMarking = true);
 
     try {
-      final user = Supabase.instance.client.auth.currentUser;
-      if (user == null) return;
+      final userId = UserService().effectiveUserId;
+      if (userId == null) return;
 
       // Get active season
       final seasonResponse = await Supabase.instance.client
@@ -100,7 +101,7 @@ class _ContentTabState extends State<ContentTab> {
       if (shouldMarkAsRead) {
         // Mark as read and save current content version
         await Supabase.instance.client.from('training_user_progress').upsert({
-          'user_id': user.id,
+          'user_id': userId,
           'topic_id': widget.topicDetail.topicId,
           'season_id': seasonId,
           'content_read_at': DateTime.now().toIso8601String(),
@@ -110,7 +111,7 @@ class _ContentTabState extends State<ContentTab> {
       } else {
         // Unmark as read - set content_read_at to null
         await Supabase.instance.client.from('training_user_progress').upsert({
-          'user_id': user.id,
+          'user_id': userId,
           'topic_id': widget.topicDetail.topicId,
           'season_id': seasonId,
           'content_read_at': null,

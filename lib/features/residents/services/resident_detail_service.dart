@@ -113,6 +113,39 @@ class ResidentDetailService {
     }
   }
 
+  /// ดึง Vital Signs แบบ paginated
+  Future<List<VitalSign>> getVitalSignHistoryPaginated(
+    int residentId, {
+    int offset = 0,
+    int limit = 20,
+  }) async {
+    try {
+      final response = await _supabase
+          .from('vitalSign')
+          .select('''
+            id,
+            resident_id,
+            sBP,
+            dBP,
+            PR,
+            O2,
+            Temp,
+            RR,
+            created_at
+          ''')
+          .eq('resident_id', residentId)
+          .order('created_at', ascending: false)
+          .range(offset, offset + limit - 1);
+
+      return (response as List)
+          .map((json) => VitalSign.fromJson(json))
+          .toList();
+    } catch (e) {
+      debugPrint('getVitalSignHistoryPaginated error: $e');
+      return [];
+    }
+  }
+
   /// ดึงรายการโรคประจำตัว (underlying diseases) จาก relation table
   Future<List<String>> getUnderlyingDiseases(int residentId) async {
     try {

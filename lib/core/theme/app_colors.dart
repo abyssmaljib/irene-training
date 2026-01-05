@@ -98,6 +98,20 @@ class AppColors {
   static const Color pastelDarkGreen1 = Color(0xFF86C8BC);
   static const Color pastelPurple = Color(0xFFD4C5E8); // Soft lavender for night section
 
+  // Progress Bar Colors (Soft Teal - เข้ากับ theme)
+  static const Color progressOnTime = Color(0xFF4DB6AC); // Soft Teal - ตรงเวลา
+  static const Color progressSlightlyLate = Color(0xFFFFB74D); // Soft Amber - สาย
+  static const Color progressVeryLate = Color(0xFFE57373); // Soft Red - สายมาก
+
+  // น้ำใจ (Kindness) - งานช่วยคนอื่น
+  static const Color kindnessBg = Color(0xFFFCE4EC); // Soft pink background
+  static const Color kindnessText = Color(0xFFAD1457); // Deep pink text
+  static const LinearGradient kindnessGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFFE91E63), Color(0xFF9C27B0)], // Pink to Purple
+  );
+
   // Gradient for Header
   static const LinearGradient primaryGradient = LinearGradient(
     begin: Alignment.topLeft,

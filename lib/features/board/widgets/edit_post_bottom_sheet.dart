@@ -321,7 +321,7 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
                       Icon(Iconsax.user, size: 14, color: AppColors.primary),
                       const SizedBox(width: 4),
                       Text(
-                        widget.post.residentName!,
+                        'คุณ${widget.post.residentName!}',
                         style: AppTypography.caption.copyWith(
                           color: AppColors.primary,
                           fontWeight: FontWeight.w500,

@@ -18,6 +18,11 @@ import '../../learning/widgets/badge_info_dialog.dart';
 // TODO: Temporarily hidden - import '../../learning/widgets/skill_visualization_section.dart';
 import '../models/user_profile.dart';
 import '../../../core/widgets/irene_app_bar.dart';
+import '../../shift_summary/screens/shift_summary_screen.dart';
+import '../../shift_summary/services/shift_summary_service.dart';
+import '../../shift_summary/providers/shift_summary_provider.dart';
+import '../../home/services/home_service.dart';
+import '../../home/services/clock_service.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -31,7 +36,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   UserRole? _userRole;
   SystemRole? _systemRole;
   List<SystemRole> _allSystemRoles = [];
+  List<DevUserInfo> _allUsers = [];
   String? _userEmail;
+  String _userSearchQuery = '';
   // NOTE: _skillsData temporarily unused - skill visualization hidden for review
   // ignore: unused_field
   ThinkingSkillsData? _skillsData;
@@ -43,6 +50,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   static const _devEmails = ['beautyheechul@gmail.com'];
 
   bool get _isDevMode => _devEmails.contains(_userEmail);
+  bool get _isImpersonating => UserService().isImpersonating;
 
   @override
   void initState() {
@@ -57,13 +65,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _loadSystemRole(),
       _loadThinkingSkills(),
       _loadBadges(),
+      _loadAllUsers(),
     ]);
+  }
+
+  Future<void> _loadAllUsers() async {
+    try {
+      final users = await UserService().getAllUsers();
+      if (mounted) {
+        setState(() {
+          _allUsers = users;
+        });
+      }
+    } catch (e) {
+      debugPrint('Load all users error: $e');
+    }
   }
 
   Future<void> _loadUserRole() async {
     try {
       final user = Supabase.instance.client.auth.currentUser;
-      _userEmail = user?.email;
+      _userEmail = user?.email; // email ดึงจาก auth user จริงเท่านั้น (ไม่ใช้ impersonate)
 
       final role = await UserService().getRole(forceRefresh: true);
       if (mounted) {
@@ -111,8 +133,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _loadThinkingSkills() async {
     try {
-      final user = Supabase.instance.client.auth.currentUser;
-      if (user == null) return;
+      final userId = UserService().effectiveUserId;
+      if (userId == null) return;
 
       final response = await Supabase.instance.client
           .from('training_v_thinking_analysis')
@@ -139,8 +161,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _loadUserProfile() async {
     try {
-      final user = Supabase.instance.client.auth.currentUser;
-      if (user == null) {
+      // Use effectiveUserId to support dev mode impersonation
+      final userId = UserService().effectiveUserId;
+      if (userId == null) {
         setState(() {
           _error = 'กรุณาเข้าสู่ระบบก่อน';
           _isLoading = false;
@@ -151,7 +174,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final response = await Supabase.instance.client
           .from('user_info')
           .select('id, photo_url, nickname, full_name, prefix, nursinghome_id')
-          .eq('id', user.id)
+          .eq('id', userId)
           .maybeSingle();
 
       if (mounted) {
@@ -160,7 +183,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             _userProfile = UserProfile.fromJson(response);
           } else {
             // Fallback with just user id
-            _userProfile = UserProfile(id: user.id);
+            _userProfile = UserProfile(id: userId);
           }
           _isLoading = false;
         });
@@ -333,8 +356,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             // Menu Section
             _buildMenuSection(),
             AppSpacing.verticalGapMd,
-            // Dev Role Selector - only for dev emails
+            // Dev Mode Sections - only for dev emails
             if (_isDevMode) ...[
+              // Impersonation warning banner
+              if (_isImpersonating) ...[
+                _buildImpersonationBanner(),
+                AppSpacing.verticalGapMd,
+              ],
+              _buildDevUserSelector(),
+              AppSpacing.verticalGapMd,
               _buildDevRoleSelector(),
               AppSpacing.verticalGapMd,
               _buildDevSystemRoleSelector(),
@@ -410,13 +440,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             },
           ),
           Divider(height: 1, color: AppColors.alternate),
-          _buildMenuItem(
-            icon: Iconsax.calendar_1,
-            label: 'เวรของฉัน',
-            onTap: () {
-              // TODO: Navigate to shift screen
-            },
-          ),
+          _buildShiftMenuItem(),
           Divider(height: 1, color: AppColors.alternate),
           _buildMenuItem(
             icon: Iconsax.warning_2,
@@ -438,10 +462,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  /// Build shift menu item with badge for pending absences
+  Widget _buildShiftMenuItem() {
+    final pendingAbsenceAsync = ref.watch(pendingAbsenceCountProvider);
+    final badgeCount = pendingAbsenceAsync.maybeWhen(
+      data: (count) => count,
+      orElse: () => 0,
+    );
+
+    return _buildMenuItem(
+      icon: Iconsax.calendar_1,
+      label: 'เวรของฉัน',
+      badgeCount: badgeCount,
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ShiftSummaryScreen()),
+        );
+      },
+    );
+  }
+
   Widget _buildMenuItem({
     required IconData icon,
     required String label,
     required VoidCallback onTap,
+    int badgeCount = 0,
   }) {
     return Material(
       color: Colors.transparent,
@@ -455,14 +501,44 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           child: Row(
             children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: AppColors.accent1,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, color: AppColors.primary, size: 20),
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: AppColors.accent1,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(icon, color: AppColors.primary, size: 20),
+                  ),
+                  if (badgeCount > 0)
+                    Positioned(
+                      right: -6,
+                      top: -6,
+                      child: Container(
+                        padding: EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: AppColors.error,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: BoxConstraints(
+                          minWidth: 18,
+                          minHeight: 18,
+                        ),
+                        child: Text(
+                          badgeCount > 9 ? '9+' : badgeCount.toString(),
+                          style: AppTypography.caption.copyWith(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
               ),
               AppSpacing.horizontalGapMd,
               Expanded(
@@ -479,6 +555,392 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildImpersonationBanner() {
+    final userService = UserService();
+    final impersonatedUser = _allUsers.where(
+      (u) => u.id == userService.effectiveUserId,
+    ).firstOrNull;
+
+    return Container(
+      width: double.infinity,
+      padding: AppSpacing.paddingMd,
+      decoration: BoxDecoration(
+        color: Colors.red.shade50,
+        borderRadius: AppRadius.mediumRadius,
+        border: Border.all(color: Colors.red.shade300, width: 2),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Iconsax.warning_2, size: 20, color: Colors.red.shade700),
+              AppSpacing.horizontalGapSm,
+              Expanded(
+                child: Text(
+                  'กำลังใช้งานในนามของ: ${impersonatedUser?.displayName ?? "Unknown"}',
+                  style: AppTypography.label.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: Colors.red.shade700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          AppSpacing.verticalGapMd,
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _stopImpersonating,
+              icon: Icon(Iconsax.back_square, size: 18),
+              label: Text('กลับมาเป็นตัวฉันเอง'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red.shade600,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: AppRadius.smallRadius,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _stopImpersonating() async {
+    UserService().stopImpersonating();
+
+    // Invalidate all service caches
+    _invalidateAllCaches();
+
+    // Increment user change counter to refresh Riverpod providers
+    ref.read(userChangeCounterProvider.notifier).state++;
+
+    // Reload all data
+    setState(() {
+      _isLoading = true;
+    });
+    await _loadData();
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('กลับมาเป็นตัวคุณเองแล้ว'),
+        backgroundColor: AppColors.primary,
+      ),
+    );
+  }
+
+  /// Invalidate all service caches when switching users
+  void _invalidateAllCaches() {
+    HomeService.instance.invalidateCache();
+    ClockService.instance.invalidateCache();
+    ShiftSummaryService.instance.invalidateCache();
+  }
+
+  Widget _buildDevUserSelector() {
+    final userService = UserService();
+    final currentEffectiveUserId = userService.effectiveUserId;
+
+    // Filter users by search query
+    final filteredUsers = _userSearchQuery.isEmpty
+        ? _allUsers
+        : _allUsers.where((user) {
+            final query = _userSearchQuery.toLowerCase();
+            final nickname = user.nickname?.toLowerCase() ?? '';
+            final fullName = user.fullName?.toLowerCase() ?? '';
+            return nickname.contains(query) || fullName.contains(query);
+          }).toList();
+
+    return Container(
+      width: double.infinity,
+      padding: AppSpacing.paddingMd,
+      decoration: BoxDecoration(
+        color: Colors.cyan.shade50,
+        borderRadius: AppRadius.mediumRadius,
+        border: Border.all(color: Colors.cyan.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Iconsax.user_edit, size: 16, color: Colors.cyan.shade700),
+              AppSpacing.horizontalGapSm,
+              Text(
+                'Dev Mode - สวมรอยเป็น User อื่น',
+                style: AppTypography.label.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.cyan.shade700,
+                ),
+              ),
+            ],
+          ),
+          AppSpacing.verticalGapSm,
+          Text(
+            'User ปัจจุบัน: ${_userProfile?.displayName ?? "-"}',
+            style: AppTypography.bodySmall.copyWith(
+              color: Colors.purple.shade900,
+            ),
+          ),
+          AppSpacing.verticalGapMd,
+          // Search field
+          TextField(
+            onChanged: (value) => setState(() => _userSearchQuery = value),
+            decoration: InputDecoration(
+              hintText: 'ค้นหาชื่อ...',
+              hintStyle: AppTypography.bodySmall.copyWith(
+                color: Colors.purple.shade300,
+              ),
+              prefixIcon: Icon(
+                Iconsax.search_normal,
+                size: 18,
+                color: Colors.purple.shade400,
+              ),
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: AppRadius.smallRadius,
+                borderSide: BorderSide(color: Colors.purple.shade200),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: AppRadius.smallRadius,
+                borderSide: BorderSide(color: Colors.purple.shade200),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: AppRadius.smallRadius,
+                borderSide: BorderSide(color: Colors.purple, width: 2),
+              ),
+            ),
+            style: AppTypography.body.copyWith(
+              color: Colors.purple.shade900,
+            ),
+          ),
+          AppSpacing.verticalGapMd,
+          if (_isLoading)
+            Text(
+              'กำลังโหลดรายชื่อ...',
+              style: AppTypography.bodySmall.copyWith(
+                color: Colors.purple.shade600,
+              ),
+            )
+          else if (_allUsers.isEmpty)
+             Text(
+              'ไม่พบรายชื่อพนักงาน',
+              style: AppTypography.bodySmall.copyWith(
+                color: Colors.purple.shade600,
+              ),
+            )
+          else if (filteredUsers.isEmpty)
+            Text(
+              'ไม่พบผู้ใช้ที่ค้นหา',
+              style: AppTypography.bodySmall.copyWith(
+                color: Colors.purple.shade600,
+              ),
+            )
+          else
+            Container(
+              constraints: BoxConstraints(maxHeight: 250),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: AppRadius.smallRadius,
+                border: Border.all(color: Colors.purple.shade200),
+              ),
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: filteredUsers.length,
+                separatorBuilder: (context, index) => Divider(
+                  height: 1,
+                  color: Colors.purple.shade100,
+                ),
+                itemBuilder: (context, index) {
+                  final user = filteredUsers[index];
+                  final isSelected = user.id == currentEffectiveUserId;
+
+                  return _buildUserListTile(user: user, isSelected: isSelected);
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUserListTile({
+    required DevUserInfo user,
+    required bool isSelected,
+  }) {
+    return InkWell(
+      onTap: () => _impersonateUser(user),
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? Colors.purple.withValues(alpha: 0.1)
+              : Colors.transparent,
+        ),
+        child: Row(
+          children: [
+            // Avatar with clocked-in indicator
+            Stack(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.purple.shade100,
+                    shape: BoxShape.circle,
+                    border: isSelected
+                        ? Border.all(color: Colors.purple, width: 2)
+                        : null,
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: user.photoUrl != null && user.photoUrl!.isNotEmpty
+                        ? Image.network(
+                            user.photoUrl!,
+                            width: 40,
+                            height: 40,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => Icon(
+                              Iconsax.user,
+                              size: 20,
+                              color: Colors.purple.shade700,
+                            ),
+                          )
+                        : Icon(
+                            Iconsax.user,
+                            size: 20,
+                            color: Colors.purple.shade700,
+                          ),
+                  ),
+                ),
+                // Clocked-in indicator (green dot)
+                if (user.isClockedIn)
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: Colors.green,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            AppSpacing.horizontalGapMd,
+            // Name
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          user.nickname ?? '-',
+                          style: AppTypography.body.copyWith(
+                            color: Colors.purple.shade900,
+                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (user.isClockedIn) ...[
+                        SizedBox(width: 6),
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade100,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            user.clockedInZones.isNotEmpty
+                                ? user.clockedInZones.join(', ')
+                                : 'ขึ้นเวร',
+                            style: AppTypography.caption.copyWith(
+                              fontSize: 9,
+                              color: Colors.green.shade700,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  if (user.fullName != null)
+                    Text(
+                      user.fullName!,
+                      style: AppTypography.caption.copyWith(
+                        color: Colors.purple.shade600,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            // Check icon
+            if (isSelected)
+              Icon(
+                Iconsax.tick_circle5,
+                size: 20,
+                color: Colors.purple,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _impersonateUser(DevUserInfo user) async {
+    final success = await UserService().impersonateUser(user.id);
+
+    if (!success) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('เกิดข้อผิดพลาดในการสวมรอย'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    // Invalidate all service caches
+    _invalidateAllCaches();
+
+    // Increment user change counter to refresh Riverpod providers
+    ref.read(userChangeCounterProvider.notifier).state++;
+
+    // Reload all data for the impersonated user
+    setState(() {
+      _isLoading = true;
+    });
+    await _loadData();
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('สวมรอยเป็น: ${user.displayName}'),
+        backgroundColor: Colors.purple,
       ),
     );
   }
@@ -731,13 +1193,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _changeSystemRole(int? roleId) async {
     try {
-      final user = Supabase.instance.client.auth.currentUser;
-      if (user == null) return;
+      final userId = UserService().effectiveUserId;
+      if (userId == null) return;
 
       await Supabase.instance.client
           .from('user_info')
           .update({'role_id': roleId})
-          .eq('id', user.id);
+          .eq('id', userId);
 
       // Clear cached role in UserService
       UserService().clearCache();

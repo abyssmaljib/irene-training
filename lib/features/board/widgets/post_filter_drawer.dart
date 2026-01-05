@@ -366,7 +366,7 @@ class _PostFilterDrawerState extends State<PostFilterDrawer> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              resident.name,
+                              'คุณ${resident.name}',
                               style: AppTypography.body.copyWith(
                                 fontWeight:
                                     isSelected ? FontWeight.w600 : FontWeight.normal,

@@ -9,6 +9,7 @@ import '../../checklist/models/system_role.dart';
 import '../models/med_log.dart';
 import '../models/med_error_log.dart';
 import '../models/meal_photo_group.dart';
+import '../../../core/services/user_service.dart';
 import 'medicine_photo_item.dart';
 
 /// Card สำหรับแสดงยาในแต่ละมื้อ (Expandable)
@@ -573,7 +574,7 @@ class _MealSectionCardState extends State<MealSectionCard>
   }) {
     if (timestamp == null) return false;
 
-    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+    final currentUserId = UserService().effectiveUserId;
     if (currentUserId == null) return false;
 
     final role = widget.systemRole;

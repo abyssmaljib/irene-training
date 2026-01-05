@@ -2,7 +2,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/services/user_service.dart';
 import '../../home/models/zone.dart';
+import '../../home/models/clock_in_out.dart';
 import '../../home/services/zone_service.dart';
+import '../../home/services/clock_service.dart';
 import '../models/resident_simple.dart';
 import '../models/system_role.dart';
 import '../models/task_log.dart';
@@ -61,9 +63,15 @@ final userServiceProvider = Provider<UserService>((ref) {
   return UserService();
 });
 
-/// Provider สำหรับ current user ID
+/// Provider that tracks user changes (for dev mode impersonation)
+/// Increment this to force rebuild of user-dependent providers
+final userChangeCounterProvider = StateProvider<int>((ref) => 0);
+
+/// Provider สำหรับ current user ID (uses effectiveUserId for dev mode)
 final currentUserIdProvider = Provider<String?>((ref) {
-  return Supabase.instance.client.auth.currentUser?.id;
+  // Watch the counter to rebuild when user changes
+  ref.watch(userChangeCounterProvider);
+  return UserService().effectiveUserId;
 });
 
 /// Provider สำหรับ nursinghome ID
@@ -321,6 +329,67 @@ final nursinghomeZonesProvider = FutureProvider<List<Zone>>((ref) async {
 /// ถ้า empty = แสดงทุก resident, ถ้ามีค่า = filter เฉพาะ residents ที่เลือก
 final selectedResidentsFilterProvider = StateProvider<Set<int>>((ref) {
   return {}; // default: แสดงทุก resident
+});
+
+// ============================================================
+// "คนไข้ของฉัน" Filter - ใช้ข้อมูลจาก Clock In
+// ============================================================
+
+/// Provider สำหรับ ClockService
+final clockServiceProvider = Provider<ClockService>((ref) {
+  return ClockService.instance;
+});
+
+/// Provider สำหรับ current shift ของ user
+final currentShiftProvider = FutureProvider<ClockInOut?>((ref) async {
+  // Watch for user changes (dev mode impersonation)
+  ref.watch(userChangeCounterProvider);
+  final clockService = ref.watch(clockServiceProvider);
+  return clockService.getCurrentShift(forceRefresh: true);
+});
+
+/// State สำหรับว่ากำลัง filter ด้วย "คนไข้ของฉัน" อยู่หรือไม่
+final myPatientsFilterActiveProvider = StateProvider<bool>((ref) {
+  return false;
+});
+
+/// State สำหรับตรวจสอบว่า init filter "คนไข้ของฉัน" แล้วหรือยัง
+/// เพื่อป้องกันไม่ให้ init ซ้ำ - tracks which user ID was initialized
+final _myPatientsFilterInitializedForUserProvider = StateProvider<String?>((ref) {
+  return null;
+});
+
+/// Provider ที่จะ auto-initialize "คนไข้ของฉัน" filter เมื่อ user clock in
+/// เรียกใช้ใน ChecklistScreen เพื่อ init filter ตอนเปิดหน้า
+final initMyPatientsFilterProvider = Provider<void>((ref) {
+  final currentShiftAsync = ref.watch(currentShiftProvider);
+  final currentUserId = ref.watch(currentUserIdProvider);
+  final initializedForUser = ref.watch(_myPatientsFilterInitializedForUserProvider);
+
+  // ถ้า init แล้วสำหรับ user นี้ ไม่ต้องทำอีก
+  if (initializedForUser == currentUserId) return;
+
+  currentShiftAsync.whenData((shift) {
+    if (shift != null && shift.isClockedIn) {
+      // Set filter เมื่อ user clock in อยู่
+      Future.microtask(() {
+        ref.read(_myPatientsFilterInitializedForUserProvider.notifier).state = currentUserId;
+        ref.read(myPatientsFilterActiveProvider.notifier).state = true;
+        ref.read(selectedZonesFilterProvider.notifier).state =
+            shift.zones.toSet();
+        ref.read(selectedResidentsFilterProvider.notifier).state =
+            shift.selectedResidentIdList.toSet();
+      });
+    } else {
+      // User is not clocked in - reset filter
+      Future.microtask(() {
+        ref.read(_myPatientsFilterInitializedForUserProvider.notifier).state = currentUserId;
+        ref.read(myPatientsFilterActiveProvider.notifier).state = false;
+        ref.read(selectedZonesFilterProvider.notifier).state = {};
+        ref.read(selectedResidentsFilterProvider.notifier).state = {};
+      });
+    }
+  });
 });
 
 // ============================================================

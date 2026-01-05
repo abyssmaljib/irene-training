@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../core/services/user_service.dart';
 import '../models/badge.dart';
 import '../models/quiz_session.dart';
 
@@ -16,8 +17,8 @@ class BadgeService {
     required String sessionId,
   }) async {
     try {
-      final user = _client.auth.currentUser;
-      if (user == null) {
+      final userId = UserService().effectiveUserId;
+      if (userId == null) {
         debugPrint('BadgeService: No user logged in');
         return [];
       }
@@ -35,7 +36,7 @@ class BadgeService {
       final existingBadges = await _client
           .from('training_user_badges')
           .select('badge_id')
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .or('season_id.eq.${session.seasonId},season_id.is.null');
 
       final existingBadgeIds =
@@ -67,14 +68,14 @@ class BadgeService {
           requirementType: requirementType,
           requirementValue: requirementValue,
           session: session,
-          userId: user.id,
+          userId: userId,
         );
 
         if (shouldAward) {
           // บันทึก badge ใหม่
           try {
             await _client.from('training_user_badges').insert({
-              'user_id': user.id,
+              'user_id': userId,
               'badge_id': badgeId,
               'season_id': session.seasonId,
             });
@@ -224,13 +225,13 @@ class BadgeService {
   /// ดึง badge ทั้งหมดของ user
   Future<List<Badge>> getUserBadges({String? seasonId}) async {
     try {
-      final user = _client.auth.currentUser;
-      if (user == null) {
+      final userId = UserService().effectiveUserId;
+      if (userId == null) {
         debugPrint('BadgeService.getUserBadges: No user');
         return [];
       }
 
-      debugPrint('BadgeService.getUserBadges: user_id=${user.id}');
+      debugPrint('BadgeService.getUserBadges: user_id=$userId');
 
       // Query จาก training_user_badges join กับ training_badges
       final response = await _client
@@ -254,7 +255,7 @@ class BadgeService {
               requirement_value
             )
           ''')
-          .eq('user_id', user.id);
+          .eq('user_id', userId);
 
       debugPrint('BadgeService.getUserBadges: found ${(response as List).length} badges');
 
@@ -286,7 +287,7 @@ class BadgeService {
   /// ดึงสถิติ badge ทั้งหมด (จำนวน user ที่ได้แต่ละ badge)
   Future<BadgeStats> getBadgeStats() async {
     try {
-      final currentUser = _client.auth.currentUser;
+      final currentUserId = UserService().effectiveUserId;
 
       // ดึง badge ทั้งหมด
       final allBadges = await _client
@@ -311,11 +312,11 @@ class BadgeService {
 
       // ดึง badge ที่ current user ได้
       final earnedBadgeIds = <String>{};
-      if (currentUser != null) {
+      if (currentUserId != null) {
         final userBadges = await _client
             .from('training_user_badges')
             .select('badge_id')
-            .eq('user_id', currentUser.id);
+            .eq('user_id', currentUserId);
         for (final row in userBadges as List) {
           earnedBadgeIds.add(row['badge_id'] as String);
         }
@@ -402,7 +403,7 @@ class BadgeService {
   /// ดึง badge ทั้งหมด (รวมที่ยังไม่ได้)
   Future<List<Badge>> getAllBadges({String? seasonId, String? userId}) async {
     try {
-      final uid = userId ?? _client.auth.currentUser?.id;
+      final uid = userId ?? UserService().effectiveUserId;
       if (uid == null) return [];
 
       var query = _client.from('training_v_badges').select();

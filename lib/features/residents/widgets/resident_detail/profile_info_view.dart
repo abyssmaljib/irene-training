@@ -83,7 +83,7 @@ class _ProfileInfoViewState extends ConsumerState<ProfileInfoView>
             title: 'ข้อมูลส่วนตัว',
             icon: Iconsax.user,
             children: [
-              _buildInfoRow('ชื่อ-นามสกุล', resident.name),
+              _buildInfoRow('ชื่อ-นามสกุล', 'คุณ${resident.name}'),
               _buildInfoRow(
                 'วันเกิด',
                 '${resident.dobDisplay} (${resident.ageDisplay})',

@@ -21,6 +21,26 @@ class EditPostState {
   final bool isSubmitting;
   final String? error;
 
+  // AI Summary fields
+  final bool isLoadingAI;
+  final String? aiSummary;
+
+  // Quiz fields
+  final int? qaId; // existing QA id from post
+  final String? qaQuestion;
+  final String? qaChoiceA;
+  final String? qaChoiceB;
+  final String? qaChoiceC;
+  final String? qaAnswer;
+
+  // AI Quiz preview (before applying)
+  final bool isLoadingQuizAI;
+  final String? aiQuizQuestion;
+  final String? aiQuizChoiceA;
+  final String? aiQuizChoiceB;
+  final String? aiQuizChoiceC;
+  final String? aiQuizAnswer;
+
   const EditPostState({
     required this.postId,
     this.text = '',
@@ -30,6 +50,23 @@ class EditPostState {
     this.newImages = const [],
     this.isSubmitting = false,
     this.error,
+    // AI Summary
+    this.isLoadingAI = false,
+    this.aiSummary,
+    // Quiz
+    this.qaId,
+    this.qaQuestion,
+    this.qaChoiceA,
+    this.qaChoiceB,
+    this.qaChoiceC,
+    this.qaAnswer,
+    // AI Quiz preview
+    this.isLoadingQuizAI = false,
+    this.aiQuizQuestion,
+    this.aiQuizChoiceA,
+    this.aiQuizChoiceB,
+    this.aiQuizChoiceC,
+    this.aiQuizAnswer,
   });
 
   /// Get final list of existing image URLs (excluding removed ones)
@@ -60,6 +97,22 @@ class EditPostState {
       newImages.isNotEmpty ||
       removedExistingIndexes.isNotEmpty;
 
+  /// Check if quiz is complete (has question and all choices)
+  bool get hasQuiz =>
+      qaQuestion != null &&
+      qaQuestion!.isNotEmpty &&
+      qaChoiceA != null &&
+      qaChoiceA!.isNotEmpty &&
+      qaChoiceB != null &&
+      qaChoiceB!.isNotEmpty &&
+      qaChoiceC != null &&
+      qaChoiceC!.isNotEmpty &&
+      qaAnswer != null;
+
+  /// Check if AI quiz preview is available
+  bool get hasAiQuizPreview =>
+      aiQuizQuestion != null && aiQuizQuestion!.isNotEmpty;
+
   EditPostState copyWith({
     int? postId,
     String? text,
@@ -69,6 +122,26 @@ class EditPostState {
     List<File>? newImages,
     bool? isSubmitting,
     String? error,
+    // AI Summary
+    bool? isLoadingAI,
+    String? aiSummary,
+    bool clearAiSummary = false,
+    // Quiz
+    int? qaId,
+    String? qaQuestion,
+    String? qaChoiceA,
+    String? qaChoiceB,
+    String? qaChoiceC,
+    String? qaAnswer,
+    bool clearQuiz = false,
+    // AI Quiz preview
+    bool? isLoadingQuizAI,
+    String? aiQuizQuestion,
+    String? aiQuizChoiceA,
+    String? aiQuizChoiceB,
+    String? aiQuizChoiceC,
+    String? aiQuizAnswer,
+    bool clearAiQuizPreview = false,
   }) {
     return EditPostState(
       postId: postId ?? this.postId,
@@ -80,6 +153,23 @@ class EditPostState {
       newImages: newImages ?? this.newImages,
       isSubmitting: isSubmitting ?? this.isSubmitting,
       error: error,
+      // AI Summary
+      isLoadingAI: isLoadingAI ?? this.isLoadingAI,
+      aiSummary: clearAiSummary ? null : (aiSummary ?? this.aiSummary),
+      // Quiz
+      qaId: clearQuiz ? null : (qaId ?? this.qaId),
+      qaQuestion: clearQuiz ? null : (qaQuestion ?? this.qaQuestion),
+      qaChoiceA: clearQuiz ? null : (qaChoiceA ?? this.qaChoiceA),
+      qaChoiceB: clearQuiz ? null : (qaChoiceB ?? this.qaChoiceB),
+      qaChoiceC: clearQuiz ? null : (qaChoiceC ?? this.qaChoiceC),
+      qaAnswer: clearQuiz ? null : (qaAnswer ?? this.qaAnswer),
+      // AI Quiz preview
+      isLoadingQuizAI: isLoadingQuizAI ?? this.isLoadingQuizAI,
+      aiQuizQuestion: clearAiQuizPreview ? null : (aiQuizQuestion ?? this.aiQuizQuestion),
+      aiQuizChoiceA: clearAiQuizPreview ? null : (aiQuizChoiceA ?? this.aiQuizChoiceA),
+      aiQuizChoiceB: clearAiQuizPreview ? null : (aiQuizChoiceB ?? this.aiQuizChoiceB),
+      aiQuizChoiceC: clearAiQuizPreview ? null : (aiQuizChoiceC ?? this.aiQuizChoiceC),
+      aiQuizAnswer: clearAiQuizPreview ? null : (aiQuizAnswer ?? this.aiQuizAnswer),
     );
   }
 }
@@ -95,6 +185,13 @@ class EditPostNotifier extends StateNotifier<EditPostState> {
       text: post.text ?? '',
       title: post.title,
       existingImageUrls: post.allImageUrls,
+      // Load existing quiz data
+      qaId: post.qaId,
+      qaQuestion: post.qaQuestion,
+      qaChoiceA: post.qaChoiceA,
+      qaChoiceB: post.qaChoiceB,
+      qaChoiceC: post.qaChoiceC,
+      qaAnswer: post.qaAnswer,
     );
     debugPrint('EditPostNotifier: initialized from post ${post.id}');
   }
@@ -154,6 +251,84 @@ class EditPostNotifier extends StateNotifier<EditPostState> {
 
   void setError(String? error) {
     state = state.copyWith(error: error);
+  }
+
+  // AI Summary methods
+  void setLoadingAI(bool value) {
+    state = state.copyWith(isLoadingAI: value);
+  }
+
+  void setAiSummary(String? summary) {
+    state = state.copyWith(
+      aiSummary: summary,
+      isLoadingAI: false,
+    );
+  }
+
+  void clearAiSummary() {
+    state = state.copyWith(clearAiSummary: true);
+  }
+
+  // Quiz methods
+  void setQaQuestion(String value) {
+    state = state.copyWith(qaQuestion: value);
+  }
+
+  void setQaChoiceA(String value) {
+    state = state.copyWith(qaChoiceA: value);
+  }
+
+  void setQaChoiceB(String value) {
+    state = state.copyWith(qaChoiceB: value);
+  }
+
+  void setQaChoiceC(String value) {
+    state = state.copyWith(qaChoiceC: value);
+  }
+
+  void setQaAnswer(String value) {
+    state = state.copyWith(qaAnswer: value);
+  }
+
+  void clearQuiz() {
+    state = state.copyWith(clearQuiz: true);
+  }
+
+  // AI Quiz preview methods
+  void setLoadingQuizAI(bool value) {
+    state = state.copyWith(isLoadingQuizAI: value);
+  }
+
+  void setAiQuizPreview({
+    required String question,
+    required String choiceA,
+    required String choiceB,
+    required String choiceC,
+    required String answer,
+  }) {
+    state = state.copyWith(
+      aiQuizQuestion: question,
+      aiQuizChoiceA: choiceA,
+      aiQuizChoiceB: choiceB,
+      aiQuizChoiceC: choiceC,
+      aiQuizAnswer: answer,
+      isLoadingQuizAI: false,
+    );
+  }
+
+  void applyAiQuizToForm() {
+    state = state.copyWith(
+      qaQuestion: state.aiQuizQuestion,
+      qaChoiceA: state.aiQuizChoiceA,
+      qaChoiceB: state.aiQuizChoiceB,
+      qaChoiceC: state.aiQuizChoiceC,
+      qaAnswer: state.aiQuizAnswer,
+      clearAiQuizPreview: true,
+    );
+  }
+
+  void clearAiQuizPreview() {
+    state = state.copyWith(clearAiQuizPreview: true);
   }
 
   void reset() {

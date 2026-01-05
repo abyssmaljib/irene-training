@@ -12,6 +12,8 @@ import '../services/post_action_service.dart';
 import '../services/post_media_service.dart';
 import '../widgets/image_picker_bar.dart' show ImagePickerHelper;
 import '../widgets/image_preview_grid.dart';
+import '../widgets/edit_ai_summary_widget.dart';
+import '../widgets/edit_quiz_form_widget.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 /// Advanced Edit Post Screen - Full page version for editing posts with title/quiz
@@ -112,7 +114,7 @@ class _AdvancedEditPostScreenState
         finalImageUrls.addAll(uploadedUrls);
       }
 
-      // Update post
+      // Update post with quiz fields
       final success = await PostActionService.instance.updatePost(
         postId: widget.post.id,
         text: text,
@@ -120,6 +122,13 @@ class _AdvancedEditPostScreenState
             ? null
             : _titleController.text.trim(),
         multiImgUrl: finalImageUrls.isEmpty ? null : finalImageUrls,
+        // Quiz fields
+        existingQaId: state.qaId,
+        qaQuestion: state.qaQuestion,
+        qaChoiceA: state.qaChoiceA,
+        qaChoiceB: state.qaChoiceB,
+        qaChoiceC: state.qaChoiceC,
+        qaAnswer: state.qaAnswer,
       );
 
       if (success) {
@@ -231,6 +240,17 @@ class _AdvancedEditPostScreenState
                 },
               ),
 
+              AppSpacing.verticalGapMd,
+
+              // AI Summary widget
+              EditAiSummaryWidget(
+                postId: widget.post.id,
+                textController: _textController,
+                onReplaceText: () {
+                  // Already handled in the widget
+                },
+              ),
+
               AppSpacing.verticalGapLg,
 
               // Divider
@@ -238,13 +258,18 @@ class _AdvancedEditPostScreenState
 
               AppSpacing.verticalGapLg,
 
-              // Quiz info (read-only if exists)
-              if (widget.post.hasQuiz) ...[
-                _buildQuizReadOnly(),
-                AppSpacing.verticalGapLg,
-                Divider(color: AppColors.alternate, height: 1),
-                AppSpacing.verticalGapLg,
-              ],
+              // Quiz form (editable)
+              EditQuizFormWidget(
+                postId: widget.post.id,
+                postText: _textController.text,
+              ),
+
+              AppSpacing.verticalGapLg,
+
+              // Divider
+              Divider(color: AppColors.alternate, height: 1),
+
+              AppSpacing.verticalGapLg,
 
               // Read-only info (tag, resident)
               _buildReadOnlyInfo(),
@@ -406,86 +431,6 @@ class _AdvancedEditPostScreenState
             ),
           ),
       ],
-    );
-  }
-
-  Widget _buildQuizReadOnly() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.alternate),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Iconsax.message_question, color: AppColors.primary, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                'คำถาม Quiz (แก้ไขไม่ได้)',
-                style: AppTypography.subtitle.copyWith(
-                  color: AppColors.primary,
-                ),
-              ),
-            ],
-          ),
-          AppSpacing.verticalGapMd,
-          Text(
-            widget.post.qaQuestion ?? '',
-            style: AppTypography.body.copyWith(
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          AppSpacing.verticalGapSm,
-          if (widget.post.qaChoiceA != null)
-            _buildQuizChoice('A', widget.post.qaChoiceA!),
-          if (widget.post.qaChoiceB != null)
-            _buildQuizChoice('B', widget.post.qaChoiceB!),
-          if (widget.post.qaChoiceC != null)
-            _buildQuizChoice('C', widget.post.qaChoiceC!),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuizChoice(String label, String text) {
-    final isCorrect = widget.post.qaAnswer == label;
-    return Padding(
-      padding: const EdgeInsets.only(top: 4),
-      child: Row(
-        children: [
-          Container(
-            width: 24,
-            height: 24,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: isCorrect ? AppColors.success : AppColors.alternate,
-              shape: BoxShape.circle,
-            ),
-            child: Text(
-              label,
-              style: AppTypography.caption.copyWith(
-                color: isCorrect ? Colors.white : AppColors.primaryText,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: AppTypography.body.copyWith(
-                color: isCorrect ? AppColors.success : AppColors.secondaryText,
-              ),
-            ),
-          ),
-          if (isCorrect)
-            Icon(Iconsax.verify, color: AppColors.success, size: 16),
-        ],
-      ),
     );
   }
 

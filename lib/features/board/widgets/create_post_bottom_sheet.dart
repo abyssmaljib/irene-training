@@ -638,6 +638,12 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
                       AppSpacing.verticalGapSm,
                       _buildCompactHandoverToggle(state),
                     ],
+
+                    // Send to family toggle (แสดงเฉพาะหัวหน้าเวร+ และเมื่อเลือก resident แล้ว)
+                    if (canCreateAdvanced && state.selectedResidentId != null) ...[
+                      AppSpacing.verticalGapSm,
+                      _buildSendToFamilyToggle(state),
+                    ],
                     AppSpacing.verticalGapMd,
 
                     // Image preview
@@ -802,6 +808,46 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
       ),
       activeTrackColor: AppColors.success.withValues(alpha: 0.5),
       activeThumbColor: AppColors.success,
+      inactiveThumbColor: AppColors.secondaryText,
+      contentPadding: EdgeInsets.zero,
+      dense: true,
+    );
+  }
+
+  Widget _buildSendToFamilyToggle(CreatePostState state) {
+    final sendToFamily = state.sendToFamily;
+
+    return SwitchListTile(
+      value: sendToFamily,
+      onChanged: (value) =>
+          ref.read(createPostProvider.notifier).setSendToFamily(value),
+      title: Row(
+        children: [
+          Icon(
+            Iconsax.people,
+            size: 20,
+            color: sendToFamily ? AppColors.primary : AppColors.secondaryText,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'ส่งให้ญาติ',
+            style: AppTypography.body.copyWith(
+              color: sendToFamily ? AppColors.primary : AppColors.primaryText,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+      subtitle: Text(
+        sendToFamily
+            ? 'จะแจ้งเตือนไปยังญาติของผู้พักอาศัย'
+            : 'เลือกถ้าต้องการแจ้งญาติ',
+        style: AppTypography.caption.copyWith(
+          color: AppColors.secondaryText,
+        ),
+      ),
+      activeTrackColor: AppColors.primary.withValues(alpha: 0.5),
+      activeThumbColor: AppColors.primary,
       inactiveThumbColor: AppColors.secondaryText,
       contentPadding: EdgeInsets.zero,
       dense: true,
@@ -1097,13 +1143,23 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
         setState(() => _isUploading = false);
       }
 
+      // Build tag topics list
+      List<String>? tagTopics;
+      if (state.selectedTag != null) {
+        tagTopics = [state.selectedTag!.name];
+      }
+      // เพิ่ม "ส่งให้ญาติ" ถ้าเลือก
+      if (state.sendToFamily) {
+        tagTopics = [...?tagTopics, 'ส่งให้ญาติ'];
+      }
+
       // Create post
       final postId = await actionService.createPost(
         userId: userId,
         nursinghomeId: nursinghomeId,
         text: text,
         tagId: state.selectedTag?.id,
-        tagName: state.selectedTag?.name,
+        tagTopics: tagTopics,
         isHandover: state.isHandover,
         residentId: state.selectedResidentId,
         imageUrls: mediaUrls.isNotEmpty ? mediaUrls : null,
@@ -1504,7 +1560,7 @@ class _ResidentSuggestionsPopupState extends State<_ResidentSuggestionsPopup> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                resident.name,
+                                'คุณ${resident.name}',
                                 style: AppTypography.body.copyWith(
                                   color: isHighlighted
                                       ? AppColors.primary

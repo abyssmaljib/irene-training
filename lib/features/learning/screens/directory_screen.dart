@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../core/services/user_service.dart';
 import '../models/topic_with_progress.dart';
 import '../widgets/topic_card.dart';
 import '../../../core/theme/app_theme.dart';
@@ -40,8 +41,8 @@ class _DirectoryScreenState extends State<DirectoryScreen> {
   Future<void> _loadTopics() async {
     try {
       // ดึง current user
-      final user = Supabase.instance.client.auth.currentUser;
-      if (user == null) {
+      final userId = UserService().effectiveUserId;
+      if (userId == null) {
         setState(() {
           _error = 'กรุณาเข้าสู่ระบบก่อน';
           _isLoading = false;
@@ -60,7 +61,7 @@ class _DirectoryScreenState extends State<DirectoryScreen> {
       final progressResponse = await Supabase.instance.client
           .from('training_v_topics_with_progress')
           .select()
-          .eq('user_id', user.id);
+          .eq('user_id', userId);
 
       // สร้าง map ของ progress โดยใช้ topic_id เป็น key
       final progressMap = <String, Map<String, dynamic>>{};

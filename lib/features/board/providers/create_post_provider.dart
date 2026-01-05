@@ -8,6 +8,7 @@ class CreatePostState {
   final String text;
   final NewTag? selectedTag;
   final bool isHandover;
+  final bool sendToFamily; // ส่งให้ญาติ
   final int? selectedResidentId;
   final String? selectedResidentName;
   final List<File> selectedImages;
@@ -35,10 +36,15 @@ class CreatePostState {
   final String? aiQuizAnswer;
   final bool isLoadingQuizAI;
 
+  // DD Record context (for creating post from shift summary)
+  final int? ddId;
+  final String? ddTemplateText;
+
   const CreatePostState({
     this.text = '',
     this.selectedTag,
     this.isHandover = false,
+    this.sendToFamily = false,
     this.selectedResidentId,
     this.selectedResidentName,
     this.selectedImages = const [],
@@ -63,6 +69,9 @@ class CreatePostState {
     this.aiQuizChoiceC,
     this.aiQuizAnswer,
     this.isLoadingQuizAI = false,
+    // DD Record context
+    this.ddId,
+    this.ddTemplateText,
   });
 
   bool get isValid => text.trim().isNotEmpty;
@@ -96,6 +105,7 @@ class CreatePostState {
     NewTag? selectedTag,
     bool? clearTag,
     bool? isHandover,
+    bool? sendToFamily,
     int? selectedResidentId,
     bool? clearResident,
     String? selectedResidentName,
@@ -127,11 +137,16 @@ class CreatePostState {
     String? aiQuizAnswer,
     bool? clearAiQuizPreview,
     bool? isLoadingQuizAI,
+    // DD Record context
+    int? ddId,
+    String? ddTemplateText,
+    bool? clearDD,
   }) {
     return CreatePostState(
       text: text ?? this.text,
       selectedTag: clearTag == true ? null : (selectedTag ?? this.selectedTag),
       isHandover: isHandover ?? this.isHandover,
+      sendToFamily: sendToFamily ?? this.sendToFamily,
       selectedResidentId: clearResident == true
           ? null
           : (selectedResidentId ?? this.selectedResidentId),
@@ -174,6 +189,9 @@ class CreatePostState {
           ? null
           : (aiQuizAnswer ?? this.aiQuizAnswer),
       isLoadingQuizAI: isLoadingQuizAI ?? this.isLoadingQuizAI,
+      // DD Record context
+      ddId: clearDD == true ? null : (ddId ?? this.ddId),
+      ddTemplateText: clearDD == true ? null : (ddTemplateText ?? this.ddTemplateText),
     );
   }
 
@@ -219,6 +237,11 @@ class CreatePostNotifier extends StateNotifier<CreatePostState> {
     if (state.selectedTag!.isForceHandover) return; // Can't change force
 
     state = state.copyWith(isHandover: value, clearError: true);
+  }
+
+  /// Toggle ส่งให้ญาติ
+  void setSendToFamily(bool value) {
+    state = state.copyWith(sendToFamily: value, clearError: true);
   }
 
   /// เลือก resident
@@ -415,6 +438,32 @@ class CreatePostNotifier extends StateNotifier<CreatePostState> {
       // Don't clear preview - keep it visible
     );
   }
+
+  // === DD Record Methods ===
+
+  /// Initialize state for DD record post creation
+  void initFromDD({
+    required int ddId,
+    required String templateText,
+    int? residentId,
+    String? residentName,
+  }) {
+    state = CreatePostState(
+      text: templateText,
+      ddId: ddId,
+      ddTemplateText: templateText,
+      selectedResidentId: residentId,
+      selectedResidentName: residentName,
+    );
+  }
+
+  /// Clear DD context
+  void clearDD() {
+    state = state.copyWith(clearDD: true);
+  }
+
+  /// Check if current post is for DD record
+  bool get hasDDContext => state.ddId != null;
 }
 
 /// Provider for create post state

@@ -222,7 +222,7 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    widget.residentName,
+                    'คุณ${widget.residentName}',
                     style: AppTypography.title.copyWith(
                       color: AppColors.textPrimary,
                     ),

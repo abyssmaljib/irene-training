@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/services/user_service.dart';
 import '../models/topic_with_progress.dart';
 import '../models/topic_detail.dart';
 import '../models/quiz_history_item.dart';
@@ -63,8 +64,8 @@ class _TopicDetailScreenState extends State<TopicDetailScreen>
 
   Future<void> _loadThinkingSkills() async {
     try {
-      final user = Supabase.instance.client.auth.currentUser;
-      if (user == null) return;
+      final userId = UserService().effectiveUserId;
+      if (userId == null) return;
 
       // Get active season
       final seasonResponse = await Supabase.instance.client
@@ -79,7 +80,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen>
       final response = await Supabase.instance.client
           .from('training_v_thinking_analysis_by_topic')
           .select()
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .eq('topic_id', widget.topic.topicId)
           .eq('season_id', seasonId);
 
@@ -104,8 +105,8 @@ class _TopicDetailScreenState extends State<TopicDetailScreen>
 
   Future<void> _loadTopicDetail() async {
     try {
-      final user = Supabase.instance.client.auth.currentUser;
-      if (user == null) {
+      final userId = UserService().effectiveUserId;
+      if (userId == null) {
         setState(() {
           _error = 'กรุณาเข้าสู่ระบบก่อน';
           _isLoading = false;
@@ -119,7 +120,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen>
           .select()
           .eq('topic_id', widget.topic.topicId);
       debugPrint('=== DEBUG training_v_topic_detail ===');
-      debugPrint('Current user.id: ${user.id}');
+      debugPrint('Current userId: $userId');
       debugPrint('Topic ID: ${widget.topic.topicId}');
       debugPrint('All rows count: ${allRows.length}');
       for (var i = 0; i < allRows.length; i++) {
@@ -132,7 +133,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen>
           .from('training_v_topic_detail')
           .select()
           .eq('topic_id', widget.topic.topicId)
-          .or('user_id.eq.${user.id},user_id.is.null')
+          .or('user_id.eq.$userId,user_id.is.null')
           .maybeSingle();
 
       debugPrint('After filter - response: $response');
@@ -167,16 +168,16 @@ class _TopicDetailScreenState extends State<TopicDetailScreen>
 
   Future<void> _loadQuizHistory() async {
     try {
-      final user = Supabase.instance.client.auth.currentUser;
-      if (user == null) return;
+      final userId = UserService().effectiveUserId;
+      if (userId == null) return;
 
-      debugPrint('Loading quiz history for topic: ${widget.topic.topicId}, user: ${user.id}');
+      debugPrint('Loading quiz history for topic: ${widget.topic.topicId}, user: $userId');
 
       final response = await Supabase.instance.client
           .from('training_v_quiz_history')
           .select()
           .eq('topic_id', widget.topic.topicId)
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .order('completed_at', ascending: false);
 
       debugPrint('Quiz history response: $response');
@@ -290,8 +291,8 @@ class _TopicDetailScreenState extends State<TopicDetailScreen>
   }
 
   Future<void> _startQuiz() async {
-    final user = Supabase.instance.client.auth.currentUser;
-    if (user == null) return;
+    final userId = UserService().effectiveUserId;
+    if (userId == null) return;
 
     try {
       // Show loading
@@ -314,7 +315,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen>
           .from('training_user_progress')
           .upsert(
             {
-              'user_id': user.id,
+              'user_id': userId,
               'topic_id': widget.topic.topicId,
               'season_id': seasonId,
             },
@@ -362,7 +363,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen>
       final sessionResponse = await Supabase.instance.client
           .from('training_quiz_sessions')
           .insert({
-            'user_id': user.id,
+            'user_id': userId,
             'topic_id': widget.topic.topicId,
             'season_id': seasonId,
             'progress_id': progressId,

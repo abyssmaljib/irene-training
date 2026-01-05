@@ -202,6 +202,13 @@ class PostActionService {
     String? title,
     String? imgUrl,
     List<String>? multiImgUrl,
+    // Quiz fields - pass existing qaId if updating, null if creating new
+    int? existingQaId,
+    String? qaQuestion,
+    String? qaChoiceA,
+    String? qaChoiceB,
+    String? qaChoiceC,
+    String? qaAnswer,
   }) async {
     try {
       final updates = <String, dynamic>{
@@ -211,6 +218,40 @@ class PostActionService {
       if (title != null) updates['title'] = title;
       if (imgUrl != null) updates['imgUrl'] = imgUrl;
       if (multiImgUrl != null) updates['multi_img_url'] = multiImgUrl;
+
+      // Handle quiz update/create
+      final hasQuizData = qaQuestion != null &&
+          qaQuestion.trim().isNotEmpty &&
+          qaChoiceA != null &&
+          qaChoiceB != null &&
+          qaChoiceC != null &&
+          qaAnswer != null;
+
+      if (hasQuizData) {
+        if (existingQaId != null) {
+          // Update existing QA
+          await _supabase.from('QATable').update({
+            'question': qaQuestion,
+            'choiceA': qaChoiceA,
+            'choiceB': qaChoiceB,
+            'choiceC': qaChoiceC,
+            'answer': qaAnswer,
+          }).eq('id', existingQaId);
+          debugPrint('PostActionService: updated QA entry $existingQaId');
+        } else {
+          // Create new QA and link to post
+          final qaResponse = await _supabase.from('QATable').insert({
+            'question': qaQuestion,
+            'choiceA': qaChoiceA,
+            'choiceB': qaChoiceB,
+            'choiceC': qaChoiceC,
+            'answer': qaAnswer,
+          }).select('id').single();
+          final newQaId = qaResponse['id'] as int;
+          updates['qa_id'] = newQaId;
+          debugPrint('PostActionService: created new QA entry $newQaId for post $postId');
+        }
+      }
 
       await _supabase.from('Post').update(updates).eq('id', postId);
       debugPrint('PostActionService: updated post $postId');

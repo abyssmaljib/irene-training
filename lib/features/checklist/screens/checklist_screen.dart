@@ -6,6 +6,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/irene_app_bar.dart';
 import '../../home/models/zone.dart';
+import '../../home/models/clock_in_out.dart';
 import '../../settings/screens/settings_screen.dart';
 import '../models/resident_simple.dart';
 import '../models/task_log.dart';
@@ -56,6 +57,9 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Auto-initialize "คนไข้ของฉัน" filter เมื่อ user clock in อยู่
+    ref.watch(initMyPatientsFilterProvider);
+
     final viewMode = ref.watch(taskViewModeProvider);
     final filteredTasksAsync = ref.watch(filteredTasksProvider);
     final groupedTasksAsync = ref.watch(groupedTasksProvider);
@@ -97,13 +101,9 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
               height: 52,
             ),
           ),
-          // Resident filter chips (แสดงเมื่อเลือก zone) - floating header
-          SliverPersistentHeader(
-            floating: true,
-            delegate: _FilterBarDelegate(
-              child: _buildResidentFilterBar(filteredResidentsAsync, selectedResidents),
-              height: _calculateResidentFilterHeight(filteredResidentsAsync),
-            ),
+          // Resident filter chips (แสดงเมื่อเลือก zone) - dynamic height
+          SliverToBoxAdapter(
+            child: _buildResidentFilterBar(filteredResidentsAsync, selectedResidents),
           ),
           // Current view mode header - pinned at top
           SliverPersistentHeader(
@@ -130,6 +130,9 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
 
   Widget _buildZoneFilterBar(
       AsyncValue<List<Zone>> zonesAsync, Set<int> selectedZones) {
+    final currentShiftAsync = ref.watch(currentShiftProvider);
+    final isMyPatientsActive = ref.watch(myPatientsFilterActiveProvider);
+
     return Container(
       padding: EdgeInsets.symmetric(
           horizontal: AppSpacing.md, vertical: AppSpacing.sm),
@@ -159,11 +162,40 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
           final sortedZones = List<Zone>.from(zones)
             ..sort((a, b) => a.name.compareTo(b.name));
 
+          // ตรวจสอบว่า user clock in อยู่หรือไม่
+          final currentShift = currentShiftAsync.valueOrNull;
+          final isClockedIn = currentShift?.isClockedIn ?? false;
+
           // มี zones - แสดง filter chips
           return SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
+                // "คนไข้ของฉัน" chip - แสดงเฉพาะเมื่อ clock in แล้ว
+                if (isClockedIn) ...[
+                  Padding(
+                    padding: EdgeInsets.only(right: AppSpacing.sm),
+                    child: SizedBox(
+                      height: 35,
+                      child: FilterChip(
+                        label: const Text('คนไข้ของฉัน'),
+                        selected: isMyPatientsActive,
+                        onSelected: (_) {
+                          _toggleMyPatientsFilter(currentShift!);
+                        },
+                        selectedColor: AppColors.accent1,
+                        checkmarkColor: AppColors.primary,
+                        labelStyle: TextStyle(
+                          color: isMyPatientsActive
+                              ? AppColors.primary
+                              : AppColors.secondaryText,
+                        ),
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                  ),
+                ],
                 // "ทั้งหมด" chip
                 Padding(
                   padding: EdgeInsets.only(right: AppSpacing.sm),
@@ -171,16 +203,17 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
                     height: 35,
                     child: FilterChip(
                       label: const Text('ทั้งหมด'),
-                      selected: selectedZones.isEmpty,
+                      selected: selectedZones.isEmpty && !isMyPatientsActive,
                       onSelected: (_) {
-                        // Clear ทั้ง zones และ residents
+                        // Clear ทั้ง zones, residents และ myPatients filter
                         ref.read(selectedZonesFilterProvider.notifier).state = {};
                         ref.read(selectedResidentsFilterProvider.notifier).state = {};
+                        ref.read(myPatientsFilterActiveProvider.notifier).state = false;
                       },
                       selectedColor: AppColors.accent1,
                       checkmarkColor: AppColors.primary,
                       labelStyle: TextStyle(
-                        color: selectedZones.isEmpty
+                        color: (selectedZones.isEmpty && !isMyPatientsActive)
                             ? AppColors.primary
                             : AppColors.secondaryText,
                       ),
@@ -198,6 +231,9 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
                           label: Text(zone.name),
                           selected: selectedZones.contains(zone.id),
                           onSelected: (selected) {
+                            // ปิด myPatients filter เมื่อเลือก zone อื่น
+                            ref.read(myPatientsFilterActiveProvider.notifier).state = false;
+
                             final currentZones =
                                 ref.read(selectedZonesFilterProvider);
                             if (selected) {
@@ -245,29 +281,23 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
     );
   }
 
-  /// คำนวณความสูงของ resident filter bar ตามจำนวน residents
-  /// เพื่อให้ Wrap แสดงได้หลายแถว
-  double _calculateResidentFilterHeight(AsyncValue<List<ResidentSimple>> residentsAsync) {
-    final residents = residentsAsync.valueOrNull;
-    if (residents == null || residents.isEmpty) {
-      return 0;
+  /// Toggle "คนไข้ของฉัน" filter
+  void _toggleMyPatientsFilter(ClockInOut currentShift) {
+    final isActive = ref.read(myPatientsFilterActiveProvider);
+
+    if (isActive) {
+      // ปิด filter - กลับไป "ทั้งหมด"
+      ref.read(myPatientsFilterActiveProvider.notifier).state = false;
+      ref.read(selectedZonesFilterProvider.notifier).state = {};
+      ref.read(selectedResidentsFilterProvider.notifier).state = {};
+    } else {
+      // เปิด filter - set zones และ residents จาก current shift
+      ref.read(myPatientsFilterActiveProvider.notifier).state = true;
+      ref.read(selectedZonesFilterProvider.notifier).state =
+          currentShift.zones.toSet();
+      ref.read(selectedResidentsFilterProvider.notifier).state =
+          currentShift.selectedResidentIdList.toSet();
     }
-
-    // ประมาณการ: chip กว้างเฉลี่ย ~100px, หน้าจอกว้าง ~360px
-    // แต่ละแถวรองรับได้ ~3 chips
-    // 1 แถว = 28 (chip height) + 8 (runSpacing) = 36
-    // padding top/bottom = 8 + 4 = 12
-    const chipHeight = 28.0;
-    const runSpacing = 8.0;
-    const paddingVertical = 12.0;
-    const chipsPerRow = 3;
-
-    // +1 สำหรับ "ทั้งหมด" chip
-    final totalChips = residents.length + 1;
-    final rows = (totalChips / chipsPerRow).ceil();
-    final height = (rows * chipHeight) + ((rows - 1) * runSpacing) + paddingVertical;
-
-    return height.clamp(36.0, 200.0); // จำกัดความสูงสูงสุด
   }
 
   Widget _buildResidentFilterBar(
@@ -317,8 +347,9 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
               ...residents.map((resident) => SizedBox(
                     height: 28,
                     child: FilterChip(
-                      label: Text(resident.name),
+                      label: Text('คุณ${resident.name}'),
                       selected: selectedResidents.contains(resident.id),
+                      showCheckmark: false,
                       onSelected: (selected) {
                         final current =
                             ref.read(selectedResidentsFilterProvider);
@@ -335,7 +366,6 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
                         }
                       },
                       selectedColor: AppColors.pastelLightGreen1,
-                      checkmarkColor: AppColors.tagPassedText,
                       labelStyle: TextStyle(
                         color: selectedResidents.contains(resident.id)
                             ? AppColors.tagPassedText
