@@ -309,7 +309,7 @@ class _ShiftSummaryScreenState extends State<ShiftSummaryScreen> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(8),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: Offset(0, 2))],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: Offset(0, 2))],
       ),
       child: Column(
         children: [
@@ -332,7 +332,7 @@ class _ShiftSummaryScreenState extends State<ShiftSummaryScreen> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(8),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: Offset(0, 2))],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: Offset(0, 2))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -370,7 +370,7 @@ class _ShiftSummaryScreenState extends State<ShiftSummaryScreen> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(8),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: Offset(0, 2))],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: Offset(0, 2))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -514,7 +514,7 @@ class _ShiftSummaryScreenState extends State<ShiftSummaryScreen> {
             children: [
                Icon(Iconsax.warning_2, color: Colors.redAccent),
                const SizedBox(width: 8),
-               Text('งานที่ยังไม่เสร็จ (${_remainingTasks})', style: AppTypography.title.copyWith(color: Colors.redAccent)),
+               Text('งานที่ยังไม่เสร็จ ($_remainingTasks)', style: AppTypography.title.copyWith(color: Colors.redAccent)),
             ],
           ),
           const SizedBox(height: 12),
@@ -522,7 +522,7 @@ class _ShiftSummaryScreenState extends State<ShiftSummaryScreen> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: _remainingTasksList.length,
-            separatorBuilder: (_, __) => const Divider(),
+            separatorBuilder: (context, index) => const Divider(),
             itemBuilder: (context, index) {
               final task = _remainingTasksList[index];
               return ListTile(

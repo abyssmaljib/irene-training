@@ -1359,7 +1359,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                     child: const Center(child: CircularProgressIndicator()),
                   );
                 },
-                errorBuilder: (_, __, ___) => _buildImageErrorPlaceholder(),
+                errorBuilder: (context, error, stackTrace) => _buildImageErrorPlaceholder(),
               ),
             ),
           )
@@ -1392,7 +1392,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                         ),
                       );
                     },
-                    errorBuilder: (_, __, ___) => _buildImageErrorPlaceholder(),
+                    errorBuilder: (context, error, stackTrace) => _buildImageErrorPlaceholder(),
                   ),
                 ),
               );
@@ -1433,7 +1433,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                     width: double.infinity,
                     height: 200,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => _buildVideoPlaceholder(),
+                    errorBuilder: (context, error, stackTrace) => _buildVideoPlaceholder(),
                   )
                 else
                   _buildVideoPlaceholder(),

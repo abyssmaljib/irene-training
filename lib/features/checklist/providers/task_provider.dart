@@ -512,7 +512,7 @@ List<TaskLog> _getPendingTasksInNext2Hours(List<TaskLog> tasks) {
 }
 
 /// Provider สำหรับจำนวนงานค้างต่อ Zone (ใน 2 ชม. ข้างหน้า)
-/// Returns Map<zoneId, count>
+/// Returns Map of zoneId to count
 final pendingTasksPerZoneProvider = Provider<Map<int, int>>((ref) {
   final tasksAsync = ref.watch(tasksProvider);
   final selectedRoleId = ref.watch(effectiveRoleFilterProvider);
@@ -582,7 +582,7 @@ final myRolePendingTasksCountProvider = Provider<int>((ref) {
 });
 
 /// Provider สำหรับจำนวนงานค้างต่อ Role (ใน 2 ชม. ข้างหน้า)
-/// Returns Map<roleId, count>
+/// Returns Map of roleId to count
 /// roleId = null (key -999) หมายถึงงานที่ไม่ระบุ role (ทุกคนทำได้)
 final pendingTasksPerRoleProvider = Provider<Map<int, int>>((ref) {
   final tasksAsync = ref.watch(tasksProvider);

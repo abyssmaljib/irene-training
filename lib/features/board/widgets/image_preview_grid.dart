@@ -208,7 +208,7 @@ class ImagePreviewGrid extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              '${totalImages}/$maxImages',
+              '$totalImages/$maxImages',
               style: TextStyle(
                 fontSize: 10,
                 color: AppColors.secondaryText,
