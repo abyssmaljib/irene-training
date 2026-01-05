@@ -216,7 +216,7 @@ class _AdvancedEditPostScreenState
               const SizedBox(height: 8),
               TextFormField(
                 controller: _textController,
-                maxLines: 6,
+                maxLines: null,
                 minLines: 4,
                 decoration: InputDecoration(
                   hintText: 'เขียนรายละเอียดที่นี่...',

@@ -7,19 +7,58 @@ import '../providers/shift_summary_provider.dart';
 import 'shift_detail_row.dart';
 
 /// Popup แสดงรายละเอียดเวรแต่ละเดือน
-class ShiftDetailPopup extends ConsumerWidget {
+class ShiftDetailPopup extends ConsumerStatefulWidget {
   final int month;
   final int year;
+  final int? highlightDDRecordId;
 
   const ShiftDetailPopup({
     super.key,
     required this.month,
     required this.year,
+    this.highlightDDRecordId,
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final monthYear = MonthYear(month: month, year: year);
+  ConsumerState<ShiftDetailPopup> createState() => _ShiftDetailPopupState();
+}
+
+class _ShiftDetailPopupState extends ConsumerState<ShiftDetailPopup> {
+  final ScrollController _scrollController = ScrollController();
+  bool _hasScrolledToHighlight = false;
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollToHighlightIfNeeded(List details) {
+    if (_hasScrolledToHighlight) return;
+    if (widget.highlightDDRecordId == null) return;
+
+    // Find index of highlighted item
+    final index = details.indexWhere((d) => d.ddRecordId == widget.highlightDDRecordId);
+    if (index < 0) return;
+
+    _hasScrolledToHighlight = true;
+
+    // Scroll to item after frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      // Estimate row height ~50px
+      final offset = index * 50.0;
+      _scrollController.animateTo(
+        offset,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final monthYear = MonthYear(month: widget.month, year: widget.year);
     final detailsAsync = ref.watch(shiftDetailsProvider(monthYear));
 
     // Thai month names
@@ -27,8 +66,8 @@ class ShiftDetailPopup extends ConsumerWidget {
       '', 'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
       'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
     ];
-    final buddhistYear = year + 543;
-    final title = 'เวร${thaiMonths[month]} $buddhistYear';
+    final buddhistYear = widget.year + 543;
+    final title = 'เวร${thaiMonths[widget.month]} $buddhistYear';
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.85,
@@ -67,12 +106,22 @@ class ShiftDetailPopup extends ConsumerWidget {
                     ),
                   );
                 }
+                // Find index to scroll to
+                _scrollToHighlightIfNeeded(details);
+
                 return ListView.builder(
+                  controller: _scrollController,
                   padding: EdgeInsets.symmetric(horizontal: AppSpacing.sm),
                   itemCount: details.length,
                   itemBuilder: (context, index) {
+                    final detail = details[index];
+                    final isHighlighted = widget.highlightDDRecordId != null &&
+                        detail.ddRecordId == widget.highlightDDRecordId;
+
                     return ShiftDetailRow(
-                      clockSummary: details[index],
+                      key: ValueKey('row_${detail.ddRecordId ?? index}'),
+                      clockSummary: detail,
+                      isHighlighted: isHighlighted,
                       onRefresh: () {
                         ref.read(shiftSummaryRefreshCounterProvider.notifier).state++;
                       },

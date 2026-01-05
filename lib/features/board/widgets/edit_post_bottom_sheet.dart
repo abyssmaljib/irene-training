@@ -229,7 +229,7 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
         AppSpacing.verticalGapSm,
         TextField(
           controller: _textController,
-          maxLines: 5,
+          maxLines: null,
           minLines: 3,
           decoration: InputDecoration(
             hintText: 'เขียนข้อความที่นี่...',

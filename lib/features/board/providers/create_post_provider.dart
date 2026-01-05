@@ -447,6 +447,7 @@ class CreatePostNotifier extends StateNotifier<CreatePostState> {
     required String templateText,
     int? residentId,
     String? residentName,
+    String? title,
   }) {
     state = CreatePostState(
       text: templateText,
@@ -454,6 +455,7 @@ class CreatePostNotifier extends StateNotifier<CreatePostState> {
       ddTemplateText: templateText,
       selectedResidentId: residentId,
       selectedResidentName: residentName,
+      title: title,
     );
   }
 

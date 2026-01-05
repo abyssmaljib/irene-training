@@ -29,6 +29,8 @@ import 'time_block_detail_screen.dart';
 import 'tarot_card_screen.dart';
 import '../models/tarot_card.dart';
 import '../widgets/tarot_core_value_card.dart';
+import '../../dd_handover/widgets/dd_summary_card.dart';
+import '../../dd_handover/screens/dd_list_screen.dart';
 
 /// หน้าหลัก - Dashboard with Clock-in/Clock-out
 class HomeScreen extends StatefulWidget {
@@ -575,6 +577,16 @@ class _HomeScreenState extends State<HomeScreen> {
             },
           ),
         if (_currentMonthSummary != null) AppSpacing.verticalGapMd,
+
+        // DD Summary Card (อยู่ระหว่าง Monthly Summary และ Clock In)
+        DDSummaryCard(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const DDListScreen()),
+            );
+          },
+        ),
 
         // Clock In Section
         ClockInSection(

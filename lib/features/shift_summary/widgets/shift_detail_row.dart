@@ -14,38 +14,90 @@ import 'sick_leave_claim_sheet.dart';
 
 /// Row แสดงรายละเอียดเวรแต่ละวัน
 /// มี 3 รูปแบบตาม ShiftRowType
-class ShiftDetailRow extends ConsumerWidget {
+class ShiftDetailRow extends ConsumerStatefulWidget {
   final ClockSummary clockSummary;
   final VoidCallback? onRefresh;
+  final bool isHighlighted;
 
   const ShiftDetailRow({
     super.key,
     required this.clockSummary,
     this.onRefresh,
+    this.isHighlighted = false,
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Material(
-      color: _getBackgroundColor(),
-      child: InkWell(
-        onTap: () => _handleTap(context, ref),
-        child: Container(
-          padding: EdgeInsets.symmetric(
-            horizontal: AppSpacing.sm,
-            vertical: AppSpacing.sm,
-          ),
-          decoration: BoxDecoration(
-            border: Border(
-              bottom: BorderSide(
-                color: AppColors.alternate,
-                width: 0.5,
+  ConsumerState<ShiftDetailRow> createState() => _ShiftDetailRowState();
+}
+
+class _ShiftDetailRowState extends ConsumerState<ShiftDetailRow>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _flashController;
+  late Animation<Color?> _flashAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _flashController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+
+    _flashAnimation = ColorTween(
+      begin: AppColors.primary.withValues(alpha: 0.4),
+      end: Colors.transparent,
+    ).animate(CurvedAnimation(
+      parent: _flashController,
+      curve: Curves.easeOut,
+    ));
+
+    // Start flash animation if highlighted
+    if (widget.isHighlighted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _flashController.forward();
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _flashController.dispose();
+    super.dispose();
+  }
+
+  ClockSummary get clockSummary => widget.clockSummary;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _flashAnimation,
+      builder: (context, child) {
+        return Material(
+          color: widget.isHighlighted && _flashController.isAnimating
+              ? _flashAnimation.value
+              : _getBackgroundColor(),
+          child: InkWell(
+            onTap: () => _handleTap(context, ref),
+            child: Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: AppSpacing.sm,
+                vertical: AppSpacing.sm,
               ),
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(
+                    color: AppColors.alternate,
+                    width: 0.5,
+                  ),
+                ),
+              ),
+              child: _buildContent(),
             ),
           ),
-          child: _buildContent(),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -388,6 +440,7 @@ class ShiftDetailRow extends ConsumerWidget {
         templateText: templateText,
         residentId: residentId,
         residentName: residentName.isNotEmpty ? residentName : null,
+        title: '📋 รายงานการไปพบแพทย์',
       );
 
       // Navigate to AdvancedCreatePostScreen
@@ -398,7 +451,7 @@ class ShiftDetailRow extends ConsumerWidget {
         );
 
         if (result == true) {
-          onRefresh?.call();
+          widget.onRefresh?.call();
         }
       }
     } catch (e) {
@@ -425,7 +478,7 @@ class ShiftDetailRow extends ConsumerWidget {
     );
 
     if (result == true) {
-      onRefresh?.call();
+      widget.onRefresh?.call();
     }
   }
 

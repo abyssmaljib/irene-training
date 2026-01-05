@@ -725,7 +725,7 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
       child: TextField(
         controller: _textController,
         focusNode: _focusNode,
-        maxLines: 4,
+        maxLines: null,
         minLines: 3,
         readOnly: isFromTask, // ถ้ามาจาก task ให้แก้ไขไม่ได้
         enabled: !isFromTask,
@@ -1229,9 +1229,9 @@ void showCreatePostBottomSheet(
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (context) => DraggableScrollableSheet(
-      initialChildSize: 0.7,
-      minChildSize: 0.5,
-      maxChildSize: 0.9,
+      initialChildSize: 0.85,
+      minChildSize: 0.6,
+      maxChildSize: 0.95,
       builder: (context, scrollController) => CreatePostBottomSheet(
         onPostCreated: onPostCreated,
         onAdvancedTap: onAdvancedTap,

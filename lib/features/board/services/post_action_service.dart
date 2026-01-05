@@ -120,6 +120,8 @@ class PostActionService {
     String? qaChoiceB,
     String? qaChoiceC,
     String? qaAnswer,
+    // DD Record link (for DD handover posts)
+    int? ddId,
   }) async {
     try {
       // Build Tag_Topics from tagName if provided
@@ -164,6 +166,7 @@ class PostActionService {
         'visible_to_relative': visibleToRelative,
         'is_handover': isHandover,
         'qa_id': qaId,
+        if (ddId != null) 'DD_id': ddId,
       }).select('id').single();
 
       final postId = response['id'] as int;

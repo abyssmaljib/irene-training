@@ -172,6 +172,8 @@ class _AdvancedCreatePostScreenState
         qaChoiceB: state.qaChoiceB,
         qaChoiceC: state.qaChoiceC,
         qaAnswer: state.qaAnswer,
+        // DD Record link
+        ddId: state.ddId,
       );
 
       if (postId != null) {
@@ -260,7 +262,7 @@ class _AdvancedCreatePostScreenState
               const SizedBox(height: 8),
               TextFormField(
                 controller: _textController,
-                maxLines: 6,
+                maxLines: null,
                 minLines: 4,
                 decoration: InputDecoration(
                   hintText: 'เขียนรายละเอียดที่นี่...',

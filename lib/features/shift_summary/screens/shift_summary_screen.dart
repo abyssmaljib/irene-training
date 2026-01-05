@@ -9,13 +9,27 @@ import '../widgets/monthly_summary_card.dart';
 import '../widgets/shift_detail_popup.dart';
 
 class ShiftSummaryScreen extends ConsumerStatefulWidget {
-  const ShiftSummaryScreen({super.key});
+  /// DD record ID to highlight (optional)
+  final int? highlightDDRecordId;
+
+  /// Month/Year to auto-open popup (optional)
+  final int? autoOpenMonth;
+  final int? autoOpenYear;
+
+  const ShiftSummaryScreen({
+    super.key,
+    this.highlightDDRecordId,
+    this.autoOpenMonth,
+    this.autoOpenYear,
+  });
 
   @override
   ConsumerState<ShiftSummaryScreen> createState() => _ShiftSummaryScreenState();
 }
 
 class _ShiftSummaryScreenState extends ConsumerState<ShiftSummaryScreen> {
+  bool _hasAutoOpened = false;
+
   @override
   Widget build(BuildContext context) {
     final summariesAsync = ref.watch(monthlySummariesProvider);
@@ -37,6 +51,8 @@ class _ShiftSummaryScreenState extends ConsumerState<ShiftSummaryScreen> {
             if (summaries.isEmpty) {
               return _buildEmptyState();
             }
+            // Auto-open popup if specified
+            _autoOpenPopupIfNeeded();
             return _buildContent(summaries);
           },
         ),
@@ -122,7 +138,7 @@ class _ShiftSummaryScreenState extends ConsumerState<ShiftSummaryScreen> {
     );
   }
 
-  void _showDetailPopup(int month, int year) {
+  void _showDetailPopup(int month, int year, {int? highlightDDRecordId}) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -130,8 +146,27 @@ class _ShiftSummaryScreenState extends ConsumerState<ShiftSummaryScreen> {
       builder: (context) => ShiftDetailPopup(
         month: month,
         year: year,
+        highlightDDRecordId: highlightDDRecordId,
       ),
     );
+  }
+
+  void _autoOpenPopupIfNeeded() {
+    if (_hasAutoOpened) return;
+    if (widget.autoOpenMonth == null || widget.autoOpenYear == null) return;
+
+    _hasAutoOpened = true;
+
+    // Use post frame callback to show popup after build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _showDetailPopup(
+          widget.autoOpenMonth!,
+          widget.autoOpenYear!,
+          highlightDDRecordId: widget.highlightDDRecordId,
+        );
+      }
+    });
   }
 
   Widget _buildEmptyState() {
