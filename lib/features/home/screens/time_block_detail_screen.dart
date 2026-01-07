@@ -3,6 +3,7 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/irene_app_bar.dart';
 import '../models/time_block_progress.dart';
 import '../models/time_block_task.dart';
 import '../services/home_service.dart';
@@ -89,17 +90,9 @@ class _TimeBlockDetailScreenState extends State<TimeBlockDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
+      appBar: IreneSecondaryAppBar(
+        title: 'สรุปงานตามช่วงเวลา',
         backgroundColor: AppColors.surface,
-        elevation: 0,
-        leading: IconButton(
-          icon: HugeIcon(icon: HugeIcons.strokeRoundedArrowLeft01, color: AppColors.primaryText),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          'สรุปงานตามช่วงเวลา',
-          style: AppTypography.title.copyWith(color: AppColors.primaryText),
-        ),
         centerTitle: true,
       ),
       body: _isLoading

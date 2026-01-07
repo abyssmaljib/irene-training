@@ -280,8 +280,32 @@ class _ProfileButton extends StatelessWidget {
 
 /// IreneSecondaryAppBar - AppBar สำหรับหน้ารอง
 /// มีปุ่มย้อนกลับ, title ชิดซ้าย, รองรับ actions และ bottom (TabBar)
+/// รองรับ titleIcon, titleWidget, backgroundColor, leadingIcon, centerTitle
 class IreneSecondaryAppBar extends StatelessWidget implements PreferredSizeWidget {
-  final String title;
+  /// Title text - ถ้าไม่ส่งมาและมี titleIcon จะแสดงแค่ icon
+  final String? title;
+
+  /// Icon แสดงก่อน title (optional)
+  /// ใช้ dynamic เพื่อรองรับ HugeIcons
+  final dynamic titleIcon;
+
+  /// Custom title widget - ถ้าส่งมาจะใช้แทน title และ titleIcon
+  /// เหมาะสำหรับกรณีที่ต้องการ title แบบ custom เช่น search field, 2 บรรทัด
+  final Widget? titleWidget;
+
+  /// สี background ของ AppBar (default: AppColors.secondaryBackground)
+  final Color? backgroundColor;
+
+  /// สี foreground (icon, text) ของ AppBar (default: AppColors.primaryText)
+  final Color? foregroundColor;
+
+  /// Icon สำหรับปุ่มย้อนกลับ (default: ArrowLeft01)
+  /// ใช้ dynamic เพื่อรองรับ HugeIcons
+  final dynamic leadingIcon;
+
+  /// จัดตำแหน่ง title ให้อยู่ตรงกลาง (default: false)
+  final bool centerTitle;
+
   final List<Widget>? actions;
   final VoidCallback? onBack;
   final PreferredSizeWidget? bottom;
@@ -289,7 +313,13 @@ class IreneSecondaryAppBar extends StatelessWidget implements PreferredSizeWidge
 
   const IreneSecondaryAppBar({
     super.key,
-    required this.title,
+    this.title,
+    this.titleIcon,
+    this.titleWidget,
+    this.backgroundColor,
+    this.foregroundColor,
+    this.leadingIcon,
+    this.centerTitle = false,
     this.actions,
     this.onBack,
     this.bottom,
@@ -303,26 +333,63 @@ class IreneSecondaryAppBar extends StatelessWidget implements PreferredSizeWidge
 
   @override
   Widget build(BuildContext context) {
+    // กำหนดสีที่ใช้
+    final bgColor = backgroundColor ?? AppColors.secondaryBackground;
+    final fgColor = foregroundColor ?? AppColors.primaryText;
+
     return AppBar(
-      backgroundColor: AppColors.secondaryBackground,
+      backgroundColor: bgColor,
+      foregroundColor: fgColor,
       elevation: 0,
       toolbarHeight: toolbarHeight,
       leading: IconButton(
         onPressed: onBack ?? () => Navigator.pop(context),
         icon: HugeIcon(
-          icon: HugeIcons.strokeRoundedArrowLeft01,
-          color: AppColors.primaryText,
+          icon: leadingIcon ?? HugeIcons.strokeRoundedArrowLeft01,
+          color: fgColor,
         ),
       ),
-      title: Text(
-        title,
-        style: AppTypography.title,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      centerTitle: false,
+      title: titleWidget ?? _buildTitle(fgColor),
+      centerTitle: centerTitle,
       actions: actions,
       bottom: bottom,
+    );
+  }
+
+  /// สร้าง title widget ที่รองรับทั้ง icon และ text
+  Widget _buildTitle(Color textColor) {
+    // ถ้ามีแค่ title ไม่มี icon - แสดง text อย่างเดียว
+    if (titleIcon == null && title != null) {
+      return Text(
+        title!,
+        style: AppTypography.title.copyWith(color: textColor),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      );
+    }
+
+    // ถ้ามี icon (อาจมีหรือไม่มี title ก็ได้)
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (titleIcon != null)
+          HugeIcon(
+            icon: titleIcon,
+            size: AppIconSize.xl,
+            color: textColor,
+          ),
+        if (titleIcon != null && title != null)
+          const SizedBox(width: 8),
+        if (title != null)
+          Flexible(
+            child: Text(
+              title!,
+              style: AppTypography.title.copyWith(color: textColor),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+      ],
     );
   }
 }

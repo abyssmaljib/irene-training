@@ -205,7 +205,7 @@ class ResidentDetail {
   /// แสดงอายุเป็นข้อความ
   String get ageDisplay => age != null ? '$age ปี' : '-';
 
-  /// แสดงวันเกิดเป็นข้อความภาษาไทย
+  /// แสดงวันเกิดเป็นข้อความภาษาไทย (ปี ค.ศ.)
   String get dobDisplay {
     if (dob == null) return '-';
     final thaiMonths = [
@@ -222,11 +222,11 @@ class ResidentDetail {
       'พ.ย.',
       'ธ.ค.'
     ];
-    final buddhistYear = dob!.year + 543;
-    return '${dob!.day} ${thaiMonths[dob!.month - 1]} $buddhistYear';
+    // แสดงปี ค.ศ. (Christian Era)
+    return '${dob!.day} ${thaiMonths[dob!.month - 1]} ${dob!.year}';
   }
 
-  /// แสดงวันที่เข้าพักเป็นข้อความภาษาไทย
+  /// แสดงวันที่เข้าพักเป็นข้อความภาษาไทย (ปี ค.ศ.)
   String get contractDateDisplay {
     if (contractDate == null) return '-';
     final thaiMonths = [
@@ -243,8 +243,8 @@ class ResidentDetail {
       'พ.ย.',
       'ธ.ค.'
     ];
-    final buddhistYear = contractDate!.year + 543;
-    return '${contractDate!.day} ${thaiMonths[contractDate!.month - 1]} $buddhistYear';
+    // แสดงปี ค.ศ. (Christian Era)
+    return '${contractDate!.day} ${thaiMonths[contractDate!.month - 1]} ${contractDate!.year}';
   }
 
   /// แสดงโรคประจำตัวเป็นข้อความ

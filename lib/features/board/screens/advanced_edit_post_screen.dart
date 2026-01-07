@@ -5,6 +5,7 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/widgets/irene_app_bar.dart';
 import '../models/post.dart';
 import '../providers/edit_post_provider.dart';
 import '../providers/post_provider.dart';
@@ -165,17 +166,9 @@ class _AdvancedEditPostScreenState
 
     return Scaffold(
       backgroundColor: AppColors.surface,
-      appBar: AppBar(
+      appBar: IreneSecondaryAppBar(
+        title: 'แก้ไขโพส',
         backgroundColor: AppColors.surface,
-        elevation: 0,
-        leading: IconButton(
-          icon: HugeIcon(icon: HugeIcons.strokeRoundedArrowLeft01, color: AppColors.primaryText),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: Text(
-          'แก้ไขโพส',
-          style: AppTypography.title.copyWith(color: AppColors.primaryText),
-        ),
       ),
       body: Form(
         key: _formKey,

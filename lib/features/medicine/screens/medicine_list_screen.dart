@@ -4,12 +4,17 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/filter_drawer_shell.dart';
+import '../../../core/widgets/irene_app_bar.dart';
 import '../../../core/widgets/input_fields.dart';
 import '../../../core/widgets/toggle_switch.dart';
+import '../../../core/services/user_service.dart';
+import '../../checklist/models/system_role.dart';
 import '../models/medicine_summary.dart';
 import '../services/medicine_service.dart';
 import '../widgets/medicine_card.dart';
 import 'medicine_photos_screen.dart';
+import 'add_medicine_to_resident_screen.dart';
+import 'edit_medicine_screen.dart';
 
 /// ข้อมูลประเภทยาสำหรับ filter chips
 class _GroupInfo {
@@ -55,10 +60,23 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
   String _searchQuery = '';
   bool _showSearch = false;
 
+  // System role ของ user ปัจจุบัน (สำหรับตรวจสิทธิ์เพิ่มยา)
+  // ต้องเป็นหัวหน้าเวรขึ้นไป (canQC) ถึงจะเห็นปุ่มเพิ่มยา
+  SystemRole? _systemRole;
+
   @override
   void initState() {
     super.initState();
     _loadMedicines();
+    _loadUserRole();
+  }
+
+  /// โหลด system role ของ user ปัจจุบัน (สำหรับตรวจสิทธิ์เพิ่มยา)
+  Future<void> _loadUserRole() async {
+    final systemRole = await UserService().getSystemRole();
+    if (mounted) {
+      setState(() => _systemRole = systemRole);
+    }
   }
 
   @override
@@ -179,6 +197,54 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
     return count;
   }
 
+  /// Navigate ไปหน้าเพิ่มยาให้ Resident
+  Future<void> _navigateToAddMedicine() async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddMedicineToResidentScreen(
+          residentId: widget.residentId,
+          residentName: widget.residentName,
+        ),
+      ),
+    );
+
+    // ถ้าเพิ่มยาสำเร็จ ให้ reload รายการยา
+    if (result == true) {
+      _loadMedicines();
+    }
+  }
+
+  /// Navigate ไปหน้าแก้ไขยาของ Resident
+  /// เฉพาะหัวหน้าเวรขึ้นไป (canQC) ถึงจะแก้ไขได้
+  Future<void> _navigateToEditMedicine(MedicineSummary medicine) async {
+    // ตรวจสอบสิทธิ์ - ต้องเป็นหัวหน้าเวรขึ้นไป
+    if (!(_systemRole?.canQC ?? false)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('คุณไม่มีสิทธิ์แก้ไขยา'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditMedicineScreen(
+          medicine: medicine,
+          residentName: widget.residentName,
+        ),
+      ),
+    );
+
+    // ถ้าแก้ไขสำเร็จ ให้ reload รายการยา
+    if (result == true) {
+      _loadMedicines();
+    }
+  }
+
   void _clearFilters() {
     setState(() {
       _selectedGroup = null;
@@ -199,14 +265,10 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
         onClearFilters: _clearFilters,
         filterCount: _filterCount,
       ),
-      appBar: AppBar(
+      appBar: IreneSecondaryAppBar(
         backgroundColor: AppColors.surface,
-        elevation: 0,
-        leading: IconButton(
-          icon: HugeIcon(icon: HugeIcons.strokeRoundedArrowLeft01, color: AppColors.textPrimary),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: _showSearch
+        // ใช้ titleWidget สำหรับ search field หรือ 2 บรรทัด
+        titleWidget: _showSearch
             ? SearchField(
                 controller: _searchController,
                 hintText: 'ค้นหายา...',
@@ -314,6 +376,23 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
           ),
         ],
       ),
+      // FloatingActionButton สำหรับเพิ่มยา
+      // แสดงเฉพาะหัวหน้าเวรขึ้นไป (canQC = level >= 30)
+      floatingActionButton: (_systemRole?.canQC ?? false)
+          ? FloatingActionButton.extended(
+              onPressed: _navigateToAddMedicine,
+              backgroundColor: AppColors.primary,
+              icon: HugeIcon(
+                icon: HugeIcons.strokeRoundedAdd01,
+                color: Colors.white,
+                size: 24,
+              ),
+              label: Text(
+                'เพิ่มยา',
+                style: AppTypography.button.copyWith(color: Colors.white),
+              ),
+            )
+          : null,
       body: Column(
         children: [
           // Toggle & count row
@@ -494,9 +573,13 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
             ],
 
             // Medicine cards
+            // กดที่ card เพื่อแก้ไขยา (เฉพาะหัวหน้าเวรขึ้นไป)
             ...medicines.map((med) => Padding(
                   padding: EdgeInsets.only(bottom: AppSpacing.sm),
-                  child: MedicineCard(medicine: med),
+                  child: MedicineCard(
+                    medicine: med,
+                    onTap: () => _navigateToEditMedicine(med),
+                  ),
                 )),
           ],
         );

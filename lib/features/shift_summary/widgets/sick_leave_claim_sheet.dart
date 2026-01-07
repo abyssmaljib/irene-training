@@ -45,7 +45,8 @@ class _SickLeaveClaimSheetState extends ConsumerState<SickLeaveClaimSheet> {
       '', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
       'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
     ];
-    final dateStr = '${widget.date.day} ${thaiMonths[widget.date.month]} ${widget.date.year + 543}';
+    // แสดงปี ค.ศ. (Christian Era)
+    final dateStr = '${widget.date.day} ${thaiMonths[widget.date.month]} ${widget.date.year}';
     // Hidden for now - leaders can't access this screen for other users
     // final systemRole = ref.watch(currentUserSystemRoleProvider).valueOrNull;
     // final canApprove = systemRole?.canQC ?? false;

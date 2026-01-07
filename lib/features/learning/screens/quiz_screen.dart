@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/confirm_dialog.dart';
+import '../../../core/widgets/irene_app_bar.dart';
 import '../models/question.dart';
 import '../models/quiz_session.dart';
 import '../models/quiz_answer.dart';
@@ -293,29 +294,17 @@ class _QuizScreenState extends State<QuizScreen> {
       },
       child: Scaffold(
         backgroundColor: AppColors.primaryBackground,
-        appBar: AppBar(
-          backgroundColor: AppColors.secondaryBackground,
-          automaticallyImplyLeading: false,
+        appBar: IreneSecondaryAppBar(
           toolbarHeight: 72,
-          titleSpacing: 0,
-          leading: IconButton(
-            icon: HugeIcon(icon: HugeIcons.strokeRoundedCancelSquare),
-            onPressed: () async {
-              final navigator = Navigator.of(context);
-              final shouldPop = await _onWillPop();
-              if (shouldPop && mounted) {
-                navigator.pop();
-              }
-            },
-          ),
-          title: Text(
-            widget.topicName,
-            style: AppTypography.body.copyWith(
-              fontWeight: FontWeight.w500,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
+          leadingIcon: HugeIcons.strokeRoundedCancelSquare,
+          onBack: () async {
+            final navigator = Navigator.of(context);
+            final shouldPop = await _onWillPop();
+            if (shouldPop && mounted) {
+              navigator.pop();
+            }
+          },
+          title: widget.topicName,
           actions: [
             Container(
               margin: const EdgeInsets.only(right: 16),
@@ -344,8 +333,6 @@ class _QuizScreenState extends State<QuizScreen> {
               ),
             ),
           ],
-          centerTitle: false,
-          elevation: 0,
         ),
         body: _buildBody(),
       ),

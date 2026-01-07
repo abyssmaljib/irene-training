@@ -197,6 +197,9 @@ class ActivityLogSection extends ConsumerWidget {
   }
 
   Widget _buildPostItem(BuildContext context, Post post) {
+    // ถ้าเป็น post ส่งเวร (isHandover) จะใช้กรอบสีแดง
+    final isHandover = post.isHandover;
+
     return GestureDetector(
       onTap: () => navigateToPostDetail(context, post.id),
       child: Container(
@@ -206,6 +209,10 @@ class ActivityLogSection extends ConsumerWidget {
           color: AppColors.surface,
           borderRadius: AppRadius.smallRadius,
           boxShadow: [AppShadows.subtle],
+          // ถ้าเป็น handover ใช้กรอบสีแดง, ถ้าไม่ใช่ไม่มีกรอบ
+          border: isHandover
+              ? Border.all(color: AppColors.error, width: 1.5)
+              : null,
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -232,13 +239,36 @@ class ActivityLogSection extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Tag label
-                  Text(
-                    _getTagLabel(post),
-                    style: AppTypography.caption.copyWith(
-                      color: _getTagColor(post),
-                      fontWeight: FontWeight.w600,
-                    ),
+                  // Tag label row (รวม handover tag ถ้ามี)
+                  Row(
+                    children: [
+                      Text(
+                        _getTagLabel(post),
+                        style: AppTypography.caption.copyWith(
+                          color: _getTagColor(post),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      // แสดง tag "ส่งเวรแล้ว" ถ้าเป็น handover
+                      if (isHandover) ...[
+                        SizedBox(width: 6),
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.error.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'ส่งเวรแล้ว',
+                            style: AppTypography.caption.copyWith(
+                              color: AppColors.error,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   // Content
                   if (post.displayText.isNotEmpty)

@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../../core/services/user_service.dart';
 import '../../models/resident_detail.dart';
 import '../../providers/resident_detail_provider.dart';
 
@@ -22,6 +23,9 @@ class _ProfileInfoViewState extends ConsumerState<ProfileInfoView>
     with SingleTickerProviderStateMixin {
   late AnimationController _highlightController;
 
+  // เก็บสถานะว่า user เป็นหัวหน้าเวรขึ้นไปหรือไม่
+  bool _canViewRelatives = false;
+
   @override
   void initState() {
     super.initState();
@@ -36,6 +40,19 @@ class _ProfileInfoViewState extends ConsumerState<ProfileInfoView>
         _triggerHighlight();
       }
     });
+
+    // ตรวจสอบ role ของ user (หัวหน้าเวรขึ้นไปถึงจะเห็นข้อมูลญาติ)
+    _checkUserPermission();
+  }
+
+  /// ตรวจสอบว่า user มีสิทธิ์ดูข้อมูลญาติหรือไม่
+  Future<void> _checkUserPermission() async {
+    final canQC = await UserService().canQC();
+    if (mounted) {
+      setState(() {
+        _canViewRelatives = canQC;
+      });
+    }
   }
 
   @override
@@ -137,25 +154,26 @@ class _ProfileInfoViewState extends ConsumerState<ProfileInfoView>
 
           AppSpacing.verticalGapMd,
 
-          // Relatives Section
-          _buildSection(
-            title: 'ผู้ติดต่อ/ญาติ',
-            icon: HugeIcons.strokeRoundedUserGroup,
-            children: [
-              if (resident.relatives.isEmpty)
-                _buildPlaceholder(
-                  icon: HugeIcons.strokeRoundedUserAdd01,
-                  message: 'ไม่มีข้อมูล',
-                  subtitle: 'ยังไม่ได้เพิ่มข้อมูลผู้ติดต่อ',
-                )
-              else
-                ...resident.relatives.map(
-                  (relative) => _buildRelativeRow(relative),
-                ),
-            ],
-          ),
+          // Relatives Section - แสดงเฉพาะหัวหน้าเวรขึ้นไป
+          if (_canViewRelatives)
+            _buildRestrictedSection(
+              title: 'ผู้ติดต่อ/ญาติ',
+              icon: HugeIcons.strokeRoundedUserGroup,
+              children: [
+                if (resident.relatives.isEmpty)
+                  _buildPlaceholder(
+                    icon: HugeIcons.strokeRoundedUserAdd01,
+                    message: 'ไม่มีข้อมูล',
+                    subtitle: 'ยังไม่ได้เพิ่มข้อมูลผู้ติดต่อ',
+                  )
+                else
+                  ...resident.relatives.map(
+                    (relative) => _buildRelativeRow(relative),
+                  ),
+              ],
+            ),
 
-          AppSpacing.verticalGapMd,
+          if (_canViewRelatives) AppSpacing.verticalGapMd,
 
           // Line Connection Section
           _buildSection(
@@ -199,6 +217,88 @@ class _ProfileInfoViewState extends ConsumerState<ProfileInfoView>
                 HugeIcon(icon: icon, color: AppColors.primary, size: AppIconSize.lg),
                 AppSpacing.horizontalGapSm,
                 Text(title, style: AppTypography.title),
+              ],
+            ),
+          ),
+          // Section Content
+          Padding(
+            padding: EdgeInsets.all(AppSpacing.md),
+            child: Column(children: children),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Section สำหรับข้อมูลที่จำกัดการเข้าถึง (เช่น ข้อมูลญาติ)
+  /// ใช้สีม่วงเพื่อแสดงว่าเป็นข้อมูลพิเศษ/restricted
+  Widget _buildRestrictedSection({
+    required String title,
+    required dynamic icon,
+    required List<Widget> children,
+  }) {
+    // ใช้สีม่วงอ่อนเพื่อแสดงว่าเป็นข้อมูลที่จำกัดการเข้าถึง
+    const restrictedColor = Color(0xFF7C3AED); // Purple-600
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: AppRadius.mediumRadius,
+        boxShadow: AppShadows.cardShadow,
+        // เพิ่ม border สีม่วงเพื่อให้เห็นความแตกต่าง
+        border: Border.all(
+          color: restrictedColor.withValues(alpha: 0.3),
+          width: 1.5,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Section Header - ใช้สีม่วงแทนสี primary
+          Container(
+            padding: EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: restrictedColor.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.vertical(
+                top: Radius.circular(AppRadius.medium),
+              ),
+            ),
+            child: Row(
+              children: [
+                HugeIcon(icon: icon, color: restrictedColor, size: AppIconSize.lg),
+                AppSpacing.horizontalGapSm,
+                Text(
+                  title,
+                  style: AppTypography.title.copyWith(color: restrictedColor),
+                ),
+                const Spacer(),
+                // Badge แสดงว่าเป็นข้อมูล restricted
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: restrictedColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      HugeIcon(
+                        icon: HugeIcons.strokeRoundedShield01,
+                        color: restrictedColor,
+                        size: AppIconSize.xs,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'หัวหน้าเวร+',
+                        style: AppTypography.caption.copyWith(
+                          color: restrictedColor,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),

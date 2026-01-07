@@ -6,6 +6,7 @@ import 'package:image/image.dart' as img;
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/irene_app_bar.dart';
 
 /// หน้า Preview รูปก่อน upload
 /// ให้ user ดูรูป หมุนรูป และยืนยันก่อน upload
@@ -191,17 +192,12 @@ class _PhotoPreviewScreenState extends State<PhotoPreviewScreen> {
 
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: AppBar(
+      appBar: IreneSecondaryAppBar(
+        title: '$typeLabel - ${widget.mealLabel}',
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
-        title: Text(
-          '$typeLabel - ${widget.mealLabel}',
-          style: AppTypography.title.copyWith(color: Colors.white),
-        ),
-        leading: IconButton(
-          onPressed: () => Navigator.pop(context, null),
-          icon: HugeIcon(icon: HugeIcons.strokeRoundedCancelCircle),
-        ),
+        leadingIcon: HugeIcons.strokeRoundedCancelCircle,
+        onBack: () => Navigator.pop(context, null),
       ),
       body: SafeArea(
         child: Column(

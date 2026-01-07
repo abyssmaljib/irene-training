@@ -70,6 +70,7 @@ class QuizHistoryItem {
 
   String get formattedScore => '$score/$totalQuestions';
 
+  /// แสดงวันที่เป็นปี ค.ศ. (Christian Era)
   String get formattedDate {
     final months = [
       'ม.ค.',
@@ -85,8 +86,7 @@ class QuizHistoryItem {
       'พ.ย.',
       'ธ.ค.'
     ];
-    final thaiYear = completedAt.year + 543;
-    return '${completedAt.day} ${months[completedAt.month - 1]} $thaiYear';
+    return '${completedAt.day} ${months[completedAt.month - 1]} ${completedAt.year}';
   }
 
   String get formattedDuration {

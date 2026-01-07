@@ -6,6 +6,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/filter_drawer_shell.dart';
 import '../../../core/widgets/input_fields.dart';
+import '../../../core/widgets/irene_app_bar.dart';
 import '../../board/models/post.dart';
 import '../../board/screens/board_screen.dart';
 import '../providers/activity_log_provider.dart';
@@ -72,14 +73,10 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
       key: _scaffoldKey,
       backgroundColor: AppColors.background,
       endDrawer: _ActivityLogFilterDrawer(residentId: widget.residentId),
-      appBar: AppBar(
+      appBar: IreneSecondaryAppBar(
         backgroundColor: AppColors.surface,
-        elevation: 0,
-        leading: IconButton(
-          icon: HugeIcon(icon: HugeIcons.strokeRoundedArrowLeft01, color: AppColors.textPrimary),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: _showSearch
+        // ใช้ titleWidget สำหรับ search field หรือ 2 บรรทัด
+        titleWidget: _showSearch
             ? SearchField(
                 controller: _searchController,
                 hintText: 'ค้นหาบันทึก...',
@@ -506,6 +503,9 @@ class _ActivityLogCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // ถ้าเป็น post ส่งเวร (isHandover) จะใช้กรอบสีแดง
+    final isHandover = post.isHandover;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -515,6 +515,10 @@ class _ActivityLogCard extends StatelessWidget {
           color: AppColors.surface,
           borderRadius: AppRadius.mediumRadius,
           boxShadow: [AppShadows.subtle],
+          // ถ้าเป็น handover ใช้กรอบสีแดง, ถ้าไม่ใช่ไม่มีกรอบ
+          border: isHandover
+              ? Border.all(color: AppColors.error, width: 1.5)
+              : null,
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -541,13 +545,36 @@ class _ActivityLogCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Tag label
-                  Text(
-                    _getTagLabel(),
-                    style: AppTypography.bodySmall.copyWith(
-                      color: _getTagColor(),
-                      fontWeight: FontWeight.w600,
-                    ),
+                  // Tag label row (รวม handover tag ถ้ามี)
+                  Row(
+                    children: [
+                      Text(
+                        _getTagLabel(),
+                        style: AppTypography.bodySmall.copyWith(
+                          color: _getTagColor(),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      // แสดง tag "ส่งเวรแล้ว" ถ้าเป็น handover
+                      if (isHandover) ...[
+                        SizedBox(width: 6),
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.error.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'ส่งเวรแล้ว',
+                            style: AppTypography.caption.copyWith(
+                              color: AppColors.error,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   AppSpacing.verticalGapXs,
                   // Content text

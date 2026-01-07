@@ -920,12 +920,23 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
                       color: Colors.white,
                     ),
                   )
-                : Text(
-                    'โพส',
-                    style: AppTypography.body.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      HugeIcon(
+                        icon: HugeIcons.strokeRoundedFloppyDisk,
+                        size: AppIconSize.md,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'โพส',
+                        style: AppTypography.body.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
           ),
         ],

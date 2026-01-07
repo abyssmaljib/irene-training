@@ -309,9 +309,9 @@ class DayPicker extends StatelessWidget {
     );
   }
 
+  // แสดงเดือนปี ค.ศ. (Christian Era)
   String _formatMonthYear(DateTime date) {
-    final buddhistYear = date.year + 543;
-    return '${_thaiMonths[date.month - 1]} $buddhistYear';
+    return '${_thaiMonths[date.month - 1]} ${date.year}';
   }
 
   String _getRelativeLabel(DateTime date) {

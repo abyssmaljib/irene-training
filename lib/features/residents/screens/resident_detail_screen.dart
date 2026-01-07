@@ -12,6 +12,7 @@ import '../widgets/resident_detail/care_dashboard_view.dart';
 import '../widgets/resident_detail/clinical_view.dart';
 import '../widgets/resident_detail/profile_info_view.dart';
 import '../widgets/resident_detail/quick_action_fab.dart';
+import '../widgets/resident_detail/clinical_action_fab.dart';
 
 /// หน้า Resident Detail - แสดงข้อมูลรายละเอียดของ Resident
 /// มี 3 Views: Care Dashboard, Clinical, Profile & Info
@@ -45,13 +46,28 @@ class _ResidentDetailScreenState extends ConsumerState<ResidentDetailScreen> {
           return _buildContent(resident, selectedView);
         },
       ),
+      // แสดง FAB ตาม tab ที่เลือก:
+      // - tab ดูแล (care): QuickActionFab
+      // - tab คลินิก (clinical): ClinicalActionFab
       floatingActionButton: residentAsync.whenOrNull(
-        data: (resident) => selectedView == DetailViewType.care && resident != null
-            ? QuickActionFab(
+        data: (resident) {
+          if (resident == null) return null;
+
+          switch (selectedView) {
+            case DetailViewType.care:
+              return QuickActionFab(
                 residentId: widget.residentId,
                 residentName: resident.name,
-              )
-            : null,
+              );
+            case DetailViewType.clinical:
+              return ClinicalActionFab(
+                residentId: widget.residentId,
+                residentName: resident.name,
+              );
+            case DetailViewType.info:
+              return null;
+          }
+        },
       ),
     );
   }

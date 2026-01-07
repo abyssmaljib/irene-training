@@ -4,6 +4,7 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/irene_app_bar.dart';
 import '../models/vital_sign.dart';
 import '../services/resident_detail_service.dart';
 import 'edit_vital_sign_screen.dart';
@@ -104,14 +105,11 @@ class _VitalSignLogScreenState extends ConsumerState<VitalSignLogScreen> {
       },
       child: Scaffold(
         backgroundColor: AppColors.background,
-        appBar: AppBar(
+        appBar: IreneSecondaryAppBar(
           backgroundColor: AppColors.surface,
-          elevation: 0,
-          leading: IconButton(
-            icon: HugeIcon(icon: HugeIcons.strokeRoundedArrowLeft01, color: AppColors.textPrimary),
-            onPressed: () => Navigator.of(context).pop(_hasUpdates),
-          ),
-          title: Column(
+          onBack: () => Navigator.of(context).pop(_hasUpdates),
+          // ใช้ titleWidget สำหรับ 2 บรรทัด
+          titleWidget: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(

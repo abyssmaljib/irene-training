@@ -584,13 +584,8 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.secondaryBackground,
-        title: Text('รายละเอียดโพส', style: AppTypography.title),
-        leading: IconButton(
-          icon: HugeIcon(icon: HugeIcons.strokeRoundedArrowLeft01, color: AppColors.primaryText),
-          onPressed: () => Navigator.pop(context),
-        ),
+      appBar: IreneSecondaryAppBar(
+        title: 'รายละเอียดโพส',
         actions: [
           // Edit button - show only if user can edit
           postAsync.maybeWhen(
@@ -1353,17 +1348,11 @@ class _FullScreenImageViewerState extends State<_FullScreenImageViewer> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: AppBar(
+      appBar: IreneSecondaryAppBar(
         backgroundColor: Colors.black,
-        leading: IconButton(
-          icon: HugeIcon(icon: HugeIcons.strokeRoundedArrowLeft01, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
+        foregroundColor: Colors.white,
         title: widget.imageUrls.length > 1
-            ? Text(
-                '${_currentIndex + 1} / ${widget.imageUrls.length}',
-                style: AppTypography.body.copyWith(color: Colors.white),
-              )
+            ? '${_currentIndex + 1} / ${widget.imageUrls.length}'
             : null,
         centerTitle: true,
       ),

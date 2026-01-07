@@ -4,6 +4,7 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/irene_app_bar.dart';
 import '../providers/vital_sign_form_provider.dart';
 import '../widgets/create_vital_sign/vital_input_section.dart';
 import '../widgets/create_vital_sign/care_input_section.dart';
@@ -26,14 +27,14 @@ class CreateVitalSignScreen extends ConsumerWidget {
     final formState = ref.watch(vitalSignFormProvider(residentId));
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          residentName != null
-              ? 'บันทึกสัญญาณชีพ - $residentName'
-              : 'บันทึกสัญญาณชีพ',
-        ),
+      appBar: IreneSecondaryAppBar(
+        // TaskAdd01Icon แทนคำว่า "บันทึกสัญญาณชีพ"
+        titleIcon: HugeIcons.strokeRoundedTaskAdd01,
+        title: residentName,
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
+        // เว้นระยะขอบขวา md
+        actions: const [SizedBox(width: AppSpacing.md)],
       ),
       body: formState.when(
         loading: () => Center(

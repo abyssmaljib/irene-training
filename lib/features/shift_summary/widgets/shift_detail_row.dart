@@ -7,9 +7,9 @@ import '../../../core/theme/app_typography.dart';
 import '../../board/providers/create_post_provider.dart';
 import '../../board/screens/advanced_create_post_screen.dart';
 import '../../board/screens/board_screen.dart';
+import '../../dd_handover/services/dd_service.dart';
 import '../models/clock_summary.dart';
 import '../models/shift_row_type.dart';
-import '../services/shift_summary_service.dart';
 import 'sick_leave_claim_sheet.dart';
 
 /// Row แสดงรายละเอียดเวรแต่ละวัน
@@ -427,8 +427,9 @@ class _ShiftDetailRowState extends ConsumerState<ShiftDetailRow>
     );
   }
 
+  /// เปิดหน้าสร้าง post สำหรับ DD ที่ยังไม่ได้ส่งเวร
   Future<void> _openCreatePost(BuildContext context, WidgetRef ref, int ddRecordId) async {
-    // Show loading
+    // Show loading indicator
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -438,8 +439,8 @@ class _ShiftDetailRowState extends ConsumerState<ShiftDetailRow>
     );
 
     try {
-      // Fetch DD Record info
-      final ddRecord = await ShiftSummaryService.instance.getDDRecordWithCalendar(ddRecordId);
+      // ดึงข้อมูล DD Record จาก DDService (ใช้ view ddRecordWithCalendar_Clock)
+      final ddRecord = await DDService.instance.getDDRecordById(ddRecordId);
 
       // Close loading dialog
       if (context.mounted) Navigator.pop(context);
@@ -453,25 +454,13 @@ class _ShiftDetailRowState extends ConsumerState<ShiftDetailRow>
         return;
       }
 
-      // Create template text
-      final residentName = ddRecord['appointment_resident_name'] as String? ?? '';
-      final appointmentTitle = ddRecord['appointment_title'] as String? ?? '';
-      final appointmentDescription = ddRecord['appointment_description'] as String? ?? '';
-      final residentId = ddRecord['appointment_resident_id'] as int?;
-
-      final templateText = '''
-พาผู้พักอาศัย: $residentName
-เรื่อง: $appointmentTitle
-รายละเอียด: $appointmentDescription
-'''.trim();
-
-      // Initialize create post state with DD context
+      // ใช้ template text จาก DDRecord model ซึ่งมี format เหมือนกับตอนกด DD
       ref.read(createPostProvider.notifier).initFromDD(
         ddId: ddRecordId,
-        templateText: templateText,
-        residentId: residentId,
-        residentName: residentName.isNotEmpty ? residentName : null,
-        title: '📋 รายงานการไปพบแพทย์',
+        templateText: ddRecord.templateText,
+        residentId: ddRecord.appointmentResidentId,
+        residentName: ddRecord.appointmentResidentName,
+        title: ddRecord.templateTitle,
       );
 
       // Navigate to AdvancedCreatePostScreen
@@ -481,6 +470,7 @@ class _ShiftDetailRowState extends ConsumerState<ShiftDetailRow>
           MaterialPageRoute(builder: (_) => const AdvancedCreatePostScreen()),
         );
 
+        // ถ้าสร้าง post สำเร็จ ให้ refresh ข้อมูล
         if (result == true) {
           widget.onRefresh?.call();
         }

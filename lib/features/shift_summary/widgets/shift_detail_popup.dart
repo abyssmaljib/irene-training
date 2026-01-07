@@ -79,8 +79,8 @@ class _ShiftDetailPopupState extends ConsumerState<ShiftDetailPopup> {
       'พฤศจิกายน',
       'ธันวาคม'
     ];
-    final buddhistYear = widget.year + 543;
-    final title = 'เวร${thaiMonths[widget.month]} $buddhistYear';
+    // แสดงปี ค.ศ. (Christian Era)
+    final title = 'เวร${thaiMonths[widget.month]} ${widget.year}';
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.92,

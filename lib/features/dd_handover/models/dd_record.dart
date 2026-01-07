@@ -84,7 +84,7 @@ class DDRecord {
     final dayName = thaiDaysShort[dt.weekday - 1];
     final day = dt.day;
     final month = thaiMonths[dt.month];
-    final yearShort = (dt.year + 543) % 100; // เอาแค่ 2 หลักท้าย เช่น 69
+    final yearShort = dt.year % 100; // เอาแค่ 2 หลักท้าย ค.ศ. เช่น 26
     final time = DateFormat('HH:mm').format(dt);
 
     return '$dayName $day $month $yearShort $time';
@@ -98,7 +98,8 @@ class DDRecord {
       '', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
       'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
     ];
-    return '${dt.day} ${thaiMonths[dt.month]} ${dt.year + 543}';
+    // แสดงปี ค.ศ. (Christian Era)
+    return '${dt.day} ${thaiMonths[dt.month]} ${dt.year}';
   }
 
   /// แสดงเวลานัด
@@ -120,7 +121,8 @@ class DDRecord {
         '', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
         'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
       ];
-      formattedDateStr = '${dt.day} ${thaiMonths[dt.month]} ${dt.year + 543}';
+      // แสดงปี ค.ศ. (Christian Era)
+      formattedDateStr = '${dt.day} ${thaiMonths[dt.month]} ${dt.year}';
       formattedTimeStr = DateFormat('HH:mm').format(dt);
     }
     final patientName = appointmentResidentName ?? '';

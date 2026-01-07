@@ -89,14 +89,14 @@ class MonthlySummary {
     );
   }
 
-  /// Display format for month/year (Thai Buddhist Era)
+  /// Display format for month/year (Christian Era / ค.ศ.)
   String get monthYearDisplay {
     final thaiMonths = [
       '', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
       'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
     ];
-    final buddhistYear = year + 543;
-    return '${thaiMonths[month]} ${buddhistYear.toString().substring(2)}';
+    // แสดงปี ค.ศ. แค่ 2 หลักท้าย (เช่น 26 แทน 2026)
+    return '${thaiMonths[month]} ${year.toString().substring(2)}';
   }
 
   /// Short format: M/YY

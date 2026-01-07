@@ -31,9 +31,9 @@ class EditVitalSignScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: IreneSecondaryAppBar(
-        title: residentName != null
-            ? 'แก้ไขสัญญาณชีพ - $residentName'
-            : 'แก้ไขสัญญาณชีพ',
+        // ใช้ TaskEdit01Icon แทนคำว่า "แก้ไขสัญญาณชีพ"
+        titleIcon: HugeIcons.strokeRoundedTaskEdit01,
+        title: residentName,
         actions: [
           // Delete button
           IconButton(
@@ -44,6 +44,8 @@ class EditVitalSignScreen extends ConsumerWidget {
             ),
             onPressed: () => _showDeleteConfirmation(context, ref),
           ),
+          // เว้นระยะขอบขวา md
+          const SizedBox(width: AppSpacing.md),
         ],
       ),
       body: formState.when(
@@ -321,7 +323,8 @@ class EditVitalSignScreen extends ConsumerWidget {
       'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.',
     ];
     final dt = data.selectedDateTime as DateTime;
-    final dateStr = '${dt.day} ${thaiMonths[dt.month - 1]} ${dt.year + 543}';
+    // แสดงปี ค.ศ. (Christian Era)
+    final dateStr = '${dt.day} ${thaiMonths[dt.month - 1]} ${dt.year}';
     final timeStr = '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')} น.';
 
     return Container(

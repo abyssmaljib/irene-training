@@ -6,6 +6,7 @@ import 'package:lottie/lottie.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/irene_app_bar.dart';
 import '../models/post.dart';
 import '../providers/post_provider.dart';
 import '../widgets/video_player_widget.dart';
@@ -69,16 +70,9 @@ class _RequiredPostsScreenState extends ConsumerState<RequiredPostsScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.secondaryBackground,
-        title: Text(
-          'โพสที่ต้องอ่าน',
-          style: AppTypography.title,
-        ),
-        leading: IconButton(
-          icon: HugeIcon(icon: HugeIcons.strokeRoundedArrowLeft01, color: AppColors.primaryText),
-          onPressed: () => Navigator.pop(context, false),
-        ),
+      appBar: IreneSecondaryAppBar(
+        title: 'โพสที่ต้องอ่าน',
+        onBack: () => Navigator.pop(context, false),
       ),
       body: postAsync.when(
         data: (post) {

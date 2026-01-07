@@ -14,7 +14,7 @@ import '../../learning/screens/directory_screen.dart';
 import '../../learning/models/badge.dart';
 import '../../learning/models/thinking_skill_data.dart';
 import '../../learning/services/badge_service.dart';
-import '../../learning/widgets/badge_info_dialog.dart';
+import '../../learning/screens/badge_collection_screen.dart';
 // TODO: Temporarily hidden - import '../../learning/widgets/skill_visualization_section.dart';
 import '../models/user_profile.dart';
 import '../../../core/widgets/irene_app_bar.dart';
@@ -1272,82 +1272,93 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
+  /// สร้าง section แสดง badges ที่ได้รับ
+  /// เมื่อกดจะ navigate ไปหน้า BadgeCollectionScreen
   Widget _buildBadgesSection() {
-    return Container(
-      width: double.infinity,
-      padding: AppSpacing.paddingMd,
-      decoration: BoxDecoration(
-        color: AppColors.secondaryBackground,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        // เมื่อกดจะไปหน้า Badge Collection
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const BadgeCollectionScreen(),
+            ),
+          );
+        },
         borderRadius: AppRadius.mediumRadius,
-        border: Border.all(color: AppColors.alternate),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+        child: Container(
+          width: double.infinity,
+          padding: AppSpacing.paddingMd,
+          decoration: BoxDecoration(
+            color: AppColors.secondaryBackground,
+            borderRadius: AppRadius.mediumRadius,
+            border: Border.all(color: AppColors.alternate),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              HugeIcon(
-                icon: HugeIcons.strokeRoundedMedal01,
-                color: AppColors.primary,
-                size: AppIconSize.lg,
-              ),
-              AppSpacing.horizontalGapSm,
-              Text(
-                'Badges ที่ได้รับ',
-                style: AppTypography.label.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: AppRadius.smallRadius,
-                ),
-                child: Text(
-                  '${_earnedBadges.length}',
-                  style: AppTypography.caption.copyWith(
+              Row(
+                children: [
+                  HugeIcon(
+                    icon: HugeIcons.strokeRoundedMedal01,
                     color: AppColors.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              // Info button - min 48px tap target
-              SizedBox(
-                width: 48,
-                height: 48,
-                child: IconButton(
-                  onPressed: () => BadgeInfoDialog.show(context),
-                  icon: HugeIcon(
-                    icon: HugeIcons.strokeRoundedInformationCircle,
-                    color: AppColors.secondaryText,
                     size: AppIconSize.lg,
                   ),
-                ),
+                  AppSpacing.horizontalGapSm,
+                  Text(
+                    'Badges ที่ได้รับ',
+                    style: AppTypography.label.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: AppRadius.smallRadius,
+                    ),
+                    child: Text(
+                      '${_earnedBadges.length}',
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  // Arrow icon แสดงว่ากดได้
+                  const SizedBox(width: 8),
+                  HugeIcon(
+                    icon: HugeIcons.strokeRoundedArrowRight01,
+                    color: AppColors.secondaryText,
+                    size: AppIconSize.md,
+                  ),
+                ],
               ),
+              AppSpacing.verticalGapMd,
+              if (_earnedBadges.isEmpty)
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      'ยังไม่มี badge - ทำแบบทดสอบเพื่อรับ badge!',
+                      style: AppTypography.bodySmall.copyWith(
+                        color: AppColors.secondaryText,
+                      ),
+                    ),
+                  ),
+                )
+              else
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: _earnedBadges.map((badge) => _buildBadgeItem(badge)).toList(),
+                ),
             ],
           ),
-          AppSpacing.verticalGapMd,
-          if (_earnedBadges.isEmpty)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text(
-                  'ยังไม่มี badge - ทำแบบทดสอบเพื่อรับ badge!',
-                  style: AppTypography.bodySmall.copyWith(
-                    color: AppColors.secondaryText,
-                  ),
-                ),
-              ),
-            )
-          else
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: _earnedBadges.map((badge) => _buildBadgeItem(badge)).toList(),
-            ),
-        ],
+        ),
       ),
     );
   }

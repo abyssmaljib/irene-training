@@ -7,6 +7,7 @@ import '../../../core/services/user_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/widgets/irene_app_bar.dart';
 import '../providers/create_post_provider.dart';
 import '../providers/post_provider.dart';
 import '../services/post_action_service.dart';
@@ -208,17 +209,9 @@ class _AdvancedCreatePostScreenState
 
     return Scaffold(
       backgroundColor: AppColors.surface,
-      appBar: AppBar(
+      appBar: IreneSecondaryAppBar(
+        title: 'สร้างประกาศใหม่',
         backgroundColor: AppColors.surface,
-        elevation: 0,
-        leading: IconButton(
-          icon: HugeIcon(icon: HugeIcons.strokeRoundedArrowLeft01, color: AppColors.primaryText),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: Text(
-          'สร้างประกาศใหม่',
-          style: AppTypography.title.copyWith(color: AppColors.primaryText),
-        ),
       ),
       body: Form(
         key: _formKey,
@@ -468,12 +461,23 @@ class _AdvancedCreatePostScreenState
                         color: Colors.white,
                       ),
                     )
-                  : Text(
-                      'โพส',
-                      style: AppTypography.body.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                      ),
+                  : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        HugeIcon(
+                          icon: HugeIcons.strokeRoundedFloppyDisk,
+                          size: AppIconSize.md,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'โพส',
+                          style: AppTypography.body.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
             ),
           ],

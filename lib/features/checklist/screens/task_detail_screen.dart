@@ -8,6 +8,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/confirm_dialog.dart';
+import '../../../core/widgets/irene_app_bar.dart';
 import '../../medicine/models/medicine_summary.dart';
 import '../../medicine/screens/photo_preview_screen.dart';
 import '../../medicine/services/camera_service.dart';
@@ -1584,9 +1585,9 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       MaterialPageRoute(
         builder: (context) => Scaffold(
           backgroundColor: Colors.black,
-          appBar: AppBar(
+          appBar: IreneSecondaryAppBar(
             backgroundColor: Colors.black,
-            iconTheme: const IconThemeData(color: Colors.white),
+            foregroundColor: Colors.white,
           ),
           body: InteractiveViewer(
             child: Center(

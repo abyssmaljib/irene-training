@@ -132,21 +132,6 @@ class ShiftSummaryService {
     }
   }
 
-  /// Get DD Record with Calendar info
-  Future<Map<String, dynamic>?> getDDRecordWithCalendar(int ddRecordId) async {
-    try {
-      final response = await _supabase
-          .from('dd_record_with_calendar_clock')
-          .select()
-          .eq('dd_id', ddRecordId)
-          .maybeSingle();
-
-      return response;
-    } catch (e) {
-      return null;
-    }
-  }
-
   /// Invalidate cache
   void invalidateCache() {
     _cachedMonthlySummaries = null;

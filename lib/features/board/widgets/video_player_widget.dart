@@ -5,6 +5,7 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/irene_app_bar.dart';
 
 /// Widget สำหรับเล่นวิดีโอจาก URL
 class VideoPlayerWidget extends StatefulWidget {
@@ -298,13 +299,10 @@ class FullScreenVideoPlayer extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: AppBar(
+      appBar: IreneSecondaryAppBar(
         backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: HugeIcon(icon: HugeIcons.strokeRoundedCancelCircle, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        foregroundColor: Colors.white,
+        leadingIcon: HugeIcons.strokeRoundedCancelCircle,
       ),
       extendBodyBehindAppBar: true,
       body: Center(
