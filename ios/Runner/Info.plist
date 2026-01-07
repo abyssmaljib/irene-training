@@ -64,5 +64,11 @@
 		<string>https</string>
 		<string>http</string>
 	</array>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>แอปต้องการเข้าถึงคลังรูปภาพเพื่อเลือกรูปยาและอัปโหลดหลักฐานการให้ยา</string>
+	<key>NSCameraUsageDescription</key>
+	<string>แอปต้องการเข้าถึงกล้องเพื่อถ่ายรูปยาและบันทึกหลักฐานการให้ยา</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>แอปต้องการเข้าถึงไมโครโฟนเพื่อบันทึกวิดีโอประกอบการดูแลผู้สูงอายุ</string>
 </dict>
 </plist>
