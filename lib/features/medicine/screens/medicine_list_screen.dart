@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -203,7 +203,7 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
         backgroundColor: AppColors.surface,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Iconsax.arrow_left, color: AppColors.textPrimary),
+          icon: HugeIcon(icon: HugeIcons.strokeRoundedArrowLeft01, color: AppColors.textPrimary),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: _showSearch
@@ -238,19 +238,19 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
         actions: [
           // Search toggle
           IconButton(
-            icon: Icon(
-              _showSearch ? Iconsax.close_circle : Iconsax.search_normal,
+            icon: HugeIcon(
+              icon: _showSearch ? HugeIcons.strokeRoundedCancelCircle : HugeIcons.strokeRoundedSearch01,
               color: _showSearch ? AppColors.error : AppColors.textPrimary,
             ),
             onPressed: _toggleSearch,
           ),
           // Filter button
           Padding(
-            padding: EdgeInsets.only(right: 8),
+            padding: EdgeInsets.only(right: AppSpacing.md),
             child: Stack(
               children: [
                 IconButton(
-                  icon: Icon(Iconsax.filter, color: AppColors.textPrimary),
+                  icon: HugeIcon(icon: HugeIcons.strokeRoundedFilterHorizontal, color: AppColors.textPrimary),
                   onPressed: () {
                     _scaffoldKey.currentState?.openEndDrawer();
                   },
@@ -282,7 +282,7 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
           ),
           // Toggle to medicine photos
           Padding(
-            padding: EdgeInsets.only(right: 8),
+            padding: EdgeInsets.only(right: AppSpacing.md),
             child: Material(
               color: AppColors.accent1,
               borderRadius: BorderRadius.circular(12),
@@ -303,10 +303,10 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
                   width: 40,
                   height: 40,
                   alignment: Alignment.center,
-                  child: Icon(
-                    Iconsax.image,
+                  child: HugeIcon(
+                    icon: HugeIcons.strokeRoundedImage01,
                     color: AppColors.primary,
-                    size: 22,
+                    size: AppIconSize.lg,
                   ),
                 ),
               ),
@@ -414,7 +414,7 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
                   });
                   _applyFilters();
                 },
-                icon: Icon(Iconsax.trash, size: 18),
+                icon: HugeIcon(icon: HugeIcons.strokeRoundedDelete01, size: AppIconSize.md),
                 label: const Text('ล้างตัวกรอง'),
                 style: TextButton.styleFrom(
                   foregroundColor: AppColors.error,
@@ -605,9 +605,9 @@ class _MedicineFilterDrawer extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             if (isSelected) ...[
-                              Icon(
-                                Iconsax.tick_circle,
-                                size: 14,
+                              HugeIcon(
+                                icon: HugeIcons.strokeRoundedCheckmarkCircle02,
+                                size: AppIconSize.sm,
                                 color: AppColors.primary,
                               ),
                               SizedBox(width: 4),

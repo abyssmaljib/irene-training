@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_colors.dart';
@@ -355,7 +355,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         children: [
           IconButton(
             onPressed: () => Navigator.pop(context),
-            icon: const Icon(Iconsax.arrow_left),
+            icon: HugeIcon(icon: HugeIcons.strokeRoundedArrowLeft01),
           ),
           Expanded(
             child: Text(
@@ -375,33 +375,33 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     Color bgColor;
     Color textColor;
     String text;
-    IconData icon;
+    dynamic icon;
 
     if (_task.isDone) {
       bgColor = AppColors.tagPassedBg;
       textColor = AppColors.tagPassedText;
       text = 'เสร็จแล้ว';
-      icon = Iconsax.tick_circle;
+      icon = HugeIcons.strokeRoundedCheckmarkCircle02;
     } else if (_task.isProblem) {
       bgColor = AppColors.error.withValues(alpha: 0.1);
       textColor = AppColors.error;
       text = 'ติดปัญหา';
-      icon = Iconsax.warning_2;
+      icon = HugeIcons.strokeRoundedAlert02;
     } else if (_task.isPostponed) {
       bgColor = AppColors.warning.withValues(alpha: 0.2);
       textColor = AppColors.warning;
       text = 'เลื่อนแล้ว';
-      icon = Iconsax.calendar_1;
+      icon = HugeIcons.strokeRoundedCalendar01;
     } else if (_task.isReferred) {
       bgColor = AppColors.secondary.withValues(alpha: 0.2);
       textColor = AppColors.secondary;
       text = 'ไม่อยู่ศูนย์';
-      icon = Iconsax.hospital;
+      icon = HugeIcons.strokeRoundedHospital01;
     } else {
       bgColor = AppColors.tagPendingBg;
       textColor = AppColors.tagPendingText;
       text = 'รอดำเนินการ';
-      icon = Iconsax.clock;
+      icon = HugeIcons.strokeRoundedClock01;
     }
 
     return Container(
@@ -413,7 +413,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: textColor),
+          HugeIcon(icon: icon, size: AppIconSize.sm, color: textColor),
           const SizedBox(width: 4),
           Text(
             text,
@@ -460,7 +460,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         // Resident name
         if (_task.residentName != null)
           _buildBadge(
-            icon: Iconsax.user,
+            icon: HugeIcons.strokeRoundedUser,
             text: _task.residentName!,
             color: AppColors.primary,
           ),
@@ -468,7 +468,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         // Task type
         if (_task.taskType != null)
           _buildBadge(
-            icon: Iconsax.category,
+            icon: HugeIcons.strokeRoundedDashboardSquare01,
             text: _task.taskType!,
             color: AppColors.secondary,
           ),
@@ -476,7 +476,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         // Expected time
         if (_task.expectedDateTime != null)
           _buildBadge(
-            icon: Iconsax.clock,
+            icon: HugeIcons.strokeRoundedClock01,
             text: DateFormat('HH:mm').format(_task.expectedDateTime!),
             color: AppColors.tagPendingText,
           ),
@@ -484,7 +484,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         // Time block
         if (_task.timeBlock != null)
           _buildBadge(
-            icon: Iconsax.timer_1,
+            icon: HugeIcons.strokeRoundedTimer01,
             text: _task.timeBlock!,
             color: AppColors.secondaryText,
           ),
@@ -492,7 +492,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         // Completed by
         if (_task.completedByNickname != null && _task.completedAt != null)
           _buildBadge(
-            icon: Iconsax.tick_circle,
+            icon: HugeIcons.strokeRoundedCheckmarkCircle02,
             text:
                 '${_task.completedByNickname} (${DateFormat('HH:mm').format(_task.completedAt!)})',
             color: AppColors.tagPassedText,
@@ -502,7 +502,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
   }
 
   Widget _buildBadge({
-    required IconData icon,
+    required dynamic icon,
     required String text,
     required Color color,
   }) {
@@ -515,7 +515,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: color),
+          HugeIcon(icon: icon, size: AppIconSize.sm, color: color),
           const SizedBox(width: 4),
           Text(
             text,
@@ -539,7 +539,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       ),
       child: Row(
         children: [
-          Icon(Iconsax.info_circle, color: AppColors.error, size: 20),
+          HugeIcon(icon: HugeIcons.strokeRoundedInformationCircle, color: AppColors.error, size: AppIconSize.lg),
           AppSpacing.horizontalGapSm,
           Expanded(
             child: Text(
@@ -697,7 +697,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       width: 50,
       height: 50,
       color: AppColors.accent1,
-      child: Icon(Iconsax.user, color: AppColors.primary, size: 24),
+      child: HugeIcon(icon: HugeIcons.strokeRoundedUser, color: AppColors.primary, size: AppIconSize.xl),
     );
   }
 
@@ -837,8 +837,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          Iconsax.image,
+                        HugeIcon(
+                          icon: HugeIcons.strokeRoundedImage01,
                           size: 32,
                           color: AppColors.secondaryText,
                         ),
@@ -982,8 +982,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                       ),
                     ],
                   ),
-                  child: const Icon(
-                    Iconsax.medal_star5,
+                  child: HugeIcon(
+                    icon: HugeIcons.strokeRoundedAward01,
                     color: Color(0xFF92400E), // amber-800
                     size: 20,
                   ),
@@ -1007,8 +1007,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(
-                Iconsax.info_circle,
+              HugeIcon(
+                icon: HugeIcons.strokeRoundedInformationCircle,
                 color: Color(0xFF0284C7),
                 size: 16,
               ),
@@ -1046,8 +1046,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           end: Alignment.bottomRight,
         ),
       ),
-      child: const Icon(
-        Iconsax.user,
+      child: HugeIcon(
+        icon: HugeIcons.strokeRoundedUser,
         size: 18,
         color: Color(0xFFB45309), // amber-700
       ),
@@ -1092,7 +1092,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
             if (canDelete)
               IconButton(
                 onPressed: _handleDeletePhoto,
-                icon: Icon(Iconsax.trash, color: AppColors.error, size: 20),
+                icon: HugeIcon(icon: HugeIcons.strokeRoundedDelete01, color: AppColors.error, size: AppIconSize.lg),
                 tooltip: 'ลบรูป',
               ),
           ],
@@ -1154,8 +1154,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          Iconsax.image,
+                        HugeIcon(
+                          icon: HugeIcons.strokeRoundedImage01,
                           size: 32,
                           color: AppColors.secondaryText,
                         ),
@@ -1199,7 +1199,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                         valueColor: AlwaysStoppedAnimation(Colors.white),
                       ),
                     )
-                  : const Icon(Iconsax.gallery_edit, size: 20),
+                  : HugeIcon(icon: HugeIcons.strokeRoundedImageComposition, size: AppIconSize.lg),
               label: Text(
                 'แทนที่ตัวอย่าง',
                 style: AppTypography.button.copyWith(
@@ -1266,8 +1266,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                             ),
                           ],
                         ),
-                        child: const Icon(
-                          Iconsax.play5,
+                        child: HugeIcon(
+                          icon: HugeIcons.strokeRoundedPlay,
                           size: 32,
                           color: Colors.white,
                         ),
@@ -1289,7 +1289,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Iconsax.video, size: 14, color: Colors.white),
+                        HugeIcon(icon: HugeIcons.strokeRoundedVideo01, size: AppIconSize.sm, color: Colors.white),
                         const SizedBox(width: 4),
                         Text(
                           'แตะเพื่อเล่น',
@@ -1316,8 +1316,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       height: 200,
       color: AppColors.background,
       child: Center(
-        child: Icon(
-          Iconsax.video,
+        child: HugeIcon(
+          icon: HugeIcons.strokeRoundedVideo01,
           size: 64,
           color: AppColors.secondaryText.withValues(alpha: 0.5),
         ),
@@ -1449,8 +1449,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                           color: AppColors.primary.withValues(alpha: 0.9),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(
-                          Iconsax.play5,
+                        child: HugeIcon(
+                          icon: HugeIcons.strokeRoundedPlay,
                           size: 32,
                           color: Colors.white,
                         ),
@@ -1472,7 +1472,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Iconsax.video, size: 14, color: Colors.white),
+                        HugeIcon(icon: HugeIcons.strokeRoundedVideo01, size: AppIconSize.sm, color: Colors.white),
                         const SizedBox(width: 4),
                         Text(
                           'แตะเพื่อเล่น',
@@ -1497,8 +1497,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     return Container(
       color: AppColors.background,
       child: Center(
-        child: Icon(
-          Iconsax.image,
+        child: HugeIcon(
+          icon: HugeIcons.strokeRoundedImage01,
           size: 32,
           color: AppColors.secondaryText,
         ),
@@ -1519,7 +1519,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         children: [
           Row(
             children: [
-              Icon(Iconsax.message_text, color: AppColors.warning, size: 18),
+              HugeIcon(icon: HugeIcons.strokeRoundedMessage01, color: AppColors.warning, size: AppIconSize.md),
               AppSpacing.horizontalGapSm,
               Text(
                 'หมายเหตุ',
@@ -1546,7 +1546,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       ),
       child: Row(
         children: [
-          Icon(Iconsax.calendar_1, color: AppColors.secondary, size: 20),
+          HugeIcon(icon: HugeIcons.strokeRoundedCalendar01, color: AppColors.secondary, size: AppIconSize.lg),
           AppSpacing.horizontalGapSm,
           Expanded(
             child: Column(
@@ -1720,7 +1720,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: Icon(Iconsax.more, color: AppColors.secondaryText),
+                child: HugeIcon(icon: HugeIcons.strokeRoundedMoreHorizontal, color: AppColors.secondaryText),
               ),
             ),
             AppSpacing.horizontalGapSm,
@@ -1748,7 +1748,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                               valueColor: AlwaysStoppedAnimation(Colors.white),
                             ),
                           )
-                        : const Icon(Iconsax.camera),
+                        : HugeIcon(icon: HugeIcons.strokeRoundedCamera01),
                     label: Text('ถ่ายรูปงาน', style: AppTypography.button),
                   ),
                 ),
@@ -1777,7 +1777,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                               valueColor: AlwaysStoppedAnimation(Colors.white),
                             ),
                           )
-                        : const Icon(Iconsax.camera),
+                        : HugeIcon(icon: HugeIcons.strokeRoundedCamera01),
                     label: Text('ถ่ายรูปก่อนโพส', style: AppTypography.button),
                   ),
                 ),
@@ -1806,7 +1806,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                               valueColor: AlwaysStoppedAnimation(Colors.white),
                             ),
                           )
-                        : const Icon(Iconsax.tick_circle),
+                        : HugeIcon(icon: HugeIcons.strokeRoundedCheckmarkCircle02),
                     label: Text('เรียบร้อย', style: AppTypography.button),
                   ),
                 ),
@@ -1826,7 +1826,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    icon: const Icon(Iconsax.document_text),
+                    icon: HugeIcon(icon: HugeIcons.strokeRoundedFileEdit),
                     label: Text('สำเร็จด้วยโพส', style: AppTypography.button),
                   ),
                 ),
@@ -1857,7 +1857,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: Icon(Iconsax.arrow_left, color: AppColors.secondaryText),
+                child: HugeIcon(icon: HugeIcons.strokeRoundedArrowLeft01, color: AppColors.secondaryText),
               ),
             ),
             AppSpacing.horizontalGapSm,
@@ -1875,7 +1875,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  icon: const Icon(Iconsax.warning_2),
+                  icon: HugeIcon(icon: HugeIcons.strokeRoundedAlert02),
                   label: Text('แจ้งติดปัญหา', style: AppTypography.button),
                 ),
               ),
@@ -1899,7 +1899,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  icon: Icon(Iconsax.calendar_1, color: AppColors.warning),
+                  icon: HugeIcon(icon: HugeIcons.strokeRoundedCalendar01, color: AppColors.warning),
                   label: Text(
                     'เลื่อนวันพรุ่งนี้',
                     style: AppTypography.button.copyWith(
@@ -1923,7 +1923,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  icon: Icon(Iconsax.hospital, color: AppColors.secondary),
+                  icon: HugeIcon(icon: HugeIcons.strokeRoundedHospital01, color: AppColors.secondary),
                   label: Text(
                     'ไม่อยู่ศูนย์',
                     style: AppTypography.button.copyWith(
@@ -1960,7 +1960,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                   valueColor: AlwaysStoppedAnimation(AppColors.error),
                 ),
               )
-            : Icon(Iconsax.close_circle, color: AppColors.error),
+            : HugeIcon(icon: HugeIcons.strokeRoundedCancelCircle, color: AppColors.error),
         label: Text(
           'ยกเลิกการรับทราบ',
           style: AppTypography.button.copyWith(color: AppColors.error),

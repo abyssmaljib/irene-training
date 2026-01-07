@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -96,8 +96,8 @@ class _ShiftActivityCardState extends State<ShiftActivityCard> {
             // Header - "งานในเวรนี้"
             Row(
               children: [
-                const Icon(Iconsax.task_square,
-                    color: AppColors.primary, size: 20),
+                HugeIcon(icon: HugeIcons.strokeRoundedTask01,
+                    color: AppColors.primary, size: AppIconSize.lg),
                 AppSpacing.horizontalGapSm,
                 Expanded(
                   child: Text(
@@ -114,10 +114,10 @@ class _ShiftActivityCardState extends State<ShiftActivityCard> {
                   ),
                 AppSpacing.horizontalGapSm,
                 // Arrow icon to indicate tappable
-                Icon(
-                  Iconsax.arrow_right_3,
+                HugeIcon(
+                  icon: HugeIcons.strokeRoundedArrowRight01,
                   color: AppColors.secondaryText.withValues(alpha: 0.5),
-                  size: 16,
+                  size: AppIconSize.sm,
                 ),
               ],
             ),
@@ -280,9 +280,9 @@ class _ShiftActivityCardState extends State<ShiftActivityCard> {
           ),
         ),
         AppSpacing.verticalGapMd,
-        Icon(
-          Iconsax.chart_2,
-          size: 32,
+        HugeIcon(
+          icon: HugeIcons.strokeRoundedChart,
+          size: AppIconSize.xxl,
           color: AppColors.secondaryText.withValues(alpha: 0.4),
         ),
         AppSpacing.verticalGapXs,
@@ -426,9 +426,9 @@ class _ShiftActivityCardState extends State<ShiftActivityCard> {
               ),
             ),
             const SizedBox(width: 4),
-            Icon(
-              Iconsax.arrow_right_3,
-              size: 14,
+            HugeIcon(
+              icon: HugeIcons.strokeRoundedArrowRight01,
+              size: AppIconSize.sm,
               color: AppColors.secondaryText.withValues(alpha: 0.6),
             ),
           ],
@@ -476,10 +476,10 @@ class _ShiftActivityCardState extends State<ShiftActivityCard> {
               // Title
               Row(
                 children: [
-                  Icon(
-                    Iconsax.timer_pause,
+                  HugeIcon(
+                    icon: HugeIcons.strokeRoundedPauseCircle,
                     color: AppColors.secondaryText,
-                    size: 20,
+                    size: AppIconSize.lg,
                   ),
                   AppSpacing.horizontalGapSm,
                   Text(
@@ -590,9 +590,9 @@ class _ShiftActivityCardState extends State<ShiftActivityCard> {
                 ),
                 child: Row(
                   children: [
-                    Icon(
-                      Iconsax.math,
-                      size: 16,
+                    HugeIcon(
+                      icon: HugeIcons.strokeRoundedCalculator01,
+                      size: AppIconSize.sm,
                       color: AppColors.secondaryText,
                     ),
                     AppSpacing.horizontalGapSm,
@@ -626,9 +626,9 @@ class _ShiftActivityCardState extends State<ShiftActivityCard> {
                     children: [
                       Row(
                         children: [
-                          Icon(
-                            Iconsax.info_circle,
-                            size: 16,
+                          HugeIcon(
+                            icon: HugeIcons.strokeRoundedInformationCircle,
+                            size: AppIconSize.sm,
                             color: AppColors.warning,
                           ),
                           const SizedBox(width: 8),
@@ -725,7 +725,7 @@ class _ShiftActivityCardState extends State<ShiftActivityCard> {
         children: [
           Row(
             children: [
-              Icon(Iconsax.clock, size: 14, color: AppColors.secondaryText),
+              HugeIcon(icon: HugeIcons.strokeRoundedClock01, size: AppIconSize.sm, color: AppColors.secondaryText),
               const SizedBox(width: 4),
               Text(
                 '$startTime → $endTime',
@@ -881,9 +881,9 @@ class _ShiftActivityCardState extends State<ShiftActivityCard> {
               ),
             ),
             AppSpacing.horizontalGapXs,
-            const Icon(
-              Iconsax.arrow_right_3,
-              size: 14,
+            HugeIcon(
+              icon: HugeIcons.strokeRoundedArrowRight01,
+              size: AppIconSize.sm,
               color: AppColors.primary,
             ),
           ],
@@ -912,9 +912,9 @@ class _ShiftActivityCardState extends State<ShiftActivityCard> {
               ),
             ),
             AppSpacing.horizontalGapXs,
-            const Icon(
-              Iconsax.arrow_right_3,
-              size: 14,
+            HugeIcon(
+              icon: HugeIcons.strokeRoundedArrowRight01,
+              size: AppIconSize.sm,
               color: AppColors.primary,
             ),
           ],

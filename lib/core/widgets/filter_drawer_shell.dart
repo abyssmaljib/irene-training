@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
@@ -68,13 +68,14 @@ class FilterDrawerShell extends StatelessWidget {
             clipBehavior: Clip.none,
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
                   color: AppColors.accent1,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(Iconsax.filter, color: AppColors.primary, size: 22),
+                alignment: Alignment.center,
+                child: HugeIcon(icon: HugeIcons.strokeRoundedFilterHorizontal, color: AppColors.primary, size: AppIconSize.lg),
               ),
               if (_hasFilters)
                 Positioned(
@@ -158,9 +159,9 @@ class FilterDrawerShell extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
-                      Iconsax.trash,
-                      size: 16,
+                    HugeIcon(
+                      icon: HugeIcons.strokeRoundedDelete01,
+                      size: AppIconSize.sm,
                       color: AppColors.error,
                     ),
                     SizedBox(width: 6),

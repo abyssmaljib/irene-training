@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -133,10 +133,10 @@ class TagPickerWidget extends ConsumerWidget {
                   : AppColors.alternate.withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(
-              isHandover ? Iconsax.arrow_swap_horizontal : Iconsax.arrow_swap_horizontal,
+            child: HugeIcon(
+              icon: HugeIcons.strokeRoundedArrowLeftRight,
               color: isHandover ? AppColors.success : AppColors.secondaryText,
-              size: 20,
+              size: AppIconSize.lg,
             ),
           ),
           const SizedBox(width: 12),
@@ -248,9 +248,9 @@ class TagPickerCompact extends ConsumerWidget {
               const SizedBox(width: 6),
               GestureDetector(
                 onTap: onTagCleared,
-                child: Icon(
-                  Iconsax.close_circle,
-                  size: 16,
+                child: HugeIcon(
+                  icon: HugeIcons.strokeRoundedCancelCircle,
+                  size: AppIconSize.sm,
                   color: AppColors.primary,
                 ),
               ),
@@ -290,9 +290,9 @@ class TagPickerCompact extends ConsumerWidget {
               ),
             ),
             const SizedBox(width: 4),
-            Icon(
-              Iconsax.arrow_down_1,
-              size: 14,
+            HugeIcon(
+              icon: HugeIcons.strokeRoundedArrowDown01,
+              size: AppIconSize.sm,
               color: AppColors.secondaryText,
             ),
           ],
@@ -399,7 +399,7 @@ class _TagPickerSheetState extends ConsumerState<TagPickerSheet> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Iconsax.hashtag, size: 48, color: AppColors.alternate),
+                        HugeIcon(icon: HugeIcons.strokeRoundedTag01, size: AppIconSize.xxxl, color: AppColors.alternate),
                         AppSpacing.verticalGapMd,
                         Text(
                           _searchQuery.isNotEmpty

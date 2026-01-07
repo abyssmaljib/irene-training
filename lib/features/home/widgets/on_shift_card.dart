@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -93,7 +93,7 @@ class OnShiftCard extends StatelessWidget {
   }
 
   Widget _buildInfoSection({
-    required IconData icon,
+    required dynamic icon,
     required String label,
     required List<String> items,
   }) {
@@ -109,8 +109,8 @@ class OnShiftCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(
-                icon,
+              HugeIcon(
+                icon: icon,
                 color: Colors.white.withValues(alpha: 0.85),
                 size: 16,
               ),
@@ -183,8 +183,8 @@ class OnShiftCard extends StatelessWidget {
                   color: Colors.white.withValues(alpha: 0.25),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(
-                  Iconsax.clock,
+                child: HugeIcon(
+                  icon: HugeIcons.strokeRoundedClock01,
                   color: Colors.white,
                   size: 24,
                 ),
@@ -220,8 +220,8 @@ class OnShiftCard extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(
-                      Iconsax.login,
+                    HugeIcon(
+                      icon: HugeIcons.strokeRoundedLogin01,
                       color: Colors.white,
                       size: 14,
                     ),
@@ -253,7 +253,7 @@ class OnShiftCard extends StatelessWidget {
                 // Zones
                 Expanded(
                   child: _InfoItem(
-                    icon: Iconsax.map,
+                    icon: HugeIcons.strokeRoundedMapsLocation01,
                     label: 'Zone',
                     value: _zonesDisplay,
                   ),
@@ -266,7 +266,7 @@ class OnShiftCard extends StatelessWidget {
                 // Residents count
                 Expanded(
                   child: _InfoItem(
-                    icon: Iconsax.people,
+                    icon: HugeIcons.strokeRoundedUserGroup,
                     label: 'คนไข้',
                     value: '${currentShift.residentCount} คน',
                   ),
@@ -279,7 +279,7 @@ class OnShiftCard extends StatelessWidget {
           if (_selectedResidentNames.isNotEmpty) ...[
             AppSpacing.verticalGapSm,
             _buildInfoSection(
-              icon: Iconsax.user,
+              icon: HugeIcons.strokeRoundedUser,
               label: 'คนไข้ที่ดูแล',
               items: _selectedResidentNames,
             ),
@@ -289,7 +289,7 @@ class OnShiftCard extends StatelessWidget {
           if (_selectedBreakTimes.isNotEmpty) ...[
             AppSpacing.verticalGapSm,
             _buildInfoSection(
-              icon: Iconsax.coffee,
+              icon: HugeIcons.strokeRoundedCoffee01,
               label: 'เวลาพัก',
               items: _selectedBreakTimes,
             ),
@@ -369,8 +369,8 @@ class OnShiftCard extends StatelessWidget {
                     : Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
-                            Iconsax.logout,
+                          HugeIcon(
+                            icon: HugeIcons.strokeRoundedLogout01,
                             color: isEnabled
                                 ? Colors.white
                                 : Colors.white.withValues(alpha: 0.5),
@@ -399,8 +399,8 @@ class OnShiftCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Iconsax.info_circle,
+              HugeIcon(
+                icon: HugeIcons.strokeRoundedInformationCircle,
                 size: 14,
                 color: Colors.white.withValues(alpha: 0.7),
               ),
@@ -420,7 +420,7 @@ class OnShiftCard extends StatelessWidget {
 }
 
 class _InfoItem extends StatelessWidget {
-  final IconData icon;
+  final dynamic icon;
   final String label;
   final String value;
 
@@ -435,8 +435,8 @@ class _InfoItem extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(
-          icon,
+        HugeIcon(
+          icon: icon,
           color: Colors.white.withValues(alpha: 0.85),
           size: 18,
         ),

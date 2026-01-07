@@ -1,0 +1,592 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hugeicons/hugeicons.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_spacing.dart';
+import '../../../core/theme/app_typography.dart';
+import '../providers/vital_sign_form_provider.dart';
+import '../widgets/create_vital_sign/vital_input_section.dart';
+import '../widgets/create_vital_sign/care_input_section.dart';
+import '../widgets/create_vital_sign/rating_section.dart';
+import '../widgets/create_vital_sign/shift_card.dart';
+
+/// Single-page scrollable form for creating vital sign records
+class CreateVitalSignScreen extends ConsumerWidget {
+  const CreateVitalSignScreen({
+    super.key,
+    required this.residentId,
+    this.residentName,
+  });
+
+  final int residentId;
+  final String? residentName;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final formState = ref.watch(vitalSignFormProvider(residentId));
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          residentName != null
+              ? 'บันทึกสัญญาณชีพ - $residentName'
+              : 'บันทึกสัญญาณชีพ',
+        ),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+      ),
+      body: formState.when(
+        loading: () => Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              Text(
+                'กำลังโหลดข้อมูล...',
+                style: AppTypography.body.copyWith(
+                  color: AppColors.secondaryText,
+                ),
+              ),
+            ],
+          ),
+        ),
+        error: (error, stack) => Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              HugeIcon(icon: HugeIcons.strokeRoundedAlert02, size: AppIconSize.xxxl, color: Colors.red),
+              const SizedBox(height: 16),
+              Text('เกิดข้อผิดพลาด: $error'),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => ref.invalidate(vitalSignFormProvider(residentId)),
+                child: const Text('ลองใหม่'),
+              ),
+            ],
+          ),
+        ),
+        data: (data) => _buildForm(context, ref, data),
+      ),
+    );
+  }
+
+  Widget _buildForm(BuildContext context, WidgetRef ref, dynamic data) {
+    final notifier = ref.read(vitalSignFormProvider(residentId).notifier);
+
+    return SingleChildScrollView(
+      clipBehavior: Clip.none,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Report Type Toggle
+          _buildReportTypeToggle(context, ref, data),
+          const SizedBox(height: AppSpacing.md),
+
+          // Date/Time & Shift Section
+          _buildMetaSection(context, ref, data),
+          const SizedBox(height: AppSpacing.lg),
+
+          // Vital Signs Section (Collapsible)
+          _buildCollapsibleSection(
+            context: context,
+            title: '🌡️ สัญญาณชีพ *',
+            subtitle: 'กรอกอย่างน้อย 1 รายการ',
+            initiallyExpanded: true,
+            children: [
+              VitalInputSection(residentId: residentId),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+
+          // Care Activities Section (Collapsible) - Always shown
+          _buildCollapsibleSection(
+            context: context,
+            title: '💧 กิจกรรมดูแล',
+            initiallyExpanded: true,
+            children: [
+              CareInputSection(residentId: residentId),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+
+          // Ratings Section (Collapsible) - Only for Full Report
+          if (data.isFullReport)
+            _buildCollapsibleSection(
+              context: context,
+              title: '⭐ การประเมิน (${data.shift}) *',
+              subtitle: 'ให้คะแนนครบทุกหัวข้อ',
+              initiallyExpanded: true,
+              children: [
+                RatingSection(residentId: residentId),
+              ],
+            ),
+
+          // General Report Section - Only for Full Report
+          if (data.isFullReport) ...[
+            const SizedBox(height: AppSpacing.md),
+            _buildGeneralReportSection(context, ref, data),
+          ],
+
+          const SizedBox(height: AppSpacing.lg),
+
+          // Error message
+          if (data.errorMessage != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.md),
+              child: Text(
+                data.errorMessage!,
+                style: AppTypography.body.copyWith(
+                  color: AppColors.error,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+
+          // Submit button
+          SizedBox(
+            height: 48,
+            child: ElevatedButton(
+              onPressed: data.isLoading
+                  ? null
+                  : () async {
+                      // Clear previous error before submit
+                      final currentError = data.errorMessage;
+
+                      final success = await notifier.submit();
+
+                      if (success && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Row(
+                              children: [
+                                HugeIcon(icon: HugeIcons.strokeRoundedTick02, color: Colors.white, size: AppIconSize.xl),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'บันทึกสำเร็จ',
+                                  style: AppTypography.body.copyWith(
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            backgroundColor: AppColors.success,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                        Navigator.of(context).pop(true);
+                      } else if (!success && context.mounted && data.errorMessage != currentError) {
+                        // Show error snackbar if validation fails
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Row(
+                              children: [
+                                HugeIcon(icon: HugeIcons.strokeRoundedAlert02, color: Colors.white, size: AppIconSize.xl),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    data.errorMessage ?? 'เกิดข้อผิดพลาด',
+                                    style: AppTypography.body.copyWith(
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            backgroundColor: AppColors.error,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            duration: const Duration(seconds: 3),
+                          ),
+                        );
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+                elevation: 0,
+                shadowColor: Colors.transparent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: data.isLoading
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        HugeIcon(icon: HugeIcons.strokeRoundedFloppyDisk, size: AppIconSize.lg, color: Colors.white),
+                        const SizedBox(width: 8),
+                        Text(
+                          'บันทึก',
+                          style: AppTypography.button.copyWith(
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+          ),
+
+          const SizedBox(height: AppSpacing.xl),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReportTypeToggle(BuildContext context, WidgetRef ref, dynamic data) {
+    final notifier = ref.read(vitalSignFormProvider(residentId).notifier);
+
+    return Stack(
+      children: [
+        // Background icon (shadow effect)
+        Positioned(
+          right: 16,
+          top: 0,
+          bottom: 0,
+          child: HugeIcon(
+            icon: data.isFullReport ? HugeIcons.strokeRoundedBook02 : HugeIcons.strokeRoundedNoteEdit,
+            size: 80,
+            color: AppColors.alternate.withValues(alpha: 0.3),
+          ),
+        ),
+
+        // Main content
+        Material(
+          color: Colors.transparent,
+          child: SwitchListTile.adaptive(
+            value: data.isFullReport,
+            onChanged: (value) {
+              notifier.setIsFullReport(value);
+            },
+            title: Text(
+              data.isFullReport ? 'สร้างรายงานฉบับเต็ม' : 'สร้างรายงานฉบับย่อ',
+              style: AppTypography.heading3.copyWith(
+                color: data.isFullReport ? AppColors.primary : AppColors.secondaryText,
+              ),
+            ),
+            subtitle: Text(
+              data.isFullReport
+                  ? 'ต้องรายงานเรื่องอุจจาระและรายงานประจำวันด้วย ใช้รายงานในเวลาประจำที่ศูนย์กำหนด'
+                  : 'จะมีเพียงสัญญาณชีพพื้นฐาน เป็นการรายงานนอกเวลาประจำ',
+              style: AppTypography.bodySmall.copyWith(
+                color: AppColors.secondaryText,
+              ),
+            ),
+            activeTrackColor: AppColors.primary.withValues(alpha: 0.3),
+            controlAffinity: ListTileControlAffinity.leading,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMetaSection(BuildContext context, WidgetRef ref, dynamic data) {
+    final notifier = ref.read(vitalSignFormProvider(residentId).notifier);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x14000000),
+            blurRadius: 8,
+            offset: Offset(0, 0),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Date/Time picker
+            Row(
+              children: [
+                HugeIcon(icon: HugeIcons.strokeRoundedCalendar03, size: AppIconSize.lg, color: AppColors.secondaryText),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: InkWell(
+                    onTap: () async {
+                      final date = await showDatePicker(
+                        context: context,
+                        initialDate: data.selectedDateTime,
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime.now(),
+                      );
+                      if (date != null && context.mounted) {
+                        final time = await showTimePicker(
+                          context: context,
+                          initialTime: TimeOfDay.fromDateTime(data.selectedDateTime),
+                        );
+                        if (time != null) {
+                          final dateTime = DateTime(
+                            date.year,
+                            date.month,
+                            date.day,
+                            time.hour,
+                            time.minute,
+                          );
+                          notifier.setDateTime(dateTime);
+                        }
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.background,
+                        border: Border.all(color: AppColors.alternate),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '${data.selectedDateTime.day}/${data.selectedDateTime.month}/${data.selectedDateTime.year} ${data.selectedDateTime.hour}:${data.selectedDateTime.minute.toString().padLeft(2, '0')}',
+                        style: AppTypography.body,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+
+            // Shift selector with custom cards
+            Row(
+              children: [
+                Expanded(
+                  child: ShiftCard(
+                    shift: 'เวรเช้า',
+                    selected: data.shift == 'เวรเช้า',
+                    onTap: () => notifier.setShift('เวรเช้า'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ShiftCard(
+                    shift: 'เวรดึก',
+                    selected: data.shift == 'เวรดึก',
+                    onTap: () => notifier.setShift('เวรดึก'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGeneralReportSection(BuildContext context, WidgetRef ref, dynamic data) {
+    final notifier = ref.read(vitalSignFormProvider(residentId).notifier);
+
+    // Show different field based on shift
+    if (data.shift == 'เวรเช้า') {
+      return _GeneralReportField(
+        label: 'รายงานเพิ่มเติมนอกเหนือจากการประเมินด้วยดาว',
+        initialValue: data.reportD,
+        onChanged: notifier.setReportD,
+        minLines: 5,
+      );
+    } else {
+      return _GeneralReportField(
+        label: 'รายงานเพิ่มเติมนอกเหนือจากการประเมินด้วยดาว',
+        initialValue: data.reportN,
+        onChanged: notifier.setReportN,
+        minLines: 3,
+      );
+    }
+  }
+
+  Widget _buildCollapsibleSection({
+    required BuildContext context,
+    required String title,
+    required List<Widget> children,
+    bool initiallyExpanded = false,
+    String? subtitle,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x14000000),
+            blurRadius: 8,
+            offset: Offset(0, 0),
+          ),
+        ],
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(
+          dividerColor: Colors.transparent,
+        ),
+        child: ExpansionTile(
+          title: Text(
+            title,
+            style: AppTypography.heading3,
+          ),
+          subtitle: subtitle != null
+              ? Text(
+                  subtitle,
+                  style: AppTypography.bodySmall.copyWith(
+                    color: AppColors.secondaryText,
+                  ),
+                )
+              : null,
+          initiallyExpanded: initiallyExpanded,
+          tilePadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 8),
+          childrenPadding: EdgeInsets.zero,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: children,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Stateful widget for General Report text field to prevent selection issue
+class _GeneralReportField extends StatefulWidget {
+  const _GeneralReportField({
+    this.label,
+    required this.initialValue,
+    required this.onChanged,
+    this.minLines = 5,
+  });
+
+  final String? label;
+  final String? initialValue;
+  final ValueChanged<String> onChanged;
+  final int minLines;
+
+  @override
+  State<_GeneralReportField> createState() => _GeneralReportFieldState();
+}
+
+class _GeneralReportFieldState extends State<_GeneralReportField> {
+  late TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialValue);
+  }
+
+  @override
+  void didUpdateWidget(_GeneralReportField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Only update if value changed from external source (not from user typing)
+    if (widget.initialValue != oldWidget.initialValue &&
+        widget.initialValue != _controller.text) {
+      _controller.text = widget.initialValue ?? '';
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x14000000),
+            blurRadius: 8,
+            offset: Offset(0, 0),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'มีรายงานเพิ่มเติมมั้ย?',
+              style: AppTypography.label.copyWith(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _controller,
+              maxLines: null,
+              minLines: widget.minLines,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: InputDecoration(
+                labelText: widget.label ?? 'รายงานเพิ่มเติมนอกเหนือจากการประเมินด้วยดาว',
+                hintText: 'บันทึกข้อสังเกตและรายงานทั่วไป...',
+                filled: true,
+                fillColor: AppColors.background,
+                prefixIcon: Padding(
+                  padding: const EdgeInsets.only(left: 12, right: 8),
+                  child: HugeIcon(
+                    icon: HugeIcons.strokeRoundedEdit01,
+                    size: AppIconSize.input,
+                    color: AppColors.secondaryText,
+                  ),
+                ),
+                prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 16,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(
+                    color: AppColors.primary,
+                    width: 1.5,
+                  ),
+                ),
+              ),
+              onChanged: widget.onChanged,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -84,8 +84,8 @@ class ClockInSection extends StatelessWidget {
                   color: AppColors.accent1,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
-                  Iconsax.clock,
+                child: HugeIcon(
+                  icon: HugeIcons.strokeRoundedClock01,
                   color: AppColors.primary,
                   size: 24,
                 ),
@@ -184,8 +184,8 @@ class ClockInSection extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Iconsax.verify,
+              HugeIcon(
+                icon: HugeIcons.strokeRoundedCheckmarkBadge01,
                 color: AppColors.primary,
                 size: 18,
               ),
@@ -289,8 +289,8 @@ class ClockInSection extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Iconsax.info_circle,
+                HugeIcon(
+                  icon: HugeIcons.strokeRoundedInformationCircle,
                   size: 14,
                   color: AppColors.secondaryText,
                 ),

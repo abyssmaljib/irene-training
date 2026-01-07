@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import '../theme/app_spacing.dart';
@@ -212,10 +212,10 @@ class _FilterButton extends StatelessWidget {
               width: 40,
               height: 40,
               alignment: Alignment.center,
-              child: Icon(
-                Iconsax.filter,
+              child: HugeIcon(
+                icon: HugeIcons.strokeRoundedFilterHorizontal,
                 color: AppColors.primary,
-                size: 22,
+                size: AppIconSize.lg,
               ),
             ),
           ),
@@ -267,10 +267,10 @@ class _ProfileButton extends StatelessWidget {
           width: 40,
           height: 40,
           alignment: Alignment.center,
-          child: Icon(
-            Iconsax.user,
+          child: HugeIcon(
+            icon: HugeIcons.strokeRoundedUser,
             color: AppColors.primary,
-            size: 22,
+            size: AppIconSize.lg,
           ),
         ),
       ),
@@ -309,8 +309,8 @@ class IreneSecondaryAppBar extends StatelessWidget implements PreferredSizeWidge
       toolbarHeight: toolbarHeight,
       leading: IconButton(
         onPressed: onBack ?? () => Navigator.pop(context),
-        icon: const Icon(
-          Iconsax.arrow_left,
+        icon: HugeIcon(
+          icon: HugeIcons.strokeRoundedArrowLeft01,
           color: AppColors.primaryText,
         ),
       ),

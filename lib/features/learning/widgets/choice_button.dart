@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart'; // includes AppRadius and AppShadows
@@ -84,9 +84,9 @@ class ChoiceButton extends StatelessWidget {
                 ),
               ),
               if (state == ChoiceState.correct)
-                Icon(Iconsax.tick_circle, color: AppColors.success, size: 24),
+                HugeIcon(icon: HugeIcons.strokeRoundedCheckmarkCircle02, color: AppColors.success, size: AppIconSize.xl),
               if (state == ChoiceState.incorrect)
-                Icon(Iconsax.close_circle5, color: AppColors.error, size: 24),
+                HugeIcon(icon: HugeIcons.strokeRoundedCancelCircle, color: AppColors.error, size: AppIconSize.xl),
             ],
           ),
         ),

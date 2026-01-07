@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -18,12 +18,16 @@ class ShiftDetailRow extends ConsumerStatefulWidget {
   final ClockSummary clockSummary;
   final VoidCallback? onRefresh;
   final bool isHighlighted;
+  final bool isTicked;
+  final ValueChanged<bool>? onCheckboxChanged;
 
   const ShiftDetailRow({
     super.key,
     required this.clockSummary,
     this.onRefresh,
     this.isHighlighted = false,
+    this.isTicked = false,
+    this.onCheckboxChanged,
   });
 
   @override
@@ -102,6 +106,10 @@ class _ShiftDetailRowState extends ConsumerState<ShiftDetailRow>
   }
 
   Color _getBackgroundColor() {
+    // Ticked rows get primary color tint (highest priority)
+    if (widget.isTicked) {
+      return AppColors.primary.withValues(alpha: 0.08);
+    }
     if (clockSummary.isAbsent == true && !clockSummary.isSick) {
       // ขาดงาน - สีเหลืองอ่อน
       return AppColors.warning.withValues(alpha: 0.1);
@@ -110,6 +118,21 @@ class _ShiftDetailRowState extends ConsumerState<ShiftDetailRow>
       return AppColors.success.withValues(alpha: 0.1);
     }
     return Colors.transparent;
+  }
+
+  Widget _buildCheckboxCell() {
+    return SizedBox(
+      width: 40,
+      child: Checkbox(
+        value: widget.isTicked,
+        onChanged: widget.onCheckboxChanged != null
+            ? (bool? value) => widget.onCheckboxChanged!(value ?? false)
+            : null,
+        activeColor: AppColors.primary,
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        visualDensity: VisualDensity.compact,
+      ),
+    );
   }
 
   Widget _buildContent() {
@@ -127,6 +150,8 @@ class _ShiftDetailRowState extends ConsumerState<ShiftDetailRow>
   Widget _buildNormalRow() {
     return Row(
       children: [
+        // Checkbox
+        _buildCheckboxCell(),
         // วันที่
         Expanded(
           child: Text(
@@ -174,15 +199,15 @@ class _ShiftDetailRowState extends ConsumerState<ShiftDetailRow>
             mainAxisSize: MainAxisSize.min,
             children: [
               if (clockSummary.isSupport == true)
-                Icon(
-                  Iconsax.star,
-                  size: 16,
+                HugeIcon(
+                  icon: HugeIcons.strokeRoundedStar,
+                  size: AppIconSize.sm,
                   color: AppColors.warning,
                 ),
               if (clockSummary.incharge == true)
-                Icon(
-                  Iconsax.medal,
-                  size: 16,
+                HugeIcon(
+                  icon: HugeIcons.strokeRoundedMedal01,
+                  size: AppIconSize.sm,
                   color: AppColors.success,
                 ),
             ],
@@ -217,11 +242,15 @@ class _ShiftDetailRowState extends ConsumerState<ShiftDetailRow>
       textColor = AppColors.error;
     }
 
+    // Return row with checkbox
+
     // Show notification dot if can claim sick leave
     final showNotiBadge = clockSummary.canClaimSickLeave;
 
     return Row(
       children: [
+        // Checkbox
+        _buildCheckboxCell(),
         // วันที่
         Expanded(
           child: Text(
@@ -276,6 +305,8 @@ class _ShiftDetailRowState extends ConsumerState<ShiftDetailRow>
 
     return Row(
       children: [
+        // Checkbox
+        _buildCheckboxCell(),
         // วันที่
         Expanded(
           child: Text(
@@ -297,9 +328,9 @@ class _ShiftDetailRowState extends ConsumerState<ShiftDetailRow>
         ),
         // Icon
         Expanded(
-          child: Icon(
-            hasDDPost ? Iconsax.tick_square : Iconsax.close_square,
-            size: 20,
+          child: HugeIcon(
+            icon: hasDDPost ? HugeIcons.strokeRoundedCheckmarkSquare02 : HugeIcons.strokeRoundedCancelSquare,
+            size: AppIconSize.lg,
             color: hasDDPost ? AppColors.primary : AppColors.secondaryText,
           ),
         ),
@@ -500,8 +531,8 @@ class _ShiftDetailRowState extends ConsumerState<ShiftDetailRow>
                   height: 100,
                   color: AppColors.background,
                   child: Center(
-                    child: Icon(
-                      Iconsax.gallery_slash,
+                    child: HugeIcon(
+                      icon: HugeIcons.strokeRoundedImageNotFound01,
                       color: AppColors.secondaryText,
                     ),
                   ),

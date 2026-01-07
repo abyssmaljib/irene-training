@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -69,26 +69,26 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
               children: [
                 _buildNavItem(
                   index: 0,
-                  icon: Iconsax.home_2,
-                  activeIcon: Iconsax.home_15,
+                  icon: HugeIcons.strokeRoundedHome01,
+                  activeIcon: HugeIcons.strokeRoundedHome01,
                   label: 'หน้าหลัก',
                 ),
                 _buildNavItem(
                   index: 1,
-                  icon: Iconsax.task_square,
-                  activeIcon: Iconsax.task_square5,
+                  icon: HugeIcons.strokeRoundedTask01,
+                  activeIcon: HugeIcons.strokeRoundedTask01,
                   label: 'เช็คลิสต์',
                 ),
                 _buildNavItem(
                   index: 2,
-                  icon: Iconsax.health,
-                  activeIcon: Iconsax.health5,
+                  icon: HugeIcons.strokeRoundedUserGroup,
+                  activeIcon: HugeIcons.strokeRoundedUserGroup,
                   label: 'คนไข้',
                 ),
                 _buildNavItem(
                   index: 3,
-                  icon: Iconsax.clipboard_text,
-                  activeIcon: Iconsax.clipboard_text5,
+                  icon: HugeIcons.strokeRoundedNews01,
+                  activeIcon: HugeIcons.strokeRoundedNews01,
                   label: 'กระดานข่าว',
                 ),
                 _buildProfileNavItem(),
@@ -102,8 +102,8 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
 
   Widget _buildNavItem({
     required int index,
-    required IconData icon,
-    required IconData activeIcon,
+    required dynamic icon,
+    required dynamic activeIcon,
     required String label,
   }) {
     final isSelected = _currentIndex == index;
@@ -121,10 +121,10 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              isSelected ? activeIcon : icon,
+            HugeIcon(
+              icon: isSelected ? activeIcon : icon,
               color: isSelected ? AppColors.primary : AppColors.secondaryText,
-              size: 24,
+              size: AppIconSize.xl,
             ),
             AppSpacing.verticalGapXs,
             Text(
@@ -168,10 +168,10 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
             Stack(
               clipBehavior: Clip.none,
               children: [
-                Icon(
-                  isSelected ? Iconsax.user : Iconsax.user,
+                HugeIcon(
+                  icon: HugeIcons.strokeRoundedUser,
                   color: isSelected ? AppColors.primary : AppColors.secondaryText,
-                  size: 24,
+                  size: AppIconSize.xl,
                 ),
                 // Red notification dot for pending absences
                 if (hasPendingAbsence)

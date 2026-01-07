@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -81,9 +81,9 @@ class PinnedPostCard extends StatelessWidget {
             color: AppColors.error,
             borderRadius: BorderRadius.circular(4),
           ),
-          child: Icon(
-            Iconsax.flag,
-            size: 12,
+          child: HugeIcon(
+            icon: HugeIcons.strokeRoundedFlag01,
+            size: AppIconSize.xs,
             color: Colors.white,
           ),
         ),
@@ -138,7 +138,7 @@ class PinnedPostCard extends StatelessWidget {
           backgroundImage:
               post.photoUrl != null ? NetworkImage(post.photoUrl!) : null,
           child: post.photoUrl == null
-              ? Icon(Iconsax.user, size: 12, color: AppColors.primary)
+              ? HugeIcon(icon: HugeIcons.strokeRoundedUser, size: AppIconSize.xs, color: AppColors.primary)
               : null,
         ),
         AppSpacing.horizontalGapSm,

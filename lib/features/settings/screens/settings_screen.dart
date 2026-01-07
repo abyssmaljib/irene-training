@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart' hide Badge;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -338,9 +338,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      Iconsax.user_tag,
-                      size: 14,
+                    HugeIcon(
+                      icon: HugeIcons.strokeRoundedUserAccount,
+                      size: AppIconSize.sm,
                       color: AppColors.primary,
                     ),
                     SizedBox(width: 4),
@@ -415,10 +415,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       width: 80,
       height: 80,
       color: AppColors.accent1,
-      child: const Icon(
-        Iconsax.user,
-        size: 40,
-        color: AppColors.primary,
+      child: Center(
+        child: HugeIcon(
+          icon: HugeIcons.strokeRoundedUser,
+          size: 40,
+          color: AppColors.primary,
+        ),
       ),
     );
   }
@@ -433,7 +435,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       child: Column(
         children: [
           _buildMenuItem(
-            icon: Iconsax.book_1,
+            icon: HugeIcons.strokeRoundedBook02,
             label: 'เรียนรู้',
             onTap: () {
               Navigator.push(
@@ -448,7 +450,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _buildDDMenuItem(),
           Divider(height: 1, color: AppColors.alternate),
           _buildMenuItem(
-            icon: Iconsax.warning_2,
+            icon: HugeIcons.strokeRoundedAlert02,
             label: 'ใบเตือน',
             onTap: () {
               // TODO: Navigate to warnings screen
@@ -456,7 +458,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           Divider(height: 1, color: AppColors.alternate),
           _buildMenuItem(
-            icon: Iconsax.setting_2,
+            icon: HugeIcons.strokeRoundedSettings02,
             label: 'ตั้งค่า',
             onTap: () {
               // TODO: Navigate to app settings
@@ -476,7 +478,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
 
     return _buildMenuItem(
-      icon: Iconsax.calendar_1,
+      icon: HugeIcons.strokeRoundedCalendar01,
       label: 'เวรของฉัน',
       badgeCount: badgeCount,
       onTap: () {
@@ -497,7 +499,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
 
     return _buildMenuItem(
-      icon: Iconsax.hospital,
+      icon: HugeIcons.strokeRoundedHospital01,
       label: 'งาน DD',
       badgeCount: badgeCount,
       onTap: () {
@@ -510,7 +512,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Widget _buildMenuItem({
-    required IconData icon,
+    required dynamic icon,
     required String label,
     required VoidCallback onTap,
     int badgeCount = 0,
@@ -537,7 +539,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       color: AppColors.accent1,
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(icon, color: AppColors.primary, size: 20),
+                    child: Center(
+                      child: HugeIcon(icon: icon, color: AppColors.primary, size: AppIconSize.lg),
+                    ),
                   ),
                   if (badgeCount > 0)
                     Positioned(
@@ -573,9 +577,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   style: AppTypography.body,
                 ),
               ),
-              Icon(
-                Iconsax.arrow_right_3,
-                size: 18,
+              HugeIcon(
+                icon: HugeIcons.strokeRoundedArrowRight01,
+                size: AppIconSize.md,
                 color: AppColors.secondaryText,
               ),
             ],
@@ -604,7 +608,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         children: [
           Row(
             children: [
-              Icon(Iconsax.warning_2, size: 20, color: Colors.red.shade700),
+              HugeIcon(icon: HugeIcons.strokeRoundedAlert02, size: AppIconSize.lg, color: Colors.red.shade700),
               AppSpacing.horizontalGapSm,
               Expanded(
                 child: Text(
@@ -622,7 +626,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             width: double.infinity,
             child: ElevatedButton.icon(
               onPressed: _stopImpersonating,
-              icon: Icon(Iconsax.back_square, size: 18),
+              icon: HugeIcon(icon: HugeIcons.strokeRoundedArrowTurnBackward, size: AppIconSize.md),
               label: Text('กลับมาเป็นตัวฉันเอง'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red.shade600,
@@ -699,7 +703,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         children: [
           Row(
             children: [
-              Icon(Iconsax.user_edit, size: 16, color: Colors.cyan.shade700),
+              HugeIcon(icon: HugeIcons.strokeRoundedUserEdit01, size: AppIconSize.sm, color: Colors.cyan.shade700),
               AppSpacing.horizontalGapSm,
               Text(
                 'Dev Mode - สวมรอยเป็น User อื่น',
@@ -726,10 +730,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               hintStyle: AppTypography.bodySmall.copyWith(
                 color: Colors.purple.shade300,
               ),
-              prefixIcon: Icon(
-                Iconsax.search_normal,
-                size: 18,
-                color: Colors.purple.shade400,
+              prefixIcon: Center(
+                widthFactor: 1,
+                heightFactor: 1,
+                child: HugeIcon(
+                  icon: HugeIcons.strokeRoundedSearch01,
+                  size: AppIconSize.md,
+                  color: Colors.purple.shade400,
+                ),
               ),
               filled: true,
               fillColor: Colors.white,
@@ -843,16 +851,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             width: 40,
                             height: 40,
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) => Icon(
-                              Iconsax.user,
-                              size: 20,
-                              color: Colors.purple.shade700,
+                            errorBuilder: (context, error, stackTrace) => Center(
+                              child: HugeIcon(
+                                icon: HugeIcons.strokeRoundedUser,
+                                size: AppIconSize.lg,
+                                color: Colors.purple.shade700,
+                              ),
                             ),
                           )
-                        : Icon(
-                            Iconsax.user,
-                            size: 20,
-                            color: Colors.purple.shade700,
+                        : Center(
+                            child: HugeIcon(
+                              icon: HugeIcons.strokeRoundedUser,
+                              size: AppIconSize.lg,
+                              color: Colors.purple.shade700,
+                            ),
                           ),
                   ),
                 ),
@@ -925,9 +937,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             // Check icon
             if (isSelected)
-              Icon(
-                Iconsax.tick_circle,
-                size: 20,
+              HugeIcon(
+                icon: HugeIcons.strokeRoundedCheckmarkCircle02,
+                size: AppIconSize.lg,
                 color: Colors.purple,
               ),
           ],
@@ -992,7 +1004,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         children: [
           Row(
             children: [
-              Icon(Iconsax.code, size: 16, color: Colors.amber.shade700),
+              HugeIcon(icon: HugeIcons.strokeRoundedSourceCode, size: AppIconSize.sm, color: Colors.amber.shade700),
               AppSpacing.horizontalGapSm,
               Text(
                 'Dev Mode - เลือก Role',
@@ -1042,9 +1054,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (isSelected) ...[
-                        Icon(
-                          Iconsax.tick_circle,
-                          size: 16,
+                        HugeIcon(
+                          icon: HugeIcons.strokeRoundedCheckmarkCircle02,
+                          size: AppIconSize.sm,
                           color: color,
                         ),
                         SizedBox(width: 4),
@@ -1109,7 +1121,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         children: [
           Row(
             children: [
-              Icon(Iconsax.user_tag, size: 16, color: Colors.teal.shade700),
+              HugeIcon(icon: HugeIcons.strokeRoundedUserAccount, size: AppIconSize.sm, color: Colors.teal.shade700),
               AppSpacing.horizontalGapSm,
               Text(
                 'Dev Mode - เลือก System Role (ตำแหน่ง)',
@@ -1198,9 +1210,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (isSelected) ...[
-              Icon(
-                Iconsax.tick_circle,
-                size: 16,
+              HugeIcon(
+                icon: HugeIcons.strokeRoundedCheckmarkCircle02,
+                size: AppIconSize.sm,
                 color: Colors.teal,
               ),
               SizedBox(width: 4),
@@ -1274,10 +1286,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         children: [
           Row(
             children: [
-              const Icon(
-                Iconsax.medal_star,
+              HugeIcon(
+                icon: HugeIcons.strokeRoundedMedal01,
                 color: AppColors.primary,
-                size: 20,
+                size: AppIconSize.lg,
               ),
               AppSpacing.horizontalGapSm,
               Text(
@@ -1307,10 +1319,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 height: 48,
                 child: IconButton(
                   onPressed: () => BadgeInfoDialog.show(context),
-                  icon: const Icon(
-                    Iconsax.info_circle,
+                  icon: HugeIcon(
+                    icon: HugeIcons.strokeRoundedInformationCircle,
                     color: AppColors.secondaryText,
-                    size: 20,
+                    size: AppIconSize.lg,
                   ),
                 ),
               ),

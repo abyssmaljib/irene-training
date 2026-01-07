@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -54,8 +54,8 @@ class UnreadPostsDialog extends StatelessWidget {
                 color: AppColors.tagPendingBg,
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                Iconsax.document_text,
+              child: HugeIcon(
+                icon: HugeIcons.strokeRoundedFileEdit,
                 color: AppColors.tagPendingText,
                 size: 32,
               ),
@@ -99,7 +99,7 @@ class UnreadPostsDialog extends StatelessWidget {
             PrimaryButton(
               text: 'ไปอ่านโพส',
               onPressed: onViewPosts,
-              icon: Iconsax.arrow_right,
+              icon: HugeIcons.strokeRoundedArrowRight01,
             ),
 
             AppSpacing.verticalGapSm,

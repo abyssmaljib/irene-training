@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -86,9 +86,9 @@ class ResidentPickerWidget extends ConsumerWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Iconsax.user,
-            size: 16,
+          HugeIcon(
+            icon: HugeIcons.strokeRoundedUser,
+            size: AppIconSize.sm,
             color: disabled ? AppColors.secondaryText : AppColors.primary,
           ),
           const SizedBox(width: 6),
@@ -104,9 +104,9 @@ class ResidentPickerWidget extends ConsumerWidget {
             const SizedBox(width: 6),
             GestureDetector(
               onTap: onResidentCleared,
-              child: Icon(
-                Iconsax.close_circle,
-                size: 16,
+              child: HugeIcon(
+                icon: HugeIcons.strokeRoundedCancelCircle,
+                size: AppIconSize.sm,
                 color: AppColors.primary,
               ),
             ),
@@ -130,9 +130,9 @@ class ResidentPickerWidget extends ConsumerWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Iconsax.user,
-              size: 16,
+            HugeIcon(
+              icon: HugeIcons.strokeRoundedUser,
+              size: AppIconSize.sm,
               color: AppColors.secondaryText,
             ),
             const SizedBox(width: 6),
@@ -143,9 +143,9 @@ class ResidentPickerWidget extends ConsumerWidget {
               ),
             ),
             const SizedBox(width: 4),
-            Icon(
-              Iconsax.arrow_down_1,
-              size: 14,
+            HugeIcon(
+              icon: HugeIcons.strokeRoundedArrowDown01,
+              size: AppIconSize.sm,
               color: AppColors.secondaryText,
             ),
           ],
@@ -247,8 +247,8 @@ class _ResidentPickerSheetState extends ConsumerState<ResidentPickerSheet> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Iconsax.user_search,
-                            size: 48, color: AppColors.alternate),
+                        HugeIcon(icon: HugeIcons.strokeRoundedUserSearch01,
+                            size: AppIconSize.xxxl, color: AppColors.alternate),
                         AppSpacing.verticalGapMd,
                         Text(
                           _searchQuery.isNotEmpty
@@ -316,7 +316,7 @@ class _ResidentPickerSheetState extends ConsumerState<ResidentPickerSheet> {
                   ? CachedNetworkImageProvider(resident.pictureUrl!)
                   : null,
               child: resident.pictureUrl == null
-                  ? Icon(Iconsax.user, color: AppColors.primary, size: 22)
+                  ? HugeIcon(icon: HugeIcons.strokeRoundedUser, color: AppColors.primary, size: AppIconSize.lg)
                   : null,
             ),
             const SizedBox(width: 12),
@@ -344,8 +344,8 @@ class _ResidentPickerSheetState extends ConsumerState<ResidentPickerSheet> {
             ),
 
             // Arrow
-            Icon(Iconsax.arrow_right_3,
-                size: 18, color: AppColors.secondaryText),
+            HugeIcon(icon: HugeIcons.strokeRoundedArrowRight01,
+                size: AppIconSize.md, color: AppColors.secondaryText),
           ],
         ),
       ),

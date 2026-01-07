@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -64,10 +64,10 @@ class DDCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Icon
-                const Icon(
-                  Iconsax.calendar_1,
+                HugeIcon(
+                  icon: HugeIcons.strokeRoundedCalendar01,
                   color: AppColors.primaryText,
-                  size: 18.0,
+                  size: AppIconSize.md,
                 ),
                 SizedBox(width: AppSpacing.xs),
                 // Content
@@ -172,10 +172,10 @@ class DDCard extends StatelessWidget {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(
-                              Iconsax.info_circle,
+                            HugeIcon(
+                              icon: HugeIcons.strokeRoundedInformationCircle,
                               color: AppColors.primaryText,
-                              size: 20.0,
+                              size: AppIconSize.lg,
                             ),
                             SizedBox(width: AppSpacing.xs),
                             Text(
@@ -193,10 +193,10 @@ class DDCard extends StatelessWidget {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(
-                              Iconsax.tick_circle,
+                            HugeIcon(
+                              icon: HugeIcons.strokeRoundedCheckmarkCircle02,
                               color: AppColors.success,
-                              size: 20.0,
+                              size: AppIconSize.lg,
                             ),
                             SizedBox(width: AppSpacing.xs),
                             Text(

@@ -6,8 +6,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/config/supabase_config.dart';
+import 'core/providers/shared_preferences_provider.dart';
 import 'features/auth/screens/login_screen.dart';
 import 'features/navigation/screens/main_navigation_screen.dart';
 import 'firebase_options.dart';
@@ -48,7 +50,17 @@ void main() async {
     anonKey: SupabaseConfig.anonKey,
   );
 
-  runApp(const ProviderScope(child: MyApp()));
+  // Initialize SharedPreferences
+  final sharedPreferences = await SharedPreferences.getInstance();
+
+  runApp(
+    ProviderScope(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(sharedPreferences),
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {

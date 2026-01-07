@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -176,9 +176,9 @@ class _MealSectionCardState extends State<MealSectionCard>
                       SizedBox(width: 8),
                       RotationTransition(
                         turns: _iconTurns,
-                        child: Icon(
-                          Iconsax.arrow_down_1,
-                          size: 20,
+                        child: HugeIcon(
+                          icon: HugeIcons.strokeRoundedArrowDown01,
+                          size: AppIconSize.lg,
                           color: AppColors.textSecondary,
                         ),
                       ),
@@ -247,7 +247,7 @@ class _MealSectionCardState extends State<MealSectionCard>
   static const _afterBgColor = Color(0xFFFEE2E2); // Red-100
 
   Widget _buildMealIcon(String mealKey) {
-    IconData icon;
+    dynamic icon;
     Color iconColor;
     Color bgColor;
 
@@ -261,22 +261,22 @@ class _MealSectionCardState extends State<MealSectionCard>
       iconColor = _mealColors['morning']!;
       bgColor = _mealBgColors['morning']!;
       // ก่อนเช้า = sunrise, หลังเช้า = sun
-      icon = isBefore ? Iconsax.sun_1 : Iconsax.sun;
+      icon = isBefore ? HugeIcons.strokeRoundedSun01 : HugeIcons.strokeRoundedSun03;
     } else if (mealKey.contains('noon') || mealKey.contains('กลางวัน')) {
       // กลางวัน - สีส้ม
       iconColor = _mealColors['noon']!;
       bgColor = _mealBgColors['noon']!;
       // ก่อนกลางวัน = sun_fog (พระอาทิตย์แรง), หลังกลางวัน = sun
-      icon = isBefore ? Iconsax.sun_fog : Iconsax.sun;
+      icon = isBefore ? HugeIcons.strokeRoundedSunCloud01 : HugeIcons.strokeRoundedSun03;
     } else if (mealKey.contains('evening') || mealKey.contains('เย็น')) {
       // เย็น - สีน้ำเงิน
       iconColor = _mealColors['evening']!;
       bgColor = _mealBgColors['evening']!;
       // ก่อนเย็น = sun_1 (sunset), หลังเย็น = cloud
-      icon = isBefore ? Iconsax.sun_1 : Iconsax.cloud;
+      icon = isBefore ? HugeIcons.strokeRoundedSun01 : HugeIcons.strokeRoundedCloud;
     } else {
       // ก่อนนอน - สีม่วง + moon
-      icon = Iconsax.moon;
+      icon = HugeIcons.strokeRoundedMoon02;
       iconColor = _mealColors['bedtime']!;
       bgColor = _mealBgColors['bedtime']!;
     }
@@ -287,7 +287,7 @@ class _MealSectionCardState extends State<MealSectionCard>
         color: bgColor,
         borderRadius: AppRadius.smallRadius,
       ),
-      child: Icon(icon, size: 16, color: iconColor),
+      child: HugeIcon(icon: icon, size: 16, color: iconColor),
     );
   }
 
@@ -328,27 +328,27 @@ class _MealSectionCardState extends State<MealSectionCard>
   Widget _buildStatusIcon(MealPhotoStatus status) {
     switch (status) {
       case MealPhotoStatus.completed:
-        return Icon(
-          Iconsax.tick_circle,
-          size: 20,
+        return HugeIcon(
+          icon: HugeIcons.strokeRoundedCheckmarkCircle02,
+          size: AppIconSize.lg,
           color: AppColors.tagPassedText,
         );
       case MealPhotoStatus.arranged:
-        return Icon(
-          Iconsax.clock,
-          size: 20,
+        return HugeIcon(
+          icon: HugeIcons.strokeRoundedClock01,
+          size: AppIconSize.lg,
           color: AppColors.tagPendingText,
         );
       case MealPhotoStatus.pending:
-        return Icon(
-          Iconsax.minus_cirlce,
-          size: 20,
+        return HugeIcon(
+          icon: HugeIcons.strokeRoundedMinusSignCircle,
+          size: AppIconSize.lg,
           color: AppColors.textSecondary,
         );
       case MealPhotoStatus.noMedicine:
-        return Icon(
-          Iconsax.minus,
-          size: 20,
+        return HugeIcon(
+          icon: HugeIcons.strokeRoundedMinusSign,
+          size: AppIconSize.lg,
           color: AppColors.inputBorder,
         );
     }
@@ -377,32 +377,32 @@ class _MealSectionCardState extends State<MealSectionCard>
     // กำหนดสีและ icon ตาม status
     Color bgColor;
     Color textColor;
-    IconData icon;
+    dynamic icon;
 
     switch (status) {
       case NurseMarkStatus.correct:
         // เขียว - รูปตรง
         bgColor = const Color(0xFFDCFCE7); // green-100
         textColor = const Color(0xFF166534); // green-800
-        icon = Iconsax.tick_circle;
+        icon = HugeIcons.strokeRoundedCheckmarkCircle02;
         break;
       case NurseMarkStatus.incorrect:
         // แดง - รูปไม่ตรง
         bgColor = const Color(0xFFFEE2E2); // red-100
         textColor = const Color(0xFFDC2626); // red-600
-        icon = Iconsax.close_circle;
+        icon = HugeIcons.strokeRoundedCancelCircle;
         break;
       case NurseMarkStatus.noPhoto:
         // เทา - ไม่มีรูป
         bgColor = const Color(0xFFF3F4F6); // gray-100
         textColor = const Color(0xFF6B7280); // gray-500
-        icon = Iconsax.gallery_slash;
+        icon = HugeIcons.strokeRoundedImageNotFound01;
         break;
       case NurseMarkStatus.swapped:
         // เหลือง - ตำแหน่งสลับ
         bgColor = const Color(0xFFFEF3C7); // amber-100
         textColor = const Color(0xFFD97706); // amber-600
-        icon = Iconsax.arrow_swap_horizontal;
+        icon = HugeIcons.strokeRoundedArrowLeftRight;
         break;
       case NurseMarkStatus.none:
         return const SizedBox.shrink();
@@ -432,8 +432,8 @@ class _MealSectionCardState extends State<MealSectionCard>
             ),
           ),
           const SizedBox(width: 2),
-          Icon(
-            icon,
+          HugeIcon(
+            icon: icon,
             size: 12,
             color: textColor,
           ),
@@ -527,9 +527,9 @@ class _MealSectionCardState extends State<MealSectionCard>
                     color: color.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(
-                    Iconsax.camera,
-                    size: 24,
+                  child: HugeIcon(
+                    icon: HugeIcons.strokeRoundedCamera01,
+                    size: AppIconSize.xl,
                     color: color,
                   ),
                 ),
@@ -673,9 +673,9 @@ class _MealSectionCardState extends State<MealSectionCard>
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(
-                              Iconsax.image,
-                              size: 32,
+                            HugeIcon(
+                              icon: HugeIcons.strokeRoundedImage01,
+                              size: AppIconSize.xxl,
                               color: AppColors.textSecondary,
                             ),
                             const SizedBox(height: 4),
@@ -705,9 +705,9 @@ class _MealSectionCardState extends State<MealSectionCard>
                           color: Colors.black54,
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(
-                          Iconsax.trash,
-                          size: 18,
+                        child: HugeIcon(
+                          icon: HugeIcons.strokeRoundedDelete01,
+                          size: AppIconSize.md,
                           color: Colors.white,
                         ),
                       ),
@@ -779,9 +779,9 @@ class _MealSectionCardState extends State<MealSectionCard>
                           ),
                         ),
                         // กดเพื่อดูรูปขยาย
-                        Icon(
-                          Iconsax.maximize_4,
-                          size: 16,
+                        HugeIcon(
+                          icon: HugeIcons.strokeRoundedMaximize01,
+                          size: AppIconSize.sm,
                           color: Colors.white70,
                         ),
                       ],
@@ -948,41 +948,41 @@ class _QCButtonState extends State<_QCButton>
   }
 
   /// ข้อมูลสีและ icon ตาม status
-  ({Color color, Color bgColor, IconData icon, String label}) _getStatusStyle() {
+  ({Color color, Color bgColor, dynamic icon, String label}) _getStatusStyle() {
     switch (widget.currentStatus) {
       case NurseMarkStatus.correct:
         return (
           color: const Color(0xFF166534), // green-800
           bgColor: const Color(0xFFDCFCE7), // green-100
-          icon: Iconsax.tick_circle,
+          icon: HugeIcons.strokeRoundedCheckmarkCircle02,
           label: 'รูปตรง',
         );
       case NurseMarkStatus.incorrect:
         return (
           color: const Color(0xFFDC2626), // red-600
           bgColor: const Color(0xFFFEE2E2), // red-100
-          icon: Iconsax.close_circle,
+          icon: HugeIcons.strokeRoundedCancelCircle,
           label: 'รูปไม่ตรง',
         );
       case NurseMarkStatus.noPhoto:
         return (
           color: const Color(0xFF6B7280), // gray-500
           bgColor: const Color(0xFFF3F4F6), // gray-100
-          icon: Iconsax.gallery_slash,
+          icon: HugeIcons.strokeRoundedImageNotFound01,
           label: 'ไม่มีรูป',
         );
       case NurseMarkStatus.swapped:
         return (
           color: const Color(0xFFD97706), // amber-600
           bgColor: const Color(0xFFFEF3C7), // amber-100
-          icon: Iconsax.arrow_swap_horizontal,
+          icon: HugeIcons.strokeRoundedArrowLeftRight,
           label: 'ตำแหน่งสลับ',
         );
       case NurseMarkStatus.none:
         return (
           color: Colors.white,
           bgColor: Colors.transparent,
-          icon: Iconsax.finger_scan,
+          icon: HugeIcons.strokeRoundedTouchInteraction04,
           label: 'ตรวจสอบ',
         );
     }
@@ -1022,8 +1022,8 @@ class _QCButtonState extends State<_QCButton>
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                style.icon,
+              HugeIcon(
+                icon: style.icon,
                 size: 14,
                 color: style.color,
               ),
@@ -1077,9 +1077,9 @@ class _QCButtonState extends State<_QCButton>
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                Iconsax.finger_scan,
-                size: 16,
+              HugeIcon(
+                icon: HugeIcons.strokeRoundedTouchInteraction04,
+                size: AppIconSize.sm,
                 color: Colors.white,
               ),
               SizedBox(width: 6),
@@ -1153,7 +1153,7 @@ class _QCBottomSheet extends StatelessWidget {
                     child: _buildOption(
                       context,
                       status: 'รูปตรง',
-                      icon: Iconsax.tick_circle,
+                      icon: HugeIcons.strokeRoundedCheckmarkCircle02,
                       color: const Color(0xFF22C55E), // green-500
                       bgColor: const Color(0xFFDCFCE7), // green-100
                       isSelected: currentStatus == NurseMarkStatus.correct,
@@ -1164,7 +1164,7 @@ class _QCBottomSheet extends StatelessWidget {
                     child: _buildOption(
                       context,
                       status: 'รูปไม่ตรง',
-                      icon: Iconsax.close_circle,
+                      icon: HugeIcons.strokeRoundedCancelCircle,
                       color: const Color(0xFFEF4444), // red-500
                       bgColor: const Color(0xFFFEE2E2), // red-100
                       isSelected: currentStatus == NurseMarkStatus.incorrect,
@@ -1179,7 +1179,7 @@ class _QCBottomSheet extends StatelessWidget {
                     child: _buildOption(
                       context,
                       status: 'ไม่มีรูป',
-                      icon: Iconsax.gallery_slash,
+                      icon: HugeIcons.strokeRoundedImageNotFound01,
                       color: const Color(0xFF6B7280), // gray-500
                       bgColor: const Color(0xFFF3F4F6), // gray-100
                       isSelected: currentStatus == NurseMarkStatus.noPhoto,
@@ -1190,7 +1190,7 @@ class _QCBottomSheet extends StatelessWidget {
                     child: _buildOption(
                       context,
                       status: 'ตำแหน่งสลับ',
-                      icon: Iconsax.arrow_swap_horizontal,
+                      icon: HugeIcons.strokeRoundedArrowLeftRight,
                       color: const Color(0xFFD97706), // amber-600
                       bgColor: const Color(0xFFFEF3C7), // amber-100
                       isSelected: currentStatus == NurseMarkStatus.swapped,
@@ -1222,9 +1222,9 @@ class _QCBottomSheet extends StatelessWidget {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
-                            Iconsax.refresh,
-                            size: 18,
+                          HugeIcon(
+                            icon: HugeIcons.strokeRoundedRefresh,
+                            size: AppIconSize.md,
                             color: AppColors.error,
                           ),
                           SizedBox(width: 8),
@@ -1272,7 +1272,7 @@ class _QCBottomSheet extends StatelessWidget {
   Widget _buildOption(
     BuildContext context, {
     required String status,
-    required IconData icon,
+    required dynamic icon,
     required Color color,
     required Color bgColor,
     required bool isSelected,
@@ -1295,8 +1295,8 @@ class _QCBottomSheet extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                icon,
+              HugeIcon(
+                icon: icon,
                 size: 28,
                 color: color,
               ),
@@ -1389,9 +1389,9 @@ class _FullScreenPhotoView extends StatelessWidget {
                       );
                     },
                     errorBuilder: (context, error, stackTrace) {
-                      return Icon(
-                        Iconsax.image,
-                        size: 64,
+                      return HugeIcon(
+                        icon: HugeIcons.strokeRoundedImage01,
+                        size: AppIconSize.display,
                         color: Colors.white54,
                       );
                     },
@@ -1416,10 +1416,10 @@ class _FullScreenPhotoView extends StatelessWidget {
                   ),
                   IconButton(
                     onPressed: () => Navigator.pop(context),
-                    icon: Icon(
-                      Iconsax.close_circle,
+                    icon: HugeIcon(
+                      icon: HugeIcons.strokeRoundedCancelCircle,
                       color: Colors.white,
-                      size: 28,
+                      size: AppIconSize.xl,
                     ),
                   ),
                 ],

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -81,7 +81,7 @@ class QuestionCard extends StatelessWidget {
                     height: 100,
                     color: AppColors.primaryBackground,
                     child: const Center(
-                      child: Icon(Iconsax.gallery_slash, color: AppColors.secondaryText),
+                      child: HugeIcon(icon: HugeIcons.strokeRoundedImageNotFound01, color: AppColors.secondaryText),
                     ),
                   );
                 },

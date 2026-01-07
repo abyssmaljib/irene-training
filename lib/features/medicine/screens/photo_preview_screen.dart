@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:image/image.dart' as img;
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -200,7 +200,7 @@ class _PhotoPreviewScreenState extends State<PhotoPreviewScreen> {
         ),
         leading: IconButton(
           onPressed: () => Navigator.pop(context, null),
-          icon: const Icon(Iconsax.close_circle),
+          icon: HugeIcon(icon: HugeIcons.strokeRoundedCancelCircle),
         ),
       ),
       body: SafeArea(
@@ -232,13 +232,13 @@ class _PhotoPreviewScreenState extends State<PhotoPreviewScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       _buildRotateButton(
-                        icon: Iconsax.rotate_left,
+                        icon: HugeIcons.strokeRoundedRotateLeft01,
                         label: 'หมุนซ้าย',
                         onTap: _isProcessing ? null : _rotateLeft,
                       ),
                       SizedBox(width: AppSpacing.xl),
                       _buildRotateButton(
-                        icon: Iconsax.rotate_right,
+                        icon: HugeIcons.strokeRoundedRotateRight01,
                         label: 'หมุนขวา',
                         onTap: _isProcessing ? null : _rotateRight,
                       ),
@@ -256,7 +256,7 @@ class _PhotoPreviewScreenState extends State<PhotoPreviewScreen> {
                           onPressed: _isProcessing
                               ? null
                               : () => Navigator.pop(context, null),
-                          icon: const Icon(Iconsax.close_circle),
+                          icon: HugeIcon(icon: HugeIcons.strokeRoundedCancelCircle),
                           label: const Text('ถ่ายใหม่'),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: Colors.white70,
@@ -280,7 +280,7 @@ class _PhotoPreviewScreenState extends State<PhotoPreviewScreen> {
                                     color: Colors.white,
                                   ),
                                 )
-                              : const Icon(Iconsax.tick_square),
+                              : HugeIcon(icon: HugeIcons.strokeRoundedCheckmarkSquare02),
                           label: Text(_isProcessing ? 'กำลังประมวลผล...' : 'ยืนยัน'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: borderColor,
@@ -301,7 +301,7 @@ class _PhotoPreviewScreenState extends State<PhotoPreviewScreen> {
   }
 
   Widget _buildRotateButton({
-    required IconData icon,
+    required dynamic icon,
     required String label,
     required VoidCallback? onTap,
   }) {
@@ -318,7 +318,7 @@ class _PhotoPreviewScreenState extends State<PhotoPreviewScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: Colors.white, size: 28),
+            HugeIcon(icon: icon, color: Colors.white, size: AppIconSize.xl),
             SizedBox(height: 4),
             Text(
               label,

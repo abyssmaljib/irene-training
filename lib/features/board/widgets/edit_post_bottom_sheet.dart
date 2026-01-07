@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -163,7 +163,7 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
                   ),
                 );
               },
-              icon: const Icon(Iconsax.edit_2, size: 16),
+              icon: HugeIcon(icon: HugeIcons.strokeRoundedEdit02, size: AppIconSize.sm),
               label: const Text('แบบละเอียด'),
               style: TextButton.styleFrom(
                 foregroundColor: AppColors.primary,
@@ -293,7 +293,7 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Iconsax.tag, size: 14, color: AppColors.primary),
+                      HugeIcon(icon: HugeIcons.strokeRoundedTag01, size: AppIconSize.sm, color: AppColors.primary),
                       const SizedBox(width: 4),
                       Text(
                         widget.post.postTagsString ??
@@ -318,7 +318,7 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Iconsax.user, size: 14, color: AppColors.primary),
+                      HugeIcon(icon: HugeIcons.strokeRoundedUser, size: AppIconSize.sm, color: AppColors.primary),
                       const SizedBox(width: 4),
                       Text(
                         'คุณ${widget.post.residentName!}',
@@ -384,8 +384,8 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
                             width: 100,
                             height: 100,
                             color: AppColors.background,
-                            child: Icon(
-                              Iconsax.image,
+                            child: HugeIcon(
+                              icon: HugeIcons.strokeRoundedImage01,
                               color: AppColors.secondaryText,
                             ),
                           ),
@@ -419,10 +419,10 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
                                 : Colors.black.withValues(alpha: 0.6),
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(
-                            isRemoved ? Iconsax.refresh : Iconsax.close_circle,
+                          child: HugeIcon(
+                            icon: isRemoved ? HugeIcons.strokeRoundedRefresh : HugeIcons.strokeRoundedCancelCircle,
                             color: Colors.white,
-                            size: 14,
+                            size: AppIconSize.sm,
                           ),
                         ),
                       ),
@@ -431,10 +431,10 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
                     if (isRemoved)
                       Positioned.fill(
                         child: Center(
-                          child: Icon(
-                            Iconsax.trash,
+                          child: HugeIcon(
+                            icon: HugeIcons.strokeRoundedDelete01,
                             color: AppColors.error,
-                            size: 32,
+                            size: AppIconSize.xxl,
                           ),
                         ),
                       ),
@@ -500,10 +500,10 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
                             color: Colors.black.withValues(alpha: 0.6),
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(
-                            Iconsax.close_circle,
+                          child: HugeIcon(
+                            icon: HugeIcons.strokeRoundedCancelCircle,
                             color: Colors.white,
-                            size: 14,
+                            size: AppIconSize.sm,
                           ),
                         ),
                       ),
@@ -538,14 +538,14 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
             spacing: 8,
             children: [
               _buildIconButton(
-                icon: Iconsax.camera,
+                icon: HugeIcons.strokeRoundedCamera01,
                 onTap: _isUploading || state.isSubmitting || !state.canAddMoreImages
                     ? null
                     : _pickFromCamera,
                 tooltip: 'ถ่ายรูป',
               ),
               _buildIconButton(
-                icon: Iconsax.gallery,
+                icon: HugeIcons.strokeRoundedImageComposition,
                 onTap: _isUploading || state.isSubmitting || !state.canAddMoreImages
                     ? null
                     : _pickFromGallery,
@@ -577,12 +577,19 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
                       color: Colors.white,
                     ),
                   )
-                : Text(
-                    'บันทึก',
-                    style: AppTypography.body.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      HugeIcon(icon: HugeIcons.strokeRoundedFloppyDisk, size: AppIconSize.md, color: Colors.white),
+                      const SizedBox(width: 8),
+                      Text(
+                        'บันทึก',
+                        style: AppTypography.body.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
           ),
         ],
@@ -591,7 +598,7 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
   }
 
   Widget _buildIconButton({
-    required IconData icon,
+    required dynamic icon,
     VoidCallback? onTap,
     String? tooltip,
   }) {
@@ -606,13 +613,13 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
           onTap: onTap,
           borderRadius: BorderRadius.circular(8),
           child: Container(
-            width: 44,
-            height: 44,
+            width: 40,
+            height: 40,
             alignment: Alignment.center,
-            child: Icon(
-              icon,
+            child: HugeIcon(
+              icon: icon,
               color: isDisabled ? AppColors.secondaryText : AppColors.primary,
-              size: 22,
+              size: AppIconSize.lg,
             ),
           ),
         ),

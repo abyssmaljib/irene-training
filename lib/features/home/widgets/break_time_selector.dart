@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -238,7 +238,7 @@ class BreakTimeSelector extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Iconsax.code, size: 16, color: Colors.purple),
+          HugeIcon(icon: HugeIcons.strokeRoundedSourceCode, size: AppIconSize.sm, color: Colors.purple),
           const SizedBox(width: 8),
           Text(
             'DEV:',
@@ -424,11 +424,11 @@ class _BreakTimeRow extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
-                            isSelected
-                                ? Iconsax.tick_circle
-                                : Iconsax.record,
-                            size: 16,
+                          HugeIcon(
+                            icon: isSelected
+                                ? HugeIcons.strokeRoundedCheckmarkCircle02
+                                : HugeIcons.strokeRoundedCircle,
+                            size: AppIconSize.sm,
                             color: isSelected ? Colors.white : AppColors.primary,
                           ),
                           const SizedBox(width: 4),
@@ -554,9 +554,9 @@ class _PersonChip extends StatelessWidget {
               shape: BoxShape.circle,
               color: isCurrentUser ? AppColors.primary : AppColors.tertiary,
             ),
-            child: const Icon(
-              Iconsax.user,
-              size: 10,
+            child: HugeIcon(
+              icon: HugeIcons.strokeRoundedUser,
+              size: AppIconSize.xs,
               color: Colors.white,
             ),
           ),

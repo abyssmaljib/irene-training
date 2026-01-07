@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/theme/app_spacing.dart';
@@ -10,7 +11,7 @@ class PrimaryButton extends StatefulWidget {
   final VoidCallback? onPressed;
   final bool isLoading;
   final bool isDisabled;
-  final IconData? icon;
+  final dynamic icon;
   final double? width;
 
   const PrimaryButton({
@@ -79,7 +80,7 @@ class _PrimaryButtonState extends State<PrimaryButton> {
                         Icon(
                           widget.icon,
                           color: AppColors.surface,
-                          size: 20,
+                          size: AppIconSize.lg,
                         ),
                         AppSpacing.horizontalGapSm,
                       ],
@@ -113,7 +114,7 @@ class SecondaryButton extends StatefulWidget {
   final VoidCallback? onPressed;
   final bool isLoading;
   final bool isDisabled;
-  final IconData? icon;
+  final dynamic icon;
   final double? width;
 
   const SecondaryButton({
@@ -176,7 +177,7 @@ class _SecondaryButtonState extends State<SecondaryButton> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     if (widget.icon != null) ...[
-                      Icon(widget.icon, size: 20),
+                      HugeIcon(icon: widget.icon, size: AppIconSize.lg),
                       AppSpacing.horizontalGapSm,
                     ],
                     Text(
@@ -199,7 +200,7 @@ class DangerButton extends StatefulWidget {
   final VoidCallback? onPressed;
   final bool isLoading;
   final bool isDisabled;
-  final IconData? icon;
+  final dynamic icon;
   final double? width;
 
   const DangerButton({
@@ -268,7 +269,7 @@ class _DangerButtonState extends State<DangerButton> {
                         Icon(
                           widget.icon,
                           color: AppColors.surface,
-                          size: 20,
+                          size: AppIconSize.lg,
                         ),
                         AppSpacing.horizontalGapSm,
                       ],
@@ -301,7 +302,7 @@ class AppTextButton extends StatelessWidget {
   final String text;
   final VoidCallback? onPressed;
   final bool isDisabled;
-  final IconData? icon;
+  final dynamic icon;
 
   const AppTextButton({
     super.key,
@@ -330,9 +331,9 @@ class AppTextButton extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (icon != null) ...[
-              Icon(
-                icon,
-                size: 20,
+              HugeIcon(
+                icon: icon,
+                size: AppIconSize.lg,
                 color: isEnabled ? AppColors.primary : AppColors.primaryDisabled,
               ),
               AppSpacing.horizontalGapSm,

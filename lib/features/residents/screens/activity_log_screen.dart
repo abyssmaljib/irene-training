@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -76,7 +76,7 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
         backgroundColor: AppColors.surface,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Iconsax.arrow_left, color: AppColors.textPrimary),
+          icon: HugeIcon(icon: HugeIcons.strokeRoundedArrowLeft01, color: AppColors.textPrimary),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: _showSearch
@@ -119,19 +119,19 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
         actions: [
           // Search toggle
           IconButton(
-            icon: Icon(
-              _showSearch ? Iconsax.close_circle : Iconsax.search_normal,
+            icon: HugeIcon(
+              icon: _showSearch ? HugeIcons.strokeRoundedCancelCircle : HugeIcons.strokeRoundedSearch01,
               color: _showSearch ? AppColors.error : AppColors.textPrimary,
             ),
             onPressed: _toggleSearch,
           ),
           // Filter button
           Padding(
-            padding: EdgeInsets.only(right: 8),
+            padding: EdgeInsets.only(right: AppSpacing.md),
             child: Stack(
               children: [
                 IconButton(
-                  icon: Icon(Iconsax.filter, color: AppColors.textPrimary),
+                  icon: HugeIcon(icon: HugeIcons.strokeRoundedFilterHorizontal, color: AppColors.textPrimary),
                   onPressed: () {
                     _scaffoldKey.currentState?.openEndDrawer();
                   },
@@ -190,7 +190,7 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Iconsax.warning_2, size: 48, color: AppColors.error),
+            HugeIcon(icon: HugeIcons.strokeRoundedAlert02, size: AppIconSize.xxxl, color: AppColors.error),
             AppSpacing.verticalGapMd,
             Text(
               'เกิดข้อผิดพลาด',
@@ -224,8 +224,8 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
                 color: AppColors.accent1,
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                Iconsax.document_text,
+              child: HugeIcon(
+                icon: HugeIcons.strokeRoundedFileEdit,
                 size: 40,
                 color: AppColors.primary,
               ),
@@ -278,7 +278,7 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
                 clearActivityLogFilters(ref, widget.residentId);
                 _searchController.clear();
               },
-              icon: Icon(Iconsax.trash, size: 18),
+              icon: HugeIcon(icon: HugeIcons.strokeRoundedDelete01, size: AppIconSize.md),
               label: Text('ล้างตัวกรอง'),
               style: TextButton.styleFrom(
                 foregroundColor: AppColors.error,
@@ -446,8 +446,8 @@ class _ActivityLogFilterDrawer extends ConsumerWidget {
                               ),
                               SizedBox(width: 6),
                               if (isSelected) ...[
-                                Icon(
-                                  Iconsax.tick_circle,
+                                HugeIcon(
+                                  icon: HugeIcons.strokeRoundedCheckmarkCircle02,
                                   size: 14,
                                   color: AppColors.primary,
                                 ),
@@ -521,16 +521,18 @@ class _ActivityLogCard extends StatelessWidget {
           children: [
             // Tag icon
             Container(
-              width: 44,
-              height: 44,
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
                 color: _getTagColor().withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(
-                _getTagIcon(),
-                size: 22,
-                color: _getTagColor(),
+              child: Center(
+                child: HugeIcon(
+                  icon: _getTagIcon(),
+                  size: AppIconSize.md,
+                  color: _getTagColor(),
+                ),
               ),
             ),
             AppSpacing.horizontalGapMd,
@@ -560,9 +562,9 @@ class _ActivityLogCard extends StatelessWidget {
                   // Author & time
                   Row(
                     children: [
-                      Icon(
-                        Iconsax.user,
-                        size: 14,
+                      HugeIcon(
+                        icon: HugeIcons.strokeRoundedUser,
+                        size: AppIconSize.sm,
                         color: AppColors.secondaryText,
                       ),
                       SizedBox(width: 4),
@@ -575,9 +577,9 @@ class _ActivityLogCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      Icon(
-                        Iconsax.clock,
-                        size: 14,
+                      HugeIcon(
+                        icon: HugeIcons.strokeRoundedClock01,
+                        size: AppIconSize.sm,
                         color: AppColors.secondaryText,
                       ),
                       SizedBox(width: 4),
@@ -602,20 +604,20 @@ class _ActivityLogCard extends StatelessWidget {
                     if (post.hasImages)
                       Padding(
                         padding: EdgeInsets.only(right: 4),
-                        child: Icon(Iconsax.image,
-                            size: 16, color: AppColors.secondaryText),
+                        child: HugeIcon(icon: HugeIcons.strokeRoundedImage01,
+                            size: AppIconSize.sm, color: AppColors.secondaryText),
                       ),
                     if (post.hasVideo)
                       Padding(
                         padding: EdgeInsets.only(right: 4),
-                        child: Icon(Iconsax.video,
-                            size: 16, color: AppColors.secondaryText),
+                        child: HugeIcon(icon: HugeIcons.strokeRoundedVideo01,
+                            size: AppIconSize.sm, color: AppColors.secondaryText),
                       ),
                   ],
                 ),
                 SizedBox(height: 20),
-                Icon(Iconsax.arrow_right_3,
-                    size: 18, color: AppColors.secondaryText),
+                HugeIcon(icon: HugeIcons.strokeRoundedArrowRight01,
+                    size: AppIconSize.md, color: AppColors.secondaryText),
               ],
             ),
           ],
@@ -624,17 +626,17 @@ class _ActivityLogCard extends StatelessWidget {
     );
   }
 
-  IconData _getTagIcon() {
+  dynamic _getTagIcon() {
     final label = post.postTags.firstOrNull?.toLowerCase() ?? '';
-    if (label.contains('แผล') || label.contains('ทำแผล')) return Iconsax.health;
-    if (label.contains('กายภาพ')) return Iconsax.activity;
-    if (label.contains('ยา')) return Iconsax.bag_2;
-    if (label.contains('อาหาร')) return Iconsax.cake;
-    if (label.contains('กิจกรรม')) return Iconsax.music;
-    if (label.contains('ญาติ')) return Iconsax.people;
-    if (label.contains('อัพเดต')) return Iconsax.document_text;
-    if (label.contains('อาการ')) return Iconsax.health;
-    return Iconsax.document_text;
+    if (label.contains('แผล') || label.contains('ทำแผล')) return HugeIcons.strokeRoundedMedicine01;
+    if (label.contains('กายภาพ')) return HugeIcons.strokeRoundedActivity01;
+    if (label.contains('ยา')) return HugeIcons.strokeRoundedShoppingBag01;
+    if (label.contains('อาหาร')) return HugeIcons.strokeRoundedRestaurant01;
+    if (label.contains('กิจกรรม')) return HugeIcons.strokeRoundedMusicNote01;
+    if (label.contains('ญาติ')) return HugeIcons.strokeRoundedUserGroup;
+    if (label.contains('อัพเดต')) return HugeIcons.strokeRoundedFileEdit;
+    if (label.contains('อาการ')) return HugeIcons.strokeRoundedMedicine01;
+    return HugeIcons.strokeRoundedFileEdit;
   }
 
   Color _getTagColor() {

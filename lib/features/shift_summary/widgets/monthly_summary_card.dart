@@ -37,10 +37,12 @@ class MonthlySummaryCard extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
             border: summary.hasIssues
-                ? Border.all(color: AppColors.warning.withValues(alpha: 0.5), width: 1)
+                ? Border.all(
+                    color: AppColors.warning.withValues(alpha: 0.5), width: 1)
                 : null,
           ),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               // เดือน/ปี
               Expanded(
@@ -52,60 +54,49 @@ class MonthlySummaryCard extends StatelessWidget {
                   ),
                 ),
               ),
-              // เช้า
-              _buildCell('${summary.totalDayShifts}'),
-              // ดึก
-              _buildCell('${summary.totalNightShifts}'),
-              // รวม
-              _buildCell(
-                '${summary.totalShifts}',
-                color: AppColors.primary,
-                fontWeight: FontWeight.w600,
+              // รวม (Total shifts)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'รวม: ',
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.secondaryText,
+                    ),
+                  ),
+                  Text(
+                    '${summary.totalShifts}',
+                    style: AppTypography.body.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
-              // WD (Required Workdays 26-25)
-              _buildCell('${summary.requiredWorkdays26To25 ?? "-"}'),
-              // OT (Previous OT - ยกมาจากเดือนก่อน)
-              _buildCell(
-                '${summary.pot ?? 0}',
-                color: (summary.pot ?? 0) > 0
-                    ? AppColors.success
-                    : null,
+              SizedBox(width: AppSpacing.md),
+              // WD (Required workdays 26-25)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'WD: ',
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.secondaryText,
+                    ),
+                  ),
+                  Text(
+                    '${summary.requiredWorkdays26To25 ?? "-"}',
+                    style: AppTypography.body.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
               ),
-              // DD (Previous DD - ยกมาจากเดือนก่อน)
-              _buildCell(
-                '${summary.pdd ?? 0}',
-                color: (summary.pdd ?? 0) > 0 ? const Color(0xFFE67E22) : null, // Orange สีเข้ม
-              ),
-              // Inc (Incharge)
-              _buildCell(
-                '${summary.inchargeCount}',
-                color: summary.inchargeCount > 0 ? AppColors.success : null,
-              ),
-              // S (Sick)
-              _buildCell(
-                '${summary.sickCount}',
-                color: summary.sickCount > 0 ? AppColors.primary : null,
-              ),
-              // A (Absent) - with notification dot only for current month
-              _buildCellWithBadge(
-                '${summary.absentCount}',
-                color: summary.absentCount > 0 ? AppColors.error : null,
-                showBadge: summary.absentCount > 0 && _isCurrentMonth,
-              ),
-              // Sup (Support)
-              _buildCell(
-                '${summary.supportCount}',
-                color: summary.supportCount > 0 ? AppColors.warning : null,
-              ),
-              // (+) Total Additional
-              _buildCell(
-                '${summary.totalAdditional ?? 0}',
-                color: (summary.totalAdditional ?? 0) > 0 ? AppColors.success : null,
-              ),
-              // (-) Total Deduction
-              _buildCell(
-                '${summary.totalDeduction?.toInt() ?? 0}',
-                color: (summary.totalDeduction ?? 0) > 0 ? AppColors.error : null,
+              SizedBox(width: AppSpacing.md),
+              // Metrics (แสดงเฉพาะค่า > 0)
+              Expanded(
+                flex: 3,
+                child: _buildKeyMetricsRow(),
               ),
             ],
           ),
@@ -114,62 +105,166 @@ class MonthlySummaryCard extends StatelessWidget {
     );
   }
 
-  Widget _buildCell(
-    String value, {
-    Color? color,
-    FontWeight? fontWeight,
-  }) {
-    return Expanded(
-      child: Text(
-        value,
+  /// Row แสดง key metrics: pDD | pOT | S | A | Sup | Net (แสดงเฉพาะค่า > 0)
+  Widget _buildKeyMetricsRow() {
+    final netAmount = summary.netAdditional;
+    final netValue =
+        netAmount >= 0 ? '+${netAmount.toInt()}' : '${netAmount.toInt()}';
+    final netColor = netAmount > 0
+        ? AppColors.success
+        : netAmount < 0
+            ? AppColors.error
+            : null;
+
+    final metrics = <Widget>[];
+
+    // pDD - แสดงเมื่อ > 0
+    if ((summary.pdd ?? 0) > 0) {
+      metrics.add(_buildMetricChip(
+        label: 'pDD',
+        value: '${summary.pdd}',
+        color: const Color(0xFFE67E22),
+      ));
+    }
+
+    // pOT - แสดงเมื่อ > 0
+    if ((summary.pot ?? 0) > 0) {
+      metrics.add(_buildMetricChip(
+        label: 'pOT',
+        value: '${summary.pot}',
+        color: AppColors.success,
+      ));
+    }
+
+    // S - แสดงเมื่อ > 0
+    if (summary.sickCount > 0) {
+      metrics.add(_buildMetricChip(
+        label: 'S',
+        value: '${summary.sickCount}',
+        color: AppColors.primary,
+      ));
+    }
+
+    // A - แสดงเมื่อ > 0
+    if (summary.absentCount > 0) {
+      metrics.add(_buildMetricChipWithBadge(
+        label: 'A',
+        value: '${summary.absentCount}',
+        color: AppColors.error,
+        showBadge: _isCurrentMonth,
+      ));
+    }
+
+    // Sup - แสดงเมื่อ > 0
+    if (summary.supportCount > 0) {
+      metrics.add(_buildMetricChip(
+        label: 'Sup',
+        value: '${summary.supportCount}',
+        color: AppColors.warning,
+      ));
+    }
+
+    // Net - แสดงเมื่อ != 0
+    if (netAmount != 0) {
+      metrics.add(_buildMetricChip(
+        label: 'Net',
+        value: netValue,
+        color: netColor,
+      ));
+    }
+
+    // ถ้าไม่มีค่าเลย แสดงข้อความ "-"
+    if (metrics.isEmpty) {
+      return Text(
+        '-',
         style: AppTypography.caption.copyWith(
-          color: color ?? AppColors.primaryText,
-          fontWeight: fontWeight ?? FontWeight.normal,
+          color: AppColors.secondaryText,
         ),
-        textAlign: TextAlign.center,
-      ),
+      );
+    }
+
+    return Wrap(
+      spacing: AppSpacing.md,
+      runSpacing: AppSpacing.xs,
+      alignment: WrapAlignment.start,
+      children: metrics,
     );
   }
 
-  /// Cell with optional notification badge
-  Widget _buildCellWithBadge(
-    String value, {
+  /// Reusable metric chip component
+  Widget _buildMetricChip({
+    required String label,
+    required String value,
     Color? color,
-    FontWeight? fontWeight,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          '$label: ',
+          style: AppTypography.caption.copyWith(
+            color: AppColors.secondaryText,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        Text(
+          value,
+          style: AppTypography.caption.copyWith(
+            color: color ?? AppColors.primaryText,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Metric chip with optional notification badge
+  Widget _buildMetricChipWithBadge({
+    required String label,
+    required String value,
+    Color? color,
     bool showBadge = false,
   }) {
-    return Expanded(
-      child: Stack(
-        clipBehavior: Clip.none,
-        alignment: Alignment.center,
-        children: [
-          Text(
-            value,
-            style: AppTypography.caption.copyWith(
-              color: color ?? AppColors.primaryText,
-              fontWeight: fontWeight ?? FontWeight.normal,
-            ),
-            textAlign: TextAlign.center,
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          '$label: ',
+          style: AppTypography.caption.copyWith(
+            color: AppColors.secondaryText,
+            fontWeight: FontWeight.w600,
           ),
-          if (showBadge)
-            Positioned(
-              right: 4,
-              top: -4,
-              child: Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: AppColors.error,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: AppColors.surface,
-                    width: 1,
+        ),
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Text(
+              value,
+              style: AppTypography.caption.copyWith(
+                color: color ?? AppColors.primaryText,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            if (showBadge)
+              Positioned(
+                right: -6,
+                top: -4,
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: AppColors.error,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppColors.surface,
+                      width: 1,
+                    ),
                   ),
                 ),
               ),
-            ),
-        ],
-      ),
+          ],
+        ),
+      ],
     );
   }
 }

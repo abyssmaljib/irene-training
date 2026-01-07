@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
@@ -23,9 +23,9 @@ class ClinicalViewPlaceholder extends StatelessWidget {
                 color: AppColors.background,
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                Iconsax.health,
-                size: 48,
+              child: HugeIcon(
+                icon: HugeIcons.strokeRoundedMedicine01,
+                size: AppIconSize.xxxl,
                 color: AppColors.secondaryText,
               ),
             ),
@@ -51,23 +51,23 @@ class ClinicalViewPlaceholder extends StatelessWidget {
               ),
             ),
             AppSpacing.verticalGapSm,
-            _buildFeatureItem(Iconsax.chart_2, 'กราฟแนวโน้มสัญญาณชีพ'),
-            _buildFeatureItem(Iconsax.note_text, 'SOAP Notes'),
-            _buildFeatureItem(Iconsax.health, 'จัดการยา'),
-            _buildFeatureItem(Iconsax.clipboard_text, 'ประวัติการรักษา'),
+            _buildFeatureItem(HugeIcons.strokeRoundedChart, 'กราฟแนวโน้มสัญญาณชีพ'),
+            _buildFeatureItem(HugeIcons.strokeRoundedNote, 'SOAP Notes'),
+            _buildFeatureItem(HugeIcons.strokeRoundedMedicine01, 'จัดการยา'),
+            _buildFeatureItem(HugeIcons.strokeRoundedClipboard, 'ประวัติการรักษา'),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildFeatureItem(IconData icon, String text) {
+  Widget _buildFeatureItem(dynamic icon, String text) {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 4),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: AppColors.primary),
+          HugeIcon(icon: icon, size: AppIconSize.sm, color: AppColors.primary),
           SizedBox(width: 8),
           Text(
             text,

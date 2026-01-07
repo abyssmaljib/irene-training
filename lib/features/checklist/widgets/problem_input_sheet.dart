@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -146,7 +146,7 @@ class _ProblemInputSheetState extends State<ProblemInputSheet> {
                             valueColor: AlwaysStoppedAnimation(Colors.white),
                           ),
                         )
-                      : const Icon(Iconsax.warning_2),
+                      : HugeIcon(icon: HugeIcons.strokeRoundedAlert02),
                   label: Text(
                     'แจ้งปัญหา',
                     style: AppTypography.button,

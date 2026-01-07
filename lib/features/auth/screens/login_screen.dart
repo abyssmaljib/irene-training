@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:pin_code_fields/pin_code_fields.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -206,9 +206,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 borderRadius: AppRadius.mediumRadius,
                 boxShadow: AppShadows.cardShadow,
               ),
-              child: Icon(
-                Iconsax.hospital,
-                size: 36,
+              child: HugeIcon(
+                icon: HugeIcons.strokeRoundedHospital01,
+                size: AppIconSize.xxl,
                 color: AppColors.primary,
               ),
             ),
@@ -275,7 +275,7 @@ class _LoginScreenState extends State<LoginScreen> {
             AppSpacing.verticalGapSm,
             Row(
               children: [
-                Icon(Iconsax.warning_2, size: 16, color: AppColors.error),
+                HugeIcon(icon: HugeIcons.strokeRoundedAlert02, size: AppIconSize.sm, color: AppColors.error),
                 AppSpacing.horizontalGapXs,
                 Expanded(
                   child: Text(
@@ -366,7 +366,7 @@ class _LoginScreenState extends State<LoginScreen> {
       controller: _emailController,
       label: 'อีเมล',
       hintText: 'example@ireneplus.com',
-      prefixIcon: Iconsax.user,
+      prefixIcon: HugeIcons.strokeRoundedUser,
       keyboardType: TextInputType.emailAddress,
       focusNode: _emailFocusNode,
       textInputAction: _isPasswordMode ? TextInputAction.next : TextInputAction.done,
@@ -516,7 +516,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   AppSpacing.horizontalGapSm,
-                  Icon(Iconsax.arrow_right, size: 20),
+                  HugeIcon(icon: HugeIcons.strokeRoundedArrowRight01, size: AppIconSize.lg),
                 ],
               ),
       ),
@@ -556,7 +556,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 AppTextField(
                   controller: forgotEmailController,
                   hintText: 'example@ireneplus.com',
-                  prefixIcon: Iconsax.sms,
+                  prefixIcon: HugeIcons.strokeRoundedMail01,
                   keyboardType: TextInputType.emailAddress,
                   errorText: errorMessage,
                 ),
@@ -690,7 +690,7 @@ class _LoginScreenState extends State<LoginScreen> {
             height: AppSpacing.buttonHeight,
             child: OutlinedButton.icon(
               onPressed: _isLoading ? null : _devLogin,
-              icon: Icon(Iconsax.code, size: 18),
+              icon: HugeIcon(icon: HugeIcons.strokeRoundedSourceCode, size: AppIconSize.md),
               label: Text(
                 'Dev Login',
                 style: AppTypography.bodySmall.copyWith(
@@ -781,3 +781,4 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
+

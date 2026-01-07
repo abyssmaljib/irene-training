@@ -1,6 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -135,9 +135,9 @@ class MedicinePhotoItem extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Iconsax.image,
-              size: 32,
+            HugeIcon(
+              icon: HugeIcons.strokeRoundedImage01,
+              size: AppIconSize.xxl,
               color: AppColors.textSecondary.withValues(alpha: 0.5),
             ),
             SizedBox(height: 4),
@@ -197,8 +197,8 @@ class MedicinePhotoItem extends StatelessWidget {
                     ),
                     IconButton(
                       onPressed: () => Navigator.pop(context),
-                      icon: Icon(
-                        Iconsax.close_circle,
+                      icon: HugeIcon(
+                        icon: HugeIcons.strokeRoundedCancelCircle,
                         color: AppColors.textSecondary,
                       ),
                       padding: EdgeInsets.zero,
@@ -223,9 +223,9 @@ class MedicinePhotoItem extends StatelessWidget {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(
-                              Iconsax.image,
-                              size: 48,
+                            HugeIcon(
+                              icon: HugeIcons.strokeRoundedImage01,
+                              size: AppIconSize.xxxl,
                               color: AppColors.textSecondary,
                             ),
                             SizedBox(height: 8),
@@ -297,7 +297,7 @@ class MedicinePhotoItem extends StatelessWidget {
             Padding(
               padding: EdgeInsets.only(bottom: 8),
               child: _buildInfoItem(
-                icon: Iconsax.tag,
+                icon: HugeIcons.strokeRoundedTag01,
                 label: 'ชื่อการค้า',
                 value: _formatBrandNameWithGeneric(),
               ),
@@ -327,7 +327,7 @@ class MedicinePhotoItem extends StatelessWidget {
             Padding(
               padding: EdgeInsets.only(bottom: 8),
               child: _buildInfoItem(
-                icon: Iconsax.category,
+                icon: HugeIcons.strokeRoundedDashboardSquare01,
                 label: 'ประเภท',
                 value: medicine.atcLevel2NameTh ?? medicine.atcLevel1NameTh ?? '',
               ),
@@ -342,14 +342,14 @@ class MedicinePhotoItem extends StatelessWidget {
   }
 
   Widget _buildInfoItem({
-    required IconData icon,
+    required dynamic icon,
     required String label,
     required String value,
   }) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 14, color: AppColors.textSecondary),
+        HugeIcon(icon: icon, size: AppIconSize.sm, color: AppColors.textSecondary),
         SizedBox(width: 4),
         Text(
           '$label: ',
@@ -393,10 +393,10 @@ class MedicinePhotoItem extends StatelessWidget {
   Widget _buildMealInfo() {
     // Meal icons
     final mealIcons = {
-      'เช้า': Iconsax.sun_1,
-      'กลางวัน': Iconsax.sun,
-      'เย็น': Iconsax.moon,
-      'ก่อนนอน': Iconsax.moon,
+      'เช้า': HugeIcons.strokeRoundedSun01,
+      'กลางวัน': HugeIcons.strokeRoundedSun03,
+      'เย็น': HugeIcons.strokeRoundedMoon02,
+      'ก่อนนอน': HugeIcons.strokeRoundedMoon02,
     };
 
     final mealColors = {
@@ -408,7 +408,7 @@ class MedicinePhotoItem extends StatelessWidget {
 
     return Row(
       children: [
-        Icon(Iconsax.clock, size: 14, color: AppColors.textSecondary),
+        HugeIcon(icon: HugeIcons.strokeRoundedClock01, size: AppIconSize.sm, color: AppColors.textSecondary),
         SizedBox(width: 4),
         Text(
           'มื้อ: ',
@@ -419,7 +419,7 @@ class MedicinePhotoItem extends StatelessWidget {
         // Meal chips
         ...medicine.bldb.map((meal) {
           final color = mealColors[meal] ?? AppColors.primary;
-          final icon = mealIcons[meal] ?? Iconsax.clock;
+          final icon = mealIcons[meal] ?? HugeIcons.strokeRoundedClock01;
           return Padding(
             padding: EdgeInsets.only(right: 4),
             child: Container(
@@ -431,7 +431,7 @@ class MedicinePhotoItem extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(icon, size: 10, color: color),
+                  HugeIcon(icon: icon, size: AppIconSize.xs, color: color),
                   SizedBox(width: 2),
                   Text(
                     meal,

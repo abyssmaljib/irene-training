@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
@@ -61,9 +61,9 @@ class ResidentHeader extends StatelessWidget {
   Widget _buildDefaultAvatar() {
     return Container(
       color: AppColors.background,
-      child: Icon(
-        Iconsax.user,
-        size: 28,
+      child: HugeIcon(
+        icon: HugeIcons.strokeRoundedUser,
+        size: AppIconSize.xl,
         color: AppColors.secondaryText,
       ),
     );
@@ -131,7 +131,7 @@ class ResidentHeader extends StatelessWidget {
       label: resident.zoneName,
       backgroundColor: AppColors.primary.withValues(alpha: 0.1),
       textColor: AppColors.primary,
-      icon: Iconsax.location,
+      icon: HugeIcons.strokeRoundedLocation01,
     ));
 
     // Bed badge
@@ -140,7 +140,7 @@ class ResidentHeader extends StatelessWidget {
         label: 'เตียง ${resident.bed}',
         backgroundColor: AppColors.background,
         textColor: AppColors.textPrimary,
-        icon: Iconsax.lamp,
+        icon: HugeIcons.strokeRoundedLamp01,
       ));
     }
 
@@ -160,7 +160,7 @@ class ResidentHeader extends StatelessWidget {
         label: 'เสี่ยงล้ม',
         backgroundColor: AppColors.tagFailedBg,
         textColor: AppColors.tagFailedText,
-        icon: Iconsax.warning_2,
+        icon: HugeIcons.strokeRoundedAlert02,
       ));
     }
 
@@ -179,7 +179,7 @@ class ResidentHeader extends StatelessWidget {
     required String label,
     required Color backgroundColor,
     required Color textColor,
-    IconData? icon,
+    dynamic icon,
   }) {
     return Container(
       padding: EdgeInsets.symmetric(
@@ -194,7 +194,7 @@ class ResidentHeader extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 10, color: textColor),
+            HugeIcon(icon: icon, size: AppIconSize.xs, color: textColor),
             SizedBox(width: 3),
           ],
           Text(

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/theme/app_spacing.dart';
@@ -99,8 +99,8 @@ class ListItemCard extends StatelessWidget {
             AppSpacing.horizontalGapSm,
             trailing!,
           ] else ...[
-            Icon(
-              Iconsax.arrow_right_3,
+            HugeIcon(
+              icon: HugeIcons.strokeRoundedArrowRight01,
               color: AppColors.textSecondary,
             ),
           ],

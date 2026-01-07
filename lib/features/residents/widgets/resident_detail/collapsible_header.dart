@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
@@ -38,15 +38,15 @@ class CollapsibleResidentHeader extends StatelessWidget {
       foregroundColor: AppColors.textPrimary,
       elevation: 0,
       leading: IconButton(
-        icon: Icon(Iconsax.arrow_left),
+        icon: HugeIcon(icon: HugeIcons.strokeRoundedArrowLeft01),
         onPressed: onBackPressed ?? () => Navigator.of(context).pop(),
       ),
       actions: [
         IconButton(
-          icon: Icon(Iconsax.more),
+          icon: HugeIcon(icon: HugeIcons.strokeRoundedMoreVertical),
           onPressed: onMorePressed,
         ),
-        SizedBox(width: 16),
+        SizedBox(width: AppSpacing.md),
       ],
       flexibleSpace: LayoutBuilder(
         builder: (context, constraints) {
@@ -107,7 +107,7 @@ class CollapsibleResidentHeader extends StatelessWidget {
   Widget _buildMiniAvatar() {
     return Container(
       color: AppColors.background,
-      child: Icon(Iconsax.user, size: 16, color: AppColors.secondaryText),
+      child: HugeIcon(icon: HugeIcons.strokeRoundedUser, size: AppIconSize.sm, color: AppColors.secondaryText),
     );
   }
 
@@ -162,7 +162,7 @@ class CollapsibleResidentHeader extends StatelessWidget {
   Widget _buildDefaultAvatar() {
     return Container(
       color: AppColors.background,
-      child: Icon(Iconsax.user, size: 32, color: AppColors.secondaryText),
+      child: HugeIcon(icon: HugeIcons.strokeRoundedUser, size: AppIconSize.xxl, color: AppColors.secondaryText),
     );
   }
 
@@ -215,9 +215,9 @@ class CollapsibleResidentHeader extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        Iconsax.health,
-                        size: 12,
+                      HugeIcon(
+                        icon: HugeIcons.strokeRoundedMedicine01,
+                        size: AppIconSize.xs,
                         color: AppColors.tagPendingText,
                       ),
                       SizedBox(width: 4),
@@ -257,7 +257,7 @@ class CollapsibleResidentHeader extends StatelessWidget {
       label: resident.zoneName,
       backgroundColor: AppColors.primary.withValues(alpha: 0.1),
       textColor: AppColors.primary,
-      icon: Iconsax.location,
+      icon: HugeIcons.strokeRoundedLocation01,
     ));
 
     // Status badge
@@ -277,7 +277,7 @@ class CollapsibleResidentHeader extends StatelessWidget {
     required String label,
     required Color backgroundColor,
     required Color textColor,
-    IconData? icon,
+    dynamic icon,
   }) {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -289,7 +289,7 @@ class CollapsibleResidentHeader extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 12, color: textColor),
+            HugeIcon(icon: icon, size: AppIconSize.xs, color: textColor),
             SizedBox(width: 4),
           ],
           Text(

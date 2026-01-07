@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../models/vital_sign.dart';
 import '../services/resident_detail_service.dart';
+import 'edit_vital_sign_screen.dart';
 
 /// หน้าแสดงประวัติสัญญาณชีพของ resident (Infinite scroll)
 class VitalSignLogScreen extends ConsumerStatefulWidget {
@@ -29,6 +30,7 @@ class _VitalSignLogScreenState extends ConsumerState<VitalSignLogScreen> {
   bool _hasMore = true;
   bool _isInitialLoading = true;
   String? _error;
+  bool _hasUpdates = false; // Track if any update occurred
 
   static const int _pageSize = 20;
 
@@ -94,34 +96,41 @@ class _VitalSignLogScreenState extends ConsumerState<VitalSignLogScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.surface,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Iconsax.arrow_left, color: AppColors.textPrimary),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              widget.residentName,
-              style: AppTypography.title.copyWith(
-                color: AppColors.textPrimary,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        Navigator.of(context).pop(_hasUpdates);
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          backgroundColor: AppColors.surface,
+          elevation: 0,
+          leading: IconButton(
+            icon: HugeIcon(icon: HugeIcons.strokeRoundedArrowLeft01, color: AppColors.textPrimary),
+            onPressed: () => Navigator.of(context).pop(_hasUpdates),
+          ),
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                widget.residentName,
+                style: AppTypography.title.copyWith(
+                  color: AppColors.textPrimary,
+                ),
               ),
-            ),
-            Text(
-              'สัญญาณชีพ',
-              style: AppTypography.caption.copyWith(
-                color: AppColors.secondaryText,
+              Text(
+                'สัญญาณชีพ',
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.secondaryText,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
+        body: _buildBody(),
       ),
-      body: _buildBody(),
     );
   }
 
@@ -157,6 +166,12 @@ class _VitalSignLogScreenState extends ConsumerState<VitalSignLogScreen> {
             vitalSign: _vitalSigns[index],
             backgroundColor:
                 isEven ? AppColors.surface : AppColors.background,
+            residentId: widget.residentId,
+            residentName: widget.residentName,
+            onUpdated: () {
+              _hasUpdates = true;
+              _refresh();
+            },
           );
         },
       ),
@@ -181,7 +196,7 @@ class _VitalSignLogScreenState extends ConsumerState<VitalSignLogScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Iconsax.warning_2, size: 48, color: AppColors.error),
+            HugeIcon(icon: HugeIcons.strokeRoundedAlert02, size: AppIconSize.xxxl, color: AppColors.error),
             AppSpacing.verticalGapMd,
             Text(
               'เกิดข้อผิดพลาด',
@@ -198,7 +213,7 @@ class _VitalSignLogScreenState extends ConsumerState<VitalSignLogScreen> {
             AppSpacing.verticalGapLg,
             TextButton.icon(
               onPressed: _refresh,
-              icon: Icon(Iconsax.refresh, size: 18),
+              icon: HugeIcon(icon: HugeIcons.strokeRoundedRefresh, size: AppIconSize.md),
               label: Text('ลองใหม่'),
               style: TextButton.styleFrom(
                 foregroundColor: AppColors.primary,
@@ -224,8 +239,8 @@ class _VitalSignLogScreenState extends ConsumerState<VitalSignLogScreen> {
                 color: AppColors.accent1,
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                Iconsax.heart,
+              child: HugeIcon(
+                icon: HugeIcons.strokeRoundedFavourite,
                 size: 40,
                 color: AppColors.primary,
               ),
@@ -253,10 +268,16 @@ class _VitalSignLogScreenState extends ConsumerState<VitalSignLogScreen> {
 class _VitalSignRow extends StatelessWidget {
   final VitalSign vitalSign;
   final Color backgroundColor;
+  final int residentId;
+  final String residentName;
+  final VoidCallback? onUpdated;
 
   const _VitalSignRow({
     required this.vitalSign,
     required this.backgroundColor,
+    required this.residentId,
+    required this.residentName,
+    this.onUpdated,
   });
 
   String _formatDateTime(DateTime dateTime) {
@@ -303,14 +324,20 @@ class _VitalSignRow extends StatelessWidget {
     final shiftColor = _getShiftColor(shift);
 
     return InkWell(
-      onTap: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('แก้ไขสัญญาณชีพ - Coming Soon'),
-            backgroundColor: AppColors.primary,
-            behavior: SnackBarBehavior.floating,
+      onTap: () async {
+        final result = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (_) => EditVitalSignScreen(
+              vitalSignId: vitalSign.id,
+              residentId: residentId,
+              residentName: residentName,
+            ),
           ),
         );
+        // Refresh list if vital sign was updated or deleted
+        if (result == true) {
+          onUpdated?.call();
+        }
       },
       child: Container(
         color: backgroundColor,
@@ -383,18 +410,20 @@ class _VitalSignRow extends StatelessWidget {
               padding: EdgeInsets.only(left: 12),
               child: InkWell(
                 onTap: () => _showShareOptions(context),
-                borderRadius: BorderRadius.circular(30),
+                borderRadius: BorderRadius.circular(20),
                 child: Container(
-                  width: 48,
-                  height: 48,
+                  width: 40,
+                  height: 40,
                   decoration: BoxDecoration(
                     color: AppColors.accent1,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(
-                    Iconsax.export_1,
-                    color: AppColors.primary,
-                    size: 22,
+                  child: Center(
+                    child: HugeIcon(
+                      icon: HugeIcons.strokeRoundedShare01,
+                      color: AppColors.primary,
+                      size: AppIconSize.md,
+                    ),
                   ),
                 ),
               ),
@@ -426,12 +455,13 @@ class _VitalSignRow extends StatelessWidget {
 }
 
 /// Navigate to Vital Sign Log Screen
-void navigateToVitalSignLog(
+/// Returns true if any vital sign was updated/deleted
+Future<bool?> navigateToVitalSignLog(
   BuildContext context, {
   required int residentId,
   required String residentName,
 }) {
-  Navigator.of(context).push(
+  return Navigator.of(context).push<bool>(
     MaterialPageRoute(
       builder: (_) => VitalSignLogScreen(
         residentId: residentId,

@@ -1,6 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/services/user_service.dart';
 import '../../../core/theme/app_colors.dart';
@@ -17,6 +17,7 @@ import '../models/report_completion_status.dart';
 import '../services/report_completion_service.dart';
 import '../widgets/residents_filter_drawer.dart';
 import 'resident_detail_screen.dart';
+import 'create_vital_sign_screen.dart';
 import '../../../core/widgets/tags_badges.dart';
 
 /// หน้าคนไข้ - Residents
@@ -489,7 +490,7 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
           AppSpacing.horizontalGapXs,
           GestureDetector(
             onTap: onRemove,
-            child: Icon(Iconsax.close_circle, size: 14, color: AppColors.primary),
+            child: HugeIcon(icon: HugeIcons.strokeRoundedCancelCircle, size: AppIconSize.sm, color: AppColors.primary),
           ),
         ],
       ),
@@ -652,14 +653,14 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
         background: _buildSwipeBackground(
           alignment: Alignment.centerLeft,
           color: AppColors.tagPendingBg,
-          icon: Iconsax.edit_2,
+          icon: HugeIcons.strokeRoundedEdit02,
           iconColor: AppColors.tagPendingText,
           label: 'สร้างรายงาน',
         ),
         secondaryBackground: _buildSwipeBackground(
           alignment: Alignment.centerRight,
           color: AppColors.tagPassedBg,
-          icon: Iconsax.add_square,
+          icon: HugeIcons.strokeRoundedMedicine01,
           iconColor: AppColors.tagPassedText,
           label: 'จัดยา',
         ),
@@ -671,7 +672,7 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
   Widget _buildSwipeBackground({
     required Alignment alignment,
     required Color color,
-    required IconData icon,
+    required dynamic icon,
     required Color iconColor,
     required String label,
   }) {
@@ -691,10 +692,10 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
                   ),
                 ),
                 AppSpacing.horizontalGapSm,
-                Icon(icon, color: iconColor, size: 24),
+                HugeIcon(icon: icon, color: iconColor, size: AppIconSize.xl),
               ]
             : [
-                Icon(icon, color: iconColor, size: 24),
+                HugeIcon(icon: icon, color: iconColor, size: AppIconSize.xl),
                 AppSpacing.horizontalGapSm,
                 Text(
                   label,
@@ -727,15 +728,15 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
   }
 
   void _onSwipeReport(_ResidentItem resident) {
-    // ไปหน้าสร้างรายงานของ resident โดยตรง
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('ไปหน้าสร้างรายงานของ คุณ${resident.name} - Coming Soon'),
-        backgroundColor: AppColors.tagPendingText,
-        duration: Duration(seconds: 2),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CreateVitalSignScreen(
+          residentId: resident.id,
+          residentName: resident.name,
+        ),
       ),
     );
-    // TODO: Navigator.push ไปหน้าสร้างรายงาน
   }
 
   Widget _buildResidentCardContent(
@@ -946,9 +947,9 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (showCheck) ...[
-            Icon(
-              Iconsax.tick_circle,
-              size: 14,
+            HugeIcon(
+              icon: HugeIcons.strokeRoundedCheckmarkCircle02,
+              size: AppIconSize.sm,
               color: textColor,
             ),
             SizedBox(width: 4),
@@ -1052,9 +1053,9 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (isCompleted) ...[
-            Icon(
-              Iconsax.tick_circle,
-              size: 14,
+            HugeIcon(
+              icon: HugeIcons.strokeRoundedCheckmarkCircle02,
+              size: AppIconSize.sm,
               color: textColor,
             ),
             SizedBox(width: 4),

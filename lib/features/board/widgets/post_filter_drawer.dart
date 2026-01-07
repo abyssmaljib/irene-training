@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -97,7 +97,7 @@ class _PostFilterDrawerState extends State<PostFilterDrawer> {
           // Section header
           Row(
             children: [
-              Icon(Iconsax.eye, size: 18, color: AppColors.secondaryText),
+              HugeIcon(icon: HugeIcons.strokeRoundedView, size: AppIconSize.md, color: AppColors.secondaryText),
               AppSpacing.horizontalGapSm,
               Text(
                 'มุมมอง',
@@ -120,16 +120,16 @@ class _PostFilterDrawerState extends State<PostFilterDrawer> {
   Widget _buildViewModeOption(PostFilterType type) {
     final isSelected = widget.filterType == type;
 
-    IconData icon;
+    dynamic icon;
     switch (type) {
       case PostFilterType.all:
-        icon = Iconsax.document_text;
+        icon = HugeIcons.strokeRoundedFileEdit;
         break;
       case PostFilterType.unacknowledged:
-        icon = Iconsax.notification_bing;
+        icon = HugeIcons.strokeRoundedNotification02;
         break;
       case PostFilterType.myPosts:
-        icon = Iconsax.user_edit;
+        icon = HugeIcons.strokeRoundedUserEdit01;
         break;
     }
 
@@ -153,9 +153,9 @@ class _PostFilterDrawerState extends State<PostFilterDrawer> {
         ),
         child: Row(
           children: [
-            Icon(
-              icon,
-              size: 20,
+            HugeIcon(
+              icon: icon,
+              size: AppIconSize.lg,
               color: isSelected ? AppColors.primary : AppColors.secondaryText,
             ),
             AppSpacing.horizontalGapMd,
@@ -169,9 +169,9 @@ class _PostFilterDrawerState extends State<PostFilterDrawer> {
               ),
             ),
             if (isSelected)
-              Icon(
-                Iconsax.tick_circle,
-                size: 20,
+              HugeIcon(
+                icon: HugeIcons.strokeRoundedCheckmarkCircle02,
+                size: AppIconSize.lg,
                 color: AppColors.primary,
               ),
           ],
@@ -196,9 +196,9 @@ class _PostFilterDrawerState extends State<PostFilterDrawer> {
           ),
           child: Row(
             children: [
-              Icon(
-                Iconsax.search_normal,
-                size: 22,
+              HugeIcon(
+                icon: HugeIcons.strokeRoundedSearch01,
+                size: AppIconSize.lg,
                 color: AppColors.secondaryText,
               ),
               SizedBox(width: 12),
@@ -227,7 +227,7 @@ class _PostFilterDrawerState extends State<PostFilterDrawer> {
           // Section header
           Row(
             children: [
-              Icon(Iconsax.user, size: 18, color: AppColors.secondaryText),
+              HugeIcon(icon: HugeIcons.strokeRoundedUser, size: AppIconSize.md, color: AppColors.secondaryText),
               AppSpacing.horizontalGapSm,
               Text(
                 'ผู้พักอาศัย',
@@ -268,9 +268,9 @@ class _PostFilterDrawerState extends State<PostFilterDrawer> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      Iconsax.tick_circle,
-                      size: 14,
+                    HugeIcon(
+                      icon: HugeIcons.strokeRoundedCheckmarkCircle02,
+                      size: AppIconSize.sm,
                       color: AppColors.primary,
                     ),
                     SizedBox(width: 6),
@@ -284,9 +284,9 @@ class _PostFilterDrawerState extends State<PostFilterDrawer> {
                       ),
                     ),
                     SizedBox(width: 6),
-                    Icon(
-                      Iconsax.close_circle,
-                      size: 16,
+                    HugeIcon(
+                      icon: HugeIcons.strokeRoundedCancelCircle,
+                      size: AppIconSize.sm,
                       color: AppColors.primary,
                     ),
                   ],
@@ -355,8 +355,8 @@ class _PostFilterDrawerState extends State<PostFilterDrawer> {
                             ? NetworkImage(resident.pictureUrl!)
                             : null,
                         child: resident.pictureUrl == null
-                            ? Icon(Iconsax.user,
-                                color: AppColors.primary, size: 18)
+                            ? HugeIcon(icon: HugeIcons.strokeRoundedUser,
+                                color: AppColors.primary, size: AppIconSize.md)
                             : null,
                       ),
                       AppSpacing.horizontalGapMd,
@@ -387,9 +387,9 @@ class _PostFilterDrawerState extends State<PostFilterDrawer> {
                       ),
                       // Check icon
                       if (isSelected)
-                        Icon(
-                          Iconsax.tick_circle,
-                          size: 20,
+                        HugeIcon(
+                          icon: HugeIcons.strokeRoundedCheckmarkCircle02,
+                          size: AppIconSize.lg,
                           color: AppColors.primary,
                         ),
                     ],

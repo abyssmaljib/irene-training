@@ -1,6 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -61,8 +61,8 @@ class CoreValueBanner extends StatelessWidget {
               color: Colors.white.withValues(alpha: 0.2),
               borderRadius: AppRadius.smallRadius,
             ),
-            child: const Icon(
-              Iconsax.quote_up,
+            child: HugeIcon(
+              icon: HugeIcons.strokeRoundedQuoteUp,
               color: Colors.white,
               size: 20,
             ),

@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -196,9 +196,9 @@ class _QuizFormWidgetState extends ConsumerState<QuizFormWidget> {
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Row(
               children: [
-                Icon(
-                  _isExpanded ? Iconsax.arrow_down_1 : Iconsax.arrow_right_3,
-                  size: 20,
+                HugeIcon(
+                  icon: _isExpanded ? HugeIcons.strokeRoundedArrowDown01 : HugeIcons.strokeRoundedArrowRight01,
+                  size: AppIconSize.lg,
                   color: AppColors.primary,
                 ),
                 const SizedBox(width: 8),
@@ -225,9 +225,9 @@ class _QuizFormWidgetState extends ConsumerState<QuizFormWidget> {
                 ),
                 const Spacer(),
                 if (state.hasQuiz)
-                  Icon(
-                    Iconsax.tick_circle5,
-                    size: 18,
+                  HugeIcon(
+                    icon: HugeIcons.strokeRoundedCheckmarkCircle02,
+                    size: AppIconSize.md,
                     color: AppColors.success,
                   ),
               ],
@@ -264,7 +264,7 @@ class _QuizFormWidgetState extends ConsumerState<QuizFormWidget> {
                                 color: AppColors.primary,
                               ),
                             )
-                          : Icon(Iconsax.flash_1, size: 18),
+                          : HugeIcon(icon: HugeIcons.strokeRoundedFlash, size: AppIconSize.md),
                       label: Text(_isOnCooldown
                           ? 'รอ $_cooldownRemaining วินาที...'
                           : 'น้องไอรีนน์ ช่วยสร้างคำถาม'),
@@ -396,9 +396,9 @@ class _QuizFormWidgetState extends ConsumerState<QuizFormWidget> {
                 // Answer selection hint
                 Row(
                   children: [
-                    Icon(
-                      Iconsax.info_circle,
-                      size: 16,
+                    HugeIcon(
+                      icon: HugeIcons.strokeRoundedInformationCircle,
+                      size: AppIconSize.sm,
                       color: AppColors.secondaryText,
                     ),
                     const SizedBox(width: 6),
@@ -420,7 +420,7 @@ class _QuizFormWidgetState extends ConsumerState<QuizFormWidget> {
                   alignment: Alignment.centerRight,
                   child: TextButton.icon(
                     onPressed: _clearQuiz,
-                    icon: Icon(Iconsax.trash, size: 16),
+                    icon: HugeIcon(icon: HugeIcons.strokeRoundedDelete01, size: AppIconSize.sm),
                     label: Text('ล้างคำถาม'),
                     style: TextButton.styleFrom(
                       foregroundColor: AppColors.error,
@@ -568,7 +568,7 @@ class _QuizFormWidgetState extends ConsumerState<QuizFormWidget> {
             children: [
               OutlinedButton.icon(
                 onPressed: _applyAiQuizToForm,
-                icon: Icon(Iconsax.arrow_down_2, size: 14),
+                icon: HugeIcon(icon: HugeIcons.strokeRoundedArrowDown02, size: AppIconSize.sm),
                 label: Text('แทนที่ข้อความ'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Color(0xFF3A0EB6),
@@ -584,7 +584,7 @@ class _QuizFormWidgetState extends ConsumerState<QuizFormWidget> {
                 onPressed: () {
                   ref.read(createPostProvider.notifier).clearAiQuizPreview();
                 },
-                icon: Icon(Iconsax.close_circle, size: 14),
+                icon: HugeIcon(icon: HugeIcons.strokeRoundedCancelCircle, size: AppIconSize.sm),
                 label: Text('ยกเลิก'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.secondaryText,

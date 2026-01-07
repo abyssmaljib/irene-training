@@ -1,8 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_spacing.dart';
 
 /// Widget สำหรับแสดง preview รูปภาพที่เลือก
 class ImagePreviewGrid extends StatelessWidget {
@@ -74,7 +75,7 @@ class ImagePreviewGrid extends StatelessWidget {
                   width: 80,
                   height: 80,
                   color: AppColors.alternate,
-                  child: Icon(Iconsax.image, color: AppColors.secondaryText),
+                  child: HugeIcon(icon: HugeIcons.strokeRoundedImage01, color: AppColors.secondaryText),
                 );
               },
             ),
@@ -130,7 +131,7 @@ class ImagePreviewGrid extends StatelessWidget {
               ),
               errorWidget: (context, url, error) => Container(
                 color: AppColors.alternate,
-                child: Icon(Iconsax.image, color: AppColors.secondaryText),
+                child: HugeIcon(icon: HugeIcons.strokeRoundedImage01, color: AppColors.secondaryText),
               ),
             ),
           ),
@@ -145,10 +146,10 @@ class ImagePreviewGrid extends StatelessWidget {
                 color: AppColors.success,
                 borderRadius: BorderRadius.circular(4),
               ),
-              child: Icon(
-                Iconsax.tick_circle,
+              child: HugeIcon(
+                icon: HugeIcons.strokeRoundedCheckmarkCircle02,
                 color: Colors.white,
-                size: 12,
+                size: AppIconSize.xs,
               ),
             ),
           ),
@@ -175,10 +176,10 @@ class ImagePreviewGrid extends StatelessWidget {
           color: Colors.black54,
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Icon(
-          Iconsax.close_circle,
+        child: HugeIcon(
+          icon: HugeIcons.strokeRoundedCancelCircle,
           color: Colors.white,
-          size: 14,
+          size: AppIconSize.sm,
         ),
       ),
     );
@@ -201,10 +202,10 @@ class ImagePreviewGrid extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Iconsax.add,
+            HugeIcon(
+              icon: HugeIcons.strokeRoundedAdd01,
               color: AppColors.secondaryText,
-              size: 24,
+              size: AppIconSize.xl,
             ),
             const SizedBox(height: 4),
             Text(
@@ -311,7 +312,7 @@ class ImagePreviewCompact extends StatelessWidget {
                     color: Colors.black54,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(Iconsax.close_circle, color: Colors.white, size: 12),
+                  child: HugeIcon(icon: HugeIcons.strokeRoundedCancelCircle, color: Colors.white, size: AppIconSize.xs),
                 ),
               ),
             ),
@@ -325,7 +326,7 @@ class ImagePreviewCompact extends StatelessWidget {
                   color: AppColors.success,
                   borderRadius: BorderRadius.circular(3),
                 ),
-                child: Icon(Iconsax.tick_circle, color: Colors.white, size: 8),
+                child: HugeIcon(icon: HugeIcons.strokeRoundedCheckmarkCircle02, color: Colors.white, size: AppIconSize.xs),
               ),
             ),
         ],

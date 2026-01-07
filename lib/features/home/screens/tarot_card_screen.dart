@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:confetti/confetti.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../models/tarot_card.dart';
@@ -727,8 +727,8 @@ class _TarotCardScreenState extends State<TarotCardScreen>
             return Container(
               color: const Color(0xFF2C1654),
               child: Center(
-                child: Icon(
-                  Iconsax.magic_star,
+                child: HugeIcon(
+                  icon: HugeIcons.strokeRoundedMagicWand01,
                   color: const Color(0xFFFFD700),
                   size: 40,
                 ),

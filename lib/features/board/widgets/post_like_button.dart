@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 
 /// Like/Acknowledge button สำหรับ Post
@@ -44,9 +45,9 @@ class PostLikeButton extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              isLiked ? Iconsax.heart5 : Iconsax.heart,
-              size: 16,
+            HugeIcon(
+              icon: HugeIcons.strokeRoundedFavourite,
+              size: AppIconSize.sm,
               color: isLiked ? AppColors.primary : AppColors.secondaryText,
             ),
             if (showCount && likeCount > 0) ...[
@@ -83,9 +84,9 @@ class PostLikeButton extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              isLiked ? Iconsax.heart5 : Iconsax.heart,
-              size: 18,
+            HugeIcon(
+              icon: HugeIcons.strokeRoundedFavourite,
+              size: AppIconSize.md,
               color: isLiked ? AppColors.primary : AppColors.secondaryText,
             ),
             SizedBox(width: 6),
@@ -155,7 +156,7 @@ class PostLikeInfo extends StatelessWidget {
             CircleAvatar(
               radius: 10,
               backgroundColor: AppColors.accent1,
-              child: Icon(Iconsax.user, size: 12, color: AppColors.primary),
+              child: HugeIcon(icon: HugeIcons.strokeRoundedUser, size: AppIconSize.xs, color: AppColors.primary),
             ),
           SizedBox(width: 6),
           // Text

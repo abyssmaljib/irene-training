@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -108,10 +108,12 @@ class _MedicineSummaryCardState extends State<MedicineSummaryCard> {
             color: AppColors.accent1,
             borderRadius: AppRadius.smallRadius,
           ),
-          child: Icon(
-            Iconsax.health,
-            color: AppColors.primary,
-            size: 20,
+          child: Center(
+            child: HugeIcon(
+              icon: HugeIcons.strokeRoundedMedicine02,
+              color: AppColors.primary,
+              size: AppIconSize.lg,
+            ),
           ),
         ),
         AppSpacing.horizontalGapMd,
@@ -243,9 +245,9 @@ class _MedicineSummaryCardState extends State<MedicineSummaryCard> {
           ),
         ),
         AppSpacing.horizontalGapXs,
-        Icon(
-          Iconsax.arrow_right_3,
-          size: 16,
+        HugeIcon(
+          icon: HugeIcons.strokeRoundedArrowRight01,
+          size: AppIconSize.sm,
           color: AppColors.primary,
         ),
       ],

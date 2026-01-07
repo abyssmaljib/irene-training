@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart' hide Badge;
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -85,8 +85,8 @@ class _BadgeInfoDialogState extends State<BadgeInfoDialog>
                 padding: const EdgeInsets.all(16),
                 child: Row(
                   children: [
-                    const Icon(
-                      Iconsax.medal_star,
+                    HugeIcon(
+                      icon: HugeIcons.strokeRoundedAward01,
                       color: AppColors.primary,
                       size: 24,
                     ),
@@ -137,7 +137,7 @@ class _BadgeInfoDialogState extends State<BadgeInfoDialog>
                       width: 48,
                       height: 48,
                       child: IconButton(
-                        icon: const Icon(Iconsax.close_circle),
+                        icon: HugeIcon(icon: HugeIcons.strokeRoundedCancelCircle),
                         onPressed: () => Navigator.pop(context),
                       ),
                     ),
@@ -398,8 +398,8 @@ class _BadgeInfoDialogState extends State<BadgeInfoDialog>
                       shape: BoxShape.circle,
                       border: Border.all(color: AppColors.surface, width: 2),
                     ),
-                    child: const Icon(
-                      Iconsax.tick_circle,
+                    child: HugeIcon(
+                      icon: HugeIcons.strokeRoundedCheckmarkCircle02,
                       size: 12,
                       color: Colors.white,
                     ),
@@ -480,8 +480,8 @@ class _BadgeInfoDialogState extends State<BadgeInfoDialog>
                 // Stats row
                 Row(
                   children: [
-                    Icon(
-                      Iconsax.people,
+                    HugeIcon(
+                      icon: HugeIcons.strokeRoundedUserGroup,
                       size: 14,
                       color: AppColors.secondaryText,
                     ),
@@ -507,8 +507,8 @@ class _BadgeInfoDialogState extends State<BadgeInfoDialog>
                       ),
                     ),
                     const Spacer(),
-                    Icon(
-                      Iconsax.star1,
+                    HugeIcon(
+                      icon: HugeIcons.strokeRoundedStar,
                       size: 14,
                       color: AppColors.warning,
                     ),

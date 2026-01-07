@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -105,7 +105,7 @@ class _EditAiSummaryWidgetState extends ConsumerState<EditAiSummaryWidget> {
                         color: AppColors.primary,
                       ),
                     )
-                  : Icon(Iconsax.magic_star, size: 16),
+                  : HugeIcon(icon: HugeIcons.strokeRoundedMagicWand01, size: AppIconSize.sm),
               label: Text('น้องไอรีนน์ ช่วยสรุป'),
               style: OutlinedButton.styleFrom(
                 foregroundColor:
@@ -167,7 +167,7 @@ class _EditAiSummaryWidgetState extends ConsumerState<EditAiSummaryWidget> {
                   children: [
                     OutlinedButton.icon(
                       onPressed: _replaceText,
-                      icon: Icon(Iconsax.arrow_up_2, size: 14),
+                      icon: HugeIcon(icon: HugeIcons.strokeRoundedArrowUp02, size: AppIconSize.sm),
                       label: Text('แทนที่ข้อความ'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFF3A0EB6),
@@ -181,7 +181,7 @@ class _EditAiSummaryWidgetState extends ConsumerState<EditAiSummaryWidget> {
                     const SizedBox(width: 8),
                     OutlinedButton.icon(
                       onPressed: _copyText,
-                      icon: Icon(Iconsax.copy, size: 14),
+                      icon: HugeIcon(icon: HugeIcons.strokeRoundedCopy01, size: AppIconSize.sm),
                       label: Text('คัดลอกข้อความ'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFF3A0EB6),

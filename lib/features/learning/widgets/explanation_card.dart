@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -43,8 +43,8 @@ class ExplanationCard extends StatelessWidget {
                       : AppColors.tagFailedBg,
                   shape: BoxShape.circle,
                 ),
-                child: Icon(
-                  isCorrect ? Iconsax.tick_circle : Iconsax.close_circle,
+                child: HugeIcon(
+                  icon: isCorrect ? HugeIcons.strokeRoundedCheckmarkCircle02 : HugeIcons.strokeRoundedCancelCircle,
                   color: isCorrect ? AppColors.success : AppColors.error,
                   size: 28,
                 ),

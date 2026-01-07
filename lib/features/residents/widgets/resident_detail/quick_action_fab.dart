@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../screens/create_vital_sign_screen.dart';
 
 /// Quick Action FAB สำหรับหน้า Resident Detail
 class QuickActionFab extends StatelessWidget {
@@ -20,7 +21,7 @@ class QuickActionFab extends StatelessWidget {
     return FloatingActionButton(
       onPressed: () => _showQuickActionSheet(context),
       backgroundColor: AppColors.primary,
-      child: Icon(Iconsax.add, color: Colors.white),
+      child: HugeIcon(icon: HugeIcons.strokeRoundedAdd01, color: Colors.white),
     );
   }
 
@@ -80,7 +81,7 @@ class _QuickActionSheet extends StatelessWidget {
                   Spacer(),
                   IconButton(
                     onPressed: () => Navigator.pop(context),
-                    icon: Icon(Iconsax.close_circle, color: AppColors.secondaryText),
+                    icon: HugeIcon(icon: HugeIcons.strokeRoundedCancelCircle, color: AppColors.secondaryText),
                   ),
                 ],
               ),
@@ -95,7 +96,7 @@ class _QuickActionSheet extends StatelessWidget {
                 children: [
                   _buildActionItem(
                     context: context,
-                    icon: Iconsax.heart,
+                    icon: HugeIcons.strokeRoundedFavourite,
                     iconColor: AppColors.error,
                     title: 'วัดสัญญาณชีพ',
                     subtitle: 'บันทึก BP, Pulse, SpO2, Temp',
@@ -104,7 +105,7 @@ class _QuickActionSheet extends StatelessWidget {
                   AppSpacing.verticalGapSm,
                   _buildActionItem(
                     context: context,
-                    icon: Iconsax.document_text,
+                    icon: HugeIcons.strokeRoundedFileEdit,
                     iconColor: AppColors.warning,
                     title: 'บันทึกการขับถ่าย',
                     subtitle: 'Bristol Score, จำนวน',
@@ -113,7 +114,7 @@ class _QuickActionSheet extends StatelessWidget {
                   AppSpacing.verticalGapSm,
                   _buildActionItem(
                     context: context,
-                    icon: Iconsax.camera,
+                    icon: HugeIcons.strokeRoundedCamera01,
                     iconColor: AppColors.secondary,
                     title: 'ถ่ายรูป',
                     subtitle: 'บันทึกรูปภาพกิจกรรม',
@@ -122,7 +123,7 @@ class _QuickActionSheet extends StatelessWidget {
                   AppSpacing.verticalGapSm,
                   _buildActionItem(
                     context: context,
-                    icon: Iconsax.note_2,
+                    icon: HugeIcons.strokeRoundedNote,
                     iconColor: AppColors.primary,
                     title: 'โน้ตด่วน',
                     subtitle: 'จดบันทึกสั้นๆ',
@@ -142,7 +143,7 @@ class _QuickActionSheet extends StatelessWidget {
 
   Widget _buildActionItem({
     required BuildContext context,
-    required IconData icon,
+    required dynamic icon,
     required Color iconColor,
     required String title,
     required String subtitle,
@@ -168,7 +169,7 @@ class _QuickActionSheet extends StatelessWidget {
                   color: iconColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, color: iconColor, size: 24),
+                child: HugeIcon(icon: icon, color: iconColor, size: AppIconSize.xl),
               ),
               AppSpacing.horizontalGapMd,
               Expanded(
@@ -185,8 +186,8 @@ class _QuickActionSheet extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(
-                Iconsax.arrow_right_3,
+              HugeIcon(
+                icon: HugeIcons.strokeRoundedArrowRight01,
                 color: AppColors.secondaryText,
               ),
             ],
@@ -199,28 +200,36 @@ class _QuickActionSheet extends StatelessWidget {
   void _handleAction(BuildContext context, String action) {
     Navigator.pop(context);
 
-    // Placeholder - แสดง SnackBar
-    String message;
     switch (action) {
       case 'vital_sign':
-        message = 'วัดสัญญาณชีพ - เร็วๆ นี้';
-        break;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => CreateVitalSignScreen(
+              residentId: residentId,
+              residentName: residentName,
+            ),
+          ),
+        );
+        return;
       case 'bowel_movement':
-        message = 'บันทึกการขับถ่าย - เร็วๆ นี้';
+        _showComingSoon(context, 'บันทึกการขับถ่าย');
         break;
       case 'photo':
-        message = 'ถ่ายรูป - เร็วๆ นี้';
+        _showComingSoon(context, 'ถ่ายรูป');
         break;
       case 'quick_note':
-        message = 'โน้ตด่วน - เร็วๆ นี้';
+        _showComingSoon(context, 'โน้ตด่วน');
         break;
       default:
-        message = 'เร็วๆ นี้';
+        _showComingSoon(context, 'ฟีเจอร์นี้');
     }
+  }
 
+  void _showComingSoon(BuildContext context, String feature) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
+        content: Text('$feature - เร็วๆ นี้'),
         backgroundColor: AppColors.primary,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(

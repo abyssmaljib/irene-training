@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -41,7 +41,7 @@ class _TaskTimeSectionState extends State<TaskTimeSection>
 
   // Cache computed values เพื่อไม่ต้องคำนวณทุกครั้งที่ rebuild
   late Color _headerColor;
-  late IconData _timeIcon;
+  late dynamic _timeIcon;
 
   // State สำหรับ "ดูเพิ่มเติม"
   bool _showAllTasks = false;
@@ -138,7 +138,7 @@ class _TaskTimeSectionState extends State<TaskTimeSection>
                 ),
                 child: Row(
                   children: [
-                    Icon(_timeIcon, size: 18, color: AppColors.textPrimary),
+                    HugeIcon(icon: _timeIcon, size: AppIconSize.md, color: AppColors.textPrimary),
                     AppSpacing.horizontalGapSm,
                     Expanded(
                       child: Text(
@@ -177,8 +177,8 @@ class _TaskTimeSectionState extends State<TaskTimeSection>
                       SizedBox(width: 8),
                       RotationTransition(
                         turns: _iconTurns,
-                        child: Icon(
-                          Iconsax.arrow_down_1,
+                        child: HugeIcon(
+                          icon: HugeIcons.strokeRoundedArrowDown01,
                           size: 20,
                           color: AppColors.secondaryText,
                         ),
@@ -259,7 +259,7 @@ class _TaskTimeSectionState extends State<TaskTimeSection>
               padding: EdgeInsets.only(top: AppSpacing.sm),
               child: AppTextButton(
                 text: _showAllTasks ? 'ย่อรายการ' : 'ดูเพิ่มอีก $remainingCount งาน',
-                icon: _showAllTasks ? Iconsax.arrow_up_2 : Iconsax.arrow_down_1,
+                icon: _showAllTasks ? HugeIcons.strokeRoundedArrowUp02 : HugeIcons.strokeRoundedArrowDown01,
                 onPressed: () {
                   setState(() {
                     _showAllTasks = !_showAllTasks;
@@ -304,19 +304,19 @@ class _TaskTimeSectionState extends State<TaskTimeSection>
     return AppColors.accent1;
   }
 
-  IconData _getTimeIcon() {
+  dynamic _getTimeIcon() {
     if (widget.timeBlock.contains('07:00') ||
         widget.timeBlock.contains('09:00') ||
         widget.timeBlock.contains('11:00')) {
-      return Iconsax.sun_1;
+      return HugeIcons.strokeRoundedSun01;
     } else if (widget.timeBlock.contains('13:00') ||
         widget.timeBlock.contains('15:00') ||
         widget.timeBlock.contains('17:00')) {
-      return Iconsax.sun;
+      return HugeIcons.strokeRoundedSun03;
     } else if (widget.timeBlock.contains('19:00') || widget.timeBlock.contains('21:00')) {
-      return Iconsax.moon;
+      return HugeIcons.strokeRoundedMoon02;
     } else {
-      return Iconsax.cloud;
+      return HugeIcons.strokeRoundedCloud;
     }
   }
 
@@ -380,7 +380,7 @@ class _TaskTimeSectionState extends State<TaskTimeSection>
 class TaskListSection extends StatelessWidget {
   final String title;
   final String? subtitle;
-  final IconData? icon;
+  final dynamic icon;
   final List<TaskLog> tasks;
   final ValueChanged<TaskLog>? onTaskTap;
   final void Function(TaskLog task, bool? checked)? onTaskCheckChanged;
@@ -407,7 +407,7 @@ class TaskListSection extends StatelessWidget {
           Row(
             children: [
               if (icon != null) ...[
-                Icon(icon, size: 20, color: AppColors.primary),
+                HugeIcon(icon: icon, size: AppIconSize.lg, color: AppColors.primary),
                 AppSpacing.horizontalGapSm,
               ],
               Expanded(
@@ -457,9 +457,9 @@ class TaskListSection extends StatelessWidget {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
-                        Iconsax.task_square,
-                        size: 48,
+                      HugeIcon(
+                        icon: HugeIcons.strokeRoundedTask01,
+                        size: AppIconSize.xxxl,
                         color: AppColors.secondaryText.withValues(alpha: 0.5),
                       ),
                       AppSpacing.verticalGapMd,

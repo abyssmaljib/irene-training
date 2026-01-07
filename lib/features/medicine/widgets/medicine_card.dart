@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -78,9 +78,9 @@ class MedicineCard extends StatelessWidget {
                   AppSpacing.verticalGapSm,
                   Row(
                     children: [
-                      Icon(
-                        Iconsax.clock,
-                        size: 14,
+                      HugeIcon(
+                        icon: HugeIcons.strokeRoundedClock01,
+                        size: AppIconSize.sm,
                         color: AppColors.textSecondary,
                       ),
                       SizedBox(width: 4),
@@ -165,9 +165,9 @@ class MedicineCard extends StatelessWidget {
 
     return Row(
       children: [
-        Icon(
-          Iconsax.health,
-          size: 14,
+        HugeIcon(
+          icon: HugeIcons.strokeRoundedMedicine01,
+          size: AppIconSize.sm,
           color: AppColors.primary,
         ),
         SizedBox(width: 4),
@@ -277,9 +277,9 @@ class MedicineCard extends StatelessWidget {
 
     return Row(
       children: [
-        Icon(
-          Iconsax.calendar,
-          size: 14,
+        HugeIcon(
+          icon: HugeIcons.strokeRoundedCalendar01,
+          size: AppIconSize.sm,
           color: AppColors.textSecondary,
         ),
         SizedBox(width: 6),

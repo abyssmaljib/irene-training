@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 
 /// Widget สำหรับเล่นวิดีโอจาก URL
@@ -116,9 +117,9 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Iconsax.video_slash,
-              size: 48,
+            HugeIcon(
+              icon: HugeIcons.strokeRoundedVideoOff,
+              size: AppIconSize.xxxl,
               color: AppColors.error,
             ),
             const SizedBox(height: 12),
@@ -131,7 +132,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
             const SizedBox(height: 8),
             TextButton.icon(
               onPressed: _initializeVideo,
-              icon: Icon(Iconsax.refresh, size: 18),
+              icon: HugeIcon(icon: HugeIcons.strokeRoundedRefresh, size: AppIconSize.md),
               label: Text('ลองใหม่'),
             ),
           ],
@@ -225,9 +226,9 @@ class _VideoThumbnailPlayerState extends State<VideoThumbnailPlayer> {
           alignment: Alignment.center,
           children: [
             // Video icon background
-            Icon(
-              Iconsax.video,
-              size: 64,
+            HugeIcon(
+              icon: HugeIcons.strokeRoundedVideo01,
+              size: AppIconSize.display,
               color: AppColors.secondaryText.withValues(alpha: 0.3),
             ),
 
@@ -245,9 +246,9 @@ class _VideoThumbnailPlayerState extends State<VideoThumbnailPlayer> {
                   ),
                 ],
               ),
-              child: Icon(
-                Iconsax.play5,
-                size: 32,
+              child: HugeIcon(
+                icon: HugeIcons.strokeRoundedPlay,
+                size: AppIconSize.xxl,
                 color: Colors.white,
               ),
             ),
@@ -301,7 +302,7 @@ class FullScreenVideoPlayer extends StatelessWidget {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Iconsax.close_circle, color: Colors.white),
+          icon: HugeIcon(icon: HugeIcons.strokeRoundedCancelCircle, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),

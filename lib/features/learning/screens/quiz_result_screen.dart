@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -47,8 +47,8 @@ class QuizResultScreen extends StatelessWidget {
                           : AppColors.tagFailedBg,
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(
-                      isPassed ? Iconsax.cup5 : Iconsax.emoji_sad5,
+                    child: HugeIcon(
+                      icon: isPassed ? HugeIcons.strokeRoundedChampion : HugeIcons.strokeRoundedSad01,
                       size: 64,
                       color: isPassed ? AppColors.success : AppColors.error,
                     ),

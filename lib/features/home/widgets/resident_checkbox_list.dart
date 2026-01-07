@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -103,8 +103,8 @@ class ResidentCheckboxList extends StatelessWidget {
             ),
             child: Column(
               children: [
-                Icon(
-                  Iconsax.user_remove,
+                HugeIcon(
+                  icon: HugeIcons.strokeRoundedUserRemove01,
                   size: 48,
                   color: AppColors.secondaryText,
                 ),
@@ -224,23 +224,23 @@ class _ResidentListItem extends StatelessWidget {
                           fit: BoxFit.cover,
                           placeholder: (context, url) => Container(
                             color: AppColors.alternate,
-                            child: Icon(
-                              Iconsax.user,
+                            child: HugeIcon(
+                              icon: HugeIcons.strokeRoundedUser,
                               color: AppColors.secondaryText,
                             ),
                           ),
                           errorWidget: (context, url, error) => Container(
                             color: AppColors.alternate,
-                            child: Icon(
-                              Iconsax.user,
+                            child: HugeIcon(
+                              icon: HugeIcons.strokeRoundedUser,
                               color: AppColors.secondaryText,
                             ),
                           ),
                         )
                       : Container(
                           color: AppColors.alternate,
-                          child: Icon(
-                            Iconsax.user,
+                          child: HugeIcon(
+                            icon: HugeIcons.strokeRoundedUser,
                             color: AppColors.secondaryText,
                           ),
                         ),

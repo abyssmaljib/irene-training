@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/theme/app_spacing.dart';
@@ -10,7 +10,7 @@ enum BadgeStatus { passed, pending, failed, neutral }
 class StatusBadge extends StatelessWidget {
   final String text;
   final BadgeStatus status;
-  final IconData? icon;
+  final dynamic icon;
 
   const StatusBadge({
     super.key,
@@ -20,19 +20,19 @@ class StatusBadge extends StatelessWidget {
   });
 
   // Factory constructors for convenience
-  factory StatusBadge.passed({String text = 'ผ่านแล้ว', IconData? icon = Iconsax.tick_circle}) {
+  factory StatusBadge.passed({String text = 'ผ่านแล้ว', dynamic icon = HugeIcons.strokeRoundedCheckmarkCircle02}) {
     return StatusBadge(text: text, status: BadgeStatus.passed, icon: icon);
   }
 
-  factory StatusBadge.pending({String text = 'รอดำเนินการ', IconData? icon = Iconsax.clock}) {
+  factory StatusBadge.pending({String text = 'รอดำเนินการ', dynamic icon = HugeIcons.strokeRoundedClock01}) {
     return StatusBadge(text: text, status: BadgeStatus.pending, icon: icon);
   }
 
-  factory StatusBadge.failed({String text = 'ล้มเหลว', IconData? icon = Iconsax.close_circle5}) {
+  factory StatusBadge.failed({String text = 'ล้มเหลว', dynamic icon = HugeIcons.strokeRoundedCancel01}) {
     return StatusBadge(text: text, status: BadgeStatus.failed, icon: icon);
   }
 
-  factory StatusBadge.neutral({String text = 'ยังไม่เริ่ม', IconData? icon}) {
+  factory StatusBadge.neutral({String text = 'ยังไม่เริ่ม', dynamic icon}) {
     return StatusBadge(text: text, status: BadgeStatus.neutral, icon: icon);
   }
 
@@ -48,9 +48,9 @@ class StatusBadge extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
-            Icon(
-              icon,
-              size: 14,
+            HugeIcon(
+              icon: icon,
+              size: AppIconSize.sm,
               color: _getTextColor(),
             ),
             AppSpacing.horizontalGapXs,
@@ -140,9 +140,9 @@ class CategoryChip extends StatelessWidget {
               AppSpacing.horizontalGapXs,
               GestureDetector(
                 onTap: onRemove,
-                child: Icon(
-                  Iconsax.close_square,
-                  size: 16,
+                child: HugeIcon(
+                  icon: HugeIcons.strokeRoundedCancel02,
+                  size: AppIconSize.sm,
                   color: AppColors.surface,
                 ),
               ),
@@ -540,8 +540,8 @@ class SpatialStatusBadge extends StatelessWidget {
         ],
       ),
       child: Center(
-        child: Icon(
-          _getIcon(),
+        child: HugeIcon(
+          icon: _getIcon(),
           color: AppColors.secondaryBackground,
           size: iconSize,
         ),
@@ -562,16 +562,16 @@ class SpatialStatusBadge extends StatelessWidget {
     }
   }
 
-  IconData _getIcon() {
+  dynamic _getIcon() {
     switch (status) {
       case SpatialStatus.newResident:
-        return Iconsax.star_1;
+        return HugeIcons.strokeRoundedStar;
       case SpatialStatus.refer:
-        return Iconsax.hospital;
+        return HugeIcons.strokeRoundedHospital01;
       case SpatialStatus.home:
-        return Iconsax.home_2;
+        return HugeIcons.strokeRoundedHome01;
       case SpatialStatus.none:
-        return Iconsax.close_circle;
+        return HugeIcons.strokeRoundedCancelCircle;
     }
   }
 }

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
@@ -45,22 +45,34 @@ class ActivityLogSection extends ConsumerWidget {
         children: [
           // Header
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('บันทึกกิจกรรม', style: AppTypography.title),
-              TextButton(
-                onPressed: () {
+              Spacer(),
+              GestureDetector(
+                onTap: () {
                   navigateToActivityLog(
                     context,
                     residentId: residentId,
                     residentName: residentName,
                   );
                 },
-                child: Text(
-                  'ดูทั้งหมด',
-                  style: AppTypography.bodySmall.copyWith(
-                    color: AppColors.primary,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'ดูทั้งหมด',
+                      style: AppTypography.bodySmall.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    SizedBox(width: 2),
+                    HugeIcon(
+                      icon: HugeIcons.strokeRoundedArrowRight01,
+                      size: AppIconSize.sm,
+                      color: AppColors.primary,
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -118,7 +130,7 @@ class ActivityLogSection extends ConsumerWidget {
       child: Center(
         child: Column(
           children: [
-            Icon(Iconsax.warning_2, size: 32, color: AppColors.error),
+            HugeIcon(icon: HugeIcons.strokeRoundedAlert02, size: AppIconSize.xxl, color: AppColors.error),
             AppSpacing.verticalGapSm,
             Text(
               'เกิดข้อผิดพลาด',
@@ -152,10 +164,12 @@ class ActivityLogSection extends ConsumerWidget {
               color: AppColors.background,
               shape: BoxShape.circle,
             ),
-            child: Icon(
-              Iconsax.document_text,
-              size: 24,
-              color: AppColors.secondaryText,
+            child: Center(
+              child: HugeIcon(
+                icon: HugeIcons.strokeRoundedFileEdit,
+                size: AppIconSize.xl,
+                color: AppColors.secondaryText,
+              ),
             ),
           ),
           AppSpacing.verticalGapMd,
@@ -198,16 +212,18 @@ class ActivityLogSection extends ConsumerWidget {
           children: [
             // Tag icon
             Container(
-              width: 36,
-              height: 36,
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
                 color: _getTagColor(post).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(
-                _getTagIcon(post),
-                size: 18,
-                color: _getTagColor(post),
+              child: Center(
+                child: HugeIcon(
+                  icon: _getTagIcon(post),
+                  size: AppIconSize.md,
+                  color: _getTagColor(post),
+                ),
               ),
             ),
             AppSpacing.horizontalGapSm,
@@ -266,9 +282,9 @@ class ActivityLogSection extends ConsumerWidget {
                 if (post.hasImages)
                   Padding(
                     padding: EdgeInsets.only(right: AppSpacing.xs),
-                    child: Icon(Iconsax.image, size: 16, color: AppColors.secondaryText),
+                    child: HugeIcon(icon: HugeIcons.strokeRoundedImage01, size: AppIconSize.sm, color: AppColors.secondaryText),
                   ),
-                Icon(Iconsax.arrow_right_3, size: 16, color: AppColors.secondaryText),
+                HugeIcon(icon: HugeIcons.strokeRoundedArrowRight01, size: AppIconSize.sm, color: AppColors.secondaryText),
               ],
             ),
           ],
@@ -277,15 +293,15 @@ class ActivityLogSection extends ConsumerWidget {
     );
   }
 
-  IconData _getTagIcon(Post post) {
+  dynamic _getTagIcon(Post post) {
     final label = post.postTags.firstOrNull?.toLowerCase() ?? '';
-    if (label.contains('แผล') || label.contains('ทำแผล')) return Iconsax.health;
-    if (label.contains('กายภาพ')) return Iconsax.activity;
-    if (label.contains('ยา')) return Iconsax.bag_2;
-    if (label.contains('อาหาร')) return Iconsax.cake;
-    if (label.contains('กิจกรรม')) return Iconsax.music;
-    if (label.contains('ญาติ')) return Iconsax.people;
-    return Iconsax.document_text;
+    if (label.contains('แผล') || label.contains('ทำแผล')) return HugeIcons.strokeRoundedMedicine01;
+    if (label.contains('กายภาพ')) return HugeIcons.strokeRoundedActivity01;
+    if (label.contains('ยา')) return HugeIcons.strokeRoundedShoppingBag01;
+    if (label.contains('อาหาร')) return HugeIcons.strokeRoundedRestaurant01;
+    if (label.contains('กิจกรรม')) return HugeIcons.strokeRoundedMusicNote01;
+    if (label.contains('ญาติ')) return HugeIcons.strokeRoundedUserGroup;
+    return HugeIcons.strokeRoundedFileEdit;
   }
 
   Color _getTagColor(Post post) {

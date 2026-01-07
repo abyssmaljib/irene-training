@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
@@ -299,7 +299,7 @@ class _QuizScreenState extends State<QuizScreen> {
           toolbarHeight: 72,
           titleSpacing: 0,
           leading: IconButton(
-            icon: const Icon(Iconsax.close_square),
+            icon: HugeIcon(icon: HugeIcons.strokeRoundedCancelSquare),
             onPressed: () async {
               final navigator = Navigator.of(context);
               final shouldPop = await _onWillPop();
@@ -327,8 +327,8 @@ class _QuizScreenState extends State<QuizScreen> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    Iconsax.timer_1,
+                  HugeIcon(
+                    icon: HugeIcons.strokeRoundedTimer01,
                     size: 16,
                     color: _timerTextColor,
                   ),

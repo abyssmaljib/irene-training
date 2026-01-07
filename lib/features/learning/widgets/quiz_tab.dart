@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -40,17 +40,17 @@ class QuizTab extends StatelessWidget {
               Row(
                 children: [
                   _buildInfoChip(
-                    icon: Iconsax.document_text,
+                    icon: HugeIcons.strokeRoundedFileEdit,
                     label: '10 ข้อ',
                   ),
                   AppSpacing.horizontalGapSm,
                   _buildInfoChip(
-                    icon: Iconsax.timer_1,
+                    icon: HugeIcons.strokeRoundedTimer01,
                     label: '10 นาที',
                   ),
                   AppSpacing.horizontalGapSm,
                   _buildInfoChip(
-                    icon: Iconsax.tick_circle,
+                    icon: HugeIcons.strokeRoundedCheckmarkCircle02,
                     label: 'ผ่าน 8/10',
                   ),
                 ],
@@ -66,7 +66,7 @@ class QuizTab extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Iconsax.tick_circle, color: AppColors.success, size: 18),
+                      HugeIcon(icon: HugeIcons.strokeRoundedCheckmarkCircle02, color: AppColors.success, size: AppIconSize.md),
                       AppSpacing.horizontalGapSm,
                       Text(
                         'ผ่านแล้ว! คะแนนสูงสุด ${topicDetail.posttestScore ?? 0}/10',
@@ -159,9 +159,9 @@ class QuizTab extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
-                            Iconsax.timer_1,
-                            size: 16,
+                          HugeIcon(
+                            icon: HugeIcons.strokeRoundedTimer01,
+                            size: AppIconSize.sm,
                             color: AppColors.tagPendingText,
                           ),
                           AppSpacing.horizontalGapXs,
@@ -190,8 +190,8 @@ class QuizTab extends StatelessWidget {
                         borderRadius: AppRadius.smallRadius,
                       ),
                     ),
-                    icon: Icon(
-                      topicDetail.isPassed ? Iconsax.refresh : Iconsax.edit_2,
+                    icon: HugeIcon(
+                      icon: topicDetail.isPassed ? HugeIcons.strokeRoundedRefresh : HugeIcons.strokeRoundedEdit02,
                       color: AppColors.surface,
                     ),
                     label: Text(
@@ -216,7 +216,7 @@ class QuizTab extends StatelessWidget {
     return quizHistory.length + 1; // +1 for history header
   }
 
-  Widget _buildInfoChip({required IconData icon, required String label}) {
+  Widget _buildInfoChip({required dynamic icon, required String label}) {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: AppSpacing.sm + 2, vertical: AppSpacing.xs + 2),
       decoration: BoxDecoration(
@@ -227,7 +227,7 @@ class QuizTab extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: AppColors.secondaryText),
+          HugeIcon(icon: icon, size: AppIconSize.sm, color: AppColors.secondaryText),
           AppSpacing.horizontalGapXs,
           Text(
             label,
@@ -245,9 +245,9 @@ class QuizTab extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Iconsax.clock,
-            size: 64,
+          HugeIcon(
+            icon: HugeIcons.strokeRoundedClock01,
+            size: AppIconSize.display,
             color: AppColors.secondaryText.withValues(alpha: 0.5),
           ),
           AppSpacing.verticalGapMd,

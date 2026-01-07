@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -203,8 +203,8 @@ class _ClockOutSurveyFormState extends State<ClockOutSurveyForm> {
               onTap: () => onChanged(starValue),
               child: Padding(
                 padding: EdgeInsets.symmetric(horizontal: AppSpacing.xs),
-                child: Icon(
-                  isSelected ? Iconsax.star1 : Iconsax.star,
+                child: HugeIcon(
+                  icon: isSelected ? HugeIcons.strokeRoundedStar : HugeIcons.strokeRoundedStar,
                   color: isSelected ? AppColors.warning : AppColors.secondaryText,
                   size: 40,
                 ),
@@ -308,12 +308,12 @@ class _ClockOutSurveyFormState extends State<ClockOutSurveyForm> {
                 : Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
-                        Iconsax.logout,
+                      HugeIcon(
+                        icon: HugeIcons.strokeRoundedLogout01,
                         color: isEnabled
                             ? Colors.white
                             : AppColors.secondaryText,
-                        size: 22,
+                        size: AppIconSize.lg,
                       ),
                       const SizedBox(width: 10),
                       Text(

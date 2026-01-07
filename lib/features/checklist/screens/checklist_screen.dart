@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -396,7 +396,7 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
       ),
       child: Row(
         children: [
-          Icon(_getViewModeIcon(viewMode), color: AppColors.primary, size: 20),
+          HugeIcon(icon: _getViewModeIcon(viewMode), color: AppColors.primary, size: AppIconSize.lg),
           AppSpacing.horizontalGapSm,
           Expanded(
             child: Column(
@@ -435,16 +435,16 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
     );
   }
 
-  IconData _getViewModeIcon(TaskViewMode mode) {
+  dynamic _getViewModeIcon(TaskViewMode mode) {
     switch (mode) {
       case TaskViewMode.upcoming:
-        return Iconsax.timer_1;
+        return HugeIcons.strokeRoundedTimer01;
       case TaskViewMode.all:
-        return Iconsax.task_square;
+        return HugeIcons.strokeRoundedTask01;
       case TaskViewMode.problem:
-        return Iconsax.warning_2;
+        return HugeIcons.strokeRoundedAlert02;
       case TaskViewMode.myDone:
-        return Iconsax.tick_circle;
+        return HugeIcons.strokeRoundedCheckmarkCircle02;
     }
   }
 
@@ -467,8 +467,8 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
           width: 40,
           height: 40,
           alignment: Alignment.center,
-          child: Icon(
-            _getViewModeIcon(currentMode),
+          child: HugeIcon(
+            icon: _getViewModeIcon(currentMode),
             color: AppColors.primary,
             size: 22,
           ),
@@ -508,7 +508,7 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Iconsax.warning_2,
+            HugeIcon(icon: HugeIcons.strokeRoundedAlert02,
                 size: 48, color: AppColors.error.withValues(alpha: 0.5)),
             AppSpacing.verticalGapMd,
             Text(
@@ -518,7 +518,7 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
             AppSpacing.verticalGapSm,
             TextButton.icon(
               onPressed: () => refreshTasks(ref),
-              icon: const Icon(Iconsax.refresh),
+              icon: HugeIcon(icon: HugeIcons.strokeRoundedRefresh),
               label: const Text('ลองใหม่'),
             ),
           ],
@@ -579,7 +579,7 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Iconsax.warning_2,
+            HugeIcon(icon: HugeIcons.strokeRoundedAlert02,
                 size: 48, color: AppColors.error.withValues(alpha: 0.5)),
             AppSpacing.verticalGapMd,
             Text(
@@ -589,7 +589,7 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
             AppSpacing.verticalGapSm,
             TextButton.icon(
               onPressed: () => refreshTasks(ref),
-              icon: const Icon(Iconsax.refresh),
+              icon: HugeIcon(icon: HugeIcons.strokeRoundedRefresh),
               label: const Text('ลองใหม่'),
             ),
           ],

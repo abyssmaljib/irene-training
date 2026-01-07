@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -83,8 +83,8 @@ class _ResidentDetailScreenState extends ConsumerState<ResidentDetailScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Iconsax.warning_2,
+            HugeIcon(
+              icon: HugeIcons.strokeRoundedAlert02,
               size: 64,
               color: AppColors.error,
             ),
@@ -108,7 +108,7 @@ class _ResidentDetailScreenState extends ConsumerState<ResidentDetailScreen> {
               onPressed: () {
                 ref.invalidate(residentDetailProvider(widget.residentId));
               },
-              icon: Icon(Iconsax.refresh),
+              icon: HugeIcon(icon: HugeIcons.strokeRoundedRefresh),
               label: Text('ลองใหม่'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
@@ -177,6 +177,9 @@ class _ResidentDetailScreenState extends ConsumerState<ResidentDetailScreen> {
           resident: resident,
           vitalSign: vitalSignAsync.valueOrNull,
           isLoadingVitalSign: vitalSignAsync.isLoading,
+          onVitalSignUpdated: () {
+            ref.invalidate(latestVitalSignProvider(widget.residentId));
+          },
         );
       case DetailViewType.clinical:
         return ClinicalView(
@@ -213,7 +216,7 @@ class _ResidentDetailScreenState extends ConsumerState<ResidentDetailScreen> {
                 ),
                 SizedBox(height: AppSpacing.lg),
                 _buildOptionItem(
-                  icon: Iconsax.edit,
+                  icon: HugeIcons.strokeRoundedEdit02,
                   label: 'แก้ไขข้อมูล',
                   onTap: () {
                     Navigator.pop(context);
@@ -223,7 +226,7 @@ class _ResidentDetailScreenState extends ConsumerState<ResidentDetailScreen> {
                   },
                 ),
                 _buildOptionItem(
-                  icon: Iconsax.document_text,
+                  icon: HugeIcons.strokeRoundedFileEdit,
                   label: 'ดูประวัติทั้งหมด',
                   onTap: () {
                     Navigator.pop(context);
@@ -233,7 +236,7 @@ class _ResidentDetailScreenState extends ConsumerState<ResidentDetailScreen> {
                   },
                 ),
                 _buildOptionItem(
-                  icon: Iconsax.printer,
+                  icon: HugeIcons.strokeRoundedPrinter,
                   label: 'พิมพ์รายงาน',
                   onTap: () {
                     Navigator.pop(context);
@@ -251,12 +254,12 @@ class _ResidentDetailScreenState extends ConsumerState<ResidentDetailScreen> {
   }
 
   Widget _buildOptionItem({
-    required IconData icon,
+    required dynamic icon,
     required String label,
     required VoidCallback onTap,
   }) {
     return ListTile(
-      leading: Icon(icon, color: AppColors.primary),
+      leading: HugeIcon(icon: icon, color: AppColors.primary),
       title: Text(
         label,
         style: AppTypography.body.copyWith(

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -86,7 +86,11 @@ class _ShiftSummaryScreenState extends ConsumerState<ShiftSummaryScreen> {
               final summary = summaries[index];
               return MonthlySummaryCard(
                 summary: summary,
-                onTap: () => _showDetailPopup(summary.month, summary.year),
+                onTap: () => _showDetailPopup(
+                  summary.month,
+                  summary.year,
+                  monthlySummary: summary,
+                ),
               );
             },
           ),
@@ -108,40 +112,56 @@ class _ShiftSummaryScreenState extends ConsumerState<ShiftSummaryScreen> {
         ),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          _buildHeaderCell('เดือน', flex: 2),
-          _buildHeaderCell('เช้า'),
-          _buildHeaderCell('ดึก'),
-          _buildHeaderCell('รวม'),
-          _buildHeaderCell('WD'),
-          _buildHeaderCell('OT'),
-          _buildHeaderCell('DD'),
-          _buildHeaderCell('Inc'),
-          _buildHeaderCell('S'),
-          _buildHeaderCell('A'),
-          _buildHeaderCell('Sup'),
-          _buildHeaderCell('+'),
-          _buildHeaderCell('-'),
+          // เดือน
+          Expanded(
+            flex: 2,
+            child: Text(
+              'เดือน',
+              style: AppTypography.caption.copyWith(
+                color: AppColors.secondaryText,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          // รวม
+          SizedBox(
+            width: 50,
+            child: Text(
+              'รวม',
+              style: AppTypography.caption.copyWith(
+                color: AppColors.secondaryText,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          SizedBox(width: AppSpacing.md),
+          // WD
+          SizedBox(
+            width: 50,
+            child: Text(
+              'WD',
+              style: AppTypography.caption.copyWith(
+                color: AppColors.secondaryText,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          SizedBox(width: AppSpacing.md),
+          // Empty space for metrics
+          Expanded(flex: 3, child: SizedBox()),
         ],
       ),
     );
   }
 
-  Widget _buildHeaderCell(String label, {int flex = 1}) {
-    return Expanded(
-      flex: flex,
-      child: Text(
-        label,
-        style: AppTypography.caption.copyWith(
-          color: AppColors.secondaryText,
-          fontWeight: FontWeight.w600,
-        ),
-        textAlign: flex > 1 ? TextAlign.start : TextAlign.center,
-      ),
-    );
-  }
-
-  void _showDetailPopup(int month, int year, {int? highlightDDRecordId}) {
+  void _showDetailPopup(
+    int month,
+    int year, {
+    int? highlightDDRecordId,
+    dynamic monthlySummary,
+  }) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -150,6 +170,7 @@ class _ShiftSummaryScreenState extends ConsumerState<ShiftSummaryScreen> {
         month: month,
         year: year,
         highlightDDRecordId: highlightDDRecordId,
+        monthlySummary: monthlySummary,
       ),
     );
   }
@@ -177,9 +198,9 @@ class _ShiftSummaryScreenState extends ConsumerState<ShiftSummaryScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Iconsax.calendar,
-            size: 64,
+          HugeIcon(
+            icon: HugeIcons.strokeRoundedCalendar01,
+            size: AppIconSize.display,
             color: AppColors.secondaryText.withValues(alpha: 0.5),
           ),
           SizedBox(height: AppSpacing.md),
@@ -199,9 +220,9 @@ class _ShiftSummaryScreenState extends ConsumerState<ShiftSummaryScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Iconsax.warning_2,
-            size: 64,
+          HugeIcon(
+            icon: HugeIcons.strokeRoundedAlert02,
+            size: AppIconSize.display,
             color: AppColors.error,
           ),
           SizedBox(height: AppSpacing.md),

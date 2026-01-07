@@ -1,7 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:lottie/lottie.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -76,7 +76,7 @@ class _RequiredPostsScreenState extends ConsumerState<RequiredPostsScreen> {
           style: AppTypography.title,
         ),
         leading: IconButton(
-          icon: Icon(Iconsax.arrow_left, color: AppColors.primaryText),
+          icon: HugeIcon(icon: HugeIcons.strokeRoundedArrowLeft01, color: AppColors.primaryText),
           onPressed: () => Navigator.pop(context, false),
         ),
       ),
@@ -261,7 +261,7 @@ class _RequiredPostsScreenState extends ConsumerState<RequiredPostsScreen> {
           backgroundImage:
               post.photoUrl != null ? NetworkImage(post.photoUrl!) : null,
           child: post.photoUrl == null
-              ? Icon(Iconsax.user, color: AppColors.primary, size: 20)
+              ? HugeIcon(icon: HugeIcons.strokeRoundedUser, color: AppColors.primary, size: AppIconSize.lg)
               : null,
         ),
         SizedBox(width: 12),
@@ -347,7 +347,7 @@ class _RequiredPostsScreenState extends ConsumerState<RequiredPostsScreen> {
                     ? NetworkImage(post.residentPictureUrl!)
                     : null,
                 child: post.residentPictureUrl == null
-                    ? Icon(Iconsax.user, color: AppColors.primary, size: 22)
+                    ? HugeIcon(icon: HugeIcons.strokeRoundedUser, color: AppColors.primary, size: AppIconSize.lg)
                     : null,
               ),
               SizedBox(width: 8),
@@ -411,7 +411,7 @@ class _RequiredPostsScreenState extends ConsumerState<RequiredPostsScreen> {
                   height: 200,
                   width: 200,
                   color: AppColors.background,
-                  child: Icon(Iconsax.image, color: AppColors.secondaryText),
+                  child: HugeIcon(icon: HugeIcons.strokeRoundedImage01, color: AppColors.secondaryText),
                 ),
               ),
             ),
@@ -518,7 +518,7 @@ class _RequiredPostsScreenState extends ConsumerState<RequiredPostsScreen> {
               child: Text('$choice : $text', style: AppTypography.body),
             ),
             if (isCorrect)
-              Icon(Iconsax.verify, color: const Color(0xFF005460), size: 24),
+              HugeIcon(icon: HugeIcons.strokeRoundedCheckmarkBadge01, color: const Color(0xFF005460), size: AppIconSize.xl),
           ],
         ),
       ),
@@ -650,8 +650,8 @@ class _RequiredPostsScreenState extends ConsumerState<RequiredPostsScreen> {
                     _goToNextPost();
                   }
                 : null,
-            icon: Icon(
-              _isLastPost ? Iconsax.tick_circle : Iconsax.arrow_right,
+            icon: HugeIcon(
+              icon: _isLastPost ? HugeIcons.strokeRoundedCheckmarkCircle02 : HugeIcons.strokeRoundedArrowRight01,
               color: Colors.white,
             ),
             label: Text(

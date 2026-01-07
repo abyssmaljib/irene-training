@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/theme/app_spacing.dart';
@@ -17,7 +17,7 @@ class AppTextField extends StatefulWidget {
   final TextEditingController? controller;
   final bool obscureText;
   final bool enabled;
-  final IconData? prefixIcon;
+  final dynamic prefixIcon;
   final Widget? suffixIcon;
   final TextInputType? keyboardType;
   final ValueChanged<String>? onChanged;
@@ -130,15 +130,24 @@ class _AppTextFieldState extends State<AppTextField> {
               color: AppColors.textSecondary.withValues(alpha: 0.6),
             ),
             prefixIcon: widget.prefixIcon != null
-                ? Icon(
-                    widget.prefixIcon,
-                    color: _isFocused
-                        ? AppColors.primary
-                        : AppColors.textSecondary,
-                    size: 22,
+                ? Padding(
+                    padding: const EdgeInsets.only(left: 12, right: 8),
+                    child: HugeIcon(
+                      icon: widget.prefixIcon,
+                      color: _isFocused
+                          ? AppColors.primary
+                          : AppColors.textSecondary,
+                      size: AppIconSize.input,
+                    ),
                   )
                 : null,
+            prefixIconConstraints: widget.prefixIcon != null
+                ? const BoxConstraints(minWidth: 0, minHeight: 0)
+                : null,
             suffixIcon: widget.suffixIcon,
+            suffixIconConstraints: widget.suffixIcon != null
+                ? const BoxConstraints(minWidth: 0, minHeight: 0)
+                : null,
             isDense: widget.isDense,
             filled: true,
             fillColor: widget.enabled
@@ -191,9 +200,9 @@ class _AppTextFieldState extends State<AppTextField> {
           AppSpacing.verticalGapXs,
           Row(
             children: [
-              Icon(
-                Iconsax.warning_2,
-                size: 14,
+              HugeIcon(
+                icon: HugeIcons.strokeRoundedAlert02,
+                size: AppIconSize.sm,
                 color: AppColors.error,
               ),
               AppSpacing.horizontalGapXs,
@@ -256,16 +265,17 @@ class _PasswordFieldState extends State<PasswordField> {
       focusNode: widget.focusNode,
       textInputAction: widget.textInputAction,
       onSubmitted: widget.onSubmitted,
-      prefixIcon: Iconsax.lock,
-      suffixIcon: IconButton(
-        icon: Icon(
-          _obscureText ? Iconsax.eye_slash : Iconsax.eye,
-          color: AppColors.textSecondary,
-          size: 22,
+      prefixIcon: HugeIcons.strokeRoundedLockPassword,
+      suffixIcon: GestureDetector(
+        onTap: () => setState(() => _obscureText = !_obscureText),
+        child: Padding(
+          padding: const EdgeInsets.only(left: 8, right: 12),
+          child: HugeIcon(
+            icon: _obscureText ? HugeIcons.strokeRoundedViewOff : HugeIcons.strokeRoundedView,
+            color: AppColors.textSecondary,
+            size: AppIconSize.input,
+          ),
         ),
-        onPressed: () {
-          setState(() => _obscureText = !_obscureText);
-        },
       ),
     );
   }
@@ -322,23 +332,26 @@ class _SearchFieldState extends State<SearchField> {
     return AppTextField(
       controller: _controller,
       hintText: widget.hintText,
-      prefixIcon: Iconsax.search_normal,
+      prefixIcon: HugeIcons.strokeRoundedSearch01,
       onChanged: widget.onChanged,
       isDense: widget.isDense,
       autofocus: widget.autofocus,
       focusNode: widget.focusNode,
       suffixIcon: _controller.text.isNotEmpty
-          ? IconButton(
-              icon: Icon(
-                Iconsax.close_circle,
-                color: AppColors.textSecondary,
-                size: 20,
-              ),
-              onPressed: () {
+          ? GestureDetector(
+              onTap: () {
                 _controller.clear();
                 widget.onClear?.call();
                 widget.onChanged?.call('');
               },
+              child: Padding(
+                padding: const EdgeInsets.only(left: 8, right: 12),
+                child: HugeIcon(
+                  icon: HugeIcons.strokeRoundedCancelCircle,
+                  color: AppColors.textSecondary,
+                  size: AppIconSize.input,
+                ),
+              ),
             )
           : null,
     );

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -93,7 +93,7 @@ class _TimeBlockDetailScreenState extends State<TimeBlockDetailScreen> {
         backgroundColor: AppColors.surface,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Iconsax.arrow_left, color: AppColors.primaryText),
+          icon: HugeIcon(icon: HugeIcons.strokeRoundedArrowLeft01, color: AppColors.primaryText),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
@@ -115,8 +115,8 @@ class _TimeBlockDetailScreenState extends State<TimeBlockDetailScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Iconsax.calendar,
+          HugeIcon(
+            icon: HugeIcons.strokeRoundedCalendar01,
             size: 64,
             color: AppColors.secondaryText.withValues(alpha: 0.4),
           ),
@@ -182,8 +182,8 @@ class _TimeBlockDetailScreenState extends State<TimeBlockDetailScreen> {
                   color: AppColors.primary.withValues(alpha: 0.1),
                   borderRadius: AppRadius.smallRadius,
                 ),
-                child: const Icon(
-                  Iconsax.chart_2,
+                child: HugeIcon(
+                  icon: HugeIcons.strokeRoundedChart,
                   color: AppColors.primary,
                   size: 24,
                 ),
@@ -232,17 +232,17 @@ class _TimeBlockDetailScreenState extends State<TimeBlockDetailScreen> {
     final tasks = _blockTasks[block.timeBlock] ?? [];
 
     Color bgColor;
-    IconData statusIcon;
+    dynamic statusIcon;
 
     if (isComplete) {
       bgColor = AppColors.tagPassedBg;
-      statusIcon = Iconsax.tick_circle;
+      statusIcon = HugeIcons.strokeRoundedCheckmarkCircle02;
     } else if (hasStarted) {
       bgColor = AppColors.tagPendingBg;
-      statusIcon = Iconsax.clock;
+      statusIcon = HugeIcons.strokeRoundedClock01;
     } else {
       bgColor = AppColors.alternate.withValues(alpha: 0.3);
-      statusIcon = Iconsax.timer_pause;
+      statusIcon = HugeIcons.strokeRoundedPauseCircle;
     }
 
     return GestureDetector(
@@ -265,8 +265,8 @@ class _TimeBlockDetailScreenState extends State<TimeBlockDetailScreen> {
               children: [
                 // Icon + Time Block
                 Container(
-                  width: 44,
-                  height: 44,
+                  width: 40,
+                  height: 40,
                   decoration: BoxDecoration(
                     color: bgColor,
                     borderRadius: AppRadius.smallRadius,
@@ -350,8 +350,8 @@ class _TimeBlockDetailScreenState extends State<TimeBlockDetailScreen> {
                     AnimatedRotation(
                       turns: isExpanded ? 0.5 : 0,
                       duration: const Duration(milliseconds: 200),
-                      child: Icon(
-                        Iconsax.arrow_down_1,
+                      child: HugeIcon(
+                        icon: HugeIcons.strokeRoundedArrowDown01,
                         color: AppColors.secondaryText,
                         size: 16,
                       ),

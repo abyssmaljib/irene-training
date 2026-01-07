@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart' hide Badge;
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -392,8 +392,8 @@ class _BadgeEarnedDialogState extends State<BadgeEarnedDialog>
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
-                            Iconsax.star1,
+                          HugeIcon(
+                            icon: HugeIcons.strokeRoundedStar,
                             size: 20,
                             color: rarityColor,
                           ),

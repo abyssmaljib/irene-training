@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -63,7 +63,7 @@ class TaskCard extends StatelessWidget {
                         Row(
                           children: [
                             if (showResident && task.residentName != null) ...[
-                              Icon(Iconsax.user,
+                              HugeIcon(icon: HugeIcons.strokeRoundedUser,
                                   size: 12, color: AppColors.secondaryText),
                               const SizedBox(width: 4),
                               Flexible(
@@ -102,7 +102,7 @@ class TaskCard extends StatelessWidget {
                       Row(
                         children: [
                           if (task.expectedDateTime != null) ...[
-                            Icon(Iconsax.clock,
+                            HugeIcon(icon: HugeIcons.strokeRoundedClock01,
                                 size: 12, color: AppColors.primary),
                             const SizedBox(width: 4),
                             Text(
@@ -146,8 +146,8 @@ class TaskCard extends StatelessWidget {
                         AppSpacing.verticalGapXs,
                         Row(
                           children: [
-                            Icon(
-                              task.isReferred ? Iconsax.hospital : Iconsax.tick_circle,
+                            HugeIcon(
+                              icon: task.isReferred ? HugeIcons.strokeRoundedHospital01 : HugeIcons.strokeRoundedCheckmarkCircle02,
                               size: 12,
                               color: task.isReferred ? AppColors.secondary : AppColors.tagPassedText,
                             ),
@@ -192,8 +192,8 @@ class TaskCard extends StatelessWidget {
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Icon(
-                                Iconsax.quote_up,
+                              HugeIcon(
+                                icon: HugeIcons.strokeRoundedQuoteUp,
                                 size: 14,
                                 color: AppColors.error,
                               ),
@@ -286,8 +286,8 @@ class TaskCard extends StatelessWidget {
           color: AppColors.tagPendingBg,
           borderRadius: BorderRadius.circular(6),
         ),
-        child: const Icon(
-          Iconsax.danger,
+        child: HugeIcon(
+          icon: HugeIcons.strokeRoundedAlert02,
           color: AppColors.tagPendingText,
           size: 18,
         ),
@@ -302,8 +302,8 @@ class TaskCard extends StatelessWidget {
           color: AppColors.secondary,
           borderRadius: BorderRadius.circular(6),
         ),
-        child: const Icon(
-          Iconsax.hospital,
+        child: HugeIcon(
+          icon: HugeIcons.strokeRoundedHospital01,
           color: Colors.white,
           size: 16,
         ),
@@ -329,7 +329,7 @@ class TaskCard extends StatelessWidget {
         ),
       ),
       child: isComplete
-          ? const Icon(Iconsax.tick_square, color: Colors.white, size: 16)
+          ? HugeIcon(icon: HugeIcons.strokeRoundedCheckmarkSquare02, color: Colors.white, size: AppIconSize.sm)
           : null,
     );
   }
@@ -338,23 +338,23 @@ class TaskCard extends StatelessWidget {
     Color bgColor;
     Color textColor;
     String text;
-    IconData icon;
+    dynamic icon;
 
     if (task.isProblem) {
       bgColor = AppColors.tagFailedBg;
       textColor = AppColors.tagFailedText;
       text = 'ติดปัญหา';
-      icon = Iconsax.warning_2;
+      icon = HugeIcons.strokeRoundedAlert02;
     } else if (task.isPostponed) {
       bgColor = AppColors.tagPendingBg;
       textColor = AppColors.tagPendingText;
       text = 'เลื่อน';
-      icon = Iconsax.calendar_1;
+      icon = HugeIcons.strokeRoundedCalendar01;
     } else if (task.isReferred) {
       bgColor = AppColors.secondary.withValues(alpha: 0.2);
       textColor = AppColors.secondary;
       text = 'ไม่อยู่ศูนย์';
-      icon = Iconsax.hospital;
+      icon = HugeIcons.strokeRoundedHospital01;
     } else {
       return const SizedBox.shrink();
     }
@@ -368,7 +368,7 @@ class TaskCard extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 10, color: textColor),
+          HugeIcon(icon: icon, size: AppIconSize.xs, color: textColor),
           const SizedBox(width: 4),
           Text(
             text,
@@ -409,7 +409,7 @@ class TaskCard extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Iconsax.user_tag, size: 10, color: Color(0xFF6750A4)),
+          HugeIcon(icon: HugeIcons.strokeRoundedUserAccount, size: AppIconSize.xs, color: Color(0xFF6750A4)),
           const SizedBox(width: 2),
           Text(
             task.assignedRoleName!,
@@ -478,8 +478,8 @@ class TaskCard extends StatelessWidget {
       items.add(
         Padding(
           padding: EdgeInsets.only(top: items.isEmpty ? 0 : 6),
-          child: Icon(
-            Iconsax.camera,
+          child: HugeIcon(
+            icon: HugeIcons.strokeRoundedCamera01,
             size: 18,
             color: AppColors.tertiary,
           ),
@@ -492,8 +492,8 @@ class TaskCard extends StatelessWidget {
       items.add(
         Padding(
           padding: EdgeInsets.only(top: items.isEmpty ? 0 : 6),
-          child: Icon(
-            Iconsax.document_text,
+          child: HugeIcon(
+            icon: HugeIcons.strokeRoundedFileEdit,
             size: 18,
             color: AppColors.tertiary,
           ),
@@ -584,7 +584,7 @@ class TaskCard extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Iconsax.repeat, size: 12, color: const Color(0xFF5D4A00)),
+          HugeIcon(icon: HugeIcons.strokeRoundedRepeat, size: AppIconSize.xs, color: const Color(0xFF5D4A00)),
           const SizedBox(width: 4),
           Text(
             text,
@@ -698,7 +698,7 @@ class TaskCard extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Iconsax.arrow_circle_left, size: 14, color: AppColors.textPrimary),
+          HugeIcon(icon: HugeIcons.strokeRoundedArrowTurnBackward, size: AppIconSize.sm, color: AppColors.textPrimary),
           const SizedBox(width: 4),
           Text(
             'เลื่อนมาจาก',
@@ -732,7 +732,7 @@ class TaskCard extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Iconsax.arrow_circle_right, size: 14, color: AppColors.textPrimary),
+          HugeIcon(icon: HugeIcons.strokeRoundedArrowTurnForward, size: AppIconSize.sm, color: AppColors.textPrimary),
           const SizedBox(width: 4),
           Text(
             'ถูกเลื่อน',

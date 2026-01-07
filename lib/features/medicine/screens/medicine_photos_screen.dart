@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -135,10 +135,10 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
           width: 40,
           height: 40,
           alignment: Alignment.center,
-          child: Icon(
-            Iconsax.clipboard_text,
+          child: HugeIcon(
+            icon: HugeIcons.strokeRoundedClipboard,
             color: AppColors.primary,
-            size: 22,
+            size: AppIconSize.lg,
           ),
         ),
       ),
@@ -161,8 +161,8 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
               elevation: 0,
               leading: IconButton(
                 onPressed: () => Navigator.pop(context, _hasDataChanged),
-                icon: Icon(
-                  Iconsax.arrow_left,
+                icon: HugeIcon(
+                  icon: HugeIcons.strokeRoundedArrowLeft01,
                   color: AppColors.primaryText,
                 ),
               ),
@@ -189,15 +189,15 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
                   onPressed: () {
                     setState(() => _showOverlay = !_showOverlay);
                   },
-                  icon: Icon(
-                    _showOverlay ? Iconsax.eye : Iconsax.eye_slash,
+                  icon: HugeIcon(
+                    icon: _showOverlay ? HugeIcons.strokeRoundedView : HugeIcons.strokeRoundedViewOff,
                     color: _showOverlay ? AppColors.primary : AppColors.textSecondary,
                   ),
                   tooltip: _showOverlay ? 'ซ่อนจำนวนเม็ดยา' : 'แสดงจำนวนเม็ดยา',
                 ),
                 // Toggle to medicine list (styled like checklist view toggle)
                 _buildViewToggle(),
-                SizedBox(width: AppSpacing.md), // Padding เท่ากับหน้า post/task
+                SizedBox(width: AppSpacing.md),
               ],
               expandedHeight: 270,
               flexibleSpace: FlexibleSpaceBar(
@@ -275,9 +275,9 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Iconsax.image,
-              size: 64,
+            HugeIcon(
+              icon: HugeIcons.strokeRoundedImage01,
+              size: AppIconSize.display,
               color: AppColors.textSecondary,
             ),
             AppSpacing.verticalGapMd,

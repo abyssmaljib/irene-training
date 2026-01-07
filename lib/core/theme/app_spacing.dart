@@ -78,6 +78,27 @@ class AppRadius {
   static final BorderRadius fullRadius = BorderRadius.circular(full);
 }
 
+/// Icon Size tokens
+/// Standardized icon sizes for consistency across the app
+class AppIconSize {
+  // Inline icons (inside text, tags, small badges)
+  static const double xs = 10.0;    // Tiny badges, status indicators
+  static const double sm = 14.0;    // Tags, inline text icons
+
+  // Standard icons (buttons, inputs, list items)
+  static const double input = 20.0; // Input field prefix/suffix icons
+  static const double md = 18.0;    // Default for most UI elements
+  static const double lg = 20.0;    // Action buttons
+
+  // Header/Avatar icons
+  static const double xl = 20.0;    // Navigation, swipe actions, headers
+
+  // Empty state & decorative icons
+  static const double xxl = 32.0;   // Card placeholders
+  static const double xxxl = 48.0;  // Empty states
+  static const double display = 64.0; // Large empty states, hero icons
+}
+
 /// Shadow presets
 class AppShadows {
   // Subtle shadow - for inputs, hover states

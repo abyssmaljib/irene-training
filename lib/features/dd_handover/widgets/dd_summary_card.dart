@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/services/user_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -113,10 +113,10 @@ class _DDSummaryCardState extends ConsumerState<DDSummaryCard> {
               // Header
               Row(
                 children: [
-                  Icon(
-                    Iconsax.calendar_tick,
+                  HugeIcon(
+                    icon: HugeIcons.strokeRoundedCalendarCheckIn01,
                     color: AppColors.warning,
-                    size: 24,
+                    size: AppIconSize.xl,
                   ),
                   SizedBox(width: AppSpacing.sm),
                   Expanded(
@@ -127,10 +127,10 @@ class _DDSummaryCardState extends ConsumerState<DDSummaryCard> {
                       ),
                     ),
                   ),
-                  Icon(
-                    Iconsax.arrow_right_3,
+                  HugeIcon(
+                    icon: HugeIcons.strokeRoundedArrowRight01,
                     color: AppColors.secondaryText,
-                    size: 20,
+                    size: AppIconSize.lg,
                   ),
                 ],
               ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 
 /// Day Picker - เลือกวัน 3 วัน (เลื่อนตาม selectedDate)
@@ -114,9 +115,9 @@ class DayPicker extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Iconsax.calendar_1,
-              size: 18,
+            HugeIcon(
+              icon: HugeIcons.strokeRoundedCalendar01,
+              size: AppIconSize.md,
               color: AppColors.textSecondary,
             ),
             SizedBox(width: 8),
@@ -153,9 +154,9 @@ class DayPicker extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Iconsax.calendar_tick,
-              size: 18,
+            HugeIcon(
+              icon: HugeIcons.strokeRoundedCalendarCheckIn01,
+              size: AppIconSize.md,
               color: isToday ? AppColors.primary : AppColors.textSecondary,
             ),
             SizedBox(width: 8),
@@ -235,9 +236,9 @@ class DayPicker extends StatelessWidget {
           children: [
             // Left arrow
             if (showArrow && isLeftArrow)
-              Icon(
-                Iconsax.arrow_left_2,
-                size: 12,
+              HugeIcon(
+                icon: HugeIcons.strokeRoundedArrowLeft01,
+                size: AppIconSize.xs,
                 color: isToday ? AppColors.primary : AppColors.textSecondary,
               ),
 
@@ -297,9 +298,9 @@ class DayPicker extends StatelessWidget {
 
             // Right arrow
             if (showArrow && !isLeftArrow)
-              Icon(
-                Iconsax.arrow_right_3,
-                size: 12,
+              HugeIcon(
+                icon: HugeIcons.strokeRoundedArrowRight01,
+                size: AppIconSize.xs,
                 color: isToday ? AppColors.primary : AppColors.textSecondary,
               ),
           ],

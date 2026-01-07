@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -110,7 +110,7 @@ class TaskFilterDrawer extends ConsumerWidget {
                       ),
                       child: Row(
                         children: [
-                          Icon(Iconsax.info_circle,
+                          HugeIcon(icon: HugeIcons.strokeRoundedInformationCircle,
                               color: AppColors.tagPendingText, size: 20),
                           AppSpacing.horizontalGapSm,
                           Expanded(
@@ -135,7 +135,7 @@ class TaskFilterDrawer extends ConsumerWidget {
                       // Shift type
                       if (shift.shiftType != null) ...[
                         _InfoRow(
-                          icon: Iconsax.clock,
+                          icon: HugeIcons.strokeRoundedClock01,
                           label: 'เวร',
                           value: shift.shiftType!,
                         ),
@@ -144,7 +144,7 @@ class TaskFilterDrawer extends ConsumerWidget {
                       // Zones
                       if (shift.hasZoneFilter) ...[
                         _InfoRow(
-                          icon: Iconsax.location,
+                          icon: HugeIcons.strokeRoundedLocation01,
                           label: 'โซน',
                           value: '${shift.zones.length} โซน',
                         ),
@@ -153,7 +153,7 @@ class TaskFilterDrawer extends ConsumerWidget {
                       // Residents
                       if (shift.hasResidentFilter) ...[
                         _InfoRow(
-                          icon: Iconsax.user,
+                          icon: HugeIcons.strokeRoundedUser,
                           label: 'ผู้พักอาศัย',
                           value: '${shift.selectedResidentIds.length} คน',
                         ),
@@ -168,7 +168,7 @@ class TaskFilterDrawer extends ConsumerWidget {
                           ),
                           child: Row(
                             children: [
-                              Icon(Iconsax.global,
+                              HugeIcon(icon: HugeIcons.strokeRoundedGlobe,
                                   color: AppColors.primary, size: 20),
                               AppSpacing.horizontalGapSm,
                               Expanded(
@@ -217,7 +217,7 @@ class TaskFilterDrawer extends ConsumerWidget {
           refreshTasks(ref);
           Navigator.of(context).pop();
         },
-        icon: const Icon(Iconsax.refresh),
+        icon: HugeIcon(icon: HugeIcons.strokeRoundedRefresh),
         label: const Text('รีเฟรชข้อมูล'),
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.primary,
@@ -246,8 +246,8 @@ class _ViewModeOption extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       onTap: onTap,
-      leading: Icon(
-        _getIcon(),
+      leading: HugeIcon(
+        icon: _getIcon(),
         color: isSelected ? AppColors.primary : AppColors.secondaryText,
       ),
       title: Text(
@@ -282,22 +282,22 @@ class _ViewModeOption extends StatelessWidget {
     );
   }
 
-  IconData _getIcon() {
+  dynamic _getIcon() {
     switch (mode) {
       case TaskViewMode.upcoming:
-        return Iconsax.timer_1;
+        return HugeIcons.strokeRoundedTimer01;
       case TaskViewMode.all:
-        return Iconsax.task_square;
+        return HugeIcons.strokeRoundedTask01;
       case TaskViewMode.problem:
-        return Iconsax.warning_2;
+        return HugeIcons.strokeRoundedAlert02;
       case TaskViewMode.myDone:
-        return Iconsax.tick_circle;
+        return HugeIcons.strokeRoundedCheckmarkCircle02;
     }
   }
 }
 
 class _InfoRow extends StatelessWidget {
-  final IconData icon;
+  final dynamic icon;
   final String label;
   final String value;
 
@@ -311,7 +311,7 @@ class _InfoRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, size: 16, color: AppColors.secondaryText),
+        HugeIcon(icon: icon, size: AppIconSize.sm, color: AppColors.secondaryText),
         AppSpacing.horizontalGapSm,
         Text(
           '$label:',
@@ -596,9 +596,9 @@ class _TaskTypeFilterSectionState extends ConsumerState<_TaskTypeFilterSection> 
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         if (isSelected) ...[
-                          Icon(
-                            Iconsax.tick_circle,
-                            size: 14,
+                          HugeIcon(
+                            icon: HugeIcons.strokeRoundedCheckmarkCircle02,
+                            size: AppIconSize.sm,
                             color: AppColors.primary,
                           ),
                           SizedBox(width: 6),
@@ -657,10 +657,10 @@ class _RoleOption extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Icon(
-                  isSelected ? Iconsax.record_circle : Iconsax.record,
+                HugeIcon(
+                  icon: isSelected ? HugeIcons.strokeRoundedCheckmarkCircle02 : HugeIcons.strokeRoundedCircle,
                   color: isSelected ? AppColors.primary : AppColors.secondaryText,
-                  size: 20,
+                  size: AppIconSize.lg,
                 ),
                 AppSpacing.horizontalGapMd,
                 Expanded(

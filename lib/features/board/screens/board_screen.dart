@@ -1,7 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:lottie/lottie.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -221,7 +221,7 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Iconsax.user, size: 14, color: AppColors.primary),
+          HugeIcon(icon: HugeIcons.strokeRoundedUser, size: AppIconSize.sm, color: AppColors.primary),
           SizedBox(width: 4),
           Text(
             name,
@@ -235,7 +235,7 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
             onTap: () {
               PostFilterNotifier(ref).clearSelectedResident();
             },
-            child: Icon(Iconsax.close_circle, size: 14, color: AppColors.primary),
+            child: HugeIcon(icon: HugeIcons.strokeRoundedCancelCircle, size: AppIconSize.sm, color: AppColors.primary),
           ),
         ],
       ),
@@ -261,24 +261,24 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
           width: 40,
           height: 40,
           alignment: Alignment.center,
-          child: Icon(
-            _getViewModeIcon(currentMode),
+          child: HugeIcon(
+            icon: _getViewModeIcon(currentMode),
             color: AppColors.primary,
-            size: 22,
+            size: AppIconSize.lg,
           ),
         ),
       ),
     );
   }
 
-  IconData _getViewModeIcon(PostFilterType mode) {
+  dynamic _getViewModeIcon(PostFilterType mode) {
     switch (mode) {
       case PostFilterType.all:
-        return Iconsax.document_text;
+        return HugeIcons.strokeRoundedFileEdit;
       case PostFilterType.unacknowledged:
-        return Iconsax.notification_bing;
+        return HugeIcons.strokeRoundedNotification02;
       case PostFilterType.myPosts:
-        return Iconsax.user_edit;
+        return HugeIcons.strokeRoundedUserEdit01;
     }
   }
 
@@ -389,9 +389,9 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Iconsax.document,
-            size: 64,
+          HugeIcon(
+            icon: HugeIcons.strokeRoundedFile01,
+            size: AppIconSize.display,
             color: AppColors.secondaryText.withValues(alpha: 0.5),
           ),
           AppSpacing.verticalGapMd,
@@ -411,9 +411,9 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Iconsax.warning_2,
-            size: 64,
+          HugeIcon(
+            icon: HugeIcons.strokeRoundedAlert02,
+            size: AppIconSize.display,
             color: AppColors.error.withValues(alpha: 0.5),
           ),
           AppSpacing.verticalGapMd,
@@ -434,7 +434,7 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
           AppSpacing.verticalGapLg,
           ElevatedButton.icon(
             onPressed: () => refreshPosts(ref),
-            icon: Icon(Iconsax.refresh),
+            icon: HugeIcon(icon: HugeIcons.strokeRoundedRefresh),
             label: Text('ลองอีกครั้ง'),
           ),
         ],
@@ -449,7 +449,7 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
         _showCreatePostScreen();
       },
       backgroundColor: AppColors.primary,
-      child: Icon(Iconsax.add, color: Colors.white),
+      child: HugeIcon(icon: HugeIcons.strokeRoundedAdd01, color: Colors.white),
     );
   }
 
@@ -588,7 +588,7 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
         backgroundColor: AppColors.secondaryBackground,
         title: Text('รายละเอียดโพส', style: AppTypography.title),
         leading: IconButton(
-          icon: Icon(Iconsax.arrow_left, color: AppColors.primaryText),
+          icon: HugeIcon(icon: HugeIcons.strokeRoundedArrowLeft01, color: AppColors.primaryText),
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
@@ -606,10 +606,13 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
 
               if (!canEdit) return const SizedBox.shrink();
 
-              return IconButton(
-                icon: Icon(Iconsax.edit, color: AppColors.primary),
-                onPressed: () => _openEditPost(context, ref, post),
-                tooltip: 'แก้ไขโพส',
+              return Padding(
+                padding: const EdgeInsets.only(right: AppSpacing.md),
+                child: IconButton(
+                  icon: HugeIcon(icon: HugeIcons.strokeRoundedEdit01, color: AppColors.primary),
+                  onPressed: () => _openEditPost(context, ref, post),
+                  tooltip: 'แก้ไขโพส',
+                ),
               );
             },
             orElse: () => const SizedBox.shrink(),
@@ -755,7 +758,7 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
           backgroundImage:
               post.photoUrl != null ? NetworkImage(post.photoUrl!) : null,
           child: post.photoUrl == null
-              ? Icon(Iconsax.user, color: AppColors.primary, size: 20)
+              ? HugeIcon(icon: HugeIcons.strokeRoundedUser, color: AppColors.primary, size: AppIconSize.lg)
               : null,
         ),
         SizedBox(width: 12),
@@ -844,7 +847,7 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
                     ? NetworkImage(post.residentPictureUrl!)
                     : null,
                 child: post.residentPictureUrl == null
-                    ? Icon(Iconsax.user, color: AppColors.primary, size: 22)
+                    ? HugeIcon(icon: HugeIcons.strokeRoundedUser, color: AppColors.primary, size: AppIconSize.lg)
                     : null,
               ),
               SizedBox(width: 8),
@@ -933,7 +936,7 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
                     height: 200,
                     width: 200,
                     color: AppColors.background,
-                    child: Icon(Iconsax.image, color: AppColors.secondaryText),
+                    child: HugeIcon(icon: HugeIcons.strokeRoundedImage01, color: AppColors.secondaryText, size: AppIconSize.xl),
                   ),
                 ),
               ),
@@ -1065,7 +1068,7 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
               ),
             ),
             if (isCorrect)
-              Icon(Iconsax.verify, color: Color(0xFF005460), size: 24),
+              HugeIcon(icon: HugeIcons.strokeRoundedCheckmarkBadge01, color: Color(0xFF005460), size: AppIconSize.xl),
           ],
         ),
       ),
@@ -1157,8 +1160,8 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
                     ref.invalidate(postDetailProvider(widget.postId));
                   }
                 : null,
-            icon: Icon(
-              isLiked ? Iconsax.heart5 : Iconsax.heart,
+            icon: HugeIcon(
+              icon: isLiked ? HugeIcons.strokeRoundedFavourite : HugeIcons.strokeRoundedFavourite,
               color: isLiked ? AppColors.error : Colors.white,
             ),
             label: Text(
@@ -1351,7 +1354,7 @@ class _FullScreenImageViewerState extends State<_FullScreenImageViewer> {
       appBar: AppBar(
         backgroundColor: Colors.black,
         leading: IconButton(
-          icon: Icon(Iconsax.arrow_left, color: Colors.white),
+          icon: HugeIcon(icon: HugeIcons.strokeRoundedArrowLeft01, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
         title: widget.imageUrls.length > 1
@@ -1400,7 +1403,7 @@ class _FullScreenImageViewerState extends State<_FullScreenImageViewer> {
                 errorWidget: (context, url, error) => Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Iconsax.image, size: 48, color: Colors.white54),
+                    HugeIcon(icon: HugeIcons.strokeRoundedImage01, size: AppIconSize.xxxl, color: Colors.white54),
                     SizedBox(height: 8),
                     Text(
                       'ไม่สามารถโหลดรูปได้',

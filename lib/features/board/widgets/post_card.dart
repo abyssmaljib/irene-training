@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -111,7 +111,7 @@ class PostCard extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: color),
+          HugeIcon(icon: icon, size: AppIconSize.xs, color: color),
           AppSpacing.horizontalGapXs,
           Text(
             text,
@@ -125,25 +125,25 @@ class PostCard extends StatelessWidget {
     );
   }
 
-  (Color, Color, String, IconData) _getTypeStyle() {
+  (Color, Color, String, dynamic) _getTypeStyle() {
     if (post.isCritical) {
-      return (AppColors.error, AppColors.tagFailedBg, 'สำคัญ', Iconsax.warning_2);
+      return (AppColors.error, AppColors.tagFailedBg, 'สำคัญ', HugeIcons.strokeRoundedAlert02);
     }
     if (post.isPolicy) {
       return (AppColors.tagPendingText, AppColors.tagPendingBg, 'นโยบาย',
-          Iconsax.notification);
+          HugeIcons.strokeRoundedNotification02);
     }
     if (post.isInfo) {
       return (AppColors.tagNeutralText, AppColors.tagNeutralBg, 'ข้อมูล',
-          Iconsax.info_circle);
+          HugeIcons.strokeRoundedInformationCircle);
     }
     if (post.isCalendar) {
       return (AppColors.secondary, AppColors.accent2, 'นัดหมาย',
-          Iconsax.calendar_1);
+          HugeIcons.strokeRoundedCalendar01);
     }
     // FYI / General
     return (AppColors.tagNeutralText, AppColors.tagNeutralBg, 'ทั่วไป',
-        Iconsax.document_text);
+        HugeIcons.strokeRoundedFileEdit);
   }
 
   Widget _buildTitle() {
@@ -189,10 +189,10 @@ class PostCard extends StatelessWidget {
   }) {
     return Row(
       children: [
-        Icon(
-          Iconsax.send_2,
+        HugeIcon(
+          icon: HugeIcons.strokeRoundedSent,
           color: AppColors.secondaryText,
-          size: 14,
+          size: AppIconSize.sm,
         ),
         SizedBox(width: 4),
         Text(
@@ -230,7 +230,7 @@ class PostCard extends StatelessWidget {
           backgroundImage:
               post.photoUrl != null ? NetworkImage(post.photoUrl!) : null,
           child: post.photoUrl == null
-              ? Icon(Iconsax.user, size: 12, color: AppColors.primary)
+              ? HugeIcon(icon: HugeIcons.strokeRoundedUser, size: AppIconSize.xs, color: AppColors.primary)
               : null,
         ),
         AppSpacing.horizontalGapSm,
@@ -246,7 +246,7 @@ class PostCard extends StatelessWidget {
         if (post.hasQuiz) _buildQuizBadge(),
         if (post.hasImages) ...[
           AppSpacing.horizontalGapSm,
-          Icon(Iconsax.image, size: 16, color: AppColors.secondaryText),
+          HugeIcon(icon: HugeIcons.strokeRoundedImage01, size: AppIconSize.sm, color: AppColors.secondaryText),
         ],
         AppSpacing.horizontalGapMd,
         // Like button
@@ -265,7 +265,7 @@ class PostCard extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Iconsax.document_text, size: 12, color: AppColors.error),
+          HugeIcon(icon: HugeIcons.strokeRoundedFileEdit, size: AppIconSize.xs, color: AppColors.error),
           AppSpacing.horizontalGapXs,
           Text(
             'มี Quiz',
@@ -292,9 +292,9 @@ class PostCard extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Iconsax.tick_circle,
-              size: 16,
+            HugeIcon(
+              icon: HugeIcons.strokeRoundedCheckmarkCircle02,
+              size: AppIconSize.sm,
               color: isLiked ? AppColors.primary : AppColors.secondaryText,
             ),
             if (likeCount > 0) ...[
@@ -368,7 +368,7 @@ class _CancelLineButtonState extends State<_CancelLineButton> {
                 ),
               )
             else
-              Icon(Iconsax.danger, size: 14, color: AppColors.error),
+              HugeIcon(icon: HugeIcons.strokeRoundedAlert02, size: AppIconSize.sm, color: AppColors.error),
             SizedBox(width: 4),
             Text(
               'ยกเลิกการส่ง',

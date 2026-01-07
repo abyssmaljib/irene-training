@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -147,9 +147,9 @@ class _ResidentsFilterDrawerState extends State<ResidentsFilterDrawer> {
           ),
           child: Row(
             children: [
-              Icon(
-                Iconsax.search_normal,
-                size: 22,
+              HugeIcon(
+                icon: HugeIcons.strokeRoundedSearch01,
+                size: AppIconSize.lg,
                 color: AppColors.secondaryText,
               ),
               SizedBox(width: 12),
@@ -181,7 +181,7 @@ class _ResidentsFilterDrawerState extends State<ResidentsFilterDrawer> {
           // Section header
           Row(
             children: [
-              Icon(Iconsax.location, size: 18, color: AppColors.secondaryText),
+              HugeIcon(icon: HugeIcons.strokeRoundedLocation01, size: AppIconSize.md, color: AppColors.secondaryText),
               AppSpacing.horizontalGapSm,
               Text(
                 'Zone',
@@ -243,9 +243,9 @@ class _ResidentsFilterDrawerState extends State<ResidentsFilterDrawer> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (isSelected) ...[
-                        Icon(
-                          Iconsax.tick_circle,
-                          size: 14,
+                        HugeIcon(
+                          icon: HugeIcons.strokeRoundedCheckmarkCircle02,
+                          size: AppIconSize.sm,
                           color: AppColors.primary,
                         ),
                         SizedBox(width: 6),
@@ -283,7 +283,7 @@ class _ResidentsFilterDrawerState extends State<ResidentsFilterDrawer> {
           // Section header
           Row(
             children: [
-              Icon(Iconsax.status, size: 18, color: AppColors.secondaryText),
+              HugeIcon(icon: HugeIcons.strokeRoundedDashboardSquare01, size: AppIconSize.md, color: AppColors.secondaryText),
               AppSpacing.horizontalGapSm,
               Text(
                 'สถานะพิเศษ',
@@ -320,9 +320,9 @@ class _ResidentsFilterDrawerState extends State<ResidentsFilterDrawer> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (isSelected) ...[
-                        Icon(
-                          Iconsax.tick_circle,
-                          size: 14,
+                        HugeIcon(
+                          icon: HugeIcons.strokeRoundedCheckmarkCircle02,
+                          size: AppIconSize.sm,
                           color: AppColors.primary,
                         ),
                         SizedBox(width: 6),

@@ -1,7 +1,7 @@
 import 'dart:math';
 import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -204,8 +204,8 @@ class _ClockOutDialogState extends State<ClockOutDialog> {
                     alignment: Alignment.topRight,
                     child: IconButton(
                       onPressed: () => Navigator.of(context).pop(false),
-                      icon: Icon(
-                        Iconsax.close_circle,
+                      icon: HugeIcon(
+                        icon: HugeIcons.strokeRoundedCancelCircle,
                         color: AppColors.secondaryText,
                         size: 28,
                       ),
@@ -387,8 +387,8 @@ class _ClockOutDialogState extends State<ClockOutDialog> {
       ),
       child: Row(
         children: [
-          Icon(
-            Iconsax.task_square,
+          HugeIcon(
+            icon: HugeIcons.strokeRoundedTask01,
             color: AppColors.tagFailedText,
             size: 20,
           ),
@@ -473,7 +473,7 @@ class _ClockOutDialogState extends State<ClockOutDialog> {
             Navigator.of(context).pop(false);
             widget.onViewPosts();
           },
-          icon: Iconsax.arrow_right,
+          icon: HugeIcons.strokeRoundedArrowRight01,
         ),
 
         AppSpacing.verticalGapSm,
@@ -532,7 +532,7 @@ class _ClockOutDialogState extends State<ClockOutDialog> {
             Navigator.of(context).pop(false);
             widget.onCreateHandover();
           },
-          icon: Iconsax.document_text,
+          icon: HugeIcons.strokeRoundedFileEdit,
         ),
 
         AppSpacing.verticalGapSm,
@@ -580,8 +580,8 @@ class _ClockOutDialogState extends State<ClockOutDialog> {
             color: AppColors.success.withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
-          child: Icon(
-            Iconsax.tick_circle,
+          child: HugeIcon(
+            icon: HugeIcons.strokeRoundedCheckmarkCircle02,
             color: AppColors.success,
             size: 64,
           ),

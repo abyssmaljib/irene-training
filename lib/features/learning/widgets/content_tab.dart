@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
@@ -139,9 +139,9 @@ class _ContentTabState extends State<ContentTab> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Iconsax.document_text,
-              size: 64,
+            HugeIcon(
+              icon: HugeIcons.strokeRoundedFileEdit,
+              size: AppIconSize.display,
               color: AppColors.secondaryText.withValues(alpha: 0.5),
             ),
             AppSpacing.verticalGapMd,
@@ -169,7 +169,7 @@ class _ContentTabState extends State<ContentTab> {
             color: AppColors.primaryBackground,
             child: Row(
               children: [
-                Icon(Iconsax.clock, size: 24, color: AppColors.secondaryText),
+                HugeIcon(icon: HugeIcons.strokeRoundedClock01, size: AppIconSize.xl, color: AppColors.secondaryText),
                 AppSpacing.horizontalGapSm,
                 Text(
                   'ใช้เวลาอ่านประมาณ ${widget.topicDetail.readingTimeMinutes} นาที',
@@ -286,11 +286,11 @@ class _ContentTabState extends State<ContentTab> {
                                   child: CircularProgressIndicator(strokeWidth: 2),
                                 )
                               else
-                                Icon(
-                                  showAsRead
-                                      ? Iconsax.tick_square
-                                      : Iconsax.tick_square,
-                                  size: 24,
+                                HugeIcon(
+                                  icon: showAsRead
+                                      ? HugeIcons.strokeRoundedCheckmarkSquare02
+                                      : HugeIcons.strokeRoundedCheckmarkSquare02,
+                                  size: AppIconSize.xl,
                                   color: _isHolding
                                       ? AppColors.error
                                       : showAsRead

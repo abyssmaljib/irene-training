@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -197,9 +197,9 @@ class _DDListScreenState extends ConsumerState<DDListScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Iconsax.calendar_tick,
-            size: 64,
+          HugeIcon(
+            icon: HugeIcons.strokeRoundedCalendarCheckIn01,
+            size: AppIconSize.display,
             color: AppColors.secondaryText.withValues(alpha: 0.5),
           ),
           SizedBox(height: AppSpacing.md),
@@ -219,9 +219,9 @@ class _DDListScreenState extends ConsumerState<DDListScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Iconsax.warning_2,
-            size: 64,
+          HugeIcon(
+            icon: HugeIcons.strokeRoundedAlert02,
+            size: AppIconSize.display,
             color: AppColors.error,
           ),
           SizedBox(height: AppSpacing.md),

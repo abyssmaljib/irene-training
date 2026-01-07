@@ -1,8 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_spacing.dart';
 
 /// Bottom bar สำหรับเลือกรูปภาพ/วีดีโอ (Camera + Gallery + Video)
 class ImagePickerBar extends StatelessWidget {
@@ -27,7 +28,7 @@ class ImagePickerBar extends StatelessWidget {
       children: [
         // Camera button
         _buildIconButton(
-          icon: Iconsax.camera,
+          icon: HugeIcons.strokeRoundedCamera01,
           onTap: disabled || isLoading ? null : onCameraTap,
           tooltip: 'ถ่ายรูป',
         ),
@@ -35,7 +36,7 @@ class ImagePickerBar extends StatelessWidget {
 
         // Gallery button
         _buildIconButton(
-          icon: Iconsax.gallery,
+          icon: HugeIcons.strokeRoundedImageComposition,
           onTap: disabled || isLoading ? null : onGalleryTap,
           tooltip: 'เลือกจากแกลเลอรี่',
         ),
@@ -43,7 +44,7 @@ class ImagePickerBar extends StatelessWidget {
 
         // Video button
         _buildIconButton(
-          icon: Iconsax.video,
+          icon: HugeIcons.strokeRoundedVideo01,
           onTap: disabled || isLoading ? null : onVideoTap,
           tooltip: 'เลือกวีดีโอ',
         ),
@@ -65,7 +66,7 @@ class ImagePickerBar extends StatelessWidget {
   }
 
   Widget _buildIconButton({
-    required IconData icon,
+    required dynamic icon,
     VoidCallback? onTap,
     String? tooltip,
   }) {
@@ -80,13 +81,13 @@ class ImagePickerBar extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(8),
           child: Container(
-            width: 44,
-            height: 44,
+            width: 40,
+            height: 40,
             alignment: Alignment.center,
-            child: Icon(
-              icon,
+            child: HugeIcon(
+              icon: icon,
               color: isDisabled ? AppColors.secondaryText : AppColors.primary,
-              size: 22,
+              size: AppIconSize.lg,
             ),
           ),
         ),

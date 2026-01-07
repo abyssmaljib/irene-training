@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
 
@@ -705,7 +705,7 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
           if (canCreateAdvanced && widget.onAdvancedTap != null)
             TextButton.icon(
               onPressed: widget.onAdvancedTap,
-              icon: Icon(Iconsax.edit_2, size: 16),
+              icon: HugeIcon(icon: HugeIcons.strokeRoundedEdit02, size: AppIconSize.sm),
               label: Text('แบบละเอียด'),
               style: TextButton.styleFrom(
                 foregroundColor: AppColors.primary,
@@ -768,9 +768,9 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
           : null,
       title: Row(
         children: [
-          Icon(
-            Iconsax.arrow_swap_horizontal,
-            size: 20,
+          HugeIcon(
+            icon: HugeIcons.strokeRoundedArrowLeftRight,
+            size: AppIconSize.lg,
             color: isHandover ? AppColors.success : AppColors.secondaryText,
           ),
           const SizedBox(width: 8),
@@ -823,9 +823,9 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
           ref.read(createPostProvider.notifier).setSendToFamily(value),
       title: Row(
         children: [
-          Icon(
-            Iconsax.people,
-            size: 20,
+          HugeIcon(
+            icon: HugeIcons.strokeRoundedUserGroup,
+            size: AppIconSize.lg,
             color: sendToFamily ? AppColors.primary : AppColors.secondaryText,
           ),
           const SizedBox(width: 8),
@@ -874,21 +874,21 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
             spacing: 8,
             children: [
               _buildIconButton(
-                icon: Iconsax.camera,
+                icon: HugeIcons.strokeRoundedCamera01,
                 onTap: _isUploading || state.isSubmitting || state.hasVideo
                     ? null
                     : _pickFromCamera,
                 tooltip: 'ถ่ายรูป',
               ),
               _buildIconButton(
-                icon: Iconsax.gallery,
+                icon: HugeIcons.strokeRoundedImageComposition,
                 onTap: _isUploading || state.isSubmitting || state.hasVideo
                     ? null
                     : _pickFromGallery,
                 tooltip: 'เลือกจากแกลเลอรี่',
               ),
               _buildIconButton(
-                icon: Iconsax.video,
+                icon: HugeIcons.strokeRoundedVideo01,
                 onTap: _isUploading || state.isSubmitting || state.hasImages
                     ? null
                     : _pickVideo,
@@ -934,7 +934,7 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
   }
 
   Widget _buildIconButton({
-    required IconData icon,
+    required dynamic icon,
     VoidCallback? onTap,
     String? tooltip,
   }) {
@@ -949,13 +949,13 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
           onTap: onTap,
           borderRadius: BorderRadius.circular(8),
           child: Container(
-            width: 44,
-            height: 44,
+            width: 40,
+            height: 40,
             alignment: Alignment.center,
-            child: Icon(
-              icon,
+            child: HugeIcon(
+              icon: icon,
               color: isDisabled ? AppColors.secondaryText : AppColors.primary,
-              size: 22,
+              size: AppIconSize.lg,
             ),
           ),
         ),
@@ -1016,9 +1016,9 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
                   : Container(
                       color: AppColors.background,
                       child: Center(
-                        child: Icon(
-                          Iconsax.video,
-                          size: 48,
+                        child: HugeIcon(
+                          icon: HugeIcons.strokeRoundedVideo01,
+                          size: AppIconSize.xxxl,
                           color: AppColors.secondaryText,
                         ),
                       ),
@@ -1035,10 +1035,10 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
                   color: Colors.black.withValues(alpha: 0.6),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(
-                  Iconsax.video_play5,
+                child: HugeIcon(
+                  icon: HugeIcons.strokeRoundedPlay,
                   color: Colors.white,
-                  size: 28,
+                  size: AppIconSize.xxl,
                 ),
               ),
             ),
@@ -1058,10 +1058,10 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
                   color: Colors.black.withValues(alpha: 0.6),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(
-                  Iconsax.close_circle5,
+                child: HugeIcon(
+                  icon: HugeIcons.strokeRoundedCancel01,
                   color: Colors.white,
-                  size: 20,
+                  size: AppIconSize.lg,
                 ),
               ),
             ),
@@ -1079,7 +1079,7 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Iconsax.video, size: 14, color: Colors.white),
+                  HugeIcon(icon: HugeIcons.strokeRoundedVideo01, size: AppIconSize.sm, color: Colors.white),
                   SizedBox(width: 4),
                   Text(
                     'วีดีโอ',
@@ -1545,9 +1545,9 @@ class _ResidentSuggestionsPopupState extends State<_ResidentSuggestionsPopup> {
                               ? CachedNetworkImageProvider(resident.pictureUrl!)
                               : null,
                           child: resident.pictureUrl == null
-                              ? Icon(
-                                  Iconsax.user,
-                                  size: 18,
+                              ? HugeIcon(
+                                  icon: HugeIcons.strokeRoundedUser,
+                                  size: AppIconSize.md,
                                   color: AppColors.secondaryText,
                                 )
                               : null,
@@ -1681,9 +1681,9 @@ class _VideoThumbnailWidgetState extends State<_VideoThumbnailWidget> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                Iconsax.video,
-                size: 48,
+              HugeIcon(
+                icon: HugeIcons.strokeRoundedVideo01,
+                size: AppIconSize.xxxl,
                 color: AppColors.secondaryText,
               ),
               SizedBox(height: 8),

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/services/user_service.dart';
@@ -212,7 +212,7 @@ class _AdvancedCreatePostScreenState
         backgroundColor: AppColors.surface,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Iconsax.arrow_left, color: AppColors.primaryText),
+          icon: HugeIcon(icon: HugeIcons.strokeRoundedArrowLeft01, color: AppColors.primaryText),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
@@ -430,17 +430,17 @@ class _AdvancedCreatePostScreenState
               spacing: 8,
               children: [
                 _buildIconButton(
-                  icon: Iconsax.camera,
+                  icon: HugeIcons.strokeRoundedCamera01,
                   onTap: _isSubmitting || state.hasVideo ? null : _pickFromCamera,
                   tooltip: 'ถ่ายรูป',
                 ),
                 _buildIconButton(
-                  icon: Iconsax.gallery,
+                  icon: HugeIcons.strokeRoundedImageComposition,
                   onTap: _isSubmitting || state.hasVideo ? null : _pickFromGallery,
                   tooltip: 'เลือกจากแกลเลอรี่',
                 ),
                 _buildIconButton(
-                  icon: Iconsax.video,
+                  icon: HugeIcons.strokeRoundedVideo01,
                   onTap: _isSubmitting || state.hasImages ? null : _pickVideo,
                   tooltip: 'เลือกวีดีโอ',
                 ),
@@ -483,7 +483,7 @@ class _AdvancedCreatePostScreenState
   }
 
   Widget _buildIconButton({
-    required IconData icon,
+    required dynamic icon,
     VoidCallback? onTap,
     String? tooltip,
   }) {
@@ -498,13 +498,13 @@ class _AdvancedCreatePostScreenState
           onTap: onTap,
           borderRadius: BorderRadius.circular(8),
           child: Container(
-            width: 44,
-            height: 44,
+            width: 40,
+            height: 40,
             alignment: Alignment.center,
-            child: Icon(
-              icon,
+            child: HugeIcon(
+              icon: icon,
               color: isDisabled ? AppColors.secondaryText : AppColors.primary,
-              size: 22,
+              size: AppIconSize.lg,
             ),
           ),
         ),
@@ -576,9 +576,9 @@ class _AdvancedCreatePostScreenState
       },
       title: Row(
         children: [
-          Icon(
-            Iconsax.people,
-            size: 20,
+          HugeIcon(
+            icon: HugeIcons.strokeRoundedUserGroup,
+            size: AppIconSize.lg,
             color: sendToFamily ? AppColors.primary : AppColors.secondaryText,
           ),
           const SizedBox(width: 8),
@@ -615,9 +615,9 @@ class _AdvancedCreatePostScreenState
         children: [
           // Video thumbnail or placeholder
           Center(
-            child: Icon(
-              Iconsax.video,
-              size: 48,
+            child: HugeIcon(
+              icon: HugeIcons.strokeRoundedVideo01,
+              size: AppIconSize.xxxl,
               color: AppColors.secondaryText,
             ),
           ),
@@ -640,7 +640,7 @@ class _AdvancedCreatePostScreenState
             top: 4,
             right: 4,
             child: IconButton(
-              icon: Icon(Iconsax.close_circle5, color: AppColors.error),
+              icon: HugeIcon(icon: HugeIcons.strokeRoundedCancel01, color: AppColors.error),
               onPressed: () {
                 ref.read(createPostProvider.notifier).clearVideo();
               },

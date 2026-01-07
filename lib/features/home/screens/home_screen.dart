@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -494,12 +494,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           ? Border.all(color: const Color(0xFFFFB300), width: 1.5)
                           : null,
                     ),
-                    child: Icon(
-                      _devMode ? Iconsax.code : Iconsax.code_1,
+                    child: HugeIcon(
+                      icon: HugeIcons.strokeRoundedSourceCode,
                       color: _devMode
                           ? const Color(0xFFE65100)
                           : AppColors.secondaryText,
-                      size: 20,
+                      size: AppIconSize.lg,
                     ),
                   ),
                 ),
@@ -706,7 +706,7 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Row(
                   children: [
-                    Icon(Iconsax.book_1, color: AppColors.secondary, size: 20),
+                    HugeIcon(icon: HugeIcons.strokeRoundedBook01, color: AppColors.secondary, size: AppIconSize.lg),
                     AppSpacing.horizontalGapSm,
                     Text('เรียนรู้ไตรมาสนี้', style: AppTypography.title),
                   ],
@@ -738,7 +738,7 @@ class _HomeScreenState extends State<HomeScreen> {
               AppSpacing.verticalGapSm,
               Row(
                 children: [
-                  Icon(Iconsax.warning_2, color: AppColors.warning, size: 14),
+                  HugeIcon(icon: HugeIcons.strokeRoundedAlert02, color: AppColors.warning, size: AppIconSize.sm),
                   AppSpacing.horizontalGapXs,
                   Text(
                     'มี $_topicsNotTested บทยังไม่สอบ',
@@ -769,7 +769,7 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               Row(
                 children: [
-                  Icon(Iconsax.document_text, color: AppColors.tertiary, size: 20),
+                  HugeIcon(icon: HugeIcons.strokeRoundedFileEdit, color: AppColors.tertiary, size: AppIconSize.lg),
                   AppSpacing.horizontalGapSm,
                   Text('ข่าวล่าสุด', style: AppTypography.title),
                 ],

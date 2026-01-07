@@ -1,5 +1,4 @@
-import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 
 /// Main tabs for the board screen - V3: เหลือ 2 tabs
 enum PostMainTab {
@@ -18,12 +17,12 @@ extension PostMainTabExtension on PostMainTab {
     }
   }
 
-  IconData get icon {
+  dynamic get icon {
     switch (this) {
       case PostMainTab.announcement:
-        return Iconsax.document_text;
+        return HugeIcons.strokeRoundedFileEdit;
       case PostMainTab.handover:
-        return Iconsax.refresh;
+        return HugeIcons.strokeRoundedRefresh;
     }
   }
 

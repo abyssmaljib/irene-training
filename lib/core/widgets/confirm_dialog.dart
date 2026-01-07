@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
@@ -29,7 +29,7 @@ class ConfirmDialogConfig {
   final String message;
   final String cancelText;
   final String confirmText;
-  final IconData icon; // icon เล็กด้านบน
+  final dynamic icon; // icon เล็กด้านบน
   final Color iconColor;
   final Color iconBackgroundColor;
   final String imageAsset; // รูปแมว
@@ -40,7 +40,7 @@ class ConfirmDialogConfig {
     required this.message,
     this.cancelText = 'ยกเลิก',
     this.confirmText = 'ยืนยัน',
-    this.icon = Iconsax.warning_2,
+    this.icon = HugeIcons.strokeRoundedAlert02,
     this.iconColor = AppColors.error,
     this.iconBackgroundColor = AppColors.tagFailedBg,
     this.imageAsset = 'assets/images/confirm_cat.webp',
@@ -56,7 +56,7 @@ class ConfirmDialogConfig {
           message: 'คุณต้องการออกจากระบบหรือไม่?',
           cancelText: 'ยกเลิก',
           confirmText: 'ออกจากระบบ',
-          icon: Iconsax.logout,
+          icon: HugeIcons.strokeRoundedLogout01,
         );
       case ConfirmDialogType.delete:
         return const ConfirmDialogConfig(
@@ -64,7 +64,7 @@ class ConfirmDialogConfig {
           message: 'คุณต้องการลบรายการนี้หรือไม่?\nการดำเนินการนี้ไม่สามารถยกเลิกได้',
           cancelText: 'ยกเลิก',
           confirmText: 'ลบ',
-          icon: Iconsax.trash,
+          icon: HugeIcons.strokeRoundedDelete01,
         );
       case ConfirmDialogType.exitQuiz:
         return const ConfirmDialogConfig(
@@ -72,7 +72,7 @@ class ConfirmDialogConfig {
           message: 'คุณต้องการออกจากการสอบหรือไม่?\nคำตอบที่ทำไว้จะไม่ถูกบันทึก',
           cancelText: 'ทำต่อ',
           confirmText: 'ออก',
-          icon: Iconsax.close_square,
+          icon: HugeIcons.strokeRoundedCancel02,
         );
       case ConfirmDialogType.warning:
         return const ConfirmDialogConfig(
@@ -80,7 +80,7 @@ class ConfirmDialogConfig {
           message: 'คุณแน่ใจหรือไม่ว่าต้องการดำเนินการนี้?',
           cancelText: 'ยกเลิก',
           confirmText: 'ยืนยัน',
-          icon: Iconsax.warning_2,
+          icon: HugeIcons.strokeRoundedAlert02,
           iconColor: Color(0xFFF59E0B),
           iconBackgroundColor: AppColors.tagPendingBg,
         );
@@ -112,7 +112,7 @@ class ConfirmDialog extends StatelessWidget {
     String? message,
     String? cancelText,
     String? confirmText,
-    IconData? icon,
+    dynamic icon,
     Color? iconColor,
     Color? iconBackgroundColor,
     String? imageAsset,
@@ -161,16 +161,16 @@ class ConfirmDialog extends StatelessWidget {
 
             // Icon เล็ก (ด้านบน)
             Container(
-              width: 44,
-              height: 44,
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
                 color: config.iconBackgroundColor,
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                config.icon,
+              child: HugeIcon(
+                icon: config.icon,
                 color: config.iconColor,
-                size: 22,
+                size: AppIconSize.lg,
               ),
             ),
 

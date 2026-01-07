@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../models/resident_detail.dart';
 import '../../models/vital_sign.dart';
 import '../../screens/vital_sign_log_screen.dart';
+import '../../screens/create_vital_sign_screen.dart';
 import 'vital_sign_snapshot.dart';
 import 'activity_log_section.dart';
 
@@ -14,12 +15,14 @@ class CareDashboardView extends StatelessWidget {
   final ResidentDetail resident;
   final VitalSign? vitalSign;
   final bool isLoadingVitalSign;
+  final VoidCallback? onVitalSignUpdated;
 
   const CareDashboardView({
     super.key,
     required this.resident,
     this.vitalSign,
     this.isLoadingVitalSign = false,
+    this.onVitalSignUpdated,
   });
 
   @override
@@ -39,11 +42,16 @@ class CareDashboardView extends StatelessWidget {
               onTapPulse: () => _showVitalDetail(context, 'Pulse'),
               onTapSpO2: () => _showVitalDetail(context, 'SpO2'),
               onTapTemp: () => _showVitalDetail(context, 'Temp'),
-              onTapViewAll: () => navigateToVitalSignLog(
-                context,
-                residentId: resident.id,
-                residentName: resident.name,
-              ),
+              onTapViewAll: () async {
+                final result = await navigateToVitalSignLog(
+                  context,
+                  residentId: resident.id,
+                  residentName: resident.name,
+                );
+                if (result == true) {
+                  onVitalSignUpdated?.call();
+                }
+              },
             )
           else
             EmptyVitalSign(
@@ -105,7 +113,7 @@ class CareDashboardView extends StatelessWidget {
     // Add status based on resident data
     if (resident.status == 'Stay') {
       statuses.add(_StatusItem(
-        iconData: Iconsax.tick_circle,
+        iconData: HugeIcons.strokeRoundedCheckmarkCircle02,
         label: 'พักอยู่',
         color: AppColors.tagPassedText,
         bgColor: AppColors.tagPassedBg,
@@ -114,7 +122,7 @@ class CareDashboardView extends StatelessWidget {
 
     if (resident.isFallRisk) {
       statuses.add(_StatusItem(
-        iconData: Iconsax.warning_2,
+        iconData: HugeIcons.strokeRoundedAlert02,
         label: 'เสี่ยงล้ม',
         color: AppColors.tagPendingText,
         bgColor: AppColors.tagPendingBg,
@@ -123,7 +131,7 @@ class CareDashboardView extends StatelessWidget {
 
     if (resident.isNPO) {
       statuses.add(_StatusItem(
-        iconData: Iconsax.forbidden_2,
+        iconData: HugeIcons.strokeRoundedCancel01,
         label: 'NPO',
         color: AppColors.tagFailedText,
         bgColor: AppColors.tagFailedBg,
@@ -161,7 +169,7 @@ class CareDashboardView extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(status.iconData, size: 14, color: status.color),
+          HugeIcon(icon: status.iconData, size: AppIconSize.sm, color: status.color),
           SizedBox(width: 4),
           Text(
             status.label,
@@ -186,18 +194,20 @@ class CareDashboardView extends StatelessWidget {
   }
 
   void _showAddVitalSign(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('เพิ่มสัญญาณชีพ - เร็วๆ นี้'),
-        backgroundColor: AppColors.primary,
-        behavior: SnackBarBehavior.floating,
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CreateVitalSignScreen(
+          residentId: resident.id,
+          residentName: resident.name,
+        ),
       ),
     );
   }
 }
 
 class _StatusItem {
-  final IconData iconData;
+  final dynamic iconData;
   final String label;
   final Color color;
   final Color bgColor;

@@ -69,6 +69,7 @@ class VitalSign {
   final int? spO2; // Oxygen Saturation
   final double? temp; // Temperature
   final int? respiratoryRate; // RR
+  final double? constipation; // Constipation days
   final DateTime createdAt;
 
   VitalSign({
@@ -80,6 +81,7 @@ class VitalSign {
     this.spO2,
     this.temp,
     this.respiratoryRate,
+    this.constipation,
     required this.createdAt,
   });
 
@@ -101,6 +103,7 @@ class VitalSign {
       spO2: json['O2'] as int?,
       temp: (json['Temp'] as num?)?.toDouble(),
       respiratoryRate: json['RR'] as int?,
+      constipation: (json['constipation'] as num?)?.toDouble(),
       createdAt: createdAt,
     );
   }

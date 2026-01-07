@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_spacing.dart' show AppSpacing, AppRadius;
+import '../../../../core/theme/app_spacing.dart' show AppSpacing, AppRadius, AppIconSize;
 import '../../providers/resident_detail_provider.dart';
 
 /// Segmented Control สำหรับเลือก View (Care, Clinical, Info)
@@ -17,9 +17,9 @@ class ViewSegmentedControl extends StatelessWidget {
   });
 
   static const _segments = [
-    (label: 'ดูแล', icon: Iconsax.heart, type: DetailViewType.care),
-    (label: 'คลินิก', icon: Iconsax.health, type: DetailViewType.clinical),
-    (label: 'ข้อมูล', icon: Iconsax.user, type: DetailViewType.info),
+    (label: 'ดูแล', icon: HugeIcons.strokeRoundedFlowerPot, type: DetailViewType.care),
+    (label: 'คลินิก', icon: HugeIcons.strokeRoundedClinic, type: DetailViewType.clinical),
+    (label: 'ข้อมูล', icon: HugeIcons.strokeRoundedUser, type: DetailViewType.info),
   ];
 
   @override
@@ -87,9 +87,9 @@ class ViewSegmentedControl extends StatelessWidget {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(
-                                  segment.icon,
-                                  size: 14,
+                                HugeIcon(
+                                  icon: segment.icon,
+                                  size: AppIconSize.md,
                                   color: isSelected ? AppColors.primary : AppColors.secondaryText,
                                 ),
                                 SizedBox(width: 4),

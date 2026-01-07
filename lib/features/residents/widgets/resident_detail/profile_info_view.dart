@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -81,7 +81,7 @@ class _ProfileInfoViewState extends ConsumerState<ProfileInfoView>
           // Profile Section
           _buildSection(
             title: 'ข้อมูลส่วนตัว',
-            icon: Iconsax.user,
+            icon: HugeIcons.strokeRoundedUser,
             children: [
               _buildInfoRow('ชื่อ-นามสกุล', 'คุณ${resident.name}'),
               _buildInfoRow(
@@ -116,7 +116,7 @@ class _ProfileInfoViewState extends ConsumerState<ProfileInfoView>
           // Medical Section
           _buildSection(
             title: 'ข้อมูลทางการแพทย์',
-            icon: Iconsax.health,
+            icon: HugeIcons.strokeRoundedHospital01,
             children: [
               _buildDiseaseChipsRow('โรคประจำตัว', resident.underlyingDiseases),
               _buildInfoRow('แพ้ยา/อาหาร', resident.foodDrugAllergy ?? '-'),
@@ -140,11 +140,11 @@ class _ProfileInfoViewState extends ConsumerState<ProfileInfoView>
           // Relatives Section
           _buildSection(
             title: 'ผู้ติดต่อ/ญาติ',
-            icon: Iconsax.people,
+            icon: HugeIcons.strokeRoundedUserGroup,
             children: [
               if (resident.relatives.isEmpty)
                 _buildPlaceholder(
-                  icon: Iconsax.user_add,
+                  icon: HugeIcons.strokeRoundedUserAdd01,
                   message: 'ไม่มีข้อมูล',
                   subtitle: 'ยังไม่ได้เพิ่มข้อมูลผู้ติดต่อ',
                 )
@@ -160,7 +160,7 @@ class _ProfileInfoViewState extends ConsumerState<ProfileInfoView>
           // Line Connection Section
           _buildSection(
             title: 'การเชื่อมต่อ',
-            icon: Iconsax.message,
+            icon: HugeIcons.strokeRoundedMessage01,
             children: [_buildLineConnectionRow(resident.isLineConnected)],
           ),
 
@@ -173,7 +173,7 @@ class _ProfileInfoViewState extends ConsumerState<ProfileInfoView>
 
   Widget _buildSection({
     required String title,
-    required IconData icon,
+    required dynamic icon,
     required List<Widget> children,
   }) {
     return Container(
@@ -196,7 +196,7 @@ class _ProfileInfoViewState extends ConsumerState<ProfileInfoView>
             ),
             child: Row(
               children: [
-                Icon(icon, color: AppColors.primary, size: 20),
+                HugeIcon(icon: icon, color: AppColors.primary, size: AppIconSize.lg),
                 AppSpacing.horizontalGapSm,
                 Text(title, style: AppTypography.title),
               ],
@@ -337,7 +337,7 @@ class _ProfileInfoViewState extends ConsumerState<ProfileInfoView>
   }
 
   Widget _buildPlaceholder({
-    required IconData icon,
+    required dynamic icon,
     required String message,
     required String subtitle,
   }) {
@@ -347,7 +347,7 @@ class _ProfileInfoViewState extends ConsumerState<ProfileInfoView>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Icon(icon, size: 40, color: AppColors.secondaryText),
+          HugeIcon(icon: icon, size: AppIconSize.xxxl, color: AppColors.secondaryText),
           AppSpacing.verticalGapSm,
           Text(
             message,
@@ -464,7 +464,7 @@ class _ProfileInfoViewState extends ConsumerState<ProfileInfoView>
           SizedBox(
             width: 24,
             child: relative.isKeyPerson
-                ? Icon(Iconsax.star1, color: Colors.amber, size: 18)
+                ? HugeIcon(icon: HugeIcons.strokeRoundedStar, color: Colors.amber, size: AppIconSize.md)
                 : null,
           ),
           // Name with nickname
@@ -489,7 +489,7 @@ class _ProfileInfoViewState extends ConsumerState<ProfileInfoView>
                     color: AppColors.primary.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(Iconsax.call, size: 18, color: AppColors.primary),
+                  child: HugeIcon(icon: HugeIcons.strokeRoundedCall, size: AppIconSize.md, color: AppColors.primary),
                 ),
               ),
             ),
@@ -537,9 +537,9 @@ class _ProfileInfoViewState extends ConsumerState<ProfileInfoView>
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  isConnected ? Iconsax.tick_circle : Iconsax.cloud_cross,
-                  size: 16,
+                HugeIcon(
+                  icon: isConnected ? HugeIcons.strokeRoundedCheckmarkCircle02 : HugeIcons.strokeRoundedCancel01,
+                  size: AppIconSize.sm,
                   color: isConnected
                       ? AppColors.tagPassedText
                       : AppColors.tagPendingText,

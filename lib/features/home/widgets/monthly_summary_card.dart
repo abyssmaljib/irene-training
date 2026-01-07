@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -41,7 +41,7 @@ class MonthlySummaryCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Icon(Iconsax.calendar_1, color: AppColors.primary, size: 20),
+                    HugeIcon(icon: HugeIcons.strokeRoundedCalendar01, color: AppColors.primary, size: AppIconSize.lg),
                     AppSpacing.horizontalGapSm,
                     Text('สรุปเวรเดือนนี้', style: AppTypography.title),
                   ],
@@ -56,10 +56,10 @@ class MonthlySummaryCard extends StatelessWidget {
                         ),
                       ),
                       AppSpacing.horizontalGapXs,
-                      Icon(
-                        Iconsax.arrow_right_3,
+                      HugeIcon(
+                        icon: HugeIcons.strokeRoundedArrowRight01,
                         color: AppColors.primary,
-                        size: 14,
+                        size: AppIconSize.sm,
                       ),
                     ],
                   ),
@@ -74,7 +74,7 @@ class MonthlySummaryCard extends StatelessWidget {
                 // Morning shifts
                 Expanded(
                   child: _buildShiftItem(
-                    icon: Iconsax.sun_1,
+                    icon: HugeIcons.strokeRoundedSun01,
                     iconColor: AppColors.warning,
                     label: 'เวรเช้า',
                     count: morningShifts,
@@ -91,7 +91,7 @@ class MonthlySummaryCard extends StatelessWidget {
                 // Night shifts
                 Expanded(
                   child: _buildShiftItem(
-                    icon: Iconsax.moon,
+                    icon: HugeIcons.strokeRoundedMoon02,
                     iconColor: AppColors.secondary,
                     label: 'เวรดึก',
                     count: nightShifts,
@@ -151,7 +151,7 @@ class MonthlySummaryCard extends StatelessWidget {
   }
 
   Widget _buildShiftItem({
-    required IconData icon,
+    required dynamic icon,
     required Color iconColor,
     required String label,
     required int count,
@@ -159,7 +159,7 @@ class MonthlySummaryCard extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(icon, color: iconColor, size: 20),
+        HugeIcon(icon: icon, color: iconColor, size: AppIconSize.lg),
         AppSpacing.horizontalGapSm,
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,

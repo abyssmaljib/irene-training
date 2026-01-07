@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../models/tarot_card.dart';
@@ -100,8 +100,8 @@ class TarotCoreValueCard extends StatelessWidget {
               ),
             ),
             // Tap hint
-            Icon(
-              Iconsax.finger_scan,
+            HugeIcon(
+              icon: HugeIcons.strokeRoundedTouchInteraction04,
               color: Colors.white.withValues(alpha: 0.4),
               size: 20,
             ),

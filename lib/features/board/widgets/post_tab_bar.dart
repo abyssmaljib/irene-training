@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../models/post_tab.dart';
 
@@ -42,9 +44,9 @@ class PostTabBar extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
-                      tab.icon,
-                      size: 18,
+                    HugeIcon(
+                      icon: tab.icon,
+                      size: AppIconSize.md,
                       color: isSelected
                           ? AppColors.primary
                           : AppColors.secondaryText,

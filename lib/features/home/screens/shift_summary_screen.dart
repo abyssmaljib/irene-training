@@ -1,9 +1,9 @@
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
-
+import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/buttons.dart';
 import '../models/clock_in_out.dart';
@@ -239,7 +239,7 @@ class _ShiftSummaryScreenState extends State<ShiftSummaryScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Iconsax.arrow_up_1, color: Colors.white),
+                  HugeIcon(icon: HugeIcons.strokeRoundedArrowUp01, color: Colors.white),
                   const SizedBox(width: 8),
                   Text(
                     'กลับไปดูรายละเอียดในเวร',
@@ -249,7 +249,7 @@ class _ShiftSummaryScreenState extends State<ShiftSummaryScreen> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const Icon(Iconsax.arrow_up_1, color: Colors.white),
+                  HugeIcon(icon: HugeIcons.strokeRoundedArrowUp01, color: Colors.white),
                 ],
               ),
             ),
@@ -414,7 +414,7 @@ class _ShiftSummaryScreenState extends State<ShiftSummaryScreen> {
               color: AppColors.alternate,
               border: Border.all(color: AppColors.primary),
             ),
-             child: const Icon(Iconsax.user, size: 20, color: AppColors.secondaryText),
+             child: HugeIcon(icon: HugeIcons.strokeRoundedUser, size: AppIconSize.lg, color: AppColors.secondaryText),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -444,7 +444,7 @@ class _ShiftSummaryScreenState extends State<ShiftSummaryScreen> {
           const SizedBox(height: 8),
           _SimpleRatingBar(
             value: _shiftScore,
-            icon: Iconsax.heart5,
+            icon: HugeIcons.strokeRoundedFavourite,
             color: AppColors.tertiary,
             onChanged: (v) => setState(() => _shiftScore = v),
           ),
@@ -453,7 +453,7 @@ class _ShiftSummaryScreenState extends State<ShiftSummaryScreen> {
           const SizedBox(height: 8),
           _SimpleRatingBar(
             value: _selfScore,
-            icon: Iconsax.star1,
+            icon: HugeIcons.strokeRoundedStar,
             color: AppColors.primary,
             onChanged: (v) => setState(() => _selfScore = v),
           ),
@@ -512,7 +512,7 @@ class _ShiftSummaryScreenState extends State<ShiftSummaryScreen> {
         children: [
           Row(
             children: [
-               Icon(Iconsax.warning_2, color: Colors.redAccent),
+               HugeIcon(icon: HugeIcons.strokeRoundedAlert02, color: Colors.redAccent),
                const SizedBox(width: 8),
                Text('งานที่ยังไม่เสร็จ ($_remainingTasks)', style: AppTypography.title.copyWith(color: Colors.redAccent)),
             ],
@@ -528,7 +528,7 @@ class _ShiftSummaryScreenState extends State<ShiftSummaryScreen> {
               return ListTile(
                 title: Text(task['task_title'] ?? '-', style: AppTypography.body.copyWith(fontWeight: FontWeight.bold)),
                 subtitle: Text('${task['resident_name'] ?? '-'} • ${task['timeBlock'] ?? '-'}', style: AppTypography.caption),
-                trailing: const Icon(Iconsax.arrow_right_3, size: 16),
+                trailing: HugeIcon(icon: HugeIcons.strokeRoundedArrowRight01, size: AppIconSize.sm),
                 dense: true,
               );
             },
@@ -545,7 +545,7 @@ class _ShiftSummaryScreenState extends State<ShiftSummaryScreen> {
       text: 'ลงเวร (เหลืออีก $_remainingTasks)',
       onPressed: isDisabled ? null : _handleClockOut,
       isLoading: _isClockingOut,
-      icon: Iconsax.logout,
+      icon: HugeIcons.strokeRoundedLogout01,
     );
   }
 }
@@ -568,7 +568,7 @@ class _GradientText extends StatelessWidget {
 
 class _SimpleRatingBar extends StatelessWidget {
   final int value;
-  final IconData icon;
+  final dynamic icon;
   final Color color;
   final ValueChanged<int> onChanged;
 
@@ -586,10 +586,10 @@ class _SimpleRatingBar extends StatelessWidget {
       children: List.generate(5, (index) {
         final i = index + 1;
         return IconButton(
-          icon: Icon(
-            icon,
+          icon: HugeIcon(
+            icon: icon,
             color: i <= value ? color : AppColors.alternate,
-            size: 32,
+            size: AppIconSize.xxl,
           ),
           onPressed: () => onChanged(i),
         );

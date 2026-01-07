@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
@@ -24,6 +24,13 @@ class VitalSignSnapshot extends StatelessWidget {
     this.onTapViewAll,
   });
 
+  /// Format datetime to Thai time string (convert to Bangkok timezone +7)
+  String _formatThaiTime(DateTime dt) {
+    // Convert to local time (Bangkok +7)
+    final localDt = dt.toLocal();
+    return '${localDt.hour.toString().padLeft(2, '0')}:${localDt.minute.toString().padLeft(2, '0')} น.';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -39,15 +46,7 @@ class VitalSignSnapshot extends StatelessWidget {
                 style: AppTypography.title,
               ),
               Spacer(),
-              if (vitalSign != null)
-                Text(
-                  vitalSign!.timeAgo,
-                  style: AppTypography.caption.copyWith(
-                    color: AppColors.secondaryText,
-                  ),
-                ),
-              if (onTapViewAll != null) ...[
-                SizedBox(width: 8),
+              if (onTapViewAll != null)
                 GestureDetector(
                   onTap: onTapViewAll,
                   child: Row(
@@ -61,15 +60,14 @@ class VitalSignSnapshot extends StatelessWidget {
                         ),
                       ),
                       SizedBox(width: 2),
-                      Icon(
-                        Iconsax.arrow_right_3,
-                        size: 14,
+                      HugeIcon(
+                        icon: HugeIcons.strokeRoundedArrowRight01,
+                        size: AppIconSize.sm,
                         color: AppColors.primary,
                       ),
                     ],
                   ),
                 ),
-              ],
             ],
           ),
         ),
@@ -83,7 +81,7 @@ class VitalSignSnapshot extends StatelessWidget {
             padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
             children: [
               _buildVitalCard(
-                icon: Iconsax.heart,
+                icon: HugeIcons.strokeRoundedFavourite,
                 iconColor: AppColors.error,
                 label: 'ความดัน',
                 value: vitalSign?.bpDisplay ?? '-',
@@ -94,7 +92,7 @@ class VitalSignSnapshot extends StatelessWidget {
               ),
               AppSpacing.horizontalGapSm,
               _buildVitalCard(
-                icon: Iconsax.activity,
+                icon: HugeIcons.strokeRoundedActivity01,
                 iconColor: AppColors.tertiary,
                 label: 'ชีพจร',
                 value: vitalSign?.pulseDisplay ?? '-',
@@ -104,7 +102,7 @@ class VitalSignSnapshot extends StatelessWidget {
               ),
               AppSpacing.horizontalGapSm,
               _buildVitalCard(
-                icon: Iconsax.cloud,
+                icon: HugeIcons.strokeRoundedCloud,
                 iconColor: AppColors.secondary,
                 label: 'SpO2',
                 value: vitalSign?.spO2Display ?? '-',
@@ -114,7 +112,7 @@ class VitalSignSnapshot extends StatelessWidget {
               ),
               AppSpacing.horizontalGapSm,
               _buildVitalCard(
-                icon: Iconsax.sun_1,
+                icon: HugeIcons.strokeRoundedSun01,
                 iconColor: AppColors.warning,
                 label: 'อุณหภูมิ',
                 value: vitalSign?.tempDisplay ?? '-',
@@ -125,12 +123,27 @@ class VitalSignSnapshot extends StatelessWidget {
             ],
           ),
         ),
+
+        // Time at bottom right
+        if (vitalSign != null)
+          Padding(
+            padding: EdgeInsets.only(right: AppSpacing.md, top: AppSpacing.xs),
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                _formatThaiTime(vitalSign!.createdAt),
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.secondaryText,
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }
 
   Widget _buildVitalCard({
-    required IconData icon,
+    required dynamic icon,
     required Color iconColor,
     required String label,
     required String value,
@@ -160,7 +173,7 @@ class VitalSignSnapshot extends StatelessWidget {
             // Icon + Label
             Row(
               children: [
-                Icon(icon, size: 14, color: iconColor),
+                HugeIcon(icon: icon, size: AppIconSize.sm, color: iconColor),
                 AppSpacing.horizontalGapXs,
                 Expanded(
                   child: Text(
@@ -310,10 +323,20 @@ class EmptyVitalSign extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Icon(
-            Iconsax.heart,
-            size: 48,
-            color: AppColors.secondaryText,
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: HugeIcon(
+                icon: HugeIcons.strokeRoundedFavourite,
+                size: AppIconSize.xl,
+                color: AppColors.secondaryText,
+              ),
+            ),
           ),
           AppSpacing.verticalGapSm,
           Text(
@@ -326,7 +349,7 @@ class EmptyVitalSign extends StatelessWidget {
             AppSpacing.verticalGapMd,
             TextButton.icon(
               onPressed: onAdd,
-              icon: Icon(Iconsax.add, size: 18),
+              icon: HugeIcon(icon: HugeIcons.strokeRoundedAdd01, size: AppIconSize.md),
               label: Text('เพิ่มสัญญาณชีพ'),
               style: TextButton.styleFrom(
                 foregroundColor: AppColors.primary,
