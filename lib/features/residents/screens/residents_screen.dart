@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
@@ -66,10 +67,29 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
   List<String>? _cachedZoneKeys;
   Map<String, List<_ResidentItem>>? _cachedGrouped;
 
+  // Realtime subscription
+  StreamSubscription<Map<int, ReportCompletionStatus>>? _reportStatusSubscription;
+
   @override
   void initState() {
     super.initState();
     _loadData();
+    _subscribeToRealtimeUpdates();
+  }
+
+  void _subscribeToRealtimeUpdates() {
+    // Subscribe to realtime updates
+    _reportCompletionService.subscribeToRealtimeUpdates();
+
+    // Listen to status stream
+    _reportStatusSubscription = _reportCompletionService.statusStream.listen((statusMap) {
+      if (mounted) {
+        setState(() {
+          _reportStatusMap = statusMap;
+          _invalidateCache();
+        });
+      }
+    });
   }
 
   /// Invalidate cache เมื่อ filter หรือ data เปลี่ยน
@@ -288,6 +308,8 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
 
   @override
   void dispose() {
+    _reportStatusSubscription?.cancel();
+    _reportCompletionService.unsubscribe();
     _searchController.dispose();
     _searchFocusNode.dispose();
     _scrollController.dispose();

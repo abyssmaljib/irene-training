@@ -107,7 +107,9 @@ class CollapsibleResidentHeader extends StatelessWidget {
   Widget _buildMiniAvatar() {
     return Container(
       color: AppColors.background,
-      child: HugeIcon(icon: HugeIcons.strokeRoundedUser, size: AppIconSize.sm, color: AppColors.secondaryText),
+      child: Center(
+        child: HugeIcon(icon: HugeIcons.strokeRoundedUser, size: AppIconSize.sm, color: AppColors.secondaryText),
+      ),
     );
   }
 
@@ -162,7 +164,9 @@ class CollapsibleResidentHeader extends StatelessWidget {
   Widget _buildDefaultAvatar() {
     return Container(
       color: AppColors.background,
-      child: HugeIcon(icon: HugeIcons.strokeRoundedUser, size: AppIconSize.xxl, color: AppColors.secondaryText),
+      child: Center(
+        child: HugeIcon(icon: HugeIcons.strokeRoundedUser, size: AppIconSize.xxl, color: AppColors.secondaryText),
+      ),
     );
   }
 

@@ -561,9 +561,11 @@ class _AdvancedEditPostScreenState
                         width: 100,
                         height: 100,
                         color: AppColors.background,
-                        child: HugeIcon(
-                          icon: HugeIcons.strokeRoundedImage01,
-                          color: AppColors.secondaryText,
+                        child: Center(
+                          child: HugeIcon(
+                            icon: HugeIcons.strokeRoundedImage01,
+                            color: AppColors.secondaryText,
+                          ),
                         ),
                       ),
                     ),

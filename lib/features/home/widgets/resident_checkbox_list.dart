@@ -224,24 +224,30 @@ class _ResidentListItem extends StatelessWidget {
                           fit: BoxFit.cover,
                           placeholder: (context, url) => Container(
                             color: AppColors.alternate,
-                            child: HugeIcon(
-                              icon: HugeIcons.strokeRoundedUser,
-                              color: AppColors.secondaryText,
+                            child: Center(
+                              child: HugeIcon(
+                                icon: HugeIcons.strokeRoundedUser,
+                                color: AppColors.secondaryText,
+                              ),
                             ),
                           ),
                           errorWidget: (context, url, error) => Container(
                             color: AppColors.alternate,
-                            child: HugeIcon(
-                              icon: HugeIcons.strokeRoundedUser,
-                              color: AppColors.secondaryText,
+                            child: Center(
+                              child: HugeIcon(
+                                icon: HugeIcons.strokeRoundedUser,
+                                color: AppColors.secondaryText,
+                              ),
                             ),
                           ),
                         )
                       : Container(
                           color: AppColors.alternate,
-                          child: HugeIcon(
-                            icon: HugeIcons.strokeRoundedUser,
-                            color: AppColors.secondaryText,
+                          child: Center(
+                            child: HugeIcon(
+                              icon: HugeIcons.strokeRoundedUser,
+                              color: AppColors.secondaryText,
+                            ),
                           ),
                         ),
                 ),

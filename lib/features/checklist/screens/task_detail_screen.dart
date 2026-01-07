@@ -697,7 +697,9 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       width: 50,
       height: 50,
       color: AppColors.accent1,
-      child: HugeIcon(icon: HugeIcons.strokeRoundedUser, color: AppColors.primary, size: AppIconSize.xl),
+      child: Center(
+        child: HugeIcon(icon: HugeIcons.strokeRoundedUser, color: AppColors.primary, size: AppIconSize.xl),
+      ),
     );
   }
 

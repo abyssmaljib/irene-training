@@ -77,11 +77,18 @@ class _PrimaryButtonState extends State<PrimaryButton> {
                       ),
                     ] else ...[
                       if (widget.icon != null) ...[
-                        Icon(
-                          widget.icon,
-                          color: AppColors.surface,
-                          size: AppIconSize.lg,
-                        ),
+                        if (widget.icon is IconData)
+                          Icon(
+                            widget.icon,
+                            color: AppColors.surface,
+                            size: AppIconSize.lg,
+                          )
+                        else
+                          HugeIcon(
+                            icon: widget.icon,
+                            color: AppColors.surface,
+                            size: AppIconSize.lg,
+                          ),
                         AppSpacing.horizontalGapSm,
                       ],
                       Text(
@@ -266,11 +273,18 @@ class _DangerButtonState extends State<DangerButton> {
                       ),
                     ] else ...[
                       if (widget.icon != null) ...[
-                        Icon(
-                          widget.icon,
-                          color: AppColors.surface,
-                          size: AppIconSize.lg,
-                        ),
+                        if (widget.icon is IconData)
+                          Icon(
+                            widget.icon,
+                            color: AppColors.surface,
+                            size: AppIconSize.lg,
+                          )
+                        else
+                          HugeIcon(
+                            icon: widget.icon,
+                            color: AppColors.surface,
+                            size: AppIconSize.lg,
+                          ),
                         AppSpacing.horizontalGapSm,
                       ],
                       Text(

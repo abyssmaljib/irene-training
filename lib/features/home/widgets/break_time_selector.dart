@@ -554,10 +554,12 @@ class _PersonChip extends StatelessWidget {
               shape: BoxShape.circle,
               color: isCurrentUser ? AppColors.primary : AppColors.tertiary,
             ),
-            child: HugeIcon(
-              icon: HugeIcons.strokeRoundedUser,
-              size: AppIconSize.xs,
-              color: Colors.white,
+            child: Center(
+              child: HugeIcon(
+                icon: HugeIcons.strokeRoundedUser,
+                size: AppIconSize.xs,
+                color: Colors.white,
+              ),
             ),
           ),
           const SizedBox(width: 4),

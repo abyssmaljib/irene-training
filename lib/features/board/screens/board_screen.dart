@@ -357,7 +357,7 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
     const userRole = 'user';
 
     return SliverPadding(
-      padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+      padding: EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, 0),
       sliver: SliverList(
         delegate: SliverChildBuilderDelegate(
           (context, index) {
@@ -936,7 +936,9 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
                     height: 200,
                     width: 200,
                     color: AppColors.background,
-                    child: HugeIcon(icon: HugeIcons.strokeRoundedImage01, color: AppColors.secondaryText, size: AppIconSize.xl),
+                    child: Center(
+                      child: HugeIcon(icon: HugeIcons.strokeRoundedImage01, color: AppColors.secondaryText, size: AppIconSize.xl),
+                    ),
                   ),
                 ),
               ),

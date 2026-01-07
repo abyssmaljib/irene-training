@@ -63,7 +63,7 @@ class CareInputSection extends ConsumerWidget {
         _CareInputField(
           label: 'น้ำออก (Output)',
           icon: HugeIcons.strokeRoundedWaterEnergy,
-          unit: 'ml',
+          unit: '',
           value: formState.output,
           onChanged: setOutput,
           keyboardType: TextInputType.text,

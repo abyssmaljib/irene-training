@@ -9,6 +9,7 @@ class MonthlySummaryCard extends StatelessWidget {
   final int morningShifts;
   final int nightShifts;
   final int? targetShifts;
+  final int absentCount;
   final VoidCallback? onTap;
 
   const MonthlySummaryCard({
@@ -16,6 +17,7 @@ class MonthlySummaryCard extends StatelessWidget {
     required this.morningShifts,
     required this.nightShifts,
     this.targetShifts,
+    this.absentCount = 0,
     this.onTap,
   });
 
@@ -41,7 +43,10 @@ class MonthlySummaryCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    HugeIcon(icon: HugeIcons.strokeRoundedCalendar01, color: AppColors.primary, size: AppIconSize.lg),
+                    HugeIcon(
+                        icon: HugeIcons.strokeRoundedCalendar01,
+                        color: AppColors.primary,
+                        size: AppIconSize.lg),
                     AppSpacing.horizontalGapSm,
                     Text('สรุปเวรเดือนนี้', style: AppTypography.title),
                   ],
@@ -49,6 +54,28 @@ class MonthlySummaryCard extends StatelessWidget {
                 if (onTap != null)
                   Row(
                     children: [
+                      // Absent notification badge
+                      if (absentCount > 0) ...[
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: AppSpacing.xs,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.error,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            'A$absentCount',
+                            style: AppTypography.caption.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ),
+                        AppSpacing.horizontalGapXs,
+                      ],
                       Text(
                         'ดูรายละเอียด',
                         style: AppTypography.caption.copyWith(

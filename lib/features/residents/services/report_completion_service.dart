@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/services/user_service.dart';
@@ -12,6 +13,14 @@ class ReportCompletionService {
   ReportCompletionService._internal();
 
   final _userService = UserService();
+
+  // Realtime subscription
+  RealtimeChannel? _channel;
+  final _statusController = StreamController<Map<int, ReportCompletionStatus>>.broadcast();
+
+  /// Stream ของ report completion status
+  /// ใช้สำหรับ listen การเปลี่ยนแปลงแบบ realtime
+  Stream<Map<int, ReportCompletionStatus>> get statusStream => _statusController.stream;
 
   /// เวลา cutoff สำหรับเปลี่ยนเวร
   /// - 07:00-19:00 = เวรเช้า
@@ -165,5 +174,46 @@ class ReportCompletionService {
       }
     }
     return result;
+  }
+
+  /// เริ่ม realtime subscription สำหรับ vitalSign table
+  /// จะ refresh status เมื่อมี INSERT ใหม่
+  Future<void> subscribeToRealtimeUpdates() async {
+    // Unsubscribe ก่อนถ้ามี channel เดิม
+    await unsubscribe();
+
+    _channel = Supabase.instance.client
+        .channel('vital_sign_changes')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'vitalSign',
+          callback: (payload) async {
+            debugPrint('ReportCompletionService: New vital sign inserted');
+            // Refresh และ emit ข้อมูลใหม่
+            final statusMap = await getReportCompletionStatusMap();
+            if (!_statusController.isClosed) {
+              _statusController.add(statusMap);
+            }
+          },
+        )
+        .subscribe();
+
+    debugPrint('ReportCompletionService: Subscribed to realtime updates');
+  }
+
+  /// ยกเลิก subscription
+  Future<void> unsubscribe() async {
+    if (_channel != null) {
+      await Supabase.instance.client.removeChannel(_channel!);
+      _channel = null;
+      debugPrint('ReportCompletionService: Unsubscribed from realtime updates');
+    }
+  }
+
+  /// Dispose service (เรียกเมื่อไม่ใช้งานแล้ว)
+  void dispose() {
+    unsubscribe();
+    _statusController.close();
   }
 }

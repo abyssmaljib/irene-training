@@ -320,8 +320,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 color: AppColors.primary,
               ),
             ),
-            // User Role Badge
-            if (_userRole != null) ...[
+            // System Role Badge (ตำแหน่ง)
+            if (_systemRole != null) ...[
               AppSpacing.verticalGapSm,
               Container(
                 padding: EdgeInsets.symmetric(
@@ -345,7 +345,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                     SizedBox(width: 4),
                     Text(
-                      _userRole!.displayName,
+                      _systemRole!.name,
                       style: AppTypography.caption.copyWith(
                         color: AppColors.primary,
                         fontWeight: FontWeight.w600,

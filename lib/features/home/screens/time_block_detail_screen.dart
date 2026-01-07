@@ -233,6 +233,7 @@ class _TimeBlockDetailScreenState extends State<TimeBlockDetailScreen> {
 
     Color bgColor;
     dynamic statusIcon;
+    final timeIcon = _getTimeIcon(block.timeBlock);
 
     if (isComplete) {
       bgColor = AppColors.tagPassedBg;
@@ -272,9 +273,10 @@ class _TimeBlockDetailScreenState extends State<TimeBlockDetailScreen> {
                     borderRadius: AppRadius.smallRadius,
                   ),
                   child: Center(
-                    child: Text(
-                      block.icon ?? '📋',
-                      style: const TextStyle(fontSize: 20),
+                    child: HugeIcon(
+                      icon: timeIcon,
+                      size: 22,
+                      color: AppColors.primaryText,
                     ),
                   ),
                 ),
@@ -337,8 +339,8 @@ class _TimeBlockDetailScreenState extends State<TimeBlockDetailScreen> {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      statusIcon,
+                    HugeIcon(
+                      icon: statusIcon,
                       color: isComplete
                           ? AppColors.progressOnTime
                           : hasStarted
@@ -500,5 +502,34 @@ class _TimeBlockDetailScreenState extends State<TimeBlockDetailScreen> {
         ],
       ),
     );
+  }
+
+  /// คืน icon ตามช่วงเวลา (เหมือนหน้า checklist)
+  dynamic _getTimeIcon(String timeBlock) {
+    // เช้า (05:00-11:00)
+    if (timeBlock.contains('05:00') ||
+        timeBlock.contains('07:00') ||
+        timeBlock.contains('09:00')) {
+      return HugeIcons.strokeRoundedSunrise;
+    }
+    // กลางวัน (11:00-17:00)
+    else if (timeBlock.contains('11:00') ||
+        timeBlock.contains('13:00') ||
+        timeBlock.contains('15:00')) {
+      return HugeIcons.strokeRoundedSun03;
+    }
+    // เย็น (17:00-23:00)
+    else if (timeBlock.contains('17:00') ||
+        timeBlock.contains('19:00') ||
+        timeBlock.contains('21:00')) {
+      return HugeIcons.strokeRoundedSunset;
+    }
+    // ดึก (23:00-05:00)
+    else if (timeBlock.contains('23:00') ||
+        timeBlock.contains('01:00') ||
+        timeBlock.contains('03:00')) {
+      return HugeIcons.strokeRoundedMoon02;
+    }
+    return HugeIcons.strokeRoundedCloud;
   }
 }

@@ -61,10 +61,12 @@ class ResidentHeader extends StatelessWidget {
   Widget _buildDefaultAvatar() {
     return Container(
       color: AppColors.background,
-      child: HugeIcon(
-        icon: HugeIcons.strokeRoundedUser,
-        size: AppIconSize.xl,
-        color: AppColors.secondaryText,
+      child: Center(
+        child: HugeIcon(
+          icon: HugeIcons.strokeRoundedUser,
+          size: AppIconSize.xl,
+          color: AppColors.secondaryText,
+        ),
       ),
     );
   }

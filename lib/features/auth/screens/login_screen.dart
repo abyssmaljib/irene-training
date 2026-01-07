@@ -206,10 +206,12 @@ class _LoginScreenState extends State<LoginScreen> {
                 borderRadius: AppRadius.mediumRadius,
                 boxShadow: AppShadows.cardShadow,
               ),
-              child: HugeIcon(
-                icon: HugeIcons.strokeRoundedHospital01,
-                size: AppIconSize.xxl,
-                color: AppColors.primary,
+              child: Center(
+                child: HugeIcon(
+                  icon: HugeIcons.strokeRoundedHospital01,
+                  size: AppIconSize.xxl,
+                  color: AppColors.primary,
+                ),
               ),
             ),
             AppSpacing.verticalGapSm,

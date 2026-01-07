@@ -305,19 +305,31 @@ class _TaskTimeSectionState extends State<TaskTimeSection>
   }
 
   dynamic _getTimeIcon() {
-    if (widget.timeBlock.contains('07:00') ||
-        widget.timeBlock.contains('09:00') ||
-        widget.timeBlock.contains('11:00')) {
-      return HugeIcons.strokeRoundedSun01;
-    } else if (widget.timeBlock.contains('13:00') ||
-        widget.timeBlock.contains('15:00') ||
-        widget.timeBlock.contains('17:00')) {
-      return HugeIcons.strokeRoundedSun03;
-    } else if (widget.timeBlock.contains('19:00') || widget.timeBlock.contains('21:00')) {
-      return HugeIcons.strokeRoundedMoon02;
-    } else {
-      return HugeIcons.strokeRoundedCloud;
+    // เช้า (05:00-11:00)
+    if (widget.timeBlock.contains('05:00') ||
+        widget.timeBlock.contains('07:00') ||
+        widget.timeBlock.contains('09:00')) {
+      return HugeIcons.strokeRoundedSunrise;
     }
+    // กลางวัน (11:00-17:00)
+    else if (widget.timeBlock.contains('11:00') ||
+        widget.timeBlock.contains('13:00') ||
+        widget.timeBlock.contains('15:00')) {
+      return HugeIcons.strokeRoundedSun03;
+    }
+    // เย็น (17:00-23:00)
+    else if (widget.timeBlock.contains('17:00') ||
+        widget.timeBlock.contains('19:00') ||
+        widget.timeBlock.contains('21:00')) {
+      return HugeIcons.strokeRoundedSunset;
+    }
+    // ดึก (23:00-05:00)
+    else if (widget.timeBlock.contains('23:00') ||
+        widget.timeBlock.contains('01:00') ||
+        widget.timeBlock.contains('03:00')) {
+      return HugeIcons.strokeRoundedMoon02;
+    }
+    return HugeIcons.strokeRoundedCloud;
   }
 
   /// คำนวณสี badge ตาม pending count

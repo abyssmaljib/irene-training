@@ -494,12 +494,14 @@ class _HomeScreenState extends State<HomeScreen> {
                           ? Border.all(color: const Color(0xFFFFB300), width: 1.5)
                           : null,
                     ),
-                    child: HugeIcon(
-                      icon: HugeIcons.strokeRoundedSourceCode,
-                      color: _devMode
-                          ? const Color(0xFFE65100)
-                          : AppColors.secondaryText,
-                      size: AppIconSize.lg,
+                    child: Center(
+                      child: HugeIcon(
+                        icon: HugeIcons.strokeRoundedSourceCode,
+                        color: _devMode
+                            ? const Color(0xFFE65100)
+                            : AppColors.secondaryText,
+                        size: AppIconSize.lg,
+                      ),
                     ),
                   ),
                 ),
@@ -571,6 +573,7 @@ class _HomeScreenState extends State<HomeScreen> {
             morningShifts: _currentMonthSummary!.totalDayShifts,
             nightShifts: _currentMonthSummary!.totalNightShifts,
             targetShifts: _currentMonthSummary!.workdayTotal,
+            absentCount: _currentMonthSummary!.absentCount,
             onTap: () {
               Navigator.push(
                 context,

@@ -1,13 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hugeicons/hugeicons.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/filter_drawer_shell.dart';
 import '../../../core/widgets/input_fields.dart';
+import '../../../core/services/user_service.dart';
 import '../../medicine/widgets/day_picker.dart';
+import '../../home/services/home_service.dart';
+import '../../home/services/clock_service.dart';
+import '../../shift_summary/services/shift_summary_service.dart';
+import '../../dd_handover/services/dd_service.dart';
 import '../providers/task_provider.dart';
+
+/// Provider สำหรับ all users (dev mode)
+final _allUsersProvider = FutureProvider<List<DevUserInfo>>((ref) async {
+  // Watch for changes
+  ref.watch(userChangeCounterProvider);
+  return UserService().getAllUsers();
+});
+
+/// Dev emails ที่สามารถใช้ impersonate ได้
+const _devEmails = ['beautyheechul@gmail.com'];
 
 /// Drawer สำหรับเลือก view mode และ filters
 class TaskFilterDrawer extends ConsumerWidget {
@@ -18,6 +34,12 @@ class TaskFilterDrawer extends ConsumerWidget {
     final currentViewMode = ref.watch(taskViewModeProvider);
     final taskCounts = ref.watch(taskCountsProvider);
     final userShiftAsync = ref.watch(userShiftProvider);
+    final userService = UserService();
+    final isImpersonating = userService.isImpersonating;
+
+    // Check if current user is dev
+    final userEmail = Supabase.instance.client.auth.currentUser?.email;
+    final isDevMode = _devEmails.contains(userEmail);
 
     return FilterDrawerShell(
       title: 'ตัวกรอง',
@@ -27,6 +49,10 @@ class TaskFilterDrawer extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Impersonation Banner (if impersonating)
+            if (isImpersonating)
+              _ImpersonationBanner(),
+
             // Date Selector Section
             Padding(
               padding: EdgeInsets.all(AppSpacing.md),
@@ -200,6 +226,12 @@ class TaskFilterDrawer extends ConsumerWidget {
                 ),
               ),
             ),
+
+            // Dev Mode Section (only for dev emails)
+            if (isDevMode) ...[
+              const Divider(height: 32),
+              _DevModeUserSelector(),
+            ],
 
             // Bottom padding for scroll content
             AppSpacing.verticalGapLg,
@@ -712,6 +744,465 @@ class _RoleOption extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+// ============================================================
+// Impersonation Widgets (Dev Mode)
+// ============================================================
+
+/// Banner แสดงว่ากำลัง impersonate อยู่
+class _ImpersonationBanner extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final allUsersAsync = ref.watch(_allUsersProvider);
+    final userService = UserService();
+    final effectiveUserId = userService.effectiveUserId;
+
+    final impersonatedUser = allUsersAsync.whenOrNull(
+      data: (users) => users.where((u) => u.id == effectiveUserId).firstOrNull,
+    );
+
+    return Container(
+      margin: EdgeInsets.all(AppSpacing.md),
+      padding: AppSpacing.paddingMd,
+      decoration: BoxDecoration(
+        color: Colors.red.shade50,
+        borderRadius: AppRadius.mediumRadius,
+        border: Border.all(color: Colors.red.shade300, width: 2),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              HugeIcon(
+                icon: HugeIcons.strokeRoundedAlert02,
+                size: AppIconSize.lg,
+                color: Colors.red.shade700,
+              ),
+              AppSpacing.horizontalGapSm,
+              Expanded(
+                child: Text(
+                  'สวมรอยเป็น: ${impersonatedUser?.displayName ?? "..."}',
+                  style: AppTypography.label.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: Colors.red.shade700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          AppSpacing.verticalGapMd,
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => _stopImpersonating(context, ref),
+              icon: HugeIcon(
+                icon: HugeIcons.strokeRoundedArrowTurnBackward,
+                size: AppIconSize.md,
+              ),
+              label: Text('กลับมาเป็นตัวฉันเอง'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red.shade600,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: AppRadius.smallRadius,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _stopImpersonating(BuildContext context, WidgetRef ref) {
+    UserService().stopImpersonating();
+
+    // Invalidate all service caches
+    HomeService.instance.invalidateCache();
+    ClockService.instance.invalidateCache();
+    ShiftSummaryService.instance.invalidateCache();
+    DDService.instance.invalidateCache();
+    UserService().clearCache();
+
+    // Invalidate role-related providers
+    ref.invalidate(currentUserSystemRoleProvider);
+    ref.invalidate(effectiveRoleFilterProvider);
+    ref.invalidate(currentShiftProvider);
+    ref.invalidate(userShiftProvider);
+
+    // Increment user change counter to refresh Riverpod providers
+    ref.read(userChangeCounterProvider.notifier).state++;
+
+    // Reset role filter to use new user's role
+    ref.read(selectedRoleFilterProvider.notifier).state = null;
+
+    // Refresh tasks
+    refreshTasks(ref);
+
+    // Close drawer
+    Navigator.of(context).pop();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('กลับมาเป็นตัวคุณเองแล้ว'),
+        backgroundColor: AppColors.primary,
+      ),
+    );
+  }
+}
+
+/// Section สำหรับ Dev Mode - สวมรอยเป็น User อื่น
+class _DevModeUserSelector extends ConsumerStatefulWidget {
+  @override
+  ConsumerState<_DevModeUserSelector> createState() => _DevModeUserSelectorState();
+}
+
+class _DevModeUserSelectorState extends ConsumerState<_DevModeUserSelector> {
+  String _searchQuery = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final allUsersAsync = ref.watch(_allUsersProvider);
+    final userService = UserService();
+    final effectiveUserId = userService.effectiveUserId;
+
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+      padding: AppSpacing.paddingMd,
+      decoration: BoxDecoration(
+        color: Colors.cyan.shade50,
+        borderRadius: AppRadius.mediumRadius,
+        border: Border.all(color: Colors.cyan.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              HugeIcon(
+                icon: HugeIcons.strokeRoundedUserEdit01,
+                size: AppIconSize.sm,
+                color: Colors.cyan.shade700,
+              ),
+              AppSpacing.horizontalGapSm,
+              Expanded(
+                child: Text(
+                  'Dev Mode - สวมรอยเป็น User อื่น',
+                  style: AppTypography.label.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: Colors.cyan.shade700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          AppSpacing.verticalGapMd,
+          // Search field
+          TextField(
+            onChanged: (value) => setState(() => _searchQuery = value),
+            decoration: InputDecoration(
+              hintText: 'ค้นหาชื่อ...',
+              hintStyle: AppTypography.bodySmall.copyWith(
+                color: Colors.cyan.shade300,
+              ),
+              prefixIcon: Center(
+                widthFactor: 1,
+                heightFactor: 1,
+                child: HugeIcon(
+                  icon: HugeIcons.strokeRoundedSearch01,
+                  size: AppIconSize.md,
+                  color: Colors.cyan.shade400,
+                ),
+              ),
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: AppRadius.smallRadius,
+                borderSide: BorderSide(color: Colors.cyan.shade200),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: AppRadius.smallRadius,
+                borderSide: BorderSide(color: Colors.cyan.shade200),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: AppRadius.smallRadius,
+                borderSide: BorderSide(color: Colors.cyan, width: 2),
+              ),
+            ),
+            style: AppTypography.body.copyWith(
+              color: Colors.cyan.shade900,
+            ),
+          ),
+          AppSpacing.verticalGapMd,
+          allUsersAsync.when(
+            data: (allUsers) {
+              // Filter users by search query
+              final filteredUsers = _searchQuery.isEmpty
+                  ? allUsers
+                  : allUsers.where((user) {
+                      final query = _searchQuery.toLowerCase();
+                      final nickname = user.nickname?.toLowerCase() ?? '';
+                      final fullName = user.fullName?.toLowerCase() ?? '';
+                      return nickname.contains(query) || fullName.contains(query);
+                    }).toList();
+
+              if (filteredUsers.isEmpty) {
+                return Center(
+                  child: Text(
+                    allUsers.isEmpty ? 'ไม่พบรายชื่อพนักงาน' : 'ไม่พบผู้ใช้ที่ค้นหา',
+                    style: AppTypography.bodySmall.copyWith(
+                      color: Colors.cyan.shade600,
+                    ),
+                  ),
+                );
+              }
+
+              return Container(
+                constraints: BoxConstraints(maxHeight: 200),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: AppRadius.smallRadius,
+                  border: Border.all(color: Colors.cyan.shade200),
+                ),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: filteredUsers.length,
+                  separatorBuilder: (context, index) => Divider(
+                    height: 1,
+                    color: Colors.cyan.shade100,
+                  ),
+                  itemBuilder: (context, index) {
+                    final user = filteredUsers[index];
+                    final isSelected = user.id == effectiveUserId;
+
+                    return _UserListTile(
+                      user: user,
+                      isSelected: isSelected,
+                      onTap: () => _impersonateUser(user),
+                    );
+                  },
+                ),
+              );
+            },
+            loading: () => Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.cyan,
+                ),
+              ),
+            ),
+            error: (_, _) => Text(
+              'ไม่สามารถโหลดรายชื่อได้',
+              style: AppTypography.bodySmall.copyWith(
+                color: Colors.red,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _impersonateUser(DevUserInfo user) async {
+    final success = await UserService().impersonateUser(user.id);
+
+    if (!success) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('เกิดข้อผิดพลาดในการสวมรอย'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    // Invalidate all service caches
+    HomeService.instance.invalidateCache();
+    ClockService.instance.invalidateCache();
+    ShiftSummaryService.instance.invalidateCache();
+    DDService.instance.invalidateCache();
+    UserService().clearCache();
+
+    // Invalidate role-related providers
+    ref.invalidate(currentUserSystemRoleProvider);
+    ref.invalidate(effectiveRoleFilterProvider);
+    ref.invalidate(currentShiftProvider);
+    ref.invalidate(userShiftProvider);
+
+    // Increment user change counter to refresh Riverpod providers
+    ref.read(userChangeCounterProvider.notifier).state++;
+
+    // Reset role filter to use new user's role
+    ref.read(selectedRoleFilterProvider.notifier).state = null;
+
+    // Refresh tasks
+    refreshTasks(ref);
+
+    // Close drawer
+    if (!mounted) return;
+    Navigator.of(context).pop();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('สวมรอยเป็น: ${user.displayName}'),
+        backgroundColor: Colors.cyan,
+      ),
+    );
+  }
+}
+
+/// Widget สำหรับแสดงแต่ละ user ใน list
+class _UserListTile extends StatelessWidget {
+  final DevUserInfo user;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _UserListTile({
+    required this.user,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.cyan.withValues(alpha: 0.1) : Colors.transparent,
+        ),
+        child: Row(
+          children: [
+            // Avatar with clocked-in indicator
+            Stack(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: Colors.cyan.shade100,
+                    shape: BoxShape.circle,
+                    border: isSelected
+                        ? Border.all(color: Colors.cyan, width: 2)
+                        : null,
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(18),
+                    child: user.photoUrl != null && user.photoUrl!.isNotEmpty
+                        ? Image.network(
+                            user.photoUrl!,
+                            width: 36,
+                            height: 36,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => Center(
+                              child: HugeIcon(
+                                icon: HugeIcons.strokeRoundedUser,
+                                size: AppIconSize.md,
+                                color: Colors.cyan.shade700,
+                              ),
+                            ),
+                          )
+                        : Center(
+                            child: HugeIcon(
+                              icon: HugeIcons.strokeRoundedUser,
+                              size: AppIconSize.md,
+                              color: Colors.cyan.shade700,
+                            ),
+                          ),
+                  ),
+                ),
+                // Clocked-in indicator (green dot)
+                if (user.isClockedIn)
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: Colors.green,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            AppSpacing.horizontalGapMd,
+            // Name
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          user.nickname ?? '-',
+                          style: AppTypography.body.copyWith(
+                            color: Colors.cyan.shade900,
+                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (user.isClockedIn) ...[
+                        SizedBox(width: 6),
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade100,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'ขึ้นเวร',
+                            style: AppTypography.caption.copyWith(
+                              fontSize: 9,
+                              color: Colors.green.shade700,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  if (user.fullName != null)
+                    Text(
+                      user.fullName!,
+                      style: AppTypography.caption.copyWith(
+                        color: Colors.cyan.shade600,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            // Check icon
+            if (isSelected)
+              HugeIcon(
+                icon: HugeIcons.strokeRoundedCheckmarkCircle02,
+                size: AppIconSize.lg,
+                color: Colors.cyan,
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

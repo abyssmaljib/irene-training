@@ -75,7 +75,9 @@ class ImagePreviewGrid extends StatelessWidget {
                   width: 80,
                   height: 80,
                   color: AppColors.alternate,
-                  child: HugeIcon(icon: HugeIcons.strokeRoundedImage01, color: AppColors.secondaryText),
+                  child: Center(
+                    child: HugeIcon(icon: HugeIcons.strokeRoundedImage01, color: AppColors.secondaryText),
+                  ),
                 );
               },
             ),
@@ -131,7 +133,9 @@ class ImagePreviewGrid extends StatelessWidget {
               ),
               errorWidget: (context, url, error) => Container(
                 color: AppColors.alternate,
-                child: HugeIcon(icon: HugeIcons.strokeRoundedImage01, color: AppColors.secondaryText),
+                child: Center(
+                  child: HugeIcon(icon: HugeIcons.strokeRoundedImage01, color: AppColors.secondaryText),
+                ),
               ),
             ),
           ),

@@ -103,10 +103,10 @@ class ClockSummary {
       userId: json['user_id'] as String,
       nursinghomeId: json['nursinghome_id'] as int?,
       clockInTime: json['clock_in_time'] != null
-          ? DateTime.parse(json['clock_in_time'] as String)
+          ? DateTime.parse(json['clock_in_time'] as String).toLocal()
           : null,
       clockOutTime: json['clock_out_time'] != null
-          ? DateTime.parse(json['clock_out_time'] as String)
+          ? DateTime.parse(json['clock_out_time'] as String).toLocal()
           : null,
       clockInId: json['clock_in_id'] as int?,
       clockOutId: json['clock_out_id'] as int?,
@@ -136,7 +136,7 @@ class ClockSummary {
       year: (json['year'] as num?)?.toInt(),
       month: (json['month'] as num?)?.toInt(),
       clockInDate: json['clock_in_date'] != null
-          ? DateTime.parse(json['clock_in_date'] as String)
+          ? DateTime.parse(json['clock_in_date'] as String).toLocal()
           : null,
     );
   }

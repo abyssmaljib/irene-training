@@ -411,7 +411,9 @@ class _RequiredPostsScreenState extends ConsumerState<RequiredPostsScreen> {
                   height: 200,
                   width: 200,
                   color: AppColors.background,
-                  child: HugeIcon(icon: HugeIcons.strokeRoundedImage01, color: AppColors.secondaryText),
+                  child: Center(
+                    child: HugeIcon(icon: HugeIcons.strokeRoundedImage01, color: AppColors.secondaryText),
+                  ),
                 ),
               ),
             ),
