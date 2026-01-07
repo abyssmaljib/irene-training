@@ -8,10 +8,17 @@ import '../models/clock_summary.dart';
 /// Service for managing shift summary data
 class ShiftSummaryService {
   static final ShiftSummaryService instance = ShiftSummaryService._();
-  ShiftSummaryService._();
+  ShiftSummaryService._() {
+    // Listen for user changes (impersonation) to auto-invalidate cache
+    _userService.userChangedNotifier.addListener(_onUserChanged);
+  }
 
   final _supabase = Supabase.instance.client;
   final _userService = UserService();
+
+  void _onUserChanged() {
+    invalidateCache();
+  }
 
   // Cache for monthly summaries
   List<MonthlySummary>? _cachedMonthlySummaries;

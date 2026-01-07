@@ -8,6 +8,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/buttons.dart';
+import '../../../core/widgets/irene_app_bar.dart';
 import '../providers/create_medicine_db_provider.dart';
 import '../providers/edit_medicine_db_form_provider.dart';
 import '../services/medicine_service.dart';
@@ -142,12 +143,42 @@ class _EditMedicineDBScreenState extends ConsumerState<EditMedicineDBScreen> {
       }
 
       // Upload to Supabase
+      debugPrint('[EditMedicineDB] Uploading image: ${pickedFile.path}');
       final url = await MedicineService.instance.uploadMedicineImage(
         File(pickedFile.path),
         imageType,
       );
+      debugPrint('[EditMedicineDB] Upload result URL: $url');
 
-      // Set URL
+      // ตรวจสอบว่า upload สำเร็จหรือไม่
+      if (url == null) {
+        // Upload fail - แสดง error และ reset uploading state
+        switch (imageType) {
+          case 'frontFoiled':
+            notifier.setUploading(frontFoiled: false);
+            break;
+          case 'backFoiled':
+            notifier.setUploading(backFoiled: false);
+            break;
+          case 'frontNude':
+            notifier.setUploading(frontNude: false);
+            break;
+          case 'backNude':
+            notifier.setUploading(backNude: false);
+            break;
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('ไม่สามารถ upload รูปได้ กรุณาลองใหม่'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Set URL (upload สำเร็จ)
       switch (imageType) {
         case 'frontFoiled':
           notifier.setFrontFoiledUrl(url);
@@ -163,6 +194,7 @@ class _EditMedicineDBScreenState extends ConsumerState<EditMedicineDBScreen> {
           break;
       }
     } catch (e) {
+      debugPrint('[EditMedicineDB] Error picking/uploading image: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -220,16 +252,11 @@ class _EditMedicineDBScreenState extends ConsumerState<EditMedicineDBScreen> {
     final atcLevel1List = ref.watch(atcLevel1ListProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('แก้ไขยาในฐานข้อมูล'),
-        leading: IconButton(
-          icon: HugeIcon(
-            icon: HugeIcons.strokeRoundedCancel01,
-            color: AppColors.textPrimary,
-            size: 24,
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
+      // ใช้ IreneSecondaryAppBar แทน AppBar เพื่อ consistency ทั้งแอป
+      // ใช้ Cancel icon เพราะเป็นหน้า edit form (ปิดโดยไม่บันทึก)
+      appBar: IreneSecondaryAppBar(
+        title: 'แก้ไขยาในฐานข้อมูล',
+        leadingIcon: HugeIcons.strokeRoundedCancel01,
       ),
       body: formState.when(
         // กำลังโหลด
@@ -621,41 +648,20 @@ class _EditMedicineDBScreenState extends ConsumerState<EditMedicineDBScreen> {
                     const SizedBox(height: AppSpacing.md),
                   ],
 
-                  // ปุ่ม Row: สร้างซ้ำ (Outline) + บันทึก (Primary)
+                  // ปุ่ม Row: สร้างซ้ำ (Secondary) + บันทึก (Primary)
                   Row(
                     children: [
-                      // ปุ่มสร้างซ้ำ (Outline)
+                      // ปุ่มสร้างซ้ำ (Secondary - Outlined ตาม design system)
                       Expanded(
-                        child: OutlinedButton.icon(
+                        child: SecondaryButton(
+                          text: state.isDuplicating ? 'กำลังสร้าง...' : 'สร้างซ้ำ',
                           onPressed: state.isLoading ||
                                   state.isUploading ||
                                   state.isDuplicating
                               ? null
                               : _duplicate,
-                          icon: state.isDuplicating
-                              ? SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: AppColors.primary,
-                                  ),
-                                )
-                              : HugeIcon(
-                                  icon: HugeIcons.strokeRoundedCopy01,
-                                  color: AppColors.primary,
-                                  size: 20,
-                                ),
-                          label: Text(
-                            state.isDuplicating ? 'กำลังสร้าง...' : 'สร้างซ้ำ',
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppColors.primary,
-                            side: BorderSide(color: AppColors.primary),
-                            padding: const EdgeInsets.symmetric(
-                              vertical: AppSpacing.md,
-                            ),
-                          ),
+                          isLoading: state.isDuplicating,
+                          icon: HugeIcons.strokeRoundedCopy01,
                         ),
                       ),
                       const SizedBox(width: AppSpacing.md),

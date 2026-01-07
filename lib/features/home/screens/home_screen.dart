@@ -71,7 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoadingBreakTimes = false;
 
   // Dev mode: สลับเวรสำหรับดูเวลาพัก และ skip validations
-  bool _devMode = true; // ตั้งเป็น false เมื่อ production
+  final bool _devMode = false; // production mode
   String? _devShiftOverride; // null = ใช้เวลาจริง, 'เวรเช้า' หรือ 'เวรดึก'
 
   // Dashboard stats
@@ -366,8 +366,14 @@ class _HomeScreenState extends State<HomeScreen> {
           _selectedBreakTimeIds = {};
           _availableResidents = [];
         });
-        // Reload dashboard stats
-        _loadDashboardStats();
+        // Reload all data after clock in
+        _clockService.invalidateCache();
+        _homeService.invalidateCache();
+        await Future.wait([
+          _loadCurrentShift(forceRefresh: true),
+          _loadDashboardStats(),
+          _loadMonthlySummary(),
+        ]);
       }
     } finally {
       if (mounted) {
@@ -468,44 +474,6 @@ class _HomeScreenState extends State<HomeScreen> {
             // IreneAppBar
             IreneAppBar(
               title: 'IRENE',
-              showDevBadge: _devMode,
-              actions: [
-                // Dev mode toggle button
-                GestureDetector(
-                  onTap: () {
-                    setState(() => _devMode = !_devMode);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(_devMode ? 'DEV Mode: ON' : 'DEV Mode: OFF'),
-                        duration: const Duration(seconds: 1),
-                        backgroundColor: _devMode ? const Color(0xFFFFB300) : AppColors.secondaryText,
-                      ),
-                    );
-                  },
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: _devMode
-                          ? const Color(0xFFFFE082)
-                          : AppColors.alternate,
-                      borderRadius: BorderRadius.circular(12),
-                      border: _devMode
-                          ? Border.all(color: const Color(0xFFFFB300), width: 1.5)
-                          : null,
-                    ),
-                    child: Center(
-                      child: HugeIcon(
-                        icon: HugeIcons.strokeRoundedSourceCode,
-                        color: _devMode
-                            ? const Color(0xFFE65100)
-                            : AppColors.secondaryText,
-                        size: AppIconSize.lg,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
               onProfileTap: () {
                 Navigator.push(
                   context,

@@ -3,6 +3,7 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/irene_app_bar.dart';
 import '../../../core/widgets/toggle_switch.dart';
 import '../../../core/services/user_service.dart';
 import '../../checklist/models/system_role.dart';
@@ -149,97 +150,77 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: NestedScrollView(
-        headerSliverBuilder: (context, innerBoxIsScrolled) {
-          return [
-            // App Bar
-            SliverAppBar(
-              pinned: true,
-              floating: true,
-              snap: true,
-              backgroundColor: AppColors.secondaryBackground,
-              elevation: 0,
-              leading: IconButton(
-                onPressed: () => Navigator.pop(context, _hasDataChanged),
-                icon: HugeIcon(
-                  icon: HugeIcons.strokeRoundedArrowLeft01,
-                  color: AppColors.primaryText,
-                ),
-              ),
-              title: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'คุณ${widget.residentName}',
-                    style: AppTypography.title,
-                  ),
-                  Text(
-                    'รูปตัวอย่างยา',
-                    style: AppTypography.caption.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-              centerTitle: false,
-              actions: [
-                // Toggle overlay button
-                IconButton(
-                  onPressed: () {
-                    setState(() => _showOverlay = !_showOverlay);
-                  },
-                  icon: HugeIcon(
-                    icon: _showOverlay ? HugeIcons.strokeRoundedView : HugeIcons.strokeRoundedViewOff,
-                    color: _showOverlay ? AppColors.primary : AppColors.textSecondary,
-                  ),
-                  tooltip: _showOverlay ? 'ซ่อนจำนวนเม็ดยา' : 'แสดงจำนวนเม็ดยา',
-                ),
-                // Toggle to medicine list (styled like checklist view toggle)
-                _buildViewToggle(),
-                SizedBox(width: AppSpacing.md),
-              ],
-              expandedHeight: 270,
-              flexibleSpace: FlexibleSpaceBar(
-                background: Container(
-                  color: AppColors.secondaryBackground,
-                  child: SafeArea(
-                    child: Padding(
-                      padding: EdgeInsets.only(
-                        left: AppSpacing.md,
-                        right: AppSpacing.md,
-                        top: kToolbarHeight + 8,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Day Picker
-                          DayPicker(
-                            selectedDate: _selectedDate,
-                            onDateChanged: _onDateChanged,
-                          ),
-
-                          SizedBox(height: AppSpacing.sm),
-
-                          // Photo Type Toggle
-                          SegmentedControl(
-                            options: const ['จัดยา (แผง)', 'เสิร์ฟยา (เม็ด)'],
-                            selectedIndex: _showFoiled ? 0 : 1,
-                            onChanged: _onPhotoTypeChanged,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
+      // ใช้ IreneSecondaryAppBar แทน SliverAppBar เพื่อ consistency ทั้งแอป
+      // หน้านี้มี titleWidget แบบ custom (2 บรรทัด) และมี actions
+      appBar: IreneSecondaryAppBar(
+        onBack: () => Navigator.pop(context, _hasDataChanged),
+        titleWidget: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'คุณ${widget.residentName}',
+              style: AppTypography.title,
+            ),
+            Text(
+              'รูปตัวอย่างยา',
+              style: AppTypography.caption.copyWith(
+                color: AppColors.textSecondary,
               ),
             ),
-          ];
-        },
-        body: RefreshIndicator(
-          onRefresh: () => _loadMealGroups(forceRefresh: true),
-          color: AppColors.primary,
-          child: _buildContent(),
+          ],
+        ),
+        actions: [
+          // Toggle overlay button
+          IconButton(
+            onPressed: () {
+              setState(() => _showOverlay = !_showOverlay);
+            },
+            icon: HugeIcon(
+              icon: _showOverlay ? HugeIcons.strokeRoundedView : HugeIcons.strokeRoundedViewOff,
+              color: _showOverlay ? AppColors.primary : AppColors.textSecondary,
+            ),
+            tooltip: _showOverlay ? 'ซ่อนจำนวนเม็ดยา' : 'แสดงจำนวนเม็ดยา',
+          ),
+          // Toggle to medicine list (styled like checklist view toggle)
+          _buildViewToggle(),
+          SizedBox(width: AppSpacing.md),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: () => _loadMealGroups(forceRefresh: true),
+        color: AppColors.primary,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Day Picker และ Photo Type Toggle (ย้ายมาอยู่ใน body แทน FlexibleSpaceBar)
+              Container(
+                color: AppColors.secondaryBackground,
+                padding: EdgeInsets.all(AppSpacing.md),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Day Picker
+                    DayPicker(
+                      selectedDate: _selectedDate,
+                      onDateChanged: _onDateChanged,
+                    ),
+                    SizedBox(height: AppSpacing.sm),
+                    // Photo Type Toggle
+                    SegmentedControl(
+                      options: const ['จัดยา (แผง)', 'เสิร์ฟยา (เม็ด)'],
+                      selectedIndex: _showFoiled ? 0 : 1,
+                      onChanged: _onPhotoTypeChanged,
+                    ),
+                  ],
+                ),
+              ),
+              // Content
+              _buildContent(),
+            ],
+          ),
         ),
       ),
     );
@@ -247,19 +228,23 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
 
   Widget _buildContent() {
     if (_isLoading) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(color: AppColors.primary),
-            AppSpacing.verticalGapMd,
-            Text(
-              'กำลังโหลดข้อมูล...',
-              style: AppTypography.body.copyWith(
-                color: AppColors.textSecondary,
+      // ใช้ SizedBox เพื่อให้ pull-to-refresh ทำงานได้
+      return SizedBox(
+        height: 300,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(color: AppColors.primary),
+              AppSpacing.verticalGapMd,
+              Text(
+                'กำลังโหลดข้อมูล...',
+                style: AppTypography.body.copyWith(
+                  color: AppColors.textSecondary,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     }
@@ -271,45 +256,51 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
     );
 
     if (totalMedicines == 0) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            HugeIcon(
-              icon: HugeIcons.strokeRoundedImage01,
-              size: AppIconSize.display,
-              color: AppColors.textSecondary,
-            ),
-            AppSpacing.verticalGapMd,
-            Text(
-              'ไม่มียาในวันนี้',
-              style: AppTypography.title.copyWith(
+      // ใช้ SizedBox เพื่อให้ pull-to-refresh ทำงานได้
+      return SizedBox(
+        height: 300,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              HugeIcon(
+                icon: HugeIcons.strokeRoundedImage01,
+                size: AppIconSize.display,
                 color: AppColors.textSecondary,
               ),
-            ),
-          ],
+              AppSpacing.verticalGapMd,
+              Text(
+                'ไม่มียาในวันนี้',
+                style: AppTypography.title.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
 
-    return ListView.builder(
+    // ใช้ Column แทน ListView.builder เพราะอยู่ใน SingleChildScrollView แล้ว
+    return Padding(
       padding: EdgeInsets.all(AppSpacing.md),
-      itemCount: _mealGroups.length,
-      itemBuilder: (context, index) {
-        final group = _mealGroups[index];
-        return MealSectionCard(
-          key: ValueKey('meal_${group.mealKey}'),
-          mealGroup: group,
-          showFoiled: _showFoiled,
-          showOverlay: _showOverlay,
-          isExpanded: _expandedIndex == index,
-          systemRole: _systemRole,
-          onExpandChanged: () => _onMealExpanded(index),
-          onTakePhoto: _onTakePhoto,
-          onDeletePhoto: _onDeletePhoto,
-          onQCPhoto: _onQCPhoto,
-        );
-      },
+      child: Column(
+        children: List.generate(_mealGroups.length, (index) {
+          final group = _mealGroups[index];
+          return MealSectionCard(
+            key: ValueKey('meal_${group.mealKey}'),
+            mealGroup: group,
+            showFoiled: _showFoiled,
+            showOverlay: _showOverlay,
+            isExpanded: _expandedIndex == index,
+            systemRole: _systemRole,
+            onExpandChanged: () => _onMealExpanded(index),
+            onTakePhoto: _onTakePhoto,
+            onDeletePhoto: _onDeletePhoto,
+            onQCPhoto: _onQCPhoto,
+          );
+        }),
+      ),
     );
   }
 

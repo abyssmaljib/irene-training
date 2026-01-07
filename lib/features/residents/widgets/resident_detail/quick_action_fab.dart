@@ -29,6 +29,7 @@ class QuickActionFab extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true, // ให้ modal ขยายได้ตาม content
       builder: (context) => _QuickActionSheet(
         residentId: residentId,
         residentName: residentName,
@@ -72,18 +73,9 @@ class _QuickActionSheet extends StatelessWidget {
             // Header
             Padding(
               padding: EdgeInsets.all(AppSpacing.md),
-              child: Row(
-                children: [
-                  Text(
-                    'ทำงานด่วน',
-                    style: AppTypography.heading3,
-                  ),
-                  Spacer(),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: HugeIcon(icon: HugeIcons.strokeRoundedCancelCircle, color: AppColors.secondaryText),
-                  ),
-                ],
+              child: Text(
+                'ทำงานด่วน',
+                style: AppTypography.heading3,
               ),
             ),
 
@@ -169,7 +161,9 @@ class _QuickActionSheet extends StatelessWidget {
                   color: iconColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: HugeIcon(icon: icon, color: iconColor, size: AppIconSize.xl),
+                child: Center(
+                  child: HugeIcon(icon: icon, color: iconColor, size: AppIconSize.xl),
+                ),
               ),
               AppSpacing.horizontalGapMd,
               Expanded(

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/dd_record.dart';
 import '../services/dd_service.dart';
+import '../../checklist/providers/task_provider.dart';
 
 /// Provider สำหรับ DD Service instance
 final ddServiceProvider = Provider<DDService>((ref) {
@@ -14,6 +15,8 @@ final ddRefreshCounterProvider = StateProvider<int>((ref) => 0);
 final ddRecordsProvider = FutureProvider<List<DDRecord>>((ref) async {
   // Watch refresh counter to invalidate cache
   ref.watch(ddRefreshCounterProvider);
+  // Watch user change counter to refresh when impersonating
+  ref.watch(userChangeCounterProvider);
 
   final service = ref.read(ddServiceProvider);
   return service.getMyDDRecords(forceRefresh: true);

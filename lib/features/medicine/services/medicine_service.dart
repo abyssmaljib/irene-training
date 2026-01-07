@@ -812,6 +812,8 @@ extension MedicineServiceMedDB on MedicineService {
     String imageType,
   ) async {
     try {
+      debugPrint('[MedicineService] uploadMedicineImage: $imageType');
+
       // สร้างชื่อไฟล์ unique โดยใช้ timestamp
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final fileName = 'medicine_${imageType}_$timestamp.jpg';
@@ -819,6 +821,7 @@ extension MedicineServiceMedDB on MedicineService {
 
       // อ่าน bytes จาก file (file ต้องมี method readAsBytes)
       final bytes = await file.readAsBytes();
+      debugPrint('[MedicineService] File bytes read: ${bytes.length} bytes');
 
       // Upload file ไป Supabase Storage (bucket: 'nursingcare')
       await _supabase.storage
@@ -827,14 +830,18 @@ extension MedicineServiceMedDB on MedicineService {
             contentType: 'image/jpeg',
             upsert: true,
           ));
+      debugPrint('[MedicineService] Upload successful');
 
       // สร้าง public URL
       final url = _supabase.storage
           .from('nursingcare')
           .getPublicUrl(filePath);
 
+      debugPrint('[MedicineService] Public URL: $url');
       return url;
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('[MedicineService] uploadMedicineImage error: $e');
+      debugPrint('[MedicineService] Stack trace: $st');
       return null;
     }
   }

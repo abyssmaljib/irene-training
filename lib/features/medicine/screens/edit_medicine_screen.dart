@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/buttons.dart';
+import '../../../core/widgets/irene_app_bar.dart';
 import '../models/medicine_summary.dart';
 import '../providers/edit_medicine_form_provider.dart';
 import '../widgets/time_slot_chips.dart';
@@ -38,8 +39,6 @@ class _EditMedicineScreenState extends ConsumerState<EditMedicineScreen> {
   // Controllers
   late final TextEditingController _takeTabController;
   late final TextEditingController _everyHrController;
-  final _reconcileController = TextEditingController();
-  final _daysController = TextEditingController();
   final _noteController = TextEditingController();
 
   // Form key
@@ -66,7 +65,6 @@ class _EditMedicineScreenState extends ConsumerState<EditMedicineScreen> {
 
     // Sync controllers กับ provider
     _takeTabController.addListener(_onTakeTabChanged);
-    _reconcileController.addListener(_onReconcileChanged);
   }
 
   void _onTakeTabChanged() {
@@ -75,46 +73,13 @@ class _EditMedicineScreenState extends ConsumerState<EditMedicineScreen> {
         .setTakeTab(_takeTabController.text);
   }
 
-  void _onReconcileChanged() {
-    ref
-        .read(editMedicineFormProvider(widget.medicine.medicineListId).notifier)
-        .setReconcile(_reconcileController.text);
-  }
-
   @override
   void dispose() {
     _takeTabController.removeListener(_onTakeTabChanged);
-    _reconcileController.removeListener(_onReconcileChanged);
     _takeTabController.dispose();
     _everyHrController.dispose();
-    _reconcileController.dispose();
-    _daysController.dispose();
     _noteController.dispose();
     super.dispose();
-  }
-
-  /// เลือกวันที่
-  Future<void> _selectDate(bool isOnDate) async {
-    final formState = ref.read(editMedicineFormProvider(widget.medicine.medicineListId)).value;
-    if (formState == null) return;
-
-    final initialDate = isOnDate ? formState.onDate : (formState.offDate ?? DateTime.now());
-
-    final selectedDate = await showDatePicker(
-      context: context,
-      initialDate: initialDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2030),
-    );
-
-    if (selectedDate != null) {
-      final notifier = ref.read(editMedicineFormProvider(widget.medicine.medicineListId).notifier);
-      if (isOnDate) {
-        notifier.setOnDate(selectedDate);
-      } else {
-        notifier.setOffDate(selectedDate);
-      }
-    }
   }
 
   /// บันทึก
@@ -125,7 +90,6 @@ class _EditMedicineScreenState extends ConsumerState<EditMedicineScreen> {
 
     // Sync values ก่อน submit
     notifier.setEveryHr(_everyHrController.text);
-    notifier.setReconcile(_reconcileController.text);
     notifier.setNote(_noteController.text);
 
     final success = await notifier.submit();
@@ -147,19 +111,9 @@ class _EditMedicineScreenState extends ConsumerState<EditMedicineScreen> {
     final formState = ref.watch(editMedicineFormProvider(widget.medicine.medicineListId));
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'แก้ไขยา ${widget.medicine.displayName}',
-          overflow: TextOverflow.ellipsis,
-        ),
-        leading: IconButton(
-          icon: HugeIcon(
-            icon: HugeIcons.strokeRoundedArrowLeft01,
-            color: AppColors.textPrimary,
-            size: 24,
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
+      // ใช้ IreneSecondaryAppBar แทน AppBar เพื่อ consistency ทั้งแอป
+      appBar: IreneSecondaryAppBar(
+        title: 'แก้ไขยา ${widget.medicine.displayName}',
       ),
       body: formState.when(
         // กำลังโหลด
@@ -371,140 +325,7 @@ class _EditMedicineScreenState extends ConsumerState<EditMedicineScreen> {
                 const SizedBox(height: AppSpacing.lg),
 
                 // ==========================================
-                // Section 4: Stock (ได้รับยาเข้า)
-                // ==========================================
-                _SectionHeader(
-                  icon: HugeIcons.strokeRoundedPackageReceive,
-                  title: 'จำนวนยาที่รับเข้า',
-                ),
-                const SizedBox(height: AppSpacing.md),
-
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: Text(
-                        'ได้รับยาเข้าเป็นจำนวน',
-                        textAlign: TextAlign.end,
-                        style: AppTypography.body,
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    Expanded(
-                      flex: 1,
-                      child: TextField(
-                        controller: _reconcileController,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        textAlign: TextAlign.center,
-                        decoration: _inputDecoration(hintText: 'จำนวน'),
-                        style: AppTypography.body,
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    Expanded(
-                      flex: 1,
-                      child: Text(widget.medicine.unit ?? 'เม็ด', style: AppTypography.body),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: AppSpacing.lg),
-
-                // ==========================================
-                // Section 5: ระยะเวลาให้ยา
-                // ==========================================
-                _SectionHeader(
-                  icon: HugeIcons.strokeRoundedCalendarCheckIn01,
-                  title: 'ระยะเวลาให้ยา (จาก setting ใหม่)',
-                ),
-                const SizedBox(height: AppSpacing.md),
-
-                // วันที่เริ่ม setting ใหม่
-                _DatePickerField(
-                  date: state.onDate,
-                  onTap: () => _selectDate(true),
-                  prefixText: 'เริ่มใช้ setting ใหม่: ',
-                ),
-                const SizedBox(height: AppSpacing.md),
-
-                // ต่อเนื่อง (CheckboxListTile)
-                Container(
-                  decoration: BoxDecoration(
-                    color: state.isContinuous ? AppColors.accent1 : AppColors.background,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: CheckboxListTile(
-                    value: state.isContinuous,
-                    onChanged: (value) => ref
-                        .read(editMedicineFormProvider(widget.medicine.medicineListId).notifier)
-                        .setIsContinuous(value ?? true),
-                    title: Text(
-                      'ต่อเนื่อง (continue)',
-                      style: AppTypography.body.copyWith(fontWeight: FontWeight.w500),
-                    ),
-                    activeColor: AppColors.primary,
-                    checkColor: AppColors.surface,
-                    controlAffinity: ListTileControlAffinity.leading,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-                  ),
-                ),
-
-                // ให้เป็นเวลา X วัน (เมื่อไม่ต่อเนื่อง)
-                if (!state.isContinuous) ...[
-                  const SizedBox(height: AppSpacing.md),
-                  Row(
-                    children: [
-                      Expanded(
-                        flex: 1,
-                        child: Text('ให้เป็นเวลา', textAlign: TextAlign.end, style: AppTypography.body),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        flex: 1,
-                        child: TextField(
-                          controller: _daysController,
-                          keyboardType: TextInputType.number,
-                          textAlign: TextAlign.center,
-                          onChanged: (value) {
-                            final days = int.tryParse(value);
-                            if (days != null && days > 0) {
-                              final offDate = state.onDate.add(Duration(days: days));
-                              ref
-                                  .read(editMedicineFormProvider(widget.medicine.medicineListId).notifier)
-                                  .setOffDate(offDate);
-                            }
-                          },
-                          decoration: _inputDecoration(hintText: 'จำนวน'),
-                          style: AppTypography.body,
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Expanded(flex: 1, child: Text('วัน', style: AppTypography.body)),
-                    ],
-                  ),
-                  // แสดง "ถึงวันที่: X" (เมื่อมี offDate)
-                  if (state.offDate != null) ...[
-                    const SizedBox(height: AppSpacing.md),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(AppSpacing.md),
-                      decoration: BoxDecoration(
-                        color: AppColors.background,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        'ถึงวันที่: ${state.offDate!.day}/${state.offDate!.month}/${state.offDate!.year}',
-                        style: AppTypography.body.copyWith(color: AppColors.secondaryText),
-                      ),
-                    ),
-                  ],
-                ],
-
-                const SizedBox(height: AppSpacing.lg),
-
-                // ==========================================
-                // Section 6: หมายเหตุการแก้ไข (required)
+                // Section 4: หมายเหตุการแก้ไข (required)
                 // ==========================================
                 _SectionHeader(
                   icon: HugeIcons.strokeRoundedNote01,
@@ -688,63 +509,6 @@ class _LabeledField extends StatelessWidget {
         const SizedBox(height: AppSpacing.xs),
         child,
       ],
-    );
-  }
-}
-
-/// Date Picker Field
-class _DatePickerField extends StatelessWidget {
-  const _DatePickerField({
-    required this.onTap,
-    this.date,
-    this.prefixText,
-  });
-
-  final DateTime? date;
-  final VoidCallback onTap;
-  final String? prefixText;
-
-  @override
-  Widget build(BuildContext context) {
-    final dateStr = date != null
-        ? '${date!.day}/${date!.month}/${date!.year}'
-        : 'เลือกวันที่';
-    final displayText = prefixText != null ? '$prefixText$dateStr' : dateStr;
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.md,
-        ),
-        decoration: BoxDecoration(
-          color: AppColors.background,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.alternate, width: 1),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                displayText,
-                style: AppTypography.body.copyWith(
-                  color: date != null ? AppColors.textPrimary : AppColors.secondaryText,
-                ),
-              ),
-            ),
-            Center(
-              child: HugeIcon(
-                icon: HugeIcons.strokeRoundedCalendar01,
-                color: AppColors.secondaryText,
-                size: 20,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

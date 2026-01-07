@@ -83,5 +83,6 @@ class DDService {
   void invalidateCache() {
     _cachedRecords = null;
     _cacheTime = null;
+    _cachedUserId = null;
   }
 }

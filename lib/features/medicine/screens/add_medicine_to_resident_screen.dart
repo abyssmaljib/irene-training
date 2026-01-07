@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/buttons.dart';
+import '../../../core/widgets/irene_app_bar.dart';
 import '../../../core/services/user_service.dart';
 import '../../checklist/models/system_role.dart';
 import '../models/med_db.dart';
@@ -202,20 +203,11 @@ class _AddMedicineToResidentScreenState
     final formState = ref.watch(addMedicineFormProvider(widget.residentId));
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          widget.residentName != null
-              ? 'เพิ่มยาให้คุณ${widget.residentName}'
-              : 'เพิ่มยาให้คนไข้',
-        ),
-        leading: IconButton(
-          icon: HugeIcon(
-            icon: HugeIcons.strokeRoundedArrowLeft01,
-            color: AppColors.textPrimary,
-            size: 24,
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
+      // ใช้ IreneSecondaryAppBar แทน AppBar เพื่อ consistency ทั้งแอป
+      appBar: IreneSecondaryAppBar(
+        title: widget.residentName != null
+            ? 'เพิ่มยาให้คุณ${widget.residentName}'
+            : 'เพิ่มยาให้คนไข้',
       ),
       body: formState.when(
         // กำลังโหลด

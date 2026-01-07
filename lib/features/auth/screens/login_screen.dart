@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:pin_code_fields/pin_code_fields.dart';
 import 'package:hugeicons/hugeicons.dart';
@@ -654,61 +653,11 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // Quick login for development
-  Future<void> _devLogin() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      await Supabase.instance.client.auth.signInWithPassword(
-        email: 'beautyheechul@gmail.com',
-        password: '123456789',
-      );
-
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
-        );
-      }
-    } on AuthException catch (e) {
-      setState(() => _errorMessage = _getThaiErrorMessage(e.message));
-    } catch (e) {
-      setState(() => _errorMessage = 'เกิดข้อผิดพลาด กรุณาลองใหม่');
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
   Widget _buildFooter() {
     return Padding(
       padding: EdgeInsets.only(bottom: AppSpacing.xl),
       child: Column(
         children: [
-          // Dev Login button
-          SizedBox(
-            height: AppSpacing.buttonHeight,
-            child: OutlinedButton.icon(
-              onPressed: _isLoading ? null : _devLogin,
-              icon: HugeIcon(icon: HugeIcons.strokeRoundedSourceCode, size: AppIconSize.md),
-              label: Text(
-                'Dev Login',
-                style: AppTypography.bodySmall.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.warning,
-                side: BorderSide(color: AppColors.warning),
-                shape: RoundedRectangleBorder(
-                  borderRadius: AppRadius.smallRadius,
-                ),
-              ),
-            ),
-          ),
-          AppSpacing.verticalGapSm,
           // Forgot password link
           SizedBox(
             height: AppSpacing.buttonHeight,
@@ -730,53 +679,6 @@ class _LoginScreenState extends State<LoginScreen> {
             style: AppTypography.caption.copyWith(
               color: AppColors.textSecondary,
             ),
-          ),
-          AppSpacing.verticalGapLg,
-          // Debug Info
-          _buildDebugInfo(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDebugInfo() {
-    final supabaseUrl = Supabase.instance.client.rest.url;
-    final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
-    final isAndroid = defaultTargetPlatform == TargetPlatform.android;
-
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-      padding: AppSpacing.paddingSm,
-      decoration: BoxDecoration(
-        color: AppColors.error.withValues(alpha: 0.1),
-        borderRadius: AppRadius.smallRadius,
-        border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '🔧 Debug Info',
-            style: AppTypography.bodySmall.copyWith(
-              fontWeight: FontWeight.bold,
-              color: AppColors.error,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Platform: ${kIsWeb ? "Web" : isIOS ? "iOS" : isAndroid ? "Android" : "Other"}',
-            style: AppTypography.caption.copyWith(fontSize: 10),
-          ),
-          Text(
-            'Supabase URL: ${supabaseUrl.isNotEmpty ? "${supabaseUrl.substring(0, 30)}..." : "EMPTY!"}',
-            style: AppTypography.caption.copyWith(
-              fontSize: 10,
-              color: supabaseUrl.isEmpty ? AppColors.error : AppColors.textSecondary,
-            ),
-          ),
-          Text(
-            'Has Session: ${Supabase.instance.client.auth.currentSession != null}',
-            style: AppTypography.caption.copyWith(fontSize: 10),
           ),
         ],
       ),

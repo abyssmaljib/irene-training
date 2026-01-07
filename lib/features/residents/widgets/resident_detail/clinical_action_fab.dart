@@ -34,6 +34,7 @@ class ClinicalActionFab extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true, // ให้ modal ขยายได้ตาม content
       builder: (context) => _ClinicalActionSheet(
         residentId: residentId,
         residentName: residentName,
@@ -78,22 +79,9 @@ class _ClinicalActionSheet extends StatelessWidget {
             // Header
             Padding(
               padding: EdgeInsets.all(AppSpacing.md),
-              child: Row(
-                children: [
-                  Text(
-                    'ทำงานด่วน (คลินิก)',
-                    style: AppTypography.heading3,
-                  ),
-                  Spacer(),
-                  // ปุ่มปิด
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: HugeIcon(
-                      icon: HugeIcons.strokeRoundedCancelCircle,
-                      color: AppColors.secondaryText,
-                    ),
-                  ),
-                ],
+              child: Text(
+                'ทำงานด่วน (คลินิก)',
+                style: AppTypography.heading3,
               ),
             ),
 

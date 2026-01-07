@@ -8,6 +8,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/buttons.dart';
+import '../../../core/widgets/irene_app_bar.dart';
 import '../providers/create_medicine_db_provider.dart';
 import '../services/medicine_service.dart';
 
@@ -145,12 +146,42 @@ class _CreateMedicineDBScreenState
       }
 
       // Upload to Supabase
+      debugPrint('[CreateMedicineDB] Uploading image: ${pickedFile.path}');
       final url = await MedicineService.instance.uploadMedicineImage(
         File(pickedFile.path),
         imageType,
       );
+      debugPrint('[CreateMedicineDB] Upload result URL: $url');
 
-      // Set URL
+      // ตรวจสอบว่า upload สำเร็จหรือไม่
+      if (url == null) {
+        // Upload fail - แสดง error และ reset uploading state
+        switch (imageType) {
+          case 'frontFoiled':
+            notifier.setUploading(frontFoiled: false);
+            break;
+          case 'backFoiled':
+            notifier.setUploading(backFoiled: false);
+            break;
+          case 'frontNude':
+            notifier.setUploading(frontNude: false);
+            break;
+          case 'backNude':
+            notifier.setUploading(backNude: false);
+            break;
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('ไม่สามารถ upload รูปได้ กรุณาลองใหม่'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Set URL (upload สำเร็จ)
       switch (imageType) {
         case 'frontFoiled':
           notifier.setFrontFoiledUrl(url);
@@ -166,6 +197,7 @@ class _CreateMedicineDBScreenState
           break;
       }
     } catch (e) {
+      debugPrint('[CreateMedicineDB] Error picking/uploading image: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -204,16 +236,11 @@ class _CreateMedicineDBScreenState
     final atcLevel1List = ref.watch(atcLevel1ListProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('เพิ่มยาในฐานข้อมูล'),
-        leading: IconButton(
-          icon: HugeIcon(
-            icon: HugeIcons.strokeRoundedCancel01,
-            color: AppColors.textPrimary,
-            size: 24,
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
+      // ใช้ IreneSecondaryAppBar แทน AppBar เพื่อ consistency ทั้งแอป
+      // ใช้ Cancel icon เพราะเป็นหน้า create form (ปิดโดยไม่บันทึก)
+      appBar: IreneSecondaryAppBar(
+        title: 'เพิ่มยาในฐานข้อมูล',
+        leadingIcon: HugeIcons.strokeRoundedCancel01,
       ),
       body: formState.when(
         // กำลังโหลด

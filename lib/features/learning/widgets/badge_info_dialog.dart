@@ -133,14 +133,6 @@ class _BadgeInfoDialogState extends State<BadgeInfoDialog>
                         ],
                       ),
                     ),
-                    SizedBox(
-                      width: 48,
-                      height: 48,
-                      child: IconButton(
-                        icon: HugeIcon(icon: HugeIcons.strokeRoundedCancelCircle),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                    ),
                   ],
                 ),
               ),
