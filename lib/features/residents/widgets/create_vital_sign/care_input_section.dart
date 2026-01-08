@@ -41,7 +41,8 @@ class CareInputSection extends ConsumerWidget {
     // Helper functions
     void setInput(String v) => isEditMode ? editNotifier!.setInput(v) : createNotifier.setInput(v);
     void setOutput(String v) => isEditMode ? editNotifier!.setOutput(v) : createNotifier.setOutput(v);
-    void setDefecation(bool v) => isEditMode ? editNotifier!.setDefecation(v) : createNotifier.setDefecation(v);
+    // defecation เป็น bool? (nullable) - null = ยังไม่ได้เลือก
+    void setDefecation(bool? v) => isEditMode ? editNotifier!.setDefecation(v) : createNotifier.setDefecation(v);
     void setConstipation(String v) => isEditMode ? editNotifier!.setConstipation(v) : createNotifier.setConstipation(v);
     void setNapkin(String v) => isEditMode ? editNotifier!.setNapkin(v) : createNotifier.setNapkin(v);
 
@@ -71,79 +72,13 @@ class CareInputSection extends ConsumerWidget {
         ),
         const SizedBox(height: AppSpacing.md),
 
-        // Defecation Section
-        Padding(
-          padding: const EdgeInsets.only(top: 16),
-          child: Text(
-            'วันนี้ได้อุจจาระหรือไม่?',
-            style: AppTypography.label.copyWith(
-              color: AppColors.textPrimary,
-            ),
-          ),
+        // Defecation Section - Card ใหญ่เด่นชัด เตะตา
+        _DefecationCard(
+          defecation: formState.defecation,
+          constipation: formState.constipation,
+          onDefecationChanged: setDefecation,
+          onConstipationChanged: setConstipation,
         ),
-
-        // Defecation Toggle with background icon
-        Stack(
-          children: [
-            // Background icon (shadow effect)
-            Positioned(
-              right: 16,
-              top: 0,
-              bottom: 0,
-              child: HugeIcon(
-                icon: HugeIcons.strokeRoundedActivity02,
-                size: 80,
-                color: AppColors.alternate.withValues(alpha: 0.3),
-              ),
-            ),
-
-            // Main content
-            Material(
-              color: Colors.transparent,
-              child: SwitchListTile.adaptive(
-                value: formState.defecation,
-                onChanged: setDefecation,
-                title: Text(
-                  formState.defecation ? 'อุจจาระออก 💩🎉' : 'อุจจาระไม่ออก 😣',
-                  style: AppTypography.heading3,
-                ),
-                activeTrackColor: AppColors.accent1,
-                controlAffinity: ListTileControlAffinity.leading,
-                contentPadding: const EdgeInsets.symmetric(vertical: 8),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-
-        // Constipation field when NOT defecated
-        if (!formState.defecation)
-          _CareInputField(
-            label: 'วันท้องผูก',
-            icon: HugeIcons.strokeRoundedToilet01,
-            unit: 'วัน',
-            value: formState.constipation,
-            onChanged: setConstipation,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            hint: 'แก้ไขได้ถ้าระบบคำนวณผิด',
-            enabled: true,
-          ),
-
-        // Constipation field when defecated (read-only, shows 0)
-        if (formState.defecation)
-          _CareInputField(
-            label: 'วันท้องผูก',
-            icon: HugeIcons.strokeRoundedToilet01,
-            unit: 'วัน',
-            value: '0',
-            onChanged: (_) {},
-            keyboardType: TextInputType.number,
-            hint: 'รีเซ็ตเป็น 0 เพราะถ่ายแล้ว',
-            enabled: false,
-          ),
         const SizedBox(height: AppSpacing.md),
 
         // Napkin Count
@@ -171,7 +106,6 @@ class _CareInputField extends StatefulWidget {
     required this.onChanged,
     this.keyboardType,
     this.hint,
-    this.enabled = true,
   });
 
   final String label;
@@ -181,10 +115,399 @@ class _CareInputField extends StatefulWidget {
   final ValueChanged<String> onChanged;
   final TextInputType? keyboardType;
   final String? hint;
-  final bool enabled;
 
   @override
   State<_CareInputField> createState() => _CareInputFieldState();
+}
+
+/// Card สำหรับ section อุจจาระ - ออกแบบให้ใหญ่และเด่นชัด เตะตา
+/// เพื่อให้ user สังเกตเห็นง่ายและไม่พลาดการกรอกข้อมูลส่วนนี้
+class _DefecationCard extends StatelessWidget {
+  const _DefecationCard({
+    required this.defecation,
+    required this.constipation,
+    required this.onDefecationChanged,
+    required this.onConstipationChanged,
+  });
+
+  // null = ยังไม่ได้เลือก, true = ถ่ายแล้ว, false = ยังไม่ถ่าย
+  final bool? defecation;
+  final String? constipation;
+  final ValueChanged<bool?> onDefecationChanged;
+  final ValueChanged<String> onConstipationChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    // สีพื้นหลังตามสถานะ:
+    // - null (ยังไม่เลือก) = สีเทา/neutral เพื่อเตือนให้เลือก
+    // - true (ถ่ายแล้ว) = สีเขียว
+    // - false (ยังไม่ถ่าย) = สีแดง
+    final Color backgroundColor;
+    final Color borderColor;
+    final Color accentColor;
+    final String headerEmoji;
+
+    if (defecation == null) {
+      // ยังไม่ได้เลือก - ใช้สีส้ม warning เพื่อเตือน
+      backgroundColor = AppColors.warning.withValues(alpha: 0.08);
+      borderColor = AppColors.warning.withValues(alpha: 0.3);
+      accentColor = AppColors.warning;
+      headerEmoji = '❓';
+    } else if (defecation!) {
+      // ถ่ายแล้ว - สีเขียว
+      backgroundColor = AppColors.success.withValues(alpha: 0.08);
+      borderColor = AppColors.success.withValues(alpha: 0.3);
+      accentColor = AppColors.success;
+      headerEmoji = '💩';
+    } else {
+      // ยังไม่ถ่าย - สีเทาเข้ม (neutral/dark)
+      backgroundColor = AppColors.secondaryText.withValues(alpha: 0.08);
+      borderColor = AppColors.secondaryText.withValues(alpha: 0.3);
+      accentColor = AppColors.secondaryText;
+      headerEmoji = '🚽';
+    }
+
+    return Stack(
+      children: [
+        // Background icon ตกแต่ง - PoopIcon ใหญ่ๆ ด้านหลัง
+        Positioned(
+          right: 16,
+          top: 16,
+          child: HugeIcon(
+            icon: HugeIcons.strokeRoundedPoop,
+            size: 100,
+            color: accentColor.withValues(alpha: 0.08),
+          ),
+        ),
+        // Main content
+        Container(
+          margin: const EdgeInsets.only(top: AppSpacing.sm),
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: borderColor, width: 2),
+          ),
+          child: Column(
+            children: [
+              // Header พร้อม icon ใหญ่ๆ
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  AppSpacing.md,
+                  AppSpacing.md,
+                  AppSpacing.sm,
+                ),
+                child: Row(
+                  children: [
+                    // Icon วงกลมใหญ่
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: accentColor.withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text(
+                          headerEmoji,
+                          style: const TextStyle(fontSize: 28),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    // Title และ subtitle
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'การขับถ่าย',
+                            style: AppTypography.heading3.copyWith(
+                              color: accentColor,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            defecation == null
+                                ? 'กรุณาเลือกสถานะ *'
+                                : 'วันนี้ได้อุจจาระหรือไม่?',
+                            style: AppTypography.bodySmall.copyWith(
+                              color: defecation == null
+                                  ? AppColors.warning
+                                  : AppColors.secondaryText,
+                              fontWeight: defecation == null
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Toggle buttons แบบ 2 ปุ่มใหญ่ๆ
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                child: Row(
+                  children: [
+                    // ปุ่ม "ถ่ายแล้ว"
+                    Expanded(
+                      child: _DefecationToggleButton(
+                        label: 'ถ่ายแล้ว',
+                        emoji: '🎉',
+                        isSelected: defecation == true,
+                        selectedColor: AppColors.success,
+                        onTap: () => onDefecationChanged(true),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    // ปุ่ม "ยังไม่ถ่าย" - ใช้สีเทาเข้ม
+                    Expanded(
+                      child: _DefecationToggleButton(
+                        label: 'ยังไม่ถ่าย',
+                        emoji: '😣',
+                        isSelected: defecation == false,
+                        selectedColor: AppColors.secondaryText,
+                        onTap: () => onDefecationChanged(false),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Constipation field - แสดงเมื่อเลือกแล้ว
+              if (defecation != null)
+                Padding(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  child: _ConstipationField(
+                    defecation: defecation!,
+                    constipation: constipation,
+                    onChanged: onConstipationChanged,
+                  ),
+                ),
+
+              // เมื่อยังไม่ได้เลือก แสดงข้อความเตือน
+              if (defecation == null)
+                Padding(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  child: Container(
+                    padding: const EdgeInsets.all(AppSpacing.sm),
+                    decoration: BoxDecoration(
+                      color: AppColors.warning.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        HugeIcon(
+                          icon: HugeIcons.strokeRoundedAlert02,
+                          size: AppIconSize.md,
+                          color: AppColors.warning,
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: Text(
+                            'กรุณาเลือกสถานะการขับถ่ายก่อนบันทึก',
+                            style: AppTypography.bodySmall.copyWith(
+                              color: AppColors.warning,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// ปุ่ม toggle สำหรับเลือกสถานะอุจจาระ - ออกแบบให้กดง่าย เห็นชัด
+class _DefecationToggleButton extends StatelessWidget {
+  const _DefecationToggleButton({
+    required this.label,
+    required this.emoji,
+    required this.isSelected,
+    required this.selectedColor,
+    required this.onTap,
+  });
+
+  final String label;
+  final String emoji;
+  final bool isSelected;
+  final Color selectedColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? selectedColor.withValues(alpha: 0.15)
+                : Colors.white.withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected
+                  ? selectedColor
+                  : AppColors.alternate,
+              width: isSelected ? 2 : 1,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                emoji,
+                style: const TextStyle(fontSize: 20),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: AppTypography.body.copyWith(
+                  color: isSelected ? selectedColor : AppColors.secondaryText,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                ),
+              ),
+              if (isSelected) ...[
+                const SizedBox(width: 6),
+                HugeIcon(
+                  icon: HugeIcons.strokeRoundedTick02,
+                  size: AppIconSize.sm,
+                  color: selectedColor,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Field สำหรับแสดงจำนวนวันท้องผูก
+class _ConstipationField extends StatefulWidget {
+  const _ConstipationField({
+    required this.defecation,
+    required this.constipation,
+    required this.onChanged,
+  });
+
+  final bool defecation;
+  final String? constipation;
+  final ValueChanged<String> onChanged;
+
+  @override
+  State<_ConstipationField> createState() => _ConstipationFieldState();
+}
+
+class _ConstipationFieldState extends State<_ConstipationField> {
+  late TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(
+      text: widget.defecation ? '0' : widget.constipation,
+    );
+  }
+
+  @override
+  void didUpdateWidget(_ConstipationField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // อัปเดต text เมื่อ defecation เปลี่ยน หรือ constipation เปลี่ยนจากภายนอก
+    if (widget.defecation != oldWidget.defecation) {
+      _controller.text = widget.defecation ? '0' : (widget.constipation ?? '');
+    } else if (!widget.defecation &&
+        widget.constipation != oldWidget.constipation &&
+        widget.constipation != _controller.text) {
+      _controller.text = widget.constipation ?? '';
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = !widget.defecation;
+    final bgColor = enabled
+        ? Colors.white
+        : AppColors.background.withValues(alpha: 0.5);
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          HugeIcon(
+            icon: HugeIcons.strokeRoundedCalendar03,
+            size: AppIconSize.lg,
+            color: enabled ? AppColors.secondaryText : AppColors.secondaryText.withValues(alpha: 0.5),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'วันท้องผูก',
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.secondaryText,
+                  ),
+                ),
+                TextField(
+                  controller: _controller,
+                  enabled: enabled,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                  ],
+                  style: AppTypography.heading3.copyWith(
+                    color: enabled ? AppColors.textPrimary : AppColors.secondaryText,
+                  ),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    contentPadding: EdgeInsets.zero,
+                    border: InputBorder.none,
+                    hintText: enabled ? 'แก้ไขได้ถ้าระบบคำนวณผิด' : 'รีเซ็ตเป็น 0 เพราะถ่ายแล้ว',
+                    hintStyle: AppTypography.bodySmall.copyWith(
+                      color: AppColors.secondaryText.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  onChanged: widget.onChanged,
+                ),
+              ],
+            ),
+          ),
+          Text(
+            'วัน',
+            style: AppTypography.body.copyWith(
+              color: AppColors.secondaryText,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _CareInputFieldState extends State<_CareInputField> {
@@ -216,7 +539,6 @@ class _CareInputFieldState extends State<_CareInputField> {
     return TextField(
       controller: _controller,
       keyboardType: widget.keyboardType ?? TextInputType.text,
-      enabled: widget.enabled,
       inputFormatters: widget.keyboardType == TextInputType.number
           ? [
               FilteringTextInputFormatter.digitsOnly,
@@ -234,15 +556,13 @@ class _CareInputFieldState extends State<_CareInputField> {
           child: HugeIcon(
             icon: widget.icon,
             size: AppIconSize.input,
-            color: widget.enabled ? AppColors.secondaryText : AppColors.secondaryText.withValues(alpha: 0.5),
+            color: AppColors.secondaryText,
           ),
         ),
         prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
         hintText: widget.hint,
         filled: true,
-        fillColor: widget.enabled
-            ? AppColors.background
-            : AppColors.background.withValues(alpha: 0.5),
+        fillColor: AppColors.background,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),

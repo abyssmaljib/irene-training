@@ -28,7 +28,7 @@ class AppColors {
 
   // Status Colors
   static const Color success = Color(0xFF023618); // Green
-  static const Color warning = Color(0xFFDEB841); // Yellow
+  static const Color warning = Color(0xFFE67E22); // Orange (เข้มขึ้นจากเหลือง เห็นชัดกว่า)
   static const Color error = Color(0xFFC60031); // Red
   static const Color info = Color(0xFFFFFFFF); // White
 

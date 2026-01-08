@@ -74,12 +74,12 @@ class VitalSignFormNotifier
         );
       }
 
-      // 6. Set initial state (defecation default = true, so constipation = '0')
+      // 6. Set initial state (defecation default = null, ยังไม่ได้เลือก)
       state = AsyncValue.data(VitalSignFormState(
         selectedDateTime: now,
         shift: shift,
-        defecation: true,
-        constipation: '0', // Default to '0' because defecation = true
+        defecation: null, // ยังไม่ได้เลือก - user ต้องเลือกเอง
+        constipation: null, // ยังไม่คำนวณจนกว่า user จะเลือก defecation
         ratings: ratings,
         reportD: templates?['templateD'] ?? '',
         reportN: templates?['templateN'] ?? '',
@@ -230,11 +230,14 @@ class VitalSignFormNotifier
     });
   }
 
-  void setDefecation(bool value) {
+  void setDefecation(bool? value) {
     state.whenData((data) {
-      String newConstipation;
+      String? newConstipation;
 
-      if (value) {
+      if (value == null) {
+        // ยังไม่ได้เลือก
+        newConstipation = null;
+      } else if (value) {
         // Defecated -> reset to '0'
         newConstipation = '0';
       } else {
@@ -312,6 +315,16 @@ class VitalSignFormNotifier
       state = AsyncValue.data(
         currentState.copyWith(
           errorMessage: 'กรุณากรอกสัญญาณชีพอย่างน้อย 1 รายการ',
+        ),
+      );
+      return false;
+    }
+
+    // Validate defecation - ต้องเลือกสถานะการขับถ่าย (Full Report only)
+    if (currentState.isFullReport && currentState.defecation == null) {
+      state = AsyncValue.data(
+        currentState.copyWith(
+          errorMessage: 'กรุณาเลือกสถานะการขับถ่าย (ถ่ายแล้ว/ยังไม่ถ่าย)',
         ),
       );
       return false;
@@ -606,11 +619,14 @@ class EditVitalSignFormNotifier
     });
   }
 
-  void setDefecation(bool value) {
+  void setDefecation(bool? value) {
     state.whenData((data) {
-      String newConstipation;
+      String? newConstipation;
 
-      if (value) {
+      if (value == null) {
+        // ยังไม่ได้เลือก
+        newConstipation = null;
+      } else if (value) {
         newConstipation = '0';
       } else {
         final lastConst = _lastConstipation ?? 0.0;
@@ -686,6 +702,16 @@ class EditVitalSignFormNotifier
       state = AsyncValue.data(
         currentState.copyWith(
           errorMessage: 'กรุณากรอกสัญญาณชีพอย่างน้อย 1 รายการ',
+        ),
+      );
+      return false;
+    }
+
+    // Validate defecation - ต้องเลือกสถานะการขับถ่าย (Full Report only)
+    if (currentState.isFullReport && currentState.defecation == null) {
+      state = AsyncValue.data(
+        currentState.copyWith(
+          errorMessage: 'กรุณาเลือกสถานะการขับถ่าย (ถ่ายแล้ว/ยังไม่ถ่าย)',
         ),
       );
       return false;

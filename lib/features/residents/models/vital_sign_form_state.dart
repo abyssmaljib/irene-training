@@ -22,7 +22,7 @@ class VitalSignFormState {
   final String? input;
   final String? output;
   final String? napkin;
-  final bool defecation;
+  final bool? defecation; // null = ยังไม่ได้เลือก, true = ถ่ายแล้ว, false = ยังไม่ถ่าย
   final String? constipation;
 
   // Ratings & Report
@@ -50,7 +50,7 @@ class VitalSignFormState {
     this.input,
     this.output,
     this.napkin,
-    this.defecation = true,
+    this.defecation, // default = null (ยังไม่ได้เลือก)
     this.constipation,
     this.ratings = const {},
     this.reportD,
