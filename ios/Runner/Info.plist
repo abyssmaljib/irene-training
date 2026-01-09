@@ -70,5 +70,10 @@
 	<string>แอปต้องการเข้าถึงกล้องเพื่อถ่ายรูปยาและบันทึกหลักฐานการให้ยา</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>แอปต้องการเข้าถึงไมโครโฟนเพื่อบันทึกวิดีโอประกอบการดูแลผู้สูงอายุ</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>
