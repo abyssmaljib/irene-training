@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:clarity_flutter/clarity_flutter.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -10,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/config/supabase_config.dart';
 import 'core/providers/shared_preferences_provider.dart';
+import 'core/services/fcm_service.dart';
 import 'features/auth/screens/login_screen.dart';
 import 'features/navigation/screens/main_navigation_screen.dart';
 import 'firebase_options.dart';
@@ -34,6 +36,9 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // Set up FCM background handler (must be before FCM initialization)
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
   // Initialize Crashlytics (NOT supported on Web)
   if (!kIsWeb) {
@@ -125,6 +130,11 @@ class _AuthWrapperState extends State<AuthWrapper> {
           if (!kIsWeb) {
             FirebaseCrashlytics.instance.setUserIdentifier(userId);
           }
+          // Initialize FCM and save token after login
+          FCMService.instance.initialize();
+        } else {
+          // Clear FCM token on logout
+          FCMService.instance.clearToken();
         }
       }
     });

@@ -14,6 +14,7 @@ import '../providers/task_provider.dart';
 import '../widgets/task_card.dart';
 import '../widgets/task_time_section.dart';
 import '../widgets/task_filter_drawer.dart';
+import '../services/task_realtime_service.dart';
 import 'task_detail_screen.dart';
 
 /// หน้าเช็คลิสต์ - รายการงาน
@@ -31,26 +32,44 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
   /// ติดตามว่า timeBlock ไหนกำลังเปิดอยู่ (accordion behavior)
   String? _expandedTimeBlock;
 
+  /// ProviderContainer สำหรับ realtime callback (ไม่ใช้ ref หลัง dispose)
+  ProviderContainer? _container;
+
   @override
   void initState() {
     super.initState();
-    // Subscribe to realtime updates
-    _subscribeToRealtimeUpdates();
+    // Subscribe to realtime updates will be done in didChangeDependencies
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Get container once and subscribe
+    if (_container == null) {
+      _container = ProviderScope.containerOf(context);
+      _subscribeToRealtimeUpdates();
+    }
   }
 
   @override
   void dispose() {
     // Unsubscribe from all channels when leaving the screen
-    ref.read(taskRealtimeServiceProvider).unsubscribeAll();
+    TaskRealtimeService.instance.unsubscribeAll();
+    _container = null;
     super.dispose();
   }
 
   void _subscribeToRealtimeUpdates() {
-    final realtimeService = ref.read(taskRealtimeServiceProvider);
-    realtimeService.subscribe(
+    final container = _container;
+    if (container == null) return;
+
+    TaskRealtimeService.instance.subscribe(
       onTaskUpdated: () {
         // Refresh tasks when other NA updates a task
-        refreshTasks(ref);
+        // ใช้ container แทน ref เพื่อหลีกเลี่ยง disposed ref error
+        if (mounted && _container != null) {
+          refreshTasksWithContainer(_container!);
+        }
       },
     );
   }

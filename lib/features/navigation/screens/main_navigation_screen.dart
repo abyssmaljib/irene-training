@@ -10,6 +10,7 @@ import '../../board/screens/board_screen.dart';
 import '../../residents/screens/residents_screen.dart';
 import '../../settings/screens/settings_screen.dart';
 import '../../shift_summary/providers/shift_summary_provider.dart';
+import '../../notifications/providers/notification_provider.dart';
 
 class MainNavigationScreen extends ConsumerStatefulWidget {
   final int initialIndex;
@@ -142,10 +143,16 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
     );
   }
 
-  /// Build profile nav item with notification badge for pending absences
+  /// Build profile nav item with notification badge for pending absences and notifications
   Widget _buildProfileNavItem() {
     final pendingAbsenceAsync = ref.watch(pendingAbsenceCountProvider);
     final hasPendingAbsence = pendingAbsenceAsync.maybeWhen(
+      data: (count) => count > 0,
+      orElse: () => false,
+    );
+
+    final unreadNotificationAsync = ref.watch(unreadNotificationCountProvider);
+    final hasUnreadNotifications = unreadNotificationAsync.maybeWhen(
       data: (count) => count > 0,
       orElse: () => false,
     );
@@ -173,8 +180,8 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
                   color: isSelected ? AppColors.primary : AppColors.secondaryText,
                   size: AppIconSize.xl,
                 ),
-                // Red notification dot for pending absences
-                if (hasPendingAbsence)
+                // Red dot for unread notifications or pending absences
+                if (hasUnreadNotifications || hasPendingAbsence)
                   Positioned(
                     right: -4,
                     top: -4,

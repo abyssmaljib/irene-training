@@ -32,6 +32,7 @@ import '../widgets/tarot_core_value_card.dart';
 import '../../dd_handover/widgets/dd_summary_card.dart';
 import '../../dd_handover/screens/dd_list_screen.dart';
 import '../../dd_handover/services/dd_service.dart';
+import '../services/clock_realtime_service.dart';
 
 /// หน้าหลัก - Dashboard with Clock-in/Clock-out
 class HomeScreen extends StatefulWidget {
@@ -47,6 +48,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final _clockService = ClockService.instance;
   final _userService = UserService();
   final _shiftSummaryService = ShiftSummaryService.instance;
+  final _clockRealtimeService = ClockRealtimeService.instance;
 
   // Zone data
   List<Zone> _zones = [];
@@ -119,12 +121,27 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadInitialData();
     // Listen for user changes (dev mode impersonation)
     _userService.userChangedNotifier.addListener(_onUserChanged);
+    // Subscribe to clock_in_out_ver2 realtime updates
+    _subscribeToClockUpdates();
   }
 
   @override
   void dispose() {
     _userService.userChangedNotifier.removeListener(_onUserChanged);
+    _clockRealtimeService.unsubscribe();
     super.dispose();
+  }
+
+  void _subscribeToClockUpdates() {
+    _clockRealtimeService.subscribe(
+      onClockUpdated: () {
+        // เมื่อเพื่อนขึ้น/ลงเวร ให้ refresh occupied residents และ break times
+        if (!_isClockedIn && mounted) {
+          _loadResidentsByZones();
+          _loadOccupiedBreakTimes();
+        }
+      },
+    );
   }
 
   void _onUserChanged() {
@@ -338,6 +355,24 @@ class _HomeScreenState extends State<HomeScreen> {
       if (_selectedZoneIds.isEmpty ||
           _selectedResidentIds.isEmpty ||
           _selectedBreakTimeIds.isEmpty) {
+        return;
+      }
+    }
+
+    // ตรวจสอบ occupied residents อีกครั้งก่อนขึ้นเวร (ป้องกัน race condition)
+    if (!_devMode) {
+      final latestOccupiedIds = await _clockService.getOccupiedResidentIds();
+      final conflictIds = _selectedResidentIds.intersection(latestOccupiedIds);
+      if (conflictIds.isNotEmpty && mounted) {
+        // มี resident ที่ถูกเลือกไปแล้ว → refresh และแจ้งเตือน
+        await _loadResidentsByZones();
+        await _loadOccupiedBreakTimes();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('มีคนไข้ที่เพื่อนเลือกไปแล้ว กรุณาเลือกใหม่'),
+            backgroundColor: Colors.orange,
+          ),
+        );
         return;
       }
     }

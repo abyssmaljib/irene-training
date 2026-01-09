@@ -488,6 +488,14 @@ void refreshTasks(WidgetRef ref) {
   ref.read(taskTypeSearchQueryProvider.notifier).state = '';
 }
 
+/// Helper function to refresh tasks using ProviderContainer (for realtime callbacks)
+void refreshTasksWithContainer(ProviderContainer container) {
+  TaskService.instance.invalidateCache();
+  container.read(taskRefreshCounterProvider.notifier).state++;
+  container.invalidate(tasksProvider);
+  container.invalidate(userShiftProvider);
+}
+
 // ============================================================
 // Pending Tasks Count Providers (งานค้างใน 2 ชม. ข้างหน้า)
 // ============================================================

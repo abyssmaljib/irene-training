@@ -61,7 +61,7 @@ final selectedMonthYearProvider = StateProvider<MonthYear?>((ref) => null);
 
 /// Provider สำหรับนับจำนวนวันขาดงานที่ยังไม่ได้แนบหลักฐาน (เดือนปัจจุบัน)
 /// ใช้แสดง badge notification ที่ปุ่ม "เวรของฉัน"
-final pendingAbsenceCountProvider = FutureProvider<int>((ref) async {
+final pendingAbsenceCountProvider = FutureProvider.autoDispose<int>((ref) async {
   // Watch refresh counter to trigger rebuild
   ref.watch(shiftSummaryRefreshCounterProvider);
   // Watch user change counter to refresh when impersonating

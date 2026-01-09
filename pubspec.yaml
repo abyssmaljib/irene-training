@@ -50,6 +50,7 @@ dependencies:
   clarity_flutter: ^1.6.0
   firebase_core: ^4.3.0
   firebase_crashlytics: ^5.0.6
+  firebase_messaging: ^16.1.0
   url_launcher: ^6.3.2
   cached_network_image: ^3.4.1
   # Camera & Image
