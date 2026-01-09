@@ -6,6 +6,7 @@ import 'package:lottie/lottie.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/irene_app_bar.dart';
 import '../../settings/screens/settings_screen.dart';
 import '../models/post.dart';
@@ -385,25 +386,7 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
   }
 
   Widget _buildEmptyState(String message) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          HugeIcon(
-            icon: HugeIcons.strokeRoundedFile01,
-            size: AppIconSize.display,
-            color: AppColors.secondaryText.withValues(alpha: 0.5),
-          ),
-          AppSpacing.verticalGapMd,
-          Text(
-            message,
-            style: AppTypography.body.copyWith(
-              color: AppColors.secondaryText,
-            ),
-          ),
-        ],
-      ),
-    );
+    return EmptyStateWidget(message: message);
   }
 
   Widget _buildErrorState(String message) {

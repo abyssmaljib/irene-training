@@ -3,6 +3,7 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/irene_app_bar.dart';
 import '../models/time_block_progress.dart';
 import '../models/time_block_task.dart';
@@ -104,25 +105,7 @@ class _TimeBlockDetailScreenState extends State<TimeBlockDetailScreen> {
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          HugeIcon(
-            icon: HugeIcons.strokeRoundedCalendar01,
-            size: 64,
-            color: AppColors.secondaryText.withValues(alpha: 0.4),
-          ),
-          AppSpacing.verticalGapMd,
-          Text(
-            'ไม่มีงานในวันนี้',
-            style: AppTypography.body.copyWith(
-              color: AppColors.secondaryText,
-            ),
-          ),
-        ],
-      ),
-    );
+    return const EmptyStateWidget(message: 'ไม่มีงานในวันนี้');
   }
 
   Widget _buildContent() {

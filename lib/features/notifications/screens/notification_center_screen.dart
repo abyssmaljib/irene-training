@@ -4,6 +4,7 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/irene_app_bar.dart';
 import '../models/app_notification.dart';
 import '../providers/notification_provider.dart';
@@ -110,33 +111,11 @@ class _NotificationCenterScreenState extends ConsumerState<NotificationCenterScr
   }
 
   Widget _buildEmptyState(bool showAll) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          HugeIcon(
-            icon: HugeIcons.strokeRoundedNotification03,
-            color: AppColors.secondaryText.withValues(alpha: 0.5),
-            size: 64,
-          ),
-          AppSpacing.verticalGapMd,
-          Text(
-            showAll ? 'ยังไม่มีการแจ้งเตือน' : 'ไม่มีการแจ้งเตือนที่ยังไม่อ่าน',
-            style: AppTypography.body.copyWith(
-              color: AppColors.secondaryText,
-            ),
-          ),
-          AppSpacing.verticalGapSm,
-          Text(
-            showAll 
-                ? 'การแจ้งเตือนใหม่จะปรากฏที่นี่'
-                : 'คุณอ่านการแจ้งเตือนทั้งหมดแล้ว 🎉',
-            style: AppTypography.bodySmall.copyWith(
-              color: AppColors.secondaryText.withValues(alpha: 0.7),
-            ),
-          ),
-        ],
-      ),
+    return EmptyStateWidget(
+      message: showAll ? 'ยังไม่มีการแจ้งเตือน' : 'ไม่มีการแจ้งเตือนที่ยังไม่อ่าน',
+      subMessage: showAll 
+          ? 'การแจ้งเตือนใหม่จะปรากฏที่นี่'
+          : 'คุณอ่านการแจ้งเตือนทั้งหมดแล้ว 🎉',
     );
   }
 

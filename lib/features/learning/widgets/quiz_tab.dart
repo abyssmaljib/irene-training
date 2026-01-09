@@ -3,6 +3,7 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/widgets/empty_state.dart';
 import '../models/quiz_history_item.dart';
 import '../models/topic_detail.dart';
 import '../models/thinking_skill_data.dart';
@@ -241,31 +242,9 @@ class QuizTab extends StatelessWidget {
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          HugeIcon(
-            icon: HugeIcons.strokeRoundedClock01,
-            size: AppIconSize.display,
-            color: AppColors.secondaryText.withValues(alpha: 0.5),
-          ),
-          AppSpacing.verticalGapMd,
-          Text(
-            'ยังไม่มีประวัติการทำแบบทดสอบ',
-            style: AppTypography.body.copyWith(
-              color: AppColors.secondaryText,
-            ),
-          ),
-          AppSpacing.verticalGapSm,
-          Text(
-            'กดปุ่มด้านล่างเพื่อเริ่มทำแบบทดสอบ',
-            style: AppTypography.bodySmall.copyWith(
-              color: AppColors.secondaryText,
-            ),
-          ),
-        ],
-      ),
+    return const EmptyStateWidget(
+      message: 'ยังไม่มีประวัติการทำแบบทดสอบ',
+      subMessage: 'กดปุ่มด้านล่างเพื่อเริ่มทำแบบทดสอบ',
     );
   }
 }

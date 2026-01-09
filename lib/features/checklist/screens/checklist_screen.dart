@@ -4,6 +4,7 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/irene_app_bar.dart';
 import '../../home/models/zone.dart';
 import '../../home/models/clock_in_out.dart';
@@ -652,34 +653,17 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
         break;
     }
 
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Image.asset(
-            'assets/images/relax_cat.webp',
-            width: 240,
-            height: 240,
-          ),
-          AppSpacing.verticalGapMd,
-          Text(
-            message,
-            style: AppTypography.body.copyWith(
-              color: AppColors.secondaryText,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          if (viewMode == TaskViewMode.upcoming) ...[
-            AppSpacing.verticalGapSm,
-            TextButton(
+    return EmptyStateWidget(
+      message: message,
+      imageSize: 240,
+      action: viewMode == TaskViewMode.upcoming
+          ? TextButton(
               onPressed: () {
                 ref.read(taskViewModeProvider.notifier).state = TaskViewMode.all;
               },
               child: const Text('ดูงานทั้งหมด'),
-            ),
-          ],
-        ],
-      ),
+            )
+          : null,
     );
   }
 

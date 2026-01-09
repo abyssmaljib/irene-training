@@ -4,6 +4,7 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/irene_app_bar.dart';
 import '../../board/providers/create_post_provider.dart';
 import '../../board/screens/advanced_create_post_screen.dart';
@@ -193,25 +194,7 @@ class _DDListScreenState extends ConsumerState<DDListScreen>
   }
 
   Widget _buildEmptyState(String message) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          HugeIcon(
-            icon: HugeIcons.strokeRoundedCalendarCheckIn01,
-            size: AppIconSize.display,
-            color: AppColors.secondaryText.withValues(alpha: 0.5),
-          ),
-          SizedBox(height: AppSpacing.md),
-          Text(
-            message,
-            style: AppTypography.body.copyWith(
-              color: AppColors.secondaryText,
-            ),
-          ),
-        ],
-      ),
-    );
+    return EmptyStateWidget(message: message);
   }
 
   Widget _buildErrorState(String error) {

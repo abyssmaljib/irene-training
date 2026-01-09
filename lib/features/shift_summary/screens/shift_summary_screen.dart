@@ -4,6 +4,7 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/irene_app_bar.dart';
 import '../providers/shift_summary_provider.dart';
 import '../widgets/monthly_summary_card.dart';
@@ -194,25 +195,7 @@ class _ShiftSummaryScreenState extends ConsumerState<ShiftSummaryScreen> {
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          HugeIcon(
-            icon: HugeIcons.strokeRoundedCalendar01,
-            size: AppIconSize.display,
-            color: AppColors.secondaryText.withValues(alpha: 0.5),
-          ),
-          SizedBox(height: AppSpacing.md),
-          Text(
-            'ยังไม่มีข้อมูลเวร',
-            style: AppTypography.body.copyWith(
-              color: AppColors.secondaryText,
-            ),
-          ),
-        ],
-      ),
-    );
+    return const EmptyStateWidget(message: 'ยังไม่มีข้อมูลเวร');
   }
 
   Widget _buildErrorState(String error) {
