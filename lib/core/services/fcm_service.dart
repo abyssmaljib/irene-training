@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'user_service.dart';
 
@@ -12,6 +13,10 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   debugPrint('Body: ${message.notification?.body}');
   debugPrint('Data: ${message.data}');
 }
+
+/// Flutter Local Notifications plugin instance
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+    FlutterLocalNotificationsPlugin();
 
 /// Service for managing Firebase Cloud Messaging (FCM)
 class FCMService {
@@ -54,6 +59,9 @@ class FCMService {
       // Get FCM token
       await _getAndSaveToken();
 
+      // Initialize local notifications
+      await _initializeLocalNotifications();
+
       // Listen for token refresh
       _tokenRefreshSubscription = _messaging.onTokenRefresh.listen((newToken) {
         debugPrint('FCM: Token refreshed');
@@ -77,6 +85,34 @@ class FCMService {
     } catch (e) {
       debugPrint('FCM: Initialization error: $e');
     }
+  }
+
+  /// Initialize local notifications for foreground display
+  Future<void> _initializeLocalNotifications() async {
+    const AndroidInitializationSettings initializationSettingsAndroid =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    
+    const DarwinInitializationSettings initializationSettingsIOS =
+        DarwinInitializationSettings(
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
+    );
+
+    const InitializationSettings initializationSettings = InitializationSettings(
+      android: initializationSettingsAndroid,
+      iOS: initializationSettingsIOS,
+    );
+
+    await flutterLocalNotificationsPlugin.initialize(
+      initializationSettings,
+      onDidReceiveNotificationResponse: (NotificationResponse response) {
+        debugPrint('Local notification tapped: ${response.payload}');
+        // TODO: Handle notification tap navigation
+      },
+    );
+
+    debugPrint('FCM: Local notifications initialized');
   }
 
   /// Request notification permission
@@ -130,11 +166,39 @@ class FCMService {
   }
 
   /// Handle foreground message
-  void _handleForegroundMessage(RemoteMessage message) {
+  void _handleForegroundMessage(RemoteMessage message) async {
     debugPrint('FCM: Foreground message received');
     debugPrint('Title: ${message.notification?.title}');
     debugPrint('Body: ${message.notification?.body}');
     debugPrint('Data: ${message.data}');
+
+    // Show local notification when app is in foreground
+    final notification = message.notification;
+    if (notification != null) {
+      await flutterLocalNotificationsPlugin.show(
+        notification.hashCode,
+        notification.title ?? 'แจ้งเตือน',
+        notification.body ?? '',
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            'alerts',
+            'Alerts',
+            channelDescription: 'Notification alerts',
+            importance: Importance.high,
+            priority: Priority.high,
+            playSound: true,
+            enableVibration: true,
+            icon: '@mipmap/ic_launcher',
+          ),
+          iOS: const DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+          ),
+        ),
+        payload: message.data.toString(),
+      );
+    }
 
     // Call custom handler if set
     onForegroundMessage?.call(message);
