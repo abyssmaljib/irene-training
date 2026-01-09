@@ -515,18 +515,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  /// Build notification menu item with red dot for unread notifications
+  /// Build notification menu item with badge count for unread notifications
   Widget _buildNotificationMenuItem() {
     final unreadCountAsync = ref.watch(unreadNotificationCountProvider);
-    final hasUnread = unreadCountAsync.maybeWhen(
-      data: (count) => count > 0,
-      orElse: () => false,
+    final unreadCount = unreadCountAsync.maybeWhen(
+      data: (count) => count,
+      orElse: () => 0,
     );
 
-    return _buildMenuItemWithDot(
+    return _buildMenuItem(
       icon: HugeIcons.strokeRoundedNotification02,
       label: 'การแจ้งเตือน',
-      showDot: hasUnread,
+      badgeCount: unreadCount,
       onTap: () {
         Navigator.push(
           context,
@@ -590,77 +590,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             fontWeight: FontWeight.bold,
                           ),
                           textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              AppSpacing.horizontalGapMd,
-              Expanded(
-                child: Text(
-                  label,
-                  style: AppTypography.body,
-                ),
-              ),
-              HugeIcon(
-                icon: HugeIcons.strokeRoundedArrowRight01,
-                size: AppIconSize.md,
-                color: AppColors.secondaryText,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Build menu item with red dot indicator (no count)
-  Widget _buildMenuItemWithDot({
-    required dynamic icon,
-    required String label,
-    required VoidCallback onTap,
-    bool showDot = false,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: AppRadius.mediumRadius,
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.md,
-          ),
-          child: Row(
-            children: [
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: AppColors.accent1,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Center(
-                      child: HugeIcon(icon: icon, color: AppColors.primary, size: AppIconSize.lg),
-                    ),
-                  ),
-                  if (showDot)
-                    Positioned(
-                      right: -4,
-                      top: -4,
-                      child: Container(
-                        width: 10,
-                        height: 10,
-                        decoration: BoxDecoration(
-                          color: AppColors.error,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: AppColors.secondaryBackground,
-                            width: 1.5,
-                          ),
                         ),
                       ),
                     ),
