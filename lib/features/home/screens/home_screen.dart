@@ -363,10 +363,11 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!_devMode) {
       final latestOccupiedIds = await _clockService.getOccupiedResidentIds();
       final conflictIds = _selectedResidentIds.intersection(latestOccupiedIds);
-      if (conflictIds.isNotEmpty && mounted) {
+      if (conflictIds.isNotEmpty) {
         // มี resident ที่ถูกเลือกไปแล้ว → refresh และแจ้งเตือน
         await _loadResidentsByZones();
         await _loadOccupiedBreakTimes();
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('มีคนไข้ที่เพื่อนเลือกไปแล้ว กรุณาเลือกใหม่'),
@@ -378,6 +379,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     // แสดงหน้าไพ่ทาโร่ก่อนขึ้นเวร
+    if (!mounted) return;
     final selectedCard = await TarotCardScreen.show(context);
     if (selectedCard == null || !mounted) return;
 
