@@ -1,9 +1,6 @@
 import 'dart:async';
 import 'package:clarity_flutter/clarity_flutter.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_crashlytics/firebase_crashlytics.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/foundation.dart';
+import 'package:onesignal_flutter/onesignal_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,10 +8,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/config/supabase_config.dart';
 import 'core/providers/shared_preferences_provider.dart';
-import 'core/services/fcm_service.dart';
+import 'core/services/onesignal_service.dart';
 import 'features/auth/screens/login_screen.dart';
 import 'features/navigation/screens/main_navigation_screen.dart';
-import 'firebase_options.dart';
+
 
 // Global variable to store Clarity project ID after loading
 String _clarityProjectId = '';
@@ -32,22 +29,10 @@ void main() async {
     // Continue without .env - fallback values will be used
   }
 
-  // Initialize Firebase
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-
-  // Set up FCM background handler (must be before FCM initialization)
-  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-
-  // Initialize Crashlytics (NOT supported on Web)
-  if (!kIsWeb) {
-    FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
-    PlatformDispatcher.instance.onError = (error, stack) {
-      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-      return true;
-    };
-  }
+  // Initialize OneSignal
+  OneSignal.Debug.setLogLevel(OSLogLevel.verbose);
+  OneSignal.initialize("c657a2e6-7daf-4c82-b468-88bb71f4ce6e");
+  OneSignal.Notifications.requestPermission(true);
 
   // Initialize Supabase with fallback values
   await Supabase.initialize(
@@ -127,14 +112,12 @@ class _AuthWrapperState extends State<AuthWrapper> {
           // Set in Clarity
           Clarity.setCustomUserId(userId);
           // Set in Crashlytics (NOT supported on Web)
-          if (!kIsWeb) {
-            FirebaseCrashlytics.instance.setUserIdentifier(userId);
-          }
-          // Initialize FCM and save token after login
-          FCMService.instance.initialize();
+
+          // Initialize OneSignal and login with user ID
+          OneSignalService.instance.initialize();
         } else {
-          // Clear FCM token on logout
-          FCMService.instance.clearToken();
+          // Logout from OneSignal
+          OneSignalService.instance.clearToken();
         }
       }
     });
