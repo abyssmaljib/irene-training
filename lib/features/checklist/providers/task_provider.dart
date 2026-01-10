@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/services/user_service.dart';
@@ -361,6 +362,8 @@ final _myPatientsFilterInitializedForUserProvider = StateProvider<String?>((ref)
 
 /// Provider ที่จะ auto-initialize "คนไข้ของฉัน" filter เมื่อ user clock in
 /// เรียกใช้ใน ChecklistScreen เพื่อ init filter ตอนเปิดหน้า
+/// หมายเหตุ: ตอน init ใช้ shift.zones เพราะยังไม่โหลด residents
+/// แต่เมื่อ user กดปุ่ม "คนไข้ของฉัน" จะหา zones จาก residents ที่ถูกต้อง
 final initMyPatientsFilterProvider = Provider<void>((ref) {
   final currentShiftAsync = ref.watch(currentShiftProvider);
   final currentUserId = ref.watch(currentUserIdProvider);
@@ -372,9 +375,13 @@ final initMyPatientsFilterProvider = Provider<void>((ref) {
   currentShiftAsync.whenData((shift) {
     if (shift != null && shift.isClockedIn) {
       // Set filter เมื่อ user clock in อยู่
-      Future.microtask(() {
+      // ใช้ addPostFrameCallback เพื่อหลีกเลี่ยง assertion error
+      WidgetsBinding.instance.addPostFrameCallback((_) {
         ref.read(_myPatientsFilterInitializedForUserProvider.notifier).state = currentUserId;
         ref.read(myPatientsFilterActiveProvider.notifier).state = true;
+
+        // ตอน init ใช้ shift.zones ก่อน (default)
+        // เมื่อ user กดปุ่ม "คนไข้ของฉัน" toggle จะหา zones จาก residents ที่ถูกต้อง
         ref.read(selectedZonesFilterProvider.notifier).state =
             shift.zones.toSet();
         ref.read(selectedResidentsFilterProvider.notifier).state =
@@ -382,7 +389,7 @@ final initMyPatientsFilterProvider = Provider<void>((ref) {
       });
     } else {
       // User is not clocked in - reset filter
-      Future.microtask(() {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
         ref.read(_myPatientsFilterInitializedForUserProvider.notifier).state = currentUserId;
         ref.read(myPatientsFilterActiveProvider.notifier).state = false;
         ref.read(selectedZonesFilterProvider.notifier).state = {};
@@ -391,6 +398,15 @@ final initMyPatientsFilterProvider = Provider<void>((ref) {
     }
   });
 });
+
+/// Helper function สำหรับหา zones จาก resident IDs
+/// ใช้ใน ChecklistScreen._toggleMyPatientsFilter
+Set<int> getZonesFromResidentIds(List<ResidentSimple> allResidents, Set<int> residentIds) {
+  return allResidents
+      .where((r) => residentIds.contains(r.id))
+      .map((r) => r.zoneId)
+      .toSet();
+}
 
 // ============================================================
 // Task Type Filter Providers

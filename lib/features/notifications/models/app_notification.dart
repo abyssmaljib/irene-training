@@ -118,7 +118,8 @@ enum NotificationType {
   badge('badge'),
   comment('comment'),
   system('system'),
-  review('review');
+  review('review'),
+  assignment('assignment');  // การมอบหมายผู้รับบริการ
 
   final String value;
   const NotificationType(this.value);
@@ -147,6 +148,8 @@ enum NotificationType {
         return 'ระบบ';
       case NotificationType.review:
         return 'ทบทวน';
+      case NotificationType.assignment:
+        return 'มอบหมายงาน';
     }
   }
 }

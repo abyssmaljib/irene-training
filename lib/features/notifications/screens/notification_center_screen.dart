@@ -9,6 +9,7 @@ import '../../../core/widgets/irene_app_bar.dart';
 import '../models/app_notification.dart';
 import '../providers/notification_provider.dart';
 import '../widgets/notification_item.dart';
+import 'notification_detail_screen.dart';
 
 class NotificationCenterScreen extends ConsumerStatefulWidget {
   const NotificationCenterScreen({super.key});
@@ -39,37 +40,76 @@ class _NotificationCenterScreenState extends ConsumerState<NotificationCenterScr
 
     return Scaffold(
       backgroundColor: AppColors.primaryBackground,
-      body: CustomScrollView(
-        slivers: [
-          IreneAppBar(
-            title: 'การแจ้งเตือน',
-            actions: [
-              // Mark all as read button
-              _buildMarkAllReadButton(notificationState),
-            ],
-          ),
-          // Tab bar
-          SliverPersistentHeader(
-            pinned: true,
-            delegate: _TabBarDelegate(
-              tabController: _tabController,
-              notificationState: notificationState,
+      // ใช้ IreneSecondaryAppBar ที่มีปุ่มย้อนกลับ พร้อม TabBar ใน bottom
+      appBar: IreneSecondaryAppBar(
+        title: 'การแจ้งเตือน',
+        actions: [
+          // Mark all as read button
+          _buildMarkAllReadButton(notificationState),
+        ],
+        bottom: TabBar(
+          controller: _tabController,
+          labelColor: AppColors.primary,
+          unselectedLabelColor: AppColors.secondaryText,
+          indicatorColor: AppColors.primary,
+          indicatorWeight: 3,
+          labelStyle: AppTypography.label.copyWith(fontWeight: FontWeight.w600),
+          unselectedLabelStyle: AppTypography.label,
+          tabs: [
+            Tab(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('ยังไม่อ่าน'),
+                  // แสดง badge จำนวน unread
+                  _buildUnreadBadge(notificationState),
+                ],
+              ),
             ),
-          ),
-          // Content
-          SliverFillRemaining(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                // Unread only tab
-                _buildNotificationList(notificationState, showAll: false),
-                // All notifications tab
-                _buildNotificationList(notificationState, showAll: true),
-              ],
-            ),
-          ),
+            Tab(text: 'ทั้งหมด'),
+          ],
+        ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          // Unread only tab
+          _buildNotificationList(notificationState, showAll: false),
+          // All notifications tab
+          _buildNotificationList(notificationState, showAll: true),
         ],
       ),
+    );
+  }
+
+  /// สร้าง badge แสดงจำนวน unread notifications
+  Widget _buildUnreadBadge(AsyncValue<List<AppNotification>> state) {
+    final unreadCount = state.whenOrNull(
+      data: (notifications) => notifications.where((n) => !n.isRead).length,
+    ) ?? 0;
+
+    if (unreadCount == 0) return const SizedBox.shrink();
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(width: 6),
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: AppColors.error,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Text(
+            unreadCount > 99 ? '99+' : unreadCount.toString(),
+            style: AppTypography.caption.copyWith(
+              color: Colors.white,
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -147,46 +187,18 @@ class _NotificationCenterScreenState extends ConsumerState<NotificationCenterScr
   }
 
   void _onNotificationTap(AppNotification notification) {
-    // Mark as read
+    // Mark as read ก่อน
     if (!notification.isRead) {
       ref.read(notificationStateProvider.notifier).markAsRead(notification.id);
     }
 
-    // Navigate based on type
-    _navigateToReference(notification);
-  }
-
-  void _navigateToReference(AppNotification notification) {
-    // TODO: Implement navigation based on notification type and reference
-    // For now, just show a snackbar
-    switch (notification.type) {
-      case NotificationType.post:
-        // Navigate to post detail
-        // if (notification.referenceId != null) {
-        //   Navigator.push(context, MaterialPageRoute(
-        //     builder: (_) => PostDetailScreen(postId: notification.referenceId!),
-        //   ));
-        // }
-        break;
-      case NotificationType.task:
-        // Navigate to task detail
-        break;
-      case NotificationType.calendar:
-        // Navigate to calendar
-        break;
-      case NotificationType.badge:
-        // Navigate to badge collection
-        break;
-      case NotificationType.comment:
-        // Navigate to post with comment
-        break;
-      case NotificationType.review:
-        // Navigate to learning topic
-        break;
-      case NotificationType.system:
-        // System notifications may not have navigation
-        break;
-    }
+    // Navigate ไปหน้า detail เพื่อดูรายละเอียดเต็มๆ
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => NotificationDetailScreen(notification: notification),
+      ),
+    );
   }
 
   void _onNotificationDismiss(AppNotification notification) {
@@ -252,76 +264,5 @@ class _NotificationCenterScreenState extends ConsumerState<NotificationCenterScr
       ),
       tooltip: 'อ่านทั้งหมด',
     );
-  }
-}
-
-/// Tab bar delegate for sliver persistent header
-class _TabBarDelegate extends SliverPersistentHeaderDelegate {
-  final TabController tabController;
-  final AsyncValue<List<AppNotification>> notificationState;
-
-  _TabBarDelegate({
-    required this.tabController,
-    required this.notificationState,
-  });
-
-  @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    final unreadCount = notificationState.whenOrNull(
-      data: (notifications) => notifications.where((n) => !n.isRead).length,
-    ) ?? 0;
-
-    return Container(
-      color: AppColors.secondaryBackground,
-      child: TabBar(
-        controller: tabController,
-        labelColor: AppColors.primary,
-        unselectedLabelColor: AppColors.secondaryText,
-        indicatorColor: AppColors.primary,
-        indicatorWeight: 3,
-        labelStyle: AppTypography.label.copyWith(fontWeight: FontWeight.w600),
-        unselectedLabelStyle: AppTypography.label,
-        tabs: [
-          Tab(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('ยังไม่อ่าน'),
-                if (unreadCount > 0) ...[
-                  SizedBox(width: 6),
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppColors.error,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      unreadCount > 99 ? '99+' : unreadCount.toString(),
-                      style: AppTypography.caption.copyWith(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          Tab(text: 'ทั้งหมด'),
-        ],
-      ),
-    );
-  }
-
-  @override
-  double get maxExtent => 48;
-
-  @override
-  double get minExtent => 48;
-
-  @override
-  bool shouldRebuild(covariant _TabBarDelegate oldDelegate) {
-    return notificationState != oldDelegate.notificationState;
   }
 }

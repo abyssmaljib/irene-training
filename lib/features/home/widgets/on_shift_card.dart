@@ -19,6 +19,7 @@ class OnShiftCard extends StatelessWidget {
   final bool isClockingOut;
   final bool canClockOut;
   final String? disabledReason;
+  final bool isLoadingResidents; // กำลังโหลดข้อมูล residents อยู่
 
   const OnShiftCard({
     super.key,
@@ -30,6 +31,7 @@ class OnShiftCard extends StatelessWidget {
     this.isClockingOut = false,
     this.canClockOut = true,
     this.disabledReason,
+    this.isLoadingResidents = false,
   });
 
   String get _shiftDisplay {
@@ -62,8 +64,14 @@ class OnShiftCard extends StatelessWidget {
   }
 
   /// แสดงรายชื่อคนไข้ที่เลือก
+  /// ถ้ากำลังโหลดอยู่หรือยังไม่มีข้อมูล จะ return list ว่าง
+  /// เพื่อไม่ให้แสดง fallback "คนไข้ #ID" ก่อนที่ข้อมูลจริงจะมา
   List<String> get _selectedResidentNames {
     if (currentShift.selectedResidentIdList.isEmpty) return [];
+    // ถ้ากำลังโหลดอยู่ ไม่แสดงอะไร (จะแสดง loading แทน)
+    if (isLoadingResidents) return [];
+    // ถ้ายังไม่มี residents data ไม่แสดง fallback
+    if (residents.isEmpty) return [];
 
     return currentShift.selectedResidentIdList.map((residentId) {
       final resident = residents.firstWhere(
@@ -141,6 +149,65 @@ class OnShiftCard extends StatelessWidget {
                 ),
               ),
             )).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Section แสดง loading state ขณะกำลังโหลดข้อมูล
+  Widget _buildLoadingSection({
+    required dynamic icon,
+    required String label,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              HugeIcon(
+                icon: icon,
+                color: Colors.white.withValues(alpha: 0.85),
+                size: 16,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: AppTypography.caption.copyWith(
+                  color: Colors.white.withValues(alpha: 0.85),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Loading indicator
+          Row(
+            children: [
+              SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    Colors.white.withValues(alpha: 0.7),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'กำลังโหลด...',
+                style: AppTypography.bodySmall.copyWith(
+                  color: Colors.white.withValues(alpha: 0.7),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -275,14 +342,21 @@ class OnShiftCard extends StatelessWidget {
             ),
           ),
 
-          // รายชื่อคนไข้
-          if (_selectedResidentNames.isNotEmpty) ...[
+          // รายชื่อคนไข้ - แสดง loading หรือรายชื่อจริง
+          if (currentShift.selectedResidentIdList.isNotEmpty) ...[
             AppSpacing.verticalGapSm,
-            _buildInfoSection(
-              icon: HugeIcons.strokeRoundedUser,
-              label: 'คนไข้ที่ดูแล',
-              items: _selectedResidentNames,
-            ),
+            if (isLoadingResidents)
+              // กำลังโหลดข้อมูล residents
+              _buildLoadingSection(
+                icon: HugeIcons.strokeRoundedUser,
+                label: 'คนไข้ที่ดูแล',
+              )
+            else if (_selectedResidentNames.isNotEmpty)
+              _buildInfoSection(
+                icon: HugeIcons.strokeRoundedUser,
+                label: 'คนไข้ที่ดูแล',
+                items: _selectedResidentNames,
+              ),
           ],
 
           // เวลาพัก

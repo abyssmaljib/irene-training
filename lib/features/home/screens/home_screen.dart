@@ -33,6 +33,7 @@ import '../../dd_handover/widgets/dd_summary_card.dart';
 import '../../dd_handover/screens/dd_list_screen.dart';
 import '../../dd_handover/services/dd_service.dart';
 import '../services/clock_realtime_service.dart';
+import '../../../main.dart' show globalRefreshNotifier;
 
 /// หน้าหลัก - Dashboard with Clock-in/Clock-out
 class HomeScreen extends StatefulWidget {
@@ -85,6 +86,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // On-shift data (สำหรับแสดงข้อมูลเวรปัจจุบัน)
   List<ResidentSimple> _shiftResidents = [];
   List<BreakTimeOption> _shiftBreakTimeOptions = [];
+  bool _isLoadingShiftResidents = false; // loading state สำหรับ residents ในเวร
 
   // Monthly summary data
   MonthlySummary? _currentMonthSummary;
@@ -123,13 +125,26 @@ class _HomeScreenState extends State<HomeScreen> {
     _userService.userChangedNotifier.addListener(_onUserChanged);
     // Subscribe to clock_in_out_ver2 realtime updates
     _subscribeToClockUpdates();
+    // Listen for global refresh (เมื่อ user กด push notification เข้ามา)
+    globalRefreshNotifier.addListener(_onGlobalRefresh);
   }
 
   @override
   void dispose() {
     _userService.userChangedNotifier.removeListener(_onUserChanged);
     _clockRealtimeService.unsubscribe();
+    globalRefreshNotifier.removeListener(_onGlobalRefresh);
     super.dispose();
+  }
+
+  /// เมื่อได้รับ signal ให้ refresh จาก push notification deep link
+  void _onGlobalRefresh() {
+    debugPrint('HomeScreen: Received global refresh signal');
+    // Invalidate cache และโหลดข้อมูลใหม่ทั้งหมด
+    _homeService.invalidateCache();
+    _clockService.invalidateCache();
+    DDService.instance.invalidateCache();
+    _loadInitialData();
   }
 
   void _subscribeToClockUpdates() {
@@ -209,39 +224,45 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _isLoadingShift = true);
     final shift = await _clockService.getCurrentShift(forceRefresh: forceRefresh);
     if (mounted) {
+      // ถ้ามี shift ที่ clock in อยู่ → set loading residents ก่อน UI rebuild
+      final needLoadResidents = shift != null && shift.isClockedIn;
       setState(() {
         _currentShift = shift;
         _isLoadingShift = false;
+        if (needLoadResidents) {
+          _isLoadingShiftResidents = true; // set ก่อน UI rebuild
+        }
       });
       // โหลดข้อมูล residents และ break times สำหรับแสดงใน OnShiftCard
-      if (shift != null && shift.isClockedIn) {
+      if (needLoadResidents) {
         _loadShiftData(shift);
       }
     }
   }
 
   Future<void> _loadShiftData(ClockInOut shift) async {
+    // หมายเหตุ: _isLoadingShiftResidents ถูก set เป็น true ใน _loadCurrentShift แล้ว
+    // เพื่อให้ UI แสดง loading ก่อนที่จะเริ่มโหลดข้อมูล
+
     debugPrint('_loadShiftData: shift.shift = ${shift.shift}');
     debugPrint('_loadShiftData: shift.zones = ${shift.zones}');
     debugPrint('_loadShiftData: shift.selectedResidentIdList = ${shift.selectedResidentIdList}');
 
-    // โหลด residents - ถ้ามี zones ให้โหลดจาก zones, ถ้าไม่มีให้โหลดจาก resident IDs โดยตรง
+    // โหลด residents จาก selectedResidentIdList โดยตรงเสมอ
+    // เพราะต้องการแสดงชื่อ residents ที่เลือกไว้ตอน clock in
+    // ไม่ใช่ทุกคนใน zone (ซึ่งอาจ filter s_status='Stay' ทำให้บาง resident หายไป)
     List<ResidentSimple> residents = [];
-    if (shift.zones.isNotEmpty) {
-      residents = await _zoneService.getResidentsByZones(shift.zones);
-      debugPrint('_loadShiftData: loaded ${residents.length} residents from zones');
-    }
-
-    // ถ้าไม่มี residents จาก zones แต่มี selectedResidentIdList ให้โหลดจาก IDs โดยตรง
-    // (กรณี dev mode หรือข้อมูลเก่าที่ zones ว่าง)
-    if (residents.isEmpty && shift.selectedResidentIdList.isNotEmpty) {
+    if (shift.selectedResidentIdList.isNotEmpty) {
       residents = await _zoneService.getResidentsByIds(shift.selectedResidentIdList);
       debugPrint('_loadShiftData: loaded ${residents.length} residents from IDs');
     }
 
     debugPrint('_loadShiftData: resident ids = ${residents.map((r) => r.id).toList()}');
     if (mounted) {
-      setState(() => _shiftResidents = residents);
+      setState(() {
+        _shiftResidents = residents;
+        _isLoadingShiftResidents = false; // โหลดเสร็จแล้ว
+      });
     }
 
     // โหลด break time options ตาม shift
@@ -650,6 +671,7 @@ class _HomeScreenState extends State<HomeScreen> {
           isClockingOut: _isClockingOut,
           canClockOut: _canClockOut,
           disabledReason: _clockOutDisabledReason,
+          isLoadingResidents: _isLoadingShiftResidents, // ส่ง loading state ไป
         ),
         AppSpacing.verticalGapMd,
         // Shift Activity Card - แสดง stats ความตรงเวลา + recent activities

@@ -35,8 +35,11 @@ final notificationsStreamProvider = StreamProvider.autoDispose<List<AppNotificat
 });
 
 /// State notifier for managing notification actions
+/// รับ ref เพื่อให้สามารถ invalidate providers อื่นได้เมื่อ notification state เปลี่ยน
 class NotificationStateNotifier extends StateNotifier<AsyncValue<List<AppNotification>>> {
-  NotificationStateNotifier() : super(const AsyncValue.loading()) {
+  final Ref _ref;
+
+  NotificationStateNotifier(this._ref) : super(const AsyncValue.loading()) {
     _loadNotifications();
   }
 
@@ -54,6 +57,9 @@ class NotificationStateNotifier extends StateNotifier<AsyncValue<List<AppNotific
     try {
       final notifications = await NotificationService.instance.fetchNotifications(forceRefresh: true);
       state = AsyncValue.data(notifications);
+      // Invalidate unread count provider เพื่อให้ badge อัพเดต
+      // ทำให้หน้า Profile และ Bottom Navigation แสดงจำนวนที่ถูกต้อง
+      _ref.invalidate(unreadNotificationCountProvider);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
     }
@@ -87,5 +93,6 @@ class NotificationStateNotifier extends StateNotifier<AsyncValue<List<AppNotific
 
 /// Provider for notification state with actions
 final notificationStateProvider = StateNotifierProvider.autoDispose<NotificationStateNotifier, AsyncValue<List<AppNotification>>>((ref) {
-  return NotificationStateNotifier();
+  // ส่ง ref เข้าไปเพื่อให้ NotificationStateNotifier สามารถ invalidate providers อื่นได้
+  return NotificationStateNotifier(ref);
 });

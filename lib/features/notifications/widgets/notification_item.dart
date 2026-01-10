@@ -222,6 +222,8 @@ class NotificationItem extends StatelessWidget {
         return HugeIcons.strokeRoundedNotification01;
       case NotificationType.review:
         return HugeIcons.strokeRoundedBook02;
+      case NotificationType.assignment:
+        return HugeIcons.strokeRoundedUserAdd01;
     }
   }
 
@@ -241,6 +243,8 @@ class NotificationItem extends StatelessWidget {
         return AppColors.primary;
       case NotificationType.review:
         return AppColors.pastelRed; // Soft red for review reminders
+      case NotificationType.assignment:
+        return AppColors.secondary; // Light Blue for assignment
     }
   }
 }

@@ -12,6 +12,18 @@ import 'core/services/onesignal_service.dart';
 import 'features/auth/screens/login_screen.dart';
 import 'features/navigation/screens/main_navigation_screen.dart';
 
+// Global navigator key สำหรับ navigation จาก service (เช่น push notification)
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+// Global refresh notifier - ใช้สำหรับบอก HomeScreen ให้ refresh ข้อมูลหลังจาก deep link
+// ValueNotifier<int> เพื่อ trigger rebuild เมื่อ value เปลี่ยน
+final ValueNotifier<int> globalRefreshNotifier = ValueNotifier<int>(0);
+
+/// เรียก function นี้เพื่อ trigger refresh ทุก screen ที่ listen อยู่
+void triggerGlobalRefresh() {
+  globalRefreshNotifier.value++;
+  debugPrint('Global refresh triggered: ${globalRefreshNotifier.value}');
+}
 
 // Global variable to store Clarity project ID after loading
 String _clarityProjectId = '';
@@ -62,6 +74,8 @@ class MyApp extends StatelessWidget {
     Widget app = MaterialApp(
       title: 'Irene Training',
       debugShowCheckedModeBanner: false,
+      // ใช้ navigatorKey เพื่อให้ services สามารถ navigate ได้
+      navigatorKey: navigatorKey,
       theme: ThemeData(
         fontFamily: 'MiSansThai',
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0D9488)),

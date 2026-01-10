@@ -152,6 +152,8 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
       AsyncValue<List<Zone>> zonesAsync, Set<int> selectedZones) {
     final currentShiftAsync = ref.watch(currentShiftProvider);
     final isMyPatientsActive = ref.watch(myPatientsFilterActiveProvider);
+    // ดึง residents ทั้งหมดเพื่อหา zones จาก residents ที่ user รับผิดชอบ
+    final allResidentsAsync = ref.watch(nursinghomeResidentsProvider);
 
     return Container(
       padding: EdgeInsets.symmetric(
@@ -201,7 +203,9 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
                         label: const Text('คนไข้ของฉัน'),
                         selected: isMyPatientsActive,
                         onSelected: (_) {
-                          _toggleMyPatientsFilter(currentShift!);
+                          // ส่ง allResidents เพื่อหา zones จาก residents ที่ user รับผิดชอบ
+                          final allResidents = allResidentsAsync.valueOrNull ?? [];
+                          _toggleMyPatientsFilter(currentShift!, allResidents);
                         },
                         selectedColor: AppColors.accent1,
                         checkmarkColor: AppColors.primary,
@@ -302,7 +306,8 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
   }
 
   /// Toggle "คนไข้ของฉัน" filter
-  void _toggleMyPatientsFilter(ClockInOut currentShift) {
+  /// รับ residents ทั้งหมดเพื่อหา zones จาก residents ที่ user รับผิดชอบ
+  void _toggleMyPatientsFilter(ClockInOut currentShift, List<ResidentSimple> allResidents) {
     final isActive = ref.read(myPatientsFilterActiveProvider);
 
     if (isActive) {
@@ -313,10 +318,19 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
     } else {
       // เปิด filter - set zones และ residents จาก current shift
       ref.read(myPatientsFilterActiveProvider.notifier).state = true;
-      ref.read(selectedZonesFilterProvider.notifier).state =
-          currentShift.zones.toSet();
-      ref.read(selectedResidentsFilterProvider.notifier).state =
-          currentShift.selectedResidentIdList.toSet();
+
+      // *** สำคัญ: หา zones จาก residents ที่ user รับผิดชอบ ***
+      // เพราะผู้พักอาจอยู่หลายโซน ไม่ใช่แค่โซนที่เลือกตอน clock in
+      final selectedResidentIds = currentShift.selectedResidentIdList.toSet();
+      final zonesFromResidents = getZonesFromResidentIds(allResidents, selectedResidentIds);
+
+      // ถ้าหา zones จาก residents ได้ ใช้ค่านั้น ไม่งั้นใช้ zones จาก shift
+      final zonesToUse = zonesFromResidents.isNotEmpty
+          ? zonesFromResidents
+          : currentShift.zones.toSet();
+
+      ref.read(selectedZonesFilterProvider.notifier).state = zonesToUse;
+      ref.read(selectedResidentsFilterProvider.notifier).state = selectedResidentIds;
     }
   }
 
