@@ -70,6 +70,8 @@
 	<string>แอปต้องการเข้าถึงกล้องเพื่อถ่ายรูปยาและบันทึกหลักฐานการให้ยา</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>แอปต้องการเข้าถึงไมโครโฟนเพื่อบันทึกวิดีโอประกอบการดูแลผู้สูงอายุ</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>แอปต้องการเข้าถึงตำแหน่งเพื่อบันทึกข้อมูลการดูแลผู้สูงอายุ</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>
