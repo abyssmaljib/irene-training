@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
@@ -45,12 +46,13 @@ class MedicinePhotoItem extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  // รูปยา (ใช้ CachedNetworkImage)
+                  // รูปยา (ใช้ _MedicineNetworkImage ที่มี timeout)
                   hasPhoto
-                      ? CachedNetworkImage(
+                      ? _MedicineNetworkImage(
                           imageUrl: photoUrl,
                           fit: BoxFit.cover,
-                          placeholder: (context, url) => Container(
+                          // placeholder เป็น Widget (ไม่ใช่ function)
+                          placeholder: Container(
                             color: AppColors.background,
                             child: Center(
                               child: CircularProgressIndicator(
@@ -59,10 +61,8 @@ class MedicinePhotoItem extends StatelessWidget {
                               ),
                             ),
                           ),
-                          errorWidget: (context, url, error) => _buildPlaceholder(),
-                          fadeInDuration: const Duration(milliseconds: 150),
-                          memCacheWidth: 300,
-                          memCacheHeight: 300,
+                          // errorWidget เป็น Widget (ไม่ใช่ function)
+                          errorWidget: _buildPlaceholder(),
                         )
                       : _buildPlaceholder(),
 
@@ -473,6 +473,235 @@ class MedicinePhotoItem extends StatelessWidget {
           }),
         ],
       ],
+    );
+  }
+}
+
+/// Widget สำหรับแสดงรูปยาจาก network พร้อม timeout และ retry mechanism
+/// - มี timeout 15 วินาที ถ้าโหลดไม่เสร็จจะแสดงข้อความ "โหลดช้า" พร้อมปุ่มลองใหม่
+/// - ถ้า error จะแสดงข้อความ "โหลดไม่ได้" พร้อมปุ่มลองใหม่
+/// - ใช้ _retryCount เป็น key เพื่อบังคับ rebuild เมื่อกดลองใหม่
+class _MedicineNetworkImage extends StatefulWidget {
+  final String imageUrl;
+  final BoxFit fit;
+  final Widget placeholder; // Widget สำหรับแสดงระหว่างโหลด
+  final Widget errorWidget; // Widget สำหรับแสดงเมื่อ error (fallback)
+
+  const _MedicineNetworkImage({
+    required this.imageUrl,
+    required this.fit,
+    required this.placeholder,
+    required this.errorWidget,
+  });
+
+  @override
+  State<_MedicineNetworkImage> createState() => _MedicineNetworkImageState();
+}
+
+class _MedicineNetworkImageState extends State<_MedicineNetworkImage> {
+  // Timeout 15 วินาที - ถ้าโหลดนานกว่านี้ถือว่าช้าเกินไป
+  static const _loadTimeout = Duration(seconds: 15);
+
+  bool _isLoading = true; // กำลังโหลดอยู่หรือไม่
+  bool _hasError = false; // เกิด error หรือไม่
+  bool _timedOut = false; // timeout หรือไม่
+  Timer? _timeoutTimer; // Timer สำหรับนับ timeout
+  int _retryCount = 0; // นับจำนวนครั้งที่กด retry (ใช้เป็น key เพื่อ force rebuild)
+
+  @override
+  void initState() {
+    super.initState();
+    _startTimeoutTimer();
+  }
+
+  @override
+  void dispose() {
+    _timeoutTimer?.cancel();
+    super.dispose();
+  }
+
+  /// เริ่ม timer นับถอยหลัง timeout
+  void _startTimeoutTimer() {
+    _timeoutTimer?.cancel();
+    _timeoutTimer = Timer(_loadTimeout, () {
+      // ถ้ายังโหลดอยู่และ widget ยัง mount อยู่ = timeout
+      if (_isLoading && mounted) {
+        setState(() {
+          _timedOut = true;
+          _isLoading = false;
+        });
+      }
+    });
+  }
+
+  /// กดปุ่มลองใหม่ - reset state และเพิ่ม retryCount เพื่อ force rebuild CachedNetworkImage
+  void _retry() {
+    if (!mounted) return;
+    setState(() {
+      _retryCount++;
+      _isLoading = true;
+      _hasError = false;
+      _timedOut = false;
+    });
+    _startTimeoutTimer();
+  }
+
+  /// เรียกเมื่อรูปโหลดสำเร็จ
+  void _onImageLoaded() {
+    _timeoutTimer?.cancel();
+    if (mounted && _isLoading) {
+      setState(() {
+        _isLoading = false;
+        _hasError = false;
+        _timedOut = false;
+      });
+    }
+  }
+
+  /// เรียกเมื่อเกิด error ตอนโหลดรูป
+  void _onImageError() {
+    _timeoutTimer?.cancel();
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+        _hasError = true;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // ถ้า timeout แสดง UI สำหรับ timeout
+    if (_timedOut) return _buildTimeoutWidget();
+    // ถ้า error แสดง UI สำหรับ error
+    if (_hasError) return _buildErrorWidget();
+
+    // ใช้ CachedNetworkImage พร้อม key ที่เปลี่ยนเมื่อ retry
+    // เพื่อบังคับให้โหลดใหม่
+    return CachedNetworkImage(
+      key: ValueKey('${widget.imageUrl}_$_retryCount'),
+      imageUrl: widget.imageUrl,
+      fit: widget.fit,
+      fadeInDuration: const Duration(milliseconds: 150),
+      memCacheWidth: 300,
+      memCacheHeight: 300,
+      // placeholder แสดงระหว่างโหลด
+      placeholder: (context, url) => widget.placeholder,
+      // errorWidget เรียก _onImageError เพื่อ update state
+      errorWidget: (context, url, error) {
+        // ใช้ addPostFrameCallback เพื่อหลีกเลี่ยง setState ระหว่าง build
+        WidgetsBinding.instance.addPostFrameCallback((_) => _onImageError());
+        return widget.errorWidget;
+      },
+      // imageBuilder เรียก _onImageLoaded เมื่อรูปโหลดสำเร็จ
+      imageBuilder: (context, imageProvider) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _onImageLoaded());
+        return Image(image: imageProvider, fit: widget.fit);
+      },
+    );
+  }
+
+  /// Widget แสดงเมื่อ timeout (โหลดช้า)
+  Widget _buildTimeoutWidget() {
+    return Container(
+      color: AppColors.background,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Icon wifi error สี pending
+            HugeIcon(
+              icon: HugeIcons.strokeRoundedWifiError01,
+              size: AppIconSize.xl,
+              color: AppColors.tagPendingText,
+            ),
+            SizedBox(height: 4),
+            Text(
+              'โหลดช้า',
+              style: AppTypography.caption.copyWith(
+                color: AppColors.tagPendingText,
+                fontSize: 9,
+              ),
+            ),
+            SizedBox(height: 4),
+            // ปุ่มลองใหม่
+            GestureDetector(
+              onTap: _retry,
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: AppRadius.fullRadius,
+                ),
+                child: Text(
+                  'ลองใหม่',
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.primary,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Widget แสดงเมื่อ error (โหลดไม่สำเร็จ)
+  Widget _buildErrorWidget() {
+    return Container(
+      color: AppColors.background,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Icon wifi error สี secondary
+            HugeIcon(
+              icon: HugeIcons.strokeRoundedWifiError01,
+              size: AppIconSize.xl,
+              color: AppColors.textSecondary,
+            ),
+            SizedBox(height: 4),
+            Text(
+              'โหลดไม่สำเร็จ',
+              style: AppTypography.caption.copyWith(
+                color: AppColors.textSecondary,
+                fontSize: 9,
+              ),
+            ),
+            // บอก user ว่าอาจเป็นเพราะเน็ตช้า
+            Text(
+              'เน็ตช้าหรือไม่มีสัญญาณ',
+              style: AppTypography.caption.copyWith(
+                color: AppColors.textSecondary.withValues(alpha: 0.7),
+                fontSize: 8,
+              ),
+            ),
+            SizedBox(height: 4),
+            // ปุ่มลองใหม่
+            GestureDetector(
+              onTap: _retry,
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: AppRadius.fullRadius,
+                ),
+                child: Text(
+                  'ลองใหม่',
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.primary,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

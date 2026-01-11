@@ -443,7 +443,11 @@ class _MealSectionCardState extends State<MealSectionCard>
   }
 
   Widget _buildContent() {
-    final medicines = widget.mealGroup.medicines;
+    // Filter ยา PRN ออก เพราะยา PRN ไม่ควรแสดงในรูปตัวอย่างยาประจำมื้อ
+    // (ยา PRN = ยาใช้เมื่อจำเป็น ไม่ใช่ยาประจำ)
+    final medicines = widget.mealGroup.medicines
+        .where((med) => med.prn != true)
+        .toList();
     final medLog = widget.mealGroup.medLog;
     final logPhotoUrl = widget.showFoiled
         ? medLog?.picture2CUrl
