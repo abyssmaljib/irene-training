@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
@@ -464,12 +466,12 @@ class _MealSectionCardState extends State<MealSectionCard>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Grid รูปตัวอย่างยา - แสดงเต็มความกว้าง
+          // Grid รูปตัวอย่างยา - 2 คอลัมน์ (ใหญ่ขึ้น ดูชัดขึ้น)
           GridView.builder(
             shrinkWrap: true,
             physics: NeverScrollableScrollPhysics(),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
+              crossAxisCount: 2,
               crossAxisSpacing: AppSpacing.xs,
               mainAxisSpacing: AppSpacing.xs,
               childAspectRatio: 1.0,
@@ -637,62 +639,13 @@ class _MealSectionCardState extends State<MealSectionCard>
             child: Stack(
               fit: StackFit.expand,
               children: [
-                // รูปจัดยา/ให้ยา - ใช้ Image.network ที่จะโหลดจนกว่าจะเสร็จ
+                // รูปจัดยา/ให้ยา - ใช้ _LogPhotoNetworkImage ที่มี timeout + retry
                 // ใช้ BoxFit.contain เพื่อรักษาสัดส่วนรูปยา (ไม่บิดเบี้ยว)
                 Container(
                   color: Colors.black,
-                  child: Image.network(
-                    photoUrl,
+                  child: _LogPhotoNetworkImage(
+                    imageUrl: photoUrl,
                     fit: BoxFit.contain,
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      final progress = loadingProgress.expectedTotalBytes != null
-                          ? loadingProgress.cumulativeBytesLoaded /
-                              loadingProgress.expectedTotalBytes!
-                          : null;
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            CircularProgressIndicator(
-                              value: progress,
-                              color: AppColors.primary,
-                              strokeWidth: 2,
-                            ),
-                            if (progress != null) ...[
-                              const SizedBox(height: 8),
-                              Text(
-                                '${(progress * 100).toInt()}%',
-                                style: AppTypography.caption.copyWith(
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      );
-                    },
-                    errorBuilder: (context, error, stackTrace) {
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            HugeIcon(
-                              icon: HugeIcons.strokeRoundedImage01,
-                              size: AppIconSize.xxl,
-                              color: AppColors.textSecondary,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'โหลดรูปไม่สำเร็จ',
-                              style: AppTypography.caption.copyWith(
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
                   ),
                 ),
 
@@ -1430,6 +1383,199 @@ class _FullScreenPhotoView extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Widget สำหรับแสดงรูป 2C/3C (จัดยา/เสิร์ฟยา) พร้อม timeout และ retry
+/// - มี timeout 15 วินาที ถ้าโหลดไม่เสร็จจะแสดงข้อความ "โหลดช้า" พร้อมปุ่มลองใหม่
+/// - ถ้า error จะแสดงข้อความ "โหลดไม่ได้" พร้อมปุ่มลองใหม่
+class _LogPhotoNetworkImage extends StatefulWidget {
+  final String imageUrl;
+  final BoxFit fit;
+
+  const _LogPhotoNetworkImage({
+    required this.imageUrl,
+    required this.fit,
+  });
+
+  @override
+  State<_LogPhotoNetworkImage> createState() => _LogPhotoNetworkImageState();
+}
+
+class _LogPhotoNetworkImageState extends State<_LogPhotoNetworkImage> {
+  // Timeout 15 วินาที
+  static const _loadTimeout = Duration(seconds: 15);
+
+  bool _isLoading = true;
+  bool _hasError = false;
+  bool _timedOut = false;
+  Timer? _timeoutTimer;
+  int _retryCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _startTimeoutTimer();
+  }
+
+  @override
+  void dispose() {
+    _timeoutTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startTimeoutTimer() {
+    _timeoutTimer?.cancel();
+    _timeoutTimer = Timer(_loadTimeout, () {
+      if (_isLoading && mounted) {
+        setState(() {
+          _timedOut = true;
+          _isLoading = false;
+        });
+      }
+    });
+  }
+
+  void _retry() {
+    if (!mounted) return;
+    setState(() {
+      _retryCount++;
+      _isLoading = true;
+      _hasError = false;
+      _timedOut = false;
+    });
+    _startTimeoutTimer();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_timedOut) return _buildTimeoutWidget();
+    if (_hasError) return _buildErrorWidget();
+
+    return Image.network(
+      // เพิ่ม query param เพื่อ bypass cache เมื่อ retry
+      '${widget.imageUrl}${_retryCount > 0 ? '?retry=$_retryCount' : ''}',
+      key: ValueKey('${widget.imageUrl}_$_retryCount'),
+      fit: widget.fit,
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) {
+          // โหลดเสร็จแล้ว - cancel timer
+          _timeoutTimer?.cancel();
+          return child;
+        }
+        final progress = loadingProgress.expectedTotalBytes != null
+            ? loadingProgress.cumulativeBytesLoaded /
+                loadingProgress.expectedTotalBytes!
+            : null;
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(
+                value: progress,
+                color: AppColors.primary,
+                strokeWidth: 2,
+              ),
+              if (progress != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  '${(progress * 100).toInt()}%',
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+      errorBuilder: (context, error, stackTrace) {
+        // เรียก setState หลัง build เสร็จ
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && !_hasError) {
+            setState(() {
+              _hasError = true;
+              _isLoading = false;
+            });
+          }
+        });
+        return _buildErrorWidget();
+      },
+    );
+  }
+
+  Widget _buildTimeoutWidget() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          HugeIcon(
+            icon: HugeIcons.strokeRoundedWifiError01,
+            size: AppIconSize.xxl,
+            color: AppColors.tagPendingText,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'โหลดช้า',
+            style: AppTypography.body.copyWith(
+              color: AppColors.tagPendingText,
+            ),
+          ),
+          const SizedBox(height: 8),
+          _buildRetryButton(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorWidget() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          HugeIcon(
+            icon: HugeIcons.strokeRoundedWifiError01,
+            size: AppIconSize.xxl,
+            color: AppColors.textSecondary,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'โหลดรูปไม่สำเร็จ',
+            style: AppTypography.body.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'เน็ตช้าหรือไม่มีสัญญาณ',
+            style: AppTypography.caption.copyWith(
+              color: AppColors.textSecondary.withValues(alpha: 0.7),
+            ),
+          ),
+          const SizedBox(height: 8),
+          _buildRetryButton(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRetryButton() {
+    return GestureDetector(
+      onTap: _retry,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.1),
+          borderRadius: AppRadius.fullRadius,
+        ),
+        child: Text(
+          'ลองใหม่',
+          style: AppTypography.button.copyWith(
+            color: AppColors.primary,
+          ),
         ),
       ),
     );

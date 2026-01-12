@@ -46,23 +46,23 @@ class MedicinePhotoItem extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  // รูปยา (ใช้ _MedicineNetworkImage ที่มี timeout)
+                  // รูปยา - ใช้ ClipRect + FittedBox เพื่อให้ cover แบบไม่บิดเบี้ยว
                   hasPhoto
-                      ? _MedicineNetworkImage(
-                          imageUrl: photoUrl,
-                          fit: BoxFit.cover,
-                          // placeholder เป็น Widget (ไม่ใช่ function)
-                          placeholder: Container(
-                            color: AppColors.background,
-                            child: Center(
-                              child: CircularProgressIndicator(
-                                color: AppColors.primary,
-                                strokeWidth: 2,
+                      ? ClipRect(
+                          child: _MedicineNetworkImage(
+                            imageUrl: photoUrl,
+                            fit: BoxFit.cover,
+                            placeholder: Container(
+                              color: AppColors.background,
+                              child: Center(
+                                child: CircularProgressIndicator(
+                                  color: AppColors.primary,
+                                  strokeWidth: 2,
+                                ),
                               ),
                             ),
+                            errorWidget: _buildPlaceholder(),
                           ),
-                          // errorWidget เป็น Widget (ไม่ใช่ function)
-                          errorWidget: _buildPlaceholder(),
                         )
                       : _buildPlaceholder(),
 
@@ -583,8 +583,9 @@ class _MedicineNetworkImageState extends State<_MedicineNetworkImage> {
       imageUrl: widget.imageUrl,
       fit: widget.fit,
       fadeInDuration: const Duration(milliseconds: 150),
-      memCacheWidth: 300,
-      memCacheHeight: 300,
+      // ใช้แค่ memCacheWidth เพื่อรักษา aspect ratio ของรูปต้นฉบับ
+      // (ถ้าใส่ทั้ง width และ height จะบังคับให้รูปเป็น 1:1 ทำให้บิดเบี้ยว)
+      memCacheWidth: 400,
       // placeholder แสดงระหว่างโหลด
       placeholder: (context, url) => widget.placeholder,
       // errorWidget เรียก _onImageError เพื่อ update state

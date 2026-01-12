@@ -79,3 +79,15 @@ Uses `flutter_riverpod` for state management. Provider files go in `features/*/p
 ### Backend
 
 Supabase is initialized in `main.dart` with config from `core/config/supabase_config.dart`.
+
+### Network Images (สำคัญมาก!)
+
+**ทุกรูปที่โหลดจาก network ต้องมี timeout และ retry mechanism เสมอ** เพื่อ UX ที่ดี:
+
+1. **Timeout 15 วินาที** - ถ้าโหลดไม่เสร็จภายในเวลา แสดง "โหลดช้า" + ปุ่มลองใหม่
+2. **Error handling** - ถ้าโหลดไม่ได้ แสดง "โหลดรูปไม่สำเร็จ" + ปุ่มลองใหม่
+3. **Progress indicator** - แสดง % ระหว่างโหลด (ถ้าทราบขนาดไฟล์)
+
+ตัวอย่าง widget: ดู `_MedicineNetworkImage` ใน `lib/features/medicine/widgets/medicine_photo_item.dart`
+
+**ห้ามใช้ `Image.network` หรือ `CachedNetworkImage` โดยตรง** โดยไม่มี timeout/retry!
