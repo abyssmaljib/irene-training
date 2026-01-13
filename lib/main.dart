@@ -4,6 +4,7 @@ import 'package:onesignal_flutter/onesignal_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/date_symbol_data_local.dart'; // สำหรับ initializeDateFormatting
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/config/supabase_config.dart';
@@ -51,6 +52,10 @@ void main() async {
     url: SupabaseConfig.url,
     anonKey: SupabaseConfig.anonKey,
   );
+
+  // Initialize Thai locale สำหรับ DateFormat
+  // ต้องเรียกก่อนใช้ DateFormat('d MMM', 'th') ไม่งั้นจะเกิด LocaleDataException
+  await initializeDateFormatting('th');
 
   // Initialize SharedPreferences
   final sharedPreferences = await SharedPreferences.getInstance();

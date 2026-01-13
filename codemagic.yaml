@@ -52,9 +52,11 @@ workflows:
 
       - name: Build AAB for Play Store
         script: |
+          # ใช้ git tag เป็น version (ตัด 'v' ออก เช่น v1.1.0 -> 1.1.0)
+          VERSION_NAME=${CM_TAG#v}
           flutter build appbundle --release \
             --build-number=$PROJECT_BUILD_NUMBER \
-            --build-name=1.0.$PROJECT_BUILD_NUMBER
+            --build-name=$VERSION_NAME
 
     artifacts:
       - build/**/outputs/**/*.aab
@@ -122,9 +124,11 @@ workflows:
 
       - name: Build IPA for App Store
         script: |
+          # ใช้ git tag เป็น version (ตัด 'v' ออก เช่น v1.1.0 -> 1.1.0)
+          VERSION_NAME=${CM_TAG#v}
           flutter build ipa --release \
             --build-number=$PROJECT_BUILD_NUMBER \
-            --build-name=1.0.$PROJECT_BUILD_NUMBER \
+            --build-name=$VERSION_NAME \
             --export-options-plist=/Users/builder/export_options.plist
 
     artifacts:
