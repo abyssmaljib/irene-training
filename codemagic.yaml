@@ -83,6 +83,8 @@ workflows:
       flutter: stable
       xcode: latest
       cocoapods: default
+      groups:
+        - ios_credentials  # Contains certificate and profile uploaded in Codemagic UI
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.giantkumakuma.irene
