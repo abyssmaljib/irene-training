@@ -77,15 +77,21 @@ workflows:
     max_build_duration: 60
     instance_type: mac_mini_m2
     integrations:
-      app_store_connect: Irene App Store  # Configure this in Codemagic UI
+      app_store_connect: Codemagic_2026  # Dev Portal Integration name in Codemagic UI
 
     environment:
       flutter: stable
       xcode: latest
       cocoapods: default
+      groups:
+        - env_secrets  # Contains SUPABASE_URL, SUPABASE_ANON_KEY, CLARITY_PROJECT_ID
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.giantkumakuma.irene
+        provisioning_profiles:
+          - Codemagic_2026_Prov_Profile
+        certificates:
+          - Codemagic_2026_Cer
       vars:
         BUNDLE_ID: "com.giantkumakuma.irene"
         APP_STORE_APP_ID: 6756898503
