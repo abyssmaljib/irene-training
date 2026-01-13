@@ -329,24 +329,33 @@ class ClockService {
     }
   }
 
-  /// นับ Announcement Posts ที่ยังไม่ได้อ่าน (like = อ่านแล้ว)
+  /// นับ Posts ที่ยังไม่ได้อ่าน (like = อ่านแล้ว)
+  /// เงื่อนไข: is_handover = true หรือ resident_id IS NULL (14 วันล่าสุด)
   Future<int> getUnreadAnnouncementsCount() async {
     final userId = _userService.effectiveUserId;
     final nursinghomeId = await _userService.getNursinghomeId();
     if (userId == null || nursinghomeId == null) return 0;
 
     try {
-      final response = await _supabase
-          .from('post_tab_likes_14d')
-          .select('post_id, like_user_ids')
-          .eq('nursinghome_id', nursinghomeId)
-          .neq('tab', 'FYI')
-          .neq('tab', 'Calendar');
+      // ดึงโพส 14 วันล่าสุดที่ต้องอ่าน
+      final fourteenDaysAgo = DateTime.now().subtract(const Duration(days: 14));
 
-      // Filter posts where user hasn't liked
+      final response = await _supabase
+          .from('postwithuserinfo')
+          .select('id, like_user_ids, is_handover, resident_id')
+          .eq('nursinghome_id', nursinghomeId)
+          .gte('post_created_at', fourteenDaysAgo.toIso8601String());
+
+      // Filter: (is_handover = true OR resident_id IS NULL) AND user ยังไม่ได้ like
       final unreadPosts = (response as List).where((post) {
+        final isHandover = post['is_handover'] as bool? ?? false;
+        final residentId = post['resident_id'];
         final likeUserIds = post['like_user_ids'] as List? ?? [];
-        return !likeUserIds.contains(userId);
+
+        // ต้องเป็นโพสที่บังคับอ่าน (handover หรือ ไม่มี resident)
+        final isRequiredPost = isHandover || residentId == null;
+
+        return isRequiredPost && !likeUserIds.contains(userId);
       }).toList();
 
       return unreadPosts.length;
@@ -356,6 +365,8 @@ class ClockService {
   }
 
   /// ดึงรายการ Posts ที่ยังไม่ได้อ่าน (สำหรับแสดงใน dialog)
+  /// เงื่อนไข: is_handover = true หรือ resident_id IS NULL (14 วันล่าสุด)
+  /// เรียงจากใหม่ไปเก่า เพื่อให้อ่านโพสใหม่ก่อน
   Future<List<Map<String, dynamic>>> getUnreadAnnouncements() async {
     final userId = _userService.effectiveUserId;
     final nursinghomeId = await _userService.getNursinghomeId();
@@ -363,23 +374,36 @@ class ClockService {
     if (userId == null || nursinghomeId == null) return [];
 
     try {
+      // ดึงโพส 14 วันล่าสุดที่ต้องอ่าน เรียงจากใหม่ไปเก่า
+      final fourteenDaysAgo = DateTime.now().subtract(const Duration(days: 14));
+
       final response = await _supabase
-          .from('post_tab_likes_14d')
-          .select('post_id, tab, like_user_ids')
+          .from('postwithuserinfo')
+          .select('id, prioritized_tab, like_user_ids, is_handover, resident_id, post_created_at')
           .eq('nursinghome_id', nursinghomeId)
-          .neq('tab', 'FYI')
-          .neq('tab', 'Calendar');
+          .gte('post_created_at', fourteenDaysAgo.toIso8601String())
+          .order('post_created_at', ascending: false);
 
       debugPrint('getUnreadAnnouncements: raw response length=${(response as List).length}');
 
-      // Filter posts where user hasn't liked
+      // Filter: (is_handover = true OR resident_id IS NULL) AND user ยังไม่ได้ like
       final unreadPosts = response.where((post) {
+        final isHandover = post['is_handover'] as bool? ?? false;
+        final residentId = post['resident_id'];
         final likeUserIds = post['like_user_ids'] as List? ?? [];
-        return !likeUserIds.contains(userId);
+
+        // ต้องเป็นโพสที่บังคับอ่าน (handover หรือ ไม่มี resident)
+        final isRequiredPost = isHandover || residentId == null;
+
+        return isRequiredPost && !likeUserIds.contains(userId);
+      }).map((post) => {
+        // แปลง field name ให้ตรงกับที่ใช้อยู่ (post_id)
+        'post_id': post['id'],
+        'tab': post['prioritized_tab'],
       }).toList();
 
       debugPrint('getUnreadAnnouncements: unread count=${unreadPosts.length}');
-      return unreadPosts.cast<Map<String, dynamic>>();
+      return unreadPosts;
     } catch (e) {
       debugPrint('getUnreadAnnouncements error: $e');
       return [];

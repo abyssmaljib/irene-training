@@ -2,8 +2,8 @@ import 'package:hugeicons/hugeicons.dart';
 
 /// Main tabs for the board screen - V3: เหลือ 2 tabs
 enum PostMainTab {
-  announcement, // นโยบาย (Policy only)
-  handover, // ส่งเวร (is_handover = true + Critical)
+  announcement, // ศูนย์ (posts ไม่มี resident_id)
+  resident, // ผู้พัก (posts ที่มี resident_id)
 }
 
 /// Extension for PostMainTab
@@ -11,9 +11,9 @@ extension PostMainTabExtension on PostMainTab {
   String get label {
     switch (this) {
       case PostMainTab.announcement:
-        return 'นโยบาย';
-      case PostMainTab.handover:
-        return 'ส่งเวร';
+        return 'ศูนย์';
+      case PostMainTab.resident:
+        return 'ผู้พัก';
     }
   }
 
@@ -21,8 +21,8 @@ extension PostMainTabExtension on PostMainTab {
     switch (this) {
       case PostMainTab.announcement:
         return HugeIcons.strokeRoundedFileEdit;
-      case PostMainTab.handover:
-        return HugeIcons.strokeRoundedRefresh;
+      case PostMainTab.resident:
+        return HugeIcons.strokeRoundedUser;
     }
   }
 
@@ -30,13 +30,11 @@ extension PostMainTabExtension on PostMainTab {
   List<String> get dbTabValues {
     switch (this) {
       case PostMainTab.announcement:
-        // นโยบาย = Policy เท่านั้น
-        return ['Announcements-Policy'];
-      case PostMainTab.handover:
-        // ส่งเวร tab ใช้ logic พิเศษใน post_service
-        // - is_handover = true
-        // - Critical posts (รวมมาด้วย)
-        return ['Announcements-Critical']; // fallback
+        // ศูนย์ = posts ที่ไม่มี resident_id
+        return [];
+      case PostMainTab.resident:
+        // ผู้พัก = posts ที่มี resident_id
+        return [];
     }
   }
 }

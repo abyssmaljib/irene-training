@@ -70,12 +70,18 @@ final unreadCountsProvider = FutureProvider<Map<PostMainTab, int>>((ref) async {
   if (nursinghomeId == null || userId == null) {
     return {
       PostMainTab.announcement: 0,
-      PostMainTab.handover: 0,
+      PostMainTab.resident: 0,
     };
   }
 
   final service = ref.watch(postServiceProvider);
   return service.getUnreadCounts(nursinghomeId, userId);
+});
+
+/// Provider สำหรับ total unread post count (สำหรับแสดง badge ที่ navigation)
+final totalUnreadPostCountProvider = FutureProvider<int>((ref) async {
+  final counts = await ref.watch(unreadCountsProvider.future);
+  return counts.values.fold<int>(0, (sum, count) => sum + count);
 });
 
 /// Provider สำหรับ post detail (by ID)

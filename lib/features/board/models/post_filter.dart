@@ -37,8 +37,8 @@ class PostFilter {
     return mainTab.dbTabValues;
   }
 
-  /// Check if this is the handover tab (uses special query logic)
-  bool get isHandoverTab => mainTab == PostMainTab.handover;
+  /// Check if this is the resident tab (posts ที่มี resident_id)
+  bool get isResidentTab => mainTab == PostMainTab.resident;
 
   /// Copy with method
   PostFilter copyWith({

@@ -79,13 +79,13 @@ class PostService {
       // Apply nursinghome filter
       query = query.eq('nursinghome_id', nursinghomeId);
 
-      // Apply tab filter - V3: นโยบาย vs ส่งเวร
-      if (filter.isHandoverTab) {
-        // ส่งเวร tab: is_handover = true หรือ Critical (รวมมาด้วย)
-        query = query.or('is_handover.eq.true,tab.eq.Announcements-Critical');
+      // Apply tab filter - V3: ศูนย์ vs ผู้พัก
+      if (filter.isResidentTab) {
+        // ผู้พัก tab: posts ที่มี resident_id และ is_handover = true
+        query = query.not('resident_id', 'is', null).eq('is_handover', true);
       } else {
-        // นโยบาย tab: Policy เท่านั้น
-        query = query.eq('tab', 'Announcements-Policy');
+        // ศูนย์ tab: posts ที่ไม่มี resident_id
+        query = query.isFilter('resident_id', null);
       }
 
       // Apply resident filter
@@ -178,6 +178,7 @@ class PostService {
   }
 
   /// ดึงจำนวน unread posts ต่อ tab - V3: 2 tabs
+  /// เงื่อนไขบังคับอ่าน: is_handover = true หรือ resident_id IS NULL
   Future<Map<PostMainTab, int>> getUnreadCounts(
     int nursinghomeId,
     String userId,
@@ -188,39 +189,41 @@ class PostService {
     }
 
     try {
-      // Query from post_tab_likes_14d view
-      // This view has posts from last 14 days with like info
+      // ดึงโพส 14 วันล่าสุด
+      final fourteenDaysAgo = DateTime.now().subtract(const Duration(days: 14));
+
       final response = await _supabase
-          .from('post_tab_likes_14d')
-          .select('tab, like_user_ids, is_handover')
-          .eq('nursinghome_id', nursinghomeId);
+          .from('postwithuserinfo')
+          .select('like_user_ids, resident_id, is_handover')
+          .eq('nursinghome_id', nursinghomeId)
+          .gte('post_created_at', fourteenDaysAgo.toIso8601String());
 
       final counts = <PostMainTab, int>{
         PostMainTab.announcement: 0,
-        PostMainTab.handover: 0,
+        PostMainTab.resident: 0,
       };
 
       for (final row in response as List) {
-        final tab = row['tab'] as String?;
         final likeUserIds = row['like_user_ids'] as List?;
+        final residentId = row['resident_id'];
         final isHandover = row['is_handover'] as bool? ?? false;
 
         // Check if user has NOT liked this post
         final hasLiked = likeUserIds?.contains(userId) ?? false;
         if (hasLiked) continue;
 
-        // Increment count for appropriate tab - V3 logic
-        // นโยบาย = Policy เท่านั้น
-        if (tab == 'Announcements-Policy') {
+        // นับเฉพาะโพสที่บังคับอ่าน: is_handover = true หรือ resident_id IS NULL
+        // Tab ผู้พัก = posts ที่มี resident_id และ is_handover = true
+        if (residentId != null && isHandover) {
+          counts[PostMainTab.resident] =
+              (counts[PostMainTab.resident] ?? 0) + 1;
+        }
+        // Tab ศูนย์ = posts ที่ไม่มี resident_id
+        else if (residentId == null) {
           counts[PostMainTab.announcement] =
               (counts[PostMainTab.announcement] ?? 0) + 1;
         }
-        // ส่งเวร = is_handover = true หรือ Critical
-        else if (isHandover || tab == 'Announcements-Critical') {
-          counts[PostMainTab.handover] =
-              (counts[PostMainTab.handover] ?? 0) + 1;
-        }
-        // FYI, Info ไม่นับใน Board (ไปอยู่ Activity Log)
+        // โพสที่มี resident แต่ไม่ใช่ handover → ไม่นับ (ไม่บังคับอ่าน)
       }
 
       // Update cache
@@ -234,8 +237,39 @@ class PostService {
       debugPrint('getUnreadCounts error: $e');
       return {
         PostMainTab.announcement: 0,
-        PostMainTab.handover: 0,
+        PostMainTab.resident: 0,
       };
+    }
+  }
+
+  /// ดึง post IDs ที่ยังไม่ได้อ่าน (สำหรับหน้าเคลียร์โพส)
+  /// เงื่อนไข: is_handover = true หรือ resident_id IS NULL (14 วันล่าสุด)
+  /// เรียงจากใหม่ไปเก่า
+  Future<List<int>> getUnreadPostIds(int nursinghomeId, String userId) async {
+    try {
+      final fourteenDaysAgo = DateTime.now().subtract(const Duration(days: 14));
+
+      final response = await _supabase
+          .from('postwithuserinfo')
+          .select('id, like_user_ids, is_handover, resident_id')
+          .eq('nursinghome_id', nursinghomeId)
+          .gte('post_created_at', fourteenDaysAgo.toIso8601String())
+          .order('post_created_at', ascending: false);
+
+      // Filter: (is_handover = true OR resident_id IS NULL) AND user ยังไม่ได้ like
+      final unreadPostIds = (response as List).where((post) {
+        final isHandover = post['is_handover'] as bool? ?? false;
+        final residentId = post['resident_id'];
+        final likeUserIds = post['like_user_ids'] as List? ?? [];
+
+        final isRequiredPost = isHandover || residentId == null;
+        return isRequiredPost && !likeUserIds.contains(userId);
+      }).map((post) => post['id'] as int).toList();
+
+      return unreadPostIds;
+    } catch (e) {
+      debugPrint('getUnreadPostIds error: $e');
+      return [];
     }
   }
 

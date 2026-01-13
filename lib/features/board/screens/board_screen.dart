@@ -13,16 +13,17 @@ import '../models/post.dart';
 import '../models/post_tab.dart';
 import '../providers/post_provider.dart';
 import '../providers/post_filter_provider.dart';
+import '../services/post_service.dart';
 import '../widgets/post_card.dart';
 import '../widgets/post_tab_bar.dart';
 import '../widgets/post_search_bar.dart';
-import '../widgets/pinned_post_card.dart';
 import '../widgets/post_filter_drawer.dart';
 import '../widgets/create_post_bottom_sheet.dart';
 import '../widgets/edit_post_bottom_sheet.dart' show showEditPostBottomSheet, navigateToAdvancedEditPostScreen;
 import '../widgets/video_player_widget.dart';
 import '../../checklist/providers/task_provider.dart' show currentUserSystemRoleProvider;
 import 'advanced_create_post_screen.dart';
+import 'required_posts_screen.dart';
 
 /// Navigate to post detail screen
 void navigateToPostDetail(BuildContext context, int postId) {
@@ -146,7 +147,7 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
                   MaterialPageRoute(builder: (_) => const SettingsScreen()),
                 );
               },
-              trailing: _buildViewModeToggle(filterType),
+              trailing: _buildTrailingButtons(filterType, unreadCountsAsync),
             ),
 
             // Search bar (collapsible) - full width
@@ -196,9 +197,6 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
                 ),
               ),
 
-            // Pinned Critical post
-            if (mainTab == PostMainTab.announcement) _buildPinnedPost(),
-
             // Search results or posts list
             if (searchQuery.isNotEmpty)
               _buildSearchResults()
@@ -243,6 +241,125 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
     );
   }
 
+  /// ปุ่มด้านขวาของ AppBar: ปุ่มเคลียร์โพส + ปุ่มเปลี่ยนมุมมอง
+  Widget _buildTrailingButtons(
+    PostFilterType filterType,
+    AsyncValue<Map<PostMainTab, int>> unreadCountsAsync,
+  ) {
+    // รวม unread count ทุก tab
+    final totalUnread = unreadCountsAsync.whenOrNull(
+      data: (counts) => counts.values.fold(0, (sum, count) => sum + count),
+    ) ?? 0;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // ปุ่มเคลียร์โพสที่ยังไม่อ่าน (แสดงเฉพาะเมื่อมีโพสที่ยังไม่อ่าน)
+        if (totalUnread > 0)
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: _buildClearUnreadButton(totalUnread),
+          ),
+        // ปุ่มเปลี่ยนมุมมอง
+        _buildViewModeToggle(filterType),
+      ],
+    );
+  }
+
+  /// ปุ่มเคลียร์โพสที่ยังไม่อ่าน พร้อม badge แสดงจำนวน
+  Widget _buildClearUnreadButton(int unreadCount) {
+    return Material(
+      color: AppColors.error.withValues(alpha: 0.1),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: _navigateToRequiredPosts,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          alignment: Alignment.center,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              HugeIcon(
+                icon: HugeIcons.strokeRoundedCheckList,
+                color: AppColors.error,
+                size: AppIconSize.md,
+              ),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.error,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  unreadCount > 99 ? '99+' : unreadCount.toString(),
+                  style: AppTypography.caption.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Navigate ไปหน้าเคลียร์โพสที่ยังไม่อ่าน
+  Future<void> _navigateToRequiredPosts() async {
+    // Invalidate cache ก่อนดึงข้อมูลใหม่
+    PostService.instance.invalidateCache();
+
+    // ดึง nursinghome และ user ID
+    final nursinghomeId = await ref.read(nursinghomeIdProvider.future);
+    final userId = ref.read(currentUserIdProvider);
+
+    if (nursinghomeId == null || userId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('ไม่สามารถดึงข้อมูลได้')),
+        );
+      }
+      return;
+    }
+
+    // ดึงรายการโพสที่ยังไม่อ่าน (ใช้ PostService เดียวกับ badge)
+    final postIds = await PostService.instance.getUnreadPostIds(nursinghomeId, userId);
+
+    if (postIds.isEmpty) {
+      // Refresh badge ด้วย
+      refreshPosts(ref);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('ไม่มีโพสที่ต้องอ่านแล้ว 🎉')),
+        );
+      }
+      return;
+    }
+
+    if (mounted) {
+      await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => RequiredPostsScreen(
+            postIds: postIds,
+            onAllPostsRead: () {
+              // Refresh posts หลังอ่านครบ
+              refreshPosts(ref);
+            },
+          ),
+        ),
+      );
+
+      // Refresh ทุกครั้งที่กลับมา (ไม่ว่าจะอ่านครบหรือไม่)
+      refreshPosts(ref);
+    }
+  }
+
   /// Toggle button สำหรับเปลี่ยนมุมมอง (View Mode) ที่มุมขวาของ AppBar
   /// กดแล้ววนไปมุมมองถัดไป: all -> unacknowledged -> myPosts -> all ...
   Widget _buildViewModeToggle(PostFilterType currentMode) {
@@ -281,33 +398,6 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
       case PostFilterType.myPosts:
         return HugeIcons.strokeRoundedUserEdit01;
     }
-  }
-
-  Widget _buildPinnedPost() {
-    final pinnedPostAsync = ref.watch(pinnedPostProvider);
-
-    return pinnedPostAsync.when(
-      data: (post) {
-        if (post == null) return SliverToBoxAdapter(child: SizedBox.shrink());
-        return SliverToBoxAdapter(
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(
-              AppSpacing.md,
-              0,
-              AppSpacing.md,
-              AppSpacing.md,
-            ),
-            child: PinnedPostCard(
-              post: post,
-              onTap: () => _navigateToDetail(post),
-              onLikeTap: () => _handleLike(post.id),
-            ),
-          ),
-        );
-      },
-      loading: () => SliverToBoxAdapter(child: SizedBox.shrink()),
-      error: (e, s) => SliverToBoxAdapter(child: SizedBox.shrink()),
-    );
   }
 
   Widget _buildSearchResults() {
@@ -354,8 +444,11 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
 
   Widget _buildPostsListView(List<Post> posts) {
     final currentUserId = ref.watch(currentUserIdProvider);
+    final mainTab = ref.watch(postMainTabProvider);
     // TODO: Get userRole from provider when available
     const userRole = 'user';
+    // ถ้าอยู่ใน tab ศูนย์ (announcement) = isCenterTab
+    final isCenterTab = mainTab == PostMainTab.announcement;
 
     return SliverPadding(
       padding: EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, 0),
@@ -365,6 +458,11 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
             final post = posts[index];
             final isLiked = post.hasUserLiked(currentUserId);
 
+            // ทุก post ที่แสดงในหน้านี้ถือว่า required อยู่แล้ว
+            // (Tab ศูนย์ = resident_id IS NULL, Tab ผู้พัก = is_handover = true)
+            // ดังนั้นแค่เช็คว่ายังไม่ได้ like ก็พอ
+            final isRequiredUnread = !isLiked;
+
             return Padding(
               padding: EdgeInsets.only(bottom: AppSpacing.md),
               child: PostCard(
@@ -372,6 +470,8 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
                 isLiked: isLiked,
                 currentUserId: currentUserId,
                 userRole: userRole,
+                isCenterTab: isCenterTab,
+                isRequiredUnread: isRequiredUnread,
                 onTap: () => _navigateToDetail(post),
                 onLikeTap: () => _handleLike(post.id),
                 onCancelPrn: (queueId) => _handleCancelPrn(queueId),
@@ -609,13 +709,19 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
           final hasQuiz = post.hasQuiz && post.qaId != null && post.qaId! > 0;
           final quizAnswered = hasQuiz && _selectedChoice == post.qaAnswer;
 
+          // post ใน tab ศูนย์ = ไม่มี resident_id
+          final isCenterTabPost = post.residentId == null;
+
           return SingleChildScrollView(
             padding: EdgeInsets.all(AppSpacing.md),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Type tag
-                _buildTypeTag(post),
+                // tab ศูนย์ = แสดง post tags จริง, tab ผู้พัก = แสดง type tag
+                if (isCenterTabPost)
+                  _buildDetailPostTags(post)
+                else
+                  _buildTypeTag(post),
                 AppSpacing.verticalGapMd,
 
                 // Title
@@ -636,8 +742,8 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
                 SelectableText(post.text ?? '', style: AppTypography.body),
                 AppSpacing.verticalGapLg,
 
-                // Tags
-                if (post.postTags.isNotEmpty) ...[
+                // Tags (แสดงเฉพาะ tab ผู้พัก เพราะ tab ศูนย์แสดงไว้ด้านบนแล้ว)
+                if (!isCenterTabPost && post.postTags.isNotEmpty) ...[
                   _buildTagsSection(post),
                   AppSpacing.verticalGapLg,
                 ],
@@ -696,7 +802,7 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
     } else if (post.isPolicy) {
       tagColor = AppColors.tagPendingText;
       tagBgColor = AppColors.tagPendingBg;
-      tagText = 'นโยบาย';
+      tagText = 'ศูนย์';
     } else if (post.isAnnouncement) {
       tagColor = AppColors.tagNeutralText;
       tagBgColor = AppColors.tagNeutralBg;
@@ -724,6 +830,32 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
           fontWeight: FontWeight.w600,
         ),
       ),
+    );
+  }
+
+  /// แสดง post tags จริงที่ user ใส่ (สำหรับ post ใน tab ศูนย์)
+  Widget _buildDetailPostTags(Post post) {
+    if (post.postTags.isEmpty) return const SizedBox.shrink();
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: post.postTags.map((tag) {
+        return Container(
+          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            '#$tag',
+            style: AppTypography.bodySmall.copyWith(
+              color: AppColors.primary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 
@@ -1071,7 +1203,7 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
             'assets/animations/Trophy.json',
             width: 300,
             height: 300,
-            fit: BoxFit.contain,
+            fit: BoxFit.cover,
             repeat: false,
             animate: true,
           ),
@@ -1352,7 +1484,7 @@ class _FullScreenImageViewerState extends State<_FullScreenImageViewer> {
             child: Center(
               child: CachedNetworkImage(
                 imageUrl: widget.imageUrls[index],
-                fit: BoxFit.contain,
+                fit: BoxFit.cover,
                 progressIndicatorBuilder: (context, url, progress) => Center(
                   child: Stack(
                     alignment: Alignment.center,

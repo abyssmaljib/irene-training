@@ -14,6 +14,7 @@ import '../../settings/screens/settings_screen.dart';
 import '../../shift_summary/providers/shift_summary_provider.dart';
 import '../../notifications/providers/notification_provider.dart';
 import '../../onboarding/providers/onboarding_provider.dart';
+import '../../board/providers/post_provider.dart';
 import '../../onboarding/models/tutorial_target.dart';
 import '../../onboarding/widgets/whats_new_dialog.dart';
 import '../../onboarding/widgets/new_feature_badge.dart';
@@ -186,14 +187,7 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
                   tutorialKey: _tutorialKeys.residentsTabKey,
                   tabId: 'residents',
                 ),
-                _buildNavItem(
-                  index: 3,
-                  icon: HugeIcons.strokeRoundedNews01,
-                  activeIcon: HugeIcons.strokeRoundedNews01,
-                  label: 'กระดานข่าว',
-                  tutorialKey: _tutorialKeys.boardTabKey,
-                  tabId: 'board',
-                ),
+                _buildBoardNavItem(),
                 _buildProfileNavItem(),
               ],
             ),
@@ -256,6 +250,94 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
             AppSpacing.verticalGapXs,
             Text(
               label,
+              textAlign: TextAlign.center,
+              style: AppTypography.caption.copyWith(
+                fontSize: 10,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                color: isSelected ? AppColors.primary : AppColors.secondaryText,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Build board nav item with red dot for unread posts
+  Widget _buildBoardNavItem() {
+    final unreadCountAsync = ref.watch(totalUnreadPostCountProvider);
+    final hasUnreadPosts = unreadCountAsync.maybeWhen(
+      data: (count) => count > 0,
+      orElse: () => false,
+    );
+
+    final isSelected = _currentIndex == 3;
+
+    // ตรวจสอบว่า tab นี้มี feature ใหม่หรือไม่
+    final userId = Supabase.instance.client.auth.currentUser?.id ?? '';
+    final newFeatureTabsAsync = ref.watch(newFeatureTabsProvider(userId));
+    final hasNewFeature = newFeatureTabsAsync.maybeWhen(
+      data: (tabs) => tabs.contains('board'),
+      orElse: () => false,
+    );
+
+    return GestureDetector(
+      key: _tutorialKeys.boardTabKey,
+      onTap: () {
+        setState(() {
+          _currentIndex = 3;
+        });
+
+        // Dismiss NEW badge เมื่อ user tap tab
+        if (hasNewFeature) {
+          ref.read(onboardingServiceProvider).dismissFeatureTab(userId, 'board');
+          ref.invalidate(newFeatureTabsProvider(userId));
+        }
+      },
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        width: 72,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Icon พร้อม badge
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                // NEW badge (ถ้ามี feature ใหม่)
+                WithNewBadge(
+                  showBadge: hasNewFeature,
+                  badgeOffset: const Offset(-6, -2),
+                  child: HugeIcon(
+                    icon: HugeIcons.strokeRoundedNews01,
+                    color: isSelected ? AppColors.primary : AppColors.secondaryText,
+                    size: AppIconSize.xl,
+                  ),
+                ),
+                // Red dot สำหรับ unread posts (แสดงเมื่อไม่มี NEW badge)
+                if (hasUnreadPosts && !hasNewFeature)
+                  Positioned(
+                    right: -4,
+                    top: -4,
+                    child: Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: AppColors.error,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: AppColors.secondaryBackground,
+                          width: 1.5,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            AppSpacing.verticalGapXs,
+            Text(
+              'กระดานข่าว',
               textAlign: TextAlign.center,
               style: AppTypography.caption.copyWith(
                 fontSize: 10,

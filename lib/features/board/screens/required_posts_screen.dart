@@ -219,7 +219,7 @@ class _RequiredPostsScreenState extends ConsumerState<RequiredPostsScreen> {
     } else if (post.isPolicy) {
       tagColor = AppColors.tagPendingText;
       tagBgColor = AppColors.tagPendingBg;
-      tagText = 'นโยบาย';
+      tagText = 'ศูนย์';
     } else if (post.isAnnouncement) {
       tagColor = AppColors.tagNeutralText;
       tagBgColor = AppColors.tagNeutralBg;
@@ -537,7 +537,7 @@ class _RequiredPostsScreenState extends ConsumerState<RequiredPostsScreen> {
             'assets/animations/Trophy.json',
             width: 300,
             height: 300,
-            fit: BoxFit.contain,
+            fit: BoxFit.cover,
             repeat: false,
           ),
         );

@@ -181,7 +181,11 @@ class Post {
       prnQueueId: json['prn_queue_id'] as int?,
       logLineStatus: json['log_line_status'] as String?,
       logLineQueueId: json['log_line_queue_id'] as int?,
-      isHandover: json['is_handover'] as bool? ?? false,
+      // is_handover = true ถ้า:
+      // 1. App ใหม่: is_handover = true (บันทึกตรงใน Post table)
+      // 2. App เก่า: Importent = true (บันทึกผ่าน Post_Tags → TagsLabel)
+      isHandover: (json['is_handover'] as bool? ?? false) ||
+          (json['Importent'] as bool? ?? false),
     );
   }
 
@@ -313,15 +317,13 @@ class Post {
   }
 
   /// Get the main tab type - V3: 2 tabs only
-  /// นโยบาย = Policy only
-  /// ส่งเวร = is_handover = true (รวม Critical)
+  /// ศูนย์ = posts ที่ไม่มี resident_id
+  /// ผู้พัก = posts ที่มี resident_id และ is_handover = true
   PostMainTab get mainTab {
-    // นโยบาย = Policy เท่านั้น
-    if (isPolicy) return PostMainTab.announcement;
-    // ส่งเวร = is_handover = true (รวม Critical และทุกอย่างที่สำคัญ)
-    if (isHandover || isCritical) return PostMainTab.handover;
-    // ที่เหลือ (FYI, Info) จะไม่แสดงใน Board แต่แสดงใน Activity Log
-    return PostMainTab.handover; // fallback
+    // ผู้พัก = posts ที่มี resident_id และ is_handover = true
+    if (residentId != null && isHandover) return PostMainTab.resident;
+    // ศูนย์ = posts ที่ไม่มี resident_id
+    return PostMainTab.announcement;
   }
 
   /// Get display text (truncated content for card)

@@ -16,6 +16,12 @@ class PostCard extends StatelessWidget {
   final Future<void> Function(int queueId)? onCancelPrn;
   final Future<void> Function(int queueId)? onCancelLogLine;
 
+  /// ถ้า true = อยู่ใน tab ศูนย์ (ซ่อน tag, แสดงกรอบสีแดงพาสเทล)
+  final bool isCenterTab;
+
+  /// ถ้า true = เป็นโพสที่บังคับอ่านและยังไม่ได้อ่าน (แสดง red dot)
+  final bool isRequiredUnread;
+
   const PostCard({
     super.key,
     required this.post,
@@ -26,6 +32,8 @@ class PostCard extends StatelessWidget {
     this.onLikeTap,
     this.onCancelPrn,
     this.onCancelLogLine,
+    this.isCenterTab = false,
+    this.isRequiredUnread = false,
   });
 
   @override
@@ -38,10 +46,15 @@ class PostCard extends StatelessWidget {
           color: AppColors.surface,
           borderRadius: AppRadius.mediumRadius,
           boxShadow: [AppShadows.subtle],
-          border: post.isCritical
+          // tab ศูนย์ = กรอบสีแดงพาสเทลทุก card
+          // tab ผู้พัก = กรอบสีแดงเฉพาะ critical
+          border: isCenterTab
               ? Border.all(
-                  color: AppColors.error.withValues(alpha: 0.3), width: 2)
-              : null,
+                  color: AppColors.error.withValues(alpha: 0.2), width: 1.5)
+              : (post.isCritical
+                  ? Border.all(
+                      color: AppColors.error.withValues(alpha: 0.3), width: 2)
+                  : null),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -89,8 +102,21 @@ class PostCard extends StatelessWidget {
   Widget _buildHeader() {
     return Row(
       children: [
-        _buildTypeTag(),
+        // แสดง post_tags (tag name) ทั้ง tab ศูนย์และ tab ผู้พัก
+        _buildPostTags(),
         Spacer(),
+        // Red dot สำหรับโพสที่บังคับอ่านและยังไม่ได้อ่าน
+        if (isRequiredUnread) ...[
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: AppColors.error,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 6),
+        ],
         Text(
           _formatTimeAgo(post.createdAt),
           style: AppTypography.caption.copyWith(color: AppColors.secondaryText),
@@ -99,51 +125,33 @@ class PostCard extends StatelessWidget {
     );
   }
 
-  Widget _buildTypeTag() {
-    final (color, bgColor, text, icon) = _getTypeStyle();
+  /// แสดง post tags จริงที่ user ใส่
+  Widget _buildPostTags() {
+    if (post.postTags.isEmpty) return const SizedBox.shrink();
 
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          HugeIcon(icon: icon, size: AppIconSize.xs, color: color),
-          AppSpacing.horizontalGapXs,
-          Text(
-            text,
+    // แสดงแค่ 2 tags แรก เพื่อไม่ให้ยาวเกินไป
+    final displayTags = post.postTags.take(2).toList();
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: displayTags.map((tag) {
+        return Container(
+          margin: EdgeInsets.only(right: 4),
+          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Text(
+            '#$tag',
             style: AppTypography.caption.copyWith(
-              color: color,
-              fontWeight: FontWeight.w600,
+              color: AppColors.primary,
+              fontWeight: FontWeight.w500,
             ),
           ),
-        ],
-      ),
+        );
+      }).toList(),
     );
-  }
-
-  (Color, Color, String, dynamic) _getTypeStyle() {
-    if (post.isCritical) {
-      return (AppColors.error, AppColors.tagFailedBg, 'สำคัญ', HugeIcons.strokeRoundedAlert02);
-    }
-    if (post.isPolicy) {
-      return (AppColors.tagPendingText, AppColors.tagPendingBg, 'นโยบาย',
-          HugeIcons.strokeRoundedNotification02);
-    }
-    if (post.isInfo) {
-      return (AppColors.tagNeutralText, AppColors.tagNeutralBg, 'ข้อมูล',
-          HugeIcons.strokeRoundedInformationCircle);
-    }
-    if (post.isCalendar) {
-      return (AppColors.secondary, AppColors.accent2, 'นัดหมาย',
-          HugeIcons.strokeRoundedCalendar01);
-    }
-    // FYI / General
-    return (AppColors.tagNeutralText, AppColors.tagNeutralBg, 'ทั่วไป',
-        HugeIcons.strokeRoundedFileEdit);
   }
 
   Widget _buildTitle() {
