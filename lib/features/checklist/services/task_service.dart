@@ -191,16 +191,27 @@ class TaskService {
     }
   }
 
-  /// Mark task เป็น problem
-  Future<bool> markTaskProblem(int logId, String description) async {
+  /// Mark task เป็น problem พร้อมระบุประเภทปัญหา
+  /// [userId] - UUID ของผู้แจ้งปัญหา
+  /// [problemType] - ประเภทปัญหา เช่น patient_refused, not_eating, other
+  /// [description] - รายละเอียดเพิ่มเติม (optional, บังคับเฉพาะ type=other)
+  Future<bool> markTaskProblem(
+    int logId,
+    String userId,
+    String problemType,
+    String? description,
+  ) async {
     try {
       await _supabase.from('A_Task_logs_ver2').update({
         'status': 'problem',
+        'problem_type': problemType,
         'Descript': description,
+        'completed_by': userId, // บันทึกผู้แจ้งปัญหา
+        'completed_at': DateTime.now().toUtc().toIso8601String(), // บันทึกเวลาที่แจ้ง
       }).eq('id', logId);
 
       invalidateCache();
-      debugPrint('markTaskProblem: log $logId marked as problem');
+      debugPrint('markTaskProblem: log $logId marked as $problemType by $userId');
       return true;
     } catch (e) {
       debugPrint('markTaskProblem error: $e');
@@ -282,6 +293,55 @@ class TaskService {
     } catch (e) {
       debugPrint('updateConfirmImage error: $e');
       return false;
+    }
+  }
+
+  /// ดึงประวัติการแก้ปัญหาของ task ที่คล้ายกัน (same taskId หรือ same residentId + taskType)
+  /// ใช้แสดงใน ProblemInputSheet ก่อนที่ user จะเลือกประเภทปัญหา
+  /// เพื่อให้ user เห็นว่าปัญหาลักษณะนี้เคยแก้อย่างไร
+  Future<List<TaskLog>> getResolutionHistory({
+    int? taskId,
+    int? residentId,
+    String? taskType,
+    int nursinghomeId = 0,
+    int limit = 5,
+  }) async {
+    try {
+      // สร้าง base query
+      // ต้องเรียก filter ก่อน order และ limit เพราะ Supabase SDK chain อย่างนั้น
+      var query = _supabase
+          .from('v2_task_logs_with_details')
+          .select()
+          .not('resolution_status', 'is', null)
+          .not('resolution_note', 'is', null);
+
+      // Filter ตาม taskId (ถ้ามี) - หา task แบบเดียวกัน
+      if (taskId != null) {
+        query = query.eq('task_id', taskId);
+      }
+      // หรือ filter ตาม residentId + taskType (ถ้ามี)
+      else if (residentId != null && taskType != null) {
+        query = query.eq('resident_id', residentId).eq('taskType', taskType);
+      }
+      // หรือ filter ตาม nursinghomeId (fallback)
+      else if (nursinghomeId > 0) {
+        query = query.eq('nursinghome_id', nursinghomeId);
+      }
+
+      // order และ limit หลัง filter เสร็จ
+      final response = await query
+          .order('resolved_at', ascending: false)
+          .limit(limit);
+
+      final tasks =
+          (response as List).map((json) => TaskLog.fromJson(json)).toList();
+
+      debugPrint(
+          'getResolutionHistory: found ${tasks.length} resolution records');
+      return tasks;
+    } catch (e) {
+      debugPrint('getResolutionHistory error: $e');
+      return [];
     }
   }
 
