@@ -69,6 +69,8 @@ dependencies:
   hugeicons: ^1.1.4
   shared_preferences: ^2.2.3
   onesignal_flutter: ^5.3.5
+  # Onboarding & Tutorial
+  tutorial_coach_mark: ^1.2.11
 
 
 dev_dependencies:

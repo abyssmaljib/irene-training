@@ -6,6 +6,16 @@ class TaskLog {
   final String? description; // task description จาก task template
   final String? descript; // หมายเหตุที่ user กรอกตอนรายงานปัญหา
   final String? status; // null = pending, 'complete' = done, 'problem' = problem
+  final String? problemType; // ประเภทปัญหา: patient_refused, not_eating, etc.
+
+  // Resolution fields - การจัดการปัญหาโดยหัวหน้าเวร
+  // null = ยังไม่จัดการ, 'dismiss' = รับทราบ, 'ticket' = สร้างตั๋วแล้ว, 'resolved' = แก้ปัญหาแล้ว
+  final String? resolutionStatus;
+  final String? resolutionNote; // วิธีแก้ปัญหาที่หัวหน้าเวรพิมพ์
+  final String? resolvedBy; // UUID ของหัวหน้าเวรที่จัดการ
+  final String? resolvedByNickname; // ชื่อหัวหน้าเวรที่จัดการ
+  final DateTime? resolvedAt; // เวลาที่จัดการ
+
   final DateTime? expectedDateTime;
   final DateTime? completedAt;
   final String? completedByUid;
@@ -78,6 +88,12 @@ class TaskLog {
     this.description,
     this.descript,
     this.status,
+    this.problemType,
+    this.resolutionStatus,
+    this.resolutionNote,
+    this.resolvedBy,
+    this.resolvedByNickname,
+    this.resolvedAt,
     this.expectedDateTime,
     this.completedAt,
     this.completedByUid,
@@ -131,6 +147,13 @@ class TaskLog {
       description: json['task_description'] as String?,
       descript: json['Descript'] as String?, // หมายเหตุจาก user
       status: json['status'] as String?,
+      problemType: json['problem_type'] as String?,
+      // Resolution fields
+      resolutionStatus: json['resolution_status'] as String?,
+      resolutionNote: json['resolution_note'] as String?,
+      resolvedBy: json['resolved_by'] as String?,
+      resolvedByNickname: json['resolved_by_nickname'] as String?,
+      resolvedAt: _parseDateTime(json['resolved_at']),
       expectedDateTime: _parseDateTime(json['ExpectedDateTime']),
       completedAt: _parseDateTime(json['log_completed_at']),
       completedByUid: json['completed_by'] as String?,
@@ -221,6 +244,19 @@ class TaskLog {
   bool get isPostponed => status == 'postpone';
   /// งาน refer (ไม่อยู่ศูนย์)
   bool get isReferred => status == 'refer';
+
+  // Resolution status helpers (การจัดการปัญหาโดยหัวหน้าเวร)
+  /// หัวหน้าเวรจัดการปัญหาแล้ว (dismiss/ticket/resolved)
+  bool get isResolved => resolutionStatus != null;
+  /// หัวหน้าเวรกดรับทราบ
+  bool get isDismissed => resolutionStatus == 'dismiss';
+  /// สร้างตั๋วแล้ว
+  bool get hasTicket => resolutionStatus == 'ticket';
+  /// แก้ปัญหาแล้ว (มี resolution note)
+  bool get isProblemResolved => resolutionStatus == 'resolved';
+  /// มีวิธีแก้ปัญหาให้ดู
+  bool get hasResolutionNote =>
+      resolutionNote != null && resolutionNote!.isNotEmpty;
 
   /// ตรวจสอบว่า resident ถูก refer หรือ home (ส่งต่อ/กลับบ้าน) หรือไม่
   /// ใช้สำหรับซ่อน tasks ของ residents ที่ไม่ได้อยู่แล้ว

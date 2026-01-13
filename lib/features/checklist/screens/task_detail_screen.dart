@@ -17,6 +17,7 @@ import '../../medicine/widgets/medicine_photo_item.dart';
 import '../models/task_log.dart';
 import '../providers/task_provider.dart';
 import '../services/task_service.dart';
+import '../models/problem_type.dart';
 import '../widgets/problem_input_sheet.dart';
 import '../../board/widgets/create_post_bottom_sheet.dart';
 import '../../board/widgets/video_player_widget.dart';
@@ -315,9 +316,9 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                       _buildPostVideo(),
                     ],
 
-                    // Descript (หมายเหตุ) - ถ้า task มีปัญหา
-                    if (_task.descript != null &&
-                        _task.descript!.isNotEmpty) ...[
+                    // Descript (หมายเหตุ) - ถ้า task มีปัญหาหรือมี problemType
+                    if ((_task.descript != null && _task.descript!.isNotEmpty) ||
+                        _task.problemType != null) ...[
                       AppSpacing.verticalGapMd,
                       _buildDescriptNote(),
                     ],
@@ -1510,6 +1511,9 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
   }
 
   Widget _buildDescriptNote() {
+    // แปลง problemType string เป็น ProblemType enum (ถ้ามี)
+    final problemType = ProblemType.fromValue(_task.problemType);
+
     return Container(
       padding: EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
@@ -1534,7 +1538,27 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
             ],
           ),
           AppSpacing.verticalGapSm,
-          Text(_task.descript!, style: AppTypography.body),
+          // แสดง problemType badge (ถ้ามี)
+          if (problemType != null) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.error.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '${problemType.emoji} ${problemType.label}',
+                style: AppTypography.body.copyWith(
+                  color: AppColors.error,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            AppSpacing.verticalGapSm,
+          ],
+          // แสดง descript (หมายเหตุเพิ่มเติม) ถ้ามี
+          if (_task.descript != null && _task.descript!.isNotEmpty)
+            Text(_task.descript!, style: AppTypography.body),
         ],
       ),
     );
@@ -2004,13 +2028,29 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
   }
 
   Future<void> _handleProblem() async {
-    final description = await ProblemInputSheet.show(context);
-    if (description == null || description.isEmpty) return;
+    // แสดง bottom sheet ให้ user เลือกประเภทปัญหา
+    // ส่ง task เข้าไปเพื่อโหลด resolution history (ประวัติการแก้ปัญหาที่ผ่านมา)
+    final problemData = await ProblemInputSheet.show(context, task: _task);
+    if (problemData == null) return;
 
     setState(() => _isLoading = true);
 
     final service = ref.read(taskServiceProvider);
-    final success = await service.markTaskProblem(_task.logId, description);
+    final userId = ref.read(currentUserIdProvider);
+
+    // ต้องมี userId ถึงจะบันทึกได้
+    if (userId == null) {
+      setState(() => _isLoading = false);
+      return;
+    }
+
+    // ส่ง userId, problemType และ description ไปบันทึก
+    final success = await service.markTaskProblem(
+      _task.logId,
+      userId,
+      problemData.type.value,
+      problemData.description,
+    );
 
     if (success) {
       refreshTasks(ref);

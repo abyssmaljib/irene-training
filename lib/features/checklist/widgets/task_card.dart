@@ -3,6 +3,7 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../models/problem_type.dart';
 import '../models/task_log.dart';
 
 /// Card สำหรับแสดง Task แต่ละรายการ
@@ -174,44 +175,85 @@ class TaskCard extends StatelessWidget {
                           ],
                         ),
                       ],
-                      // หมายเหตุสำหรับ problem tasks (ใช้ descript field)
-                      if (showProblemNote &&
-                          task.isProblem &&
-                          task.descript != null &&
-                          task.descript!.isNotEmpty) ...[
+                      // Problem type badge (แสดงนอกกล่อง description)
+                      if (showProblemNote && task.isProblem && task.problemType != null) ...[
                         AppSpacing.verticalGapSm,
+                        Builder(builder: (context) {
+                          // แปลง problemType string เป็น ProblemType enum
+                          final problemType = ProblemType.fromValue(task.problemType);
+                          if (problemType == null) return const SizedBox.shrink();
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.error.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  problemType.emoji,
+                                  style: const TextStyle(fontSize: 14),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  problemType.label,
+                                  style: AppTypography.caption.copyWith(
+                                    color: AppColors.error,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
+                      ],
+                      // หมายเหตุสำหรับ problem tasks (เฉพาะ descript)
+                      if (showProblemNote && task.isProblem && task.descript != null && task.descript!.isNotEmpty) ...[
+                        AppSpacing.verticalGapXs,
                         Container(
                           width: double.infinity,
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
+                              horizontal: 8, vertical: 6),
                           decoration: BoxDecoration(
                             color: AppColors.surface,
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: AppColors.error),
+                            border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
                           ),
-                          child: Row(
+                          child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              HugeIcon(
-                                icon: HugeIcons.strokeRoundedQuoteUp,
-                                size: 14,
-                                color: AppColors.error,
-                              ),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: Text(
-                                  task.descript!,
-                                  style: AppTypography.caption.copyWith(
-                                    color: AppColors.error,
-                                  ),
-                                ),
-                              ),
-                              if (task.completedByNickname != null) ...[
-                                const SizedBox(width: 4),
-                                Text(
-                                  '- ${task.completedByNickname}',
-                                  style: AppTypography.caption.copyWith(
+                              // แสดง descript (หมายเหตุเพิ่มเติม)
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  HugeIcon(
+                                    icon: HugeIcons.strokeRoundedQuoteUp,
+                                    size: 14,
                                     color: AppColors.secondaryText,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      task.descript!,
+                                      style: AppTypography.caption.copyWith(
+                                        color: AppColors.textPrimary,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              // แสดงชื่อผู้แจ้ง
+                              if (task.completedByNickname != null) ...[
+                                const SizedBox(height: 2),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: Text(
+                                    '- ${task.completedByNickname}',
+                                    style: AppTypography.caption.copyWith(
+                                      color: AppColors.secondaryText,
+                                      fontSize: 10,
+                                    ),
                                   ),
                                 ),
                               ],
