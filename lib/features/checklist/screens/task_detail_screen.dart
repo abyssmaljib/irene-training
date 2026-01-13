@@ -1911,56 +1911,26 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         ),
         AppSpacing.verticalGapSm,
 
-        // Postpone + Refer buttons
-        Row(
-          children: [
-            // Postpone button
-            Expanded(
-              child: SizedBox(
-                height: 48,
-                child: OutlinedButton.icon(
-                  onPressed: _isLoading ? null : _handlePostpone,
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: AppColors.warning),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  icon: HugeIcon(icon: HugeIcons.strokeRoundedCalendar01, color: AppColors.warning),
-                  label: Text(
-                    'เลื่อนวันพรุ่งนี้',
-                    style: AppTypography.button.copyWith(
-                      color: AppColors.warning,
-                    ),
-                  ),
-                ),
+        // Refer button (ปุ่มเลื่อนวันพรุ่งนี้ถูกลบออก - ให้หัวหน้าเวรตัดสินใจแทน)
+        SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: OutlinedButton.icon(
+            onPressed: _isLoading ? null : _handleRefer,
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(color: AppColors.secondary),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
             ),
-            AppSpacing.horizontalGapSm,
-
-            // Refer button
-            Expanded(
-              child: SizedBox(
-                height: 48,
-                child: OutlinedButton.icon(
-                  onPressed: _isLoading ? null : _handleRefer,
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: AppColors.secondary),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  icon: HugeIcon(icon: HugeIcons.strokeRoundedHospital01, color: AppColors.secondary),
-                  label: Text(
-                    'ไม่อยู่ศูนย์',
-                    style: AppTypography.button.copyWith(
-                      color: AppColors.secondary,
-                    ),
-                  ),
-                ),
+            icon: HugeIcon(icon: HugeIcons.strokeRoundedHospital01, color: AppColors.secondary),
+            label: Text(
+              'ไม่อยู่ศูนย์',
+              style: AppTypography.button.copyWith(
+                color: AppColors.secondary,
               ),
             ),
-          ],
+          ),
         ),
       ],
     );
@@ -2060,32 +2030,6 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('ไม่สามารถบันทึกได้ กรุณาลองใหม่')),
-        );
-      }
-    }
-  }
-
-  Future<void> _handlePostpone() async {
-    setState(() => _isLoading = true);
-
-    final service = ref.read(taskServiceProvider);
-    final userId = ref.read(currentUserIdProvider);
-
-    if (userId == null) {
-      setState(() => _isLoading = false);
-      return;
-    }
-
-    final success = await service.postponeTask(_task.logId, userId, _task);
-
-    if (success) {
-      refreshTasks(ref);
-      if (mounted) Navigator.pop(context);
-    } else {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('ไม่สามารถเลื่อนงานได้ กรุณาลองใหม่')),
         );
       }
     }
