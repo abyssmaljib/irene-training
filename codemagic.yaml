@@ -86,8 +86,6 @@ workflows:
       groups:
         - env_secrets  # Contains SUPABASE_URL, SUPABASE_ANON_KEY, CLARITY_PROJECT_ID
       ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.giantkumakuma.irene
         provisioning_profiles:
           - Codemagic_2026_Prov_Profile
         certificates:
