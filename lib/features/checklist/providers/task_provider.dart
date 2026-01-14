@@ -75,6 +75,24 @@ final currentUserIdProvider = Provider<String?>((ref) {
   return UserService().effectiveUserId;
 });
 
+/// Provider สำหรับ current user nickname
+/// ใช้สำหรับ Optimistic Update เพื่อแสดงชื่อผู้ทำงานทันที
+final currentUserNicknameProvider = FutureProvider<String?>((ref) async {
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null) return null;
+
+  try {
+    final response = await Supabase.instance.client
+        .from('user_info')
+        .select('nickname')
+        .eq('id', userId)
+        .maybeSingle();
+    return response?['nickname'] as String?;
+  } catch (e) {
+    return null;
+  }
+});
+
 /// Provider สำหรับ nursinghome ID
 final nursinghomeIdProvider = FutureProvider<int?>((ref) async {
   final userService = ref.watch(userServiceProvider);
@@ -175,11 +193,13 @@ List<TaskLog> _filterByZonesResidentsRoleAndType(
 }
 
 /// Provider สำหรับ filtered tasks ตาม view mode
+/// ใช้ optimistic updates เพื่อให้ UI ตอบสนองทันที
 final filteredTasksProvider = Provider<AsyncValue<List<TaskLog>>>((ref) {
   // Watch refresh counter to enable manual refresh
   ref.watch(taskRefreshCounterProvider);
 
   final tasksAsync = ref.watch(tasksProvider);
+  final optimisticUpdates = ref.watch(optimisticTaskUpdatesProvider);
   final viewMode = ref.watch(taskViewModeProvider);
   final shiftAsync = ref.watch(userShiftProvider);
   final userId = ref.watch(currentUserIdProvider);
@@ -192,11 +212,16 @@ final filteredTasksProvider = Provider<AsyncValue<List<TaskLog>>>((ref) {
 
   return tasksAsync.when(
     data: (tasks) {
+      // รวม optimistic updates เข้ากับ tasks
+      final mergedTasks = optimisticUpdates.isEmpty
+          ? tasks
+          : tasks.map((task) => optimisticUpdates[task.logId] ?? task).toList();
+
       final shift = shiftAsync.valueOrNull;
 
       // Apply zone, resident, role, and task type filter
       final filteredTasks = _filterByZonesResidentsRoleAndType(
-        tasks, selectedZones, selectedResidents, userRole, selectedRoleId, selectedTaskTypes);
+        mergedTasks, selectedZones, selectedResidents, userRole, selectedRoleId, selectedTaskTypes);
 
       switch (viewMode) {
         case TaskViewMode.upcoming:
@@ -216,9 +241,11 @@ final filteredTasksProvider = Provider<AsyncValue<List<TaskLog>>>((ref) {
 });
 
 /// Provider สำหรับ grouped tasks by timeBlock (สำหรับ view mode = all)
+/// ใช้ optimistic updates เพื่อให้ UI ตอบสนองทันที
 final groupedTasksProvider =
     Provider<AsyncValue<Map<String, List<TaskLog>>>>((ref) {
   final tasksAsync = ref.watch(tasksProvider);
+  final optimisticUpdates = ref.watch(optimisticTaskUpdatesProvider);
   final service = ref.watch(taskServiceProvider);
   final selectedZones = ref.watch(selectedZonesFilterProvider);
   final selectedResidents = ref.watch(selectedResidentsFilterProvider);
@@ -228,9 +255,14 @@ final groupedTasksProvider =
 
   return tasksAsync.when(
     data: (tasks) {
+      // รวม optimistic updates เข้ากับ tasks
+      final mergedTasks = optimisticUpdates.isEmpty
+          ? tasks
+          : tasks.map((task) => optimisticUpdates[task.logId] ?? task).toList();
+
       // Apply zone, resident, role, and task type filter
       final filteredTasks = _filterByZonesResidentsRoleAndType(
-        tasks, selectedZones, selectedResidents, userRole, selectedRoleId, selectedTaskTypes);
+        mergedTasks, selectedZones, selectedResidents, userRole, selectedRoleId, selectedTaskTypes);
       return AsyncValue.data(service.groupTasksByTimeBlock(filteredTasks));
     },
     loading: () => const AsyncValue.loading(),
@@ -239,8 +271,10 @@ final groupedTasksProvider =
 });
 
 /// Provider สำหรับ task counts per view mode
+/// ใช้ optimistic updates เพื่อให้ count อัพเดตทันที
 final taskCountsProvider = Provider<Map<TaskViewMode, int>>((ref) {
   final tasksAsync = ref.watch(tasksProvider);
+  final optimisticUpdates = ref.watch(optimisticTaskUpdatesProvider);
   final shiftAsync = ref.watch(userShiftProvider);
   final userId = ref.watch(currentUserIdProvider);
   final service = ref.watch(taskServiceProvider);
@@ -253,9 +287,15 @@ final taskCountsProvider = Provider<Map<TaskViewMode, int>>((ref) {
   if (!tasksAsync.hasValue) return {};
 
   final allTasks = tasksAsync.value!;
+
+  // รวม optimistic updates เข้ากับ tasks
+  final mergedTasks = optimisticUpdates.isEmpty
+      ? allTasks
+      : allTasks.map((task) => optimisticUpdates[task.logId] ?? task).toList();
+
   // Apply zone, resident, role, and task type filter
   final tasks = _filterByZonesResidentsRoleAndType(
-    allTasks, selectedZones, selectedResidents, userRole, selectedRoleId, selectedTaskTypes);
+    mergedTasks, selectedZones, selectedResidents, userRole, selectedRoleId, selectedTaskTypes);
   final shift = shiftAsync.valueOrNull;
 
   return {
@@ -511,6 +551,100 @@ void refreshTasksWithContainer(ProviderContainer container) {
   container.invalidate(tasksProvider);
   container.invalidate(userShiftProvider);
 }
+
+// ============================================================
+// Optimistic Update - อัพเดต UI ทันทีก่อนรอ server ตอบกลับ
+// ============================================================
+
+/// Provider สำหรับเก็บ optimistic updates ที่ยังไม่ได้ sync กับ server
+/// Key = logId, Value = optimistically updated TaskLog
+final optimisticTaskUpdatesProvider = StateProvider<Map<int, TaskLog>>((ref) {
+  return {};
+});
+
+/// อัพเดต task แบบ optimistic (อัพเดต UI ทันทีก่อนรอ server)
+/// คืนค่า function สำหรับ rollback ถ้า server error
+///
+/// Usage:
+/// ```dart
+/// final rollback = optimisticUpdateTask(ref, updatedTask);
+/// try {
+///   await server.updateTask(...);
+///   commitOptimisticUpdate(ref, logId); // ยืนยัน - ลบ optimistic state
+/// } catch (e) {
+///   rollback(); // ย้อนกลับ
+/// }
+/// ```
+void Function() optimisticUpdateTask(WidgetRef ref, TaskLog updatedTask) {
+  final updates = ref.read(optimisticTaskUpdatesProvider);
+  final previousTask = updates[updatedTask.logId];
+
+  // เก็บ optimistic update
+  ref.read(optimisticTaskUpdatesProvider.notifier).state = {
+    ...updates,
+    updatedTask.logId: updatedTask,
+  };
+
+  // Trigger UI rebuild
+  ref.read(taskRefreshCounterProvider.notifier).state++;
+
+  // คืน rollback function
+  return () {
+    final current = ref.read(optimisticTaskUpdatesProvider);
+    if (previousTask != null) {
+      // คืนค่าเดิม
+      ref.read(optimisticTaskUpdatesProvider.notifier).state = {
+        ...current,
+        updatedTask.logId: previousTask,
+      };
+    } else {
+      // ลบออก
+      final newMap = Map<int, TaskLog>.from(current);
+      newMap.remove(updatedTask.logId);
+      ref.read(optimisticTaskUpdatesProvider.notifier).state = newMap;
+    }
+    ref.read(taskRefreshCounterProvider.notifier).state++;
+  };
+}
+
+/// ยืนยัน optimistic update เมื่อ server สำเร็จ
+/// ลบ optimistic state และ invalidate cache เพื่อ fetch ข้อมูลใหม่
+void commitOptimisticUpdate(WidgetRef ref, int logId) {
+  final updates = ref.read(optimisticTaskUpdatesProvider);
+  final newMap = Map<int, TaskLog>.from(updates);
+  newMap.remove(logId);
+  ref.read(optimisticTaskUpdatesProvider.notifier).state = newMap;
+
+  // Invalidate cache เพื่อให้ realtime sync มาแล้วข้อมูลถูกต้อง
+  TaskService.instance.invalidateCache();
+}
+
+/// Provider ที่รวม tasks จาก server กับ optimistic updates
+/// ใช้แทน tasksProvider ใน UI
+final tasksWithOptimisticProvider = Provider<AsyncValue<List<TaskLog>>>((ref) {
+  final tasksAsync = ref.watch(tasksProvider);
+  final optimisticUpdates = ref.watch(optimisticTaskUpdatesProvider);
+
+  // Watch refresh counter เพื่อ trigger rebuild
+  ref.watch(taskRefreshCounterProvider);
+
+  return tasksAsync.when(
+    data: (tasks) {
+      if (optimisticUpdates.isEmpty) {
+        return AsyncValue.data(tasks);
+      }
+
+      // แทนที่ tasks ด้วย optimistic updates
+      final updatedTasks = tasks.map((task) {
+        return optimisticUpdates[task.logId] ?? task;
+      }).toList();
+
+      return AsyncValue.data(updatedTasks);
+    },
+    loading: () => const AsyncValue.loading(),
+    error: (e, st) => AsyncValue.error(e, st),
+  );
+});
 
 // ============================================================
 // Pending Tasks Count Providers (งานค้างใน 2 ชม. ข้างหน้า)

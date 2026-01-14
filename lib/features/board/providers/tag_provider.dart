@@ -6,10 +6,11 @@ import '../models/new_tag.dart';
 final tagsProvider = FutureProvider<List<NewTag>>((ref) async {
   final supabase = Supabase.instance.client;
 
+  // ดึงเฉพาะ tag ที่ is_visible = true (ซ่อนจาก UI แต่ยังใช้งานได้)
   final response = await supabase
       .from('new_tags')
-      .select('id, name, icon, emoji, handover_mode, legacy_tags, sort_order, is_active')
-      .eq('is_active', true)
+      .select('id, name, icon, emoji, handover_mode, legacy_tags, sort_order, is_visible')
+      .eq('is_visible', true)
       .order('sort_order', ascending: true)
       .order('name', ascending: true);
 

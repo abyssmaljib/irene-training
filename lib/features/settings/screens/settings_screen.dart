@@ -28,7 +28,8 @@ import '../../dd_handover/providers/dd_provider.dart';
 import '../../dd_handover/services/dd_service.dart';
 import '../../notifications/screens/notification_center_screen.dart';
 import '../../notifications/providers/notification_provider.dart';
-import '../../navigation/screens/main_navigation_screen.dart';
+// NOTE: Tutorial feature ถูกซ่อนไว้ชั่วคราว
+// import '../../navigation/screens/main_navigation_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -469,17 +470,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               // TODO: Navigate to app settings
             },
           ),
-          Divider(height: 1, color: AppColors.alternate),
-          _buildMenuItem(
-            icon: HugeIcons.strokeRoundedHelpCircle,
-            label: 'ดู Tutorial อีกครั้ง',
-            onTap: () {
-              // กลับไปหน้า Home แล้วเริ่ม Tutorial
-              Navigator.pop(context); // ปิดหน้า Settings ถ้าเปิดแยก
-              MainNavigationScreen.navigateToTab(context, 0); // ไป Home
-              MainNavigationScreen.replayTutorial(context);
-            },
-          ),
+          // NOTE: Tutorial feature ถูกซ่อนไว้ชั่วคราว
+          // Divider(height: 1, color: AppColors.alternate),
+          // _buildMenuItem(
+          //   icon: HugeIcons.strokeRoundedHelpCircle,
+          //   label: 'ดู Tutorial อีกครั้ง',
+          //   onTap: () {
+          //     Navigator.pop(context);
+          //     MainNavigationScreen.navigateToTab(context, 0);
+          //     MainNavigationScreen.replayTutorial(context);
+          //   },
+          // ),
         ],
       ),
     );

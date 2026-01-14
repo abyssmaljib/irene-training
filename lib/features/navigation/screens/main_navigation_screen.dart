@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hugeicons/hugeicons.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+// NOTE: Tutorial feature ถูกซ่อนไว้ชั่วคราว
+// import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -13,10 +14,11 @@ import '../../residents/screens/residents_screen.dart';
 import '../../settings/screens/settings_screen.dart';
 import '../../shift_summary/providers/shift_summary_provider.dart';
 import '../../notifications/providers/notification_provider.dart';
-import '../../onboarding/providers/onboarding_provider.dart';
+// NOTE: Tutorial/Onboarding feature ถูกซ่อนไว้ชั่วคราว
+// import '../../onboarding/providers/onboarding_provider.dart';
 import '../../board/providers/post_provider.dart';
 import '../../onboarding/models/tutorial_target.dart';
-import '../../onboarding/widgets/whats_new_dialog.dart';
+// import '../../onboarding/widgets/whats_new_dialog.dart';
 import '../../onboarding/widgets/new_feature_badge.dart';
 
 class MainNavigationScreen extends ConsumerStatefulWidget {
@@ -61,75 +63,64 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
   }
 
   /// ตรวจสอบและแสดง tutorial สำหรับ user ใหม่
+  /// NOTE: Tutorial feature ถูกซ่อนไว้ชั่วคราว
   Future<void> _checkAndShowTutorial() async {
-    // ดึง user ID จาก Supabase
-    final userId = Supabase.instance.client.auth.currentUser?.id;
-    if (userId == null) return;
-
-    // ตรวจสอบว่าควรแสดง tutorial หรือไม่
-    final onboardingService = ref.read(onboardingServiceProvider);
-    final shouldShow = onboardingService.shouldShowTutorial(userId);
-
-    if (shouldShow && mounted) {
-      // รอสักครู่ให้ UI พร้อม
-      await Future.delayed(const Duration(milliseconds: 500));
-      if (mounted) {
-        _startTutorial(userId);
-      }
-    } else {
-      // ถ้าไม่ต้องแสดง tutorial ให้ตรวจสอบ What's New
-      _checkAndShowWhatsNew(userId);
-    }
+    // TODO: Tutorial feature hidden - uncomment to re-enable
+    // final userId = Supabase.instance.client.auth.currentUser?.id;
+    // if (userId == null) return;
+    // final onboardingService = ref.read(onboardingServiceProvider);
+    // final shouldShow = onboardingService.shouldShowTutorial(userId);
+    // if (shouldShow && mounted) {
+    //   await Future.delayed(const Duration(milliseconds: 500));
+    //   if (mounted) {
+    //     _startTutorial(userId);
+    //   }
+    // } else {
+    //   _checkAndShowWhatsNew(userId);
+    // }
   }
 
-  /// เริ่ม tutorial
-  void _startTutorial(String userId) {
-    startTutorialWithNavigation(
-      ref: ref,
-      context: context,
-      userId: userId,
-      onNavigate: (tabIndex) {
-        // Navigate ไป tab ที่กำหนด
-        setState(() {
-          _currentIndex = tabIndex;
-        });
-      },
-      onFinish: () {
-        // เมื่อ tutorial จบ ให้ตรวจสอบ What's New
-        _checkAndShowWhatsNew(userId);
-      },
-    );
-  }
+  // NOTE: Tutorial feature ถูกซ่อนไว้ชั่วคราว
+  // /// เริ่ม tutorial
+  // void _startTutorial(String userId) {
+  //   startTutorialWithNavigation(
+  //     ref: ref,
+  //     context: context,
+  //     userId: userId,
+  //     onNavigate: (tabIndex) {
+  //       setState(() {
+  //         _currentIndex = tabIndex;
+  //       });
+  //     },
+  //     onFinish: () {
+  //       _checkAndShowWhatsNew(userId);
+  //     },
+  //   );
+  // }
 
   /// เริ่ม tutorial ใหม่ (สำหรับ replay)
+  /// NOTE: Tutorial feature ถูกซ่อนไว้ชั่วคราว
   void replayTutorial() {
-    final userId = Supabase.instance.client.auth.currentUser?.id;
-    if (userId == null) return;
-
-    // Navigate กลับไป Home ก่อน
-    setState(() {
-      _currentIndex = 0;
-    });
-
-    // รอให้ UI update แล้วเริ่ม tutorial
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _startTutorial(userId);
-    });
+    // final userId = Supabase.instance.client.auth.currentUser?.id;
+    // if (userId == null) return;
+    // setState(() {
+    //   _currentIndex = 0;
+    // });
+    // WidgetsBinding.instance.addPostFrameCallback((_) {
+    //   _startTutorial(userId);
+    // });
   }
 
-  /// ตรวจสอบและแสดง What's New dialog
-  Future<void> _checkAndShowWhatsNew(String userId) async {
-    final onboardingService = ref.read(onboardingServiceProvider);
-    final announcement =
-        await onboardingService.getNewVersionAnnouncement(userId);
-
-    if (announcement != null && mounted) {
-      // แสดง What's New dialog
-      await WhatsNewDialog.show(context, announcement);
-      // บันทึกว่า user เห็น version นี้แล้ว
-      await onboardingService.updateLastSeenVersion(userId);
-    }
-  }
+  // NOTE: What's New feature ถูกซ่อนไว้ชั่วคราว
+  // Future<void> _checkAndShowWhatsNew(String userId) async {
+  //   final onboardingService = ref.read(onboardingServiceProvider);
+  //   final announcement =
+  //       await onboardingService.getNewVersionAnnouncement(userId);
+  //   if (announcement != null && mounted) {
+  //     await WhatsNewDialog.show(context, announcement);
+  //     await onboardingService.updateLastSeenVersion(userId);
+  //   }
+  // }
 
   void setTab(int index) {
     setState(() {
@@ -207,14 +198,15 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
   }) {
     final isSelected = _currentIndex == index;
 
-    // ตรวจสอบว่า tab นี้มี feature ใหม่หรือไม่
-    final userId = Supabase.instance.client.auth.currentUser?.id ?? '';
-    final newFeatureTabsAsync = ref.watch(newFeatureTabsProvider(userId));
-    final hasNewFeature = tabId != null &&
-        newFeatureTabsAsync.maybeWhen(
-          data: (tabs) => tabs.contains(tabId),
-          orElse: () => false,
-        );
+    // NOTE: NEW badge feature ถูกซ่อนไว้ชั่วคราว
+    // final userId = Supabase.instance.client.auth.currentUser?.id ?? '';
+    // final newFeatureTabsAsync = ref.watch(newFeatureTabsProvider(userId));
+    // final hasNewFeature = tabId != null &&
+    //     newFeatureTabsAsync.maybeWhen(
+    //       data: (tabs) => tabs.contains(tabId),
+    //       orElse: () => false,
+    //     );
+    const hasNewFeature = false;
 
     return GestureDetector(
       key: tutorialKey, // ใช้ key สำหรับ tutorial highlight
@@ -223,12 +215,12 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
           _currentIndex = index;
         });
 
-        // Dismiss NEW badge เมื่อ user tap tab ที่มี feature ใหม่
-        // Note: hasNewFeature เป็น true ก็ต่อเมื่อ tabId != null
-        if (hasNewFeature) {
-          ref.read(onboardingServiceProvider).dismissFeatureTab(userId, tabId);
-          ref.invalidate(newFeatureTabsProvider(userId));
-        }
+        // NOTE: NEW badge dismiss ถูกซ่อนไว้ชั่วคราว
+        // if (hasNewFeature) {
+        //   final userId = Supabase.instance.client.auth.currentUser?.id ?? '';
+        //   ref.read(onboardingServiceProvider).dismissFeatureTab(userId, tabId!);
+        //   ref.invalidate(newFeatureTabsProvider(userId));
+        // }
       },
       behavior: HitTestBehavior.opaque,
       child: SizedBox(
@@ -273,13 +265,14 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
 
     final isSelected = _currentIndex == 3;
 
-    // ตรวจสอบว่า tab นี้มี feature ใหม่หรือไม่
-    final userId = Supabase.instance.client.auth.currentUser?.id ?? '';
-    final newFeatureTabsAsync = ref.watch(newFeatureTabsProvider(userId));
-    final hasNewFeature = newFeatureTabsAsync.maybeWhen(
-      data: (tabs) => tabs.contains('board'),
-      orElse: () => false,
-    );
+    // NOTE: NEW badge feature ถูกซ่อนไว้ชั่วคราว
+    // final userId = Supabase.instance.client.auth.currentUser?.id ?? '';
+    // final newFeatureTabsAsync = ref.watch(newFeatureTabsProvider(userId));
+    // final hasNewFeature = newFeatureTabsAsync.maybeWhen(
+    //   data: (tabs) => tabs.contains('board'),
+    //   orElse: () => false,
+    // );
+    const hasNewFeature = false;
 
     return GestureDetector(
       key: _tutorialKeys.boardTabKey,
@@ -288,11 +281,12 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
           _currentIndex = 3;
         });
 
-        // Dismiss NEW badge เมื่อ user tap tab
-        if (hasNewFeature) {
-          ref.read(onboardingServiceProvider).dismissFeatureTab(userId, 'board');
-          ref.invalidate(newFeatureTabsProvider(userId));
-        }
+        // NOTE: NEW badge dismiss ถูกซ่อนไว้ชั่วคราว
+        // if (hasNewFeature) {
+        //   final userId = Supabase.instance.client.auth.currentUser?.id ?? '';
+        //   ref.read(onboardingServiceProvider).dismissFeatureTab(userId, 'board');
+        //   ref.invalidate(newFeatureTabsProvider(userId));
+        // }
       },
       behavior: HitTestBehavior.opaque,
       child: SizedBox(

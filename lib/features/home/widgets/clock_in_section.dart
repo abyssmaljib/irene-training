@@ -158,17 +158,63 @@ class ClockInSection extends StatelessWidget {
     );
   }
 
+  /// คำนวณจำนวน group ของ break time ทั้งหมด
+  /// Group by breakName (เช่น "พัก 20 นาที", "พัก 30 นาที")
+  int get _totalBreakTimeGroups {
+    final groupNames = <String>{};
+    for (final option in breakTimeOptions) {
+      // ใช้ breakName หรือ 'อื่นๆ' เหมือนกับ BreakTimeSelector
+      final groupName = option.breakName ?? 'อื่นๆ';
+      // เอาเฉพาะ option ที่มี breakTime ไม่ว่าง
+      if (option.breakTime.isNotEmpty) {
+        groupNames.add(groupName);
+      }
+    }
+    return groupNames.length;
+  }
+
+  /// ตรวจว่าเลือกครบทุก group แล้วหรือยัง
+  bool get _hasSelectedAllBreakTimeGroups {
+    // หา group ที่เลือกไว้
+    final selectedGroupNames = <String>{};
+    for (final option in breakTimeOptions) {
+      if (selectedBreakTimeIds.contains(option.id)) {
+        final groupName = option.breakName ?? 'อื่นๆ';
+        selectedGroupNames.add(groupName);
+      }
+    }
+    return selectedGroupNames.length >= _totalBreakTimeGroups;
+  }
+
   bool get _canClockIn =>
       devMode || // Dev mode: always allow clock in
       (selectedZoneIds.isNotEmpty &&
       selectedResidentIds.isNotEmpty &&
-      selectedBreakTimeIds.isNotEmpty);
+      _hasSelectedAllBreakTimeGroups);
 
   String _getValidationMessage() {
     final missing = <String>[];
     if (selectedZoneIds.isEmpty) missing.add('Zone');
     if (selectedResidentIds.isEmpty) missing.add('คนไข้');
-    if (selectedBreakTimeIds.isEmpty) missing.add('เวลาพัก');
+
+    // ตรวจสอบว่าเลือกเวลาพักครบทุก group หรือยัง
+    if (!_hasSelectedAllBreakTimeGroups) {
+      final totalGroups = _totalBreakTimeGroups;
+      // นับ group ที่เลือกแล้ว
+      final selectedGroupNames = <String>{};
+      for (final option in breakTimeOptions) {
+        if (selectedBreakTimeIds.contains(option.id)) {
+          selectedGroupNames.add(option.breakName ?? 'อื่นๆ');
+        }
+      }
+      final selectedCount = selectedGroupNames.length;
+
+      if (selectedCount == 0) {
+        missing.add('เวลาพัก (ทั้ง $totalGroups ช่วง)');
+      } else {
+        missing.add('เวลาพัก (เลือกแล้ว $selectedCount/$totalGroups ช่วง)');
+      }
+    }
 
     if (missing.isEmpty) return '';
     return 'กรุณาเลือก ${missing.join(', ')}';

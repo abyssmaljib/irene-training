@@ -8,7 +8,7 @@ class CreatePostState {
   final String text;
   final NewTag? selectedTag;
   final bool isHandover;
-  final bool sendToFamily; // ส่งให้ญาติ
+  final bool sendToFamily; // ส่งให้หัวหน้าเวร
   final int? selectedResidentId;
   final String? selectedResidentName;
   final List<File> selectedImages;
@@ -239,7 +239,7 @@ class CreatePostNotifier extends StateNotifier<CreatePostState> {
     state = state.copyWith(isHandover: value, clearError: true);
   }
 
-  /// Toggle ส่งให้ญาติ
+  /// Toggle ส่งให้หัวหน้าเวร
   void setSendToFamily(bool value) {
     state = state.copyWith(sendToFamily: value, clearError: true);
   }

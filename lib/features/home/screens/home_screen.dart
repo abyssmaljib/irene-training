@@ -34,7 +34,8 @@ import '../../dd_handover/screens/dd_list_screen.dart';
 import '../../dd_handover/services/dd_service.dart';
 import '../services/clock_realtime_service.dart';
 import '../../../main.dart' show globalRefreshNotifier;
-import '../../onboarding/widgets/replay_tutorial_button.dart';
+// NOTE: Tutorial feature ถูกซ่อนไว้ชั่วคราว
+// import '../../onboarding/widgets/replay_tutorial_button.dart';
 
 /// หน้าหลัก - Dashboard with Clock-in/Clock-out
 class HomeScreen extends StatefulWidget {
@@ -148,12 +149,11 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadInitialData();
   }
 
-  /// เริ่ม Tutorial ใหม่ (replay)
-  void _replayTutorial() {
-    // หา MainNavigationScreen state และเรียก replayTutorial
-    // ใช้ static method ของ MainNavigationScreen
-    MainNavigationScreen.replayTutorial(context);
-  }
+  // NOTE: Tutorial feature ถูกซ่อนไว้ชั่วคราว
+  // /// เริ่ม Tutorial ใหม่ (replay)
+  // void _replayTutorial() {
+  //   MainNavigationScreen.replayTutorial(context);
+  // }
 
   void _subscribeToClockUpdates() {
     _clockRealtimeService.subscribe(
@@ -540,12 +540,12 @@ class _HomeScreenState extends State<HomeScreen> {
             // IreneAppBar
             IreneAppBar(
               title: 'IRENE',
-              actions: [
-                // ปุ่มดู Tutorial อีกครั้ง
-                ReplayTutorialButton(
-                  onPressed: _replayTutorial,
-                ),
-              ],
+              // NOTE: Tutorial feature ถูกซ่อนไว้ชั่วคราว
+              // actions: [
+              //   ReplayTutorialButton(
+              //     onPressed: _replayTutorial,
+              //   ),
+              // ],
               onProfileTap: () {
                 Navigator.push(
                   context,

@@ -77,10 +77,10 @@ class ClockService {
 
     try {
       // กำหนด shift ตามเวลาปัจจุบัน
+      // AM (00:00-11:59) = เวรเช้า, PM (12:00-23:59) = เวรดึก
       final now = DateTime.now();
       final hour = now.hour;
-      // เวรเช้า: 07:00-19:00, เวรดึก: 19:00-07:00
-      final shift = (hour >= 7 && hour < 19) ? 'เวรเช้า' : 'เวรดึก';
+      final shift = hour < 12 ? 'เวรเช้า' : 'เวรดึก';
 
       final response = await _supabase.from('clock_in_out_ver2').insert({
         'user_id': userId,
@@ -145,10 +145,12 @@ class ClockService {
   }
 
   /// ดึงตัวเลือกเวลาพักสำหรับ shift ปัจจุบัน
+  /// - AM (00:00-11:59) = เวรเช้า (มาทำงานตอนเช้า)
+  /// - PM (12:00-23:59) = เวรดึก (มาทำงานตอนบ่าย/เย็น)
   Future<List<BreakTimeOption>> getBreakTimeOptionsForCurrentShift() async {
-    final now = DateTime.now();
-    final hour = now.hour;
-    final shift = (hour >= 7 && hour < 19) ? 'เวรเช้า' : 'เวรดึก';
+    final hour = DateTime.now().hour;
+    // AM = เวรเช้า, PM = เวรดึก
+    final shift = hour < 12 ? 'เวรเช้า' : 'เวรดึก';
     return getBreakTimeOptions(shift: shift);
   }
 
@@ -186,9 +188,12 @@ class ClockService {
   }
 
   /// กำหนด shift จากเวลาปัจจุบัน
+  /// - AM (00:00-11:59) = เวรเช้า (มาทำงานตอนเช้า)
+  /// - PM (12:00-23:59) = เวรดึก (มาทำงานตอนบ่าย/เย็น)
   String getCurrentShiftType() {
     final hour = DateTime.now().hour;
-    return (hour >= 7 && hour < 19) ? 'เวรเช้า' : 'เวรดึก';
+    // AM = เวรเช้า, PM = เวรดึก
+    return hour < 12 ? 'เวรเช้า' : 'เวรดึก';
   }
 
   /// ดึงเวลาพักที่เพื่อนทั้งหมดในเวรปัจจุบันเลือกไปแล้ว
@@ -199,7 +204,10 @@ class ClockService {
     if (userId == null || nursinghomeId == null) return {};
 
     try {
-      // ดึง clock_in_out ที่ยังไม่ลงเวร (ของคนอื่น) พร้อม zones
+      // กำหนด shift ปัจจุบัน (AM = เวรเช้า, PM = เวรดึก)
+      final currentShift = getCurrentShiftType();
+
+      // ดึง clock_in_out ที่ยังไม่ลงเวร (ของคนอื่น) เฉพาะ shift เดียวกัน
       final response = await _supabase
           .from('clock_in_out_ver2')
           .select('''
@@ -208,6 +216,7 @@ class ClockService {
             user_info:user_id(nickname)
           ''')
           .eq('nursinghome_id', nursinghomeId)
+          .eq('shift', currentShift)
           .neq('user_id', userId)
           .isFilter('clock_out_timestamp', null);
 
@@ -270,13 +279,17 @@ class ClockService {
     if (userId == null || nursinghomeId == null) return {};
 
     try {
-      // ดึง clock_in_out ที่ยังไม่ลงเวร (ของคนอื่น ไม่ใช่ตัวเอง)
+      // กำหนด shift ปัจจุบัน (AM = เวรเช้า, PM = เวรดึก)
+      final currentShift = getCurrentShiftType();
+
+      // ดึง clock_in_out ที่ยังไม่ลงเวร (ของคนอื่น) เฉพาะ shift เดียวกัน
       final response = await _supabase
           .from('clock_in_out_ver2')
           .select('selected_resident_id_list')
           .eq('nursinghome_id', nursinghomeId)
-          .neq('user_id', userId) // ไม่รวมของตัวเอง
-          .isFilter('clock_out_timestamp', null); // ยังไม่ลงเวร
+          .eq('shift', currentShift)
+          .neq('user_id', userId)
+          .isFilter('clock_out_timestamp', null);
 
       final occupiedIds = <int>{};
       for (final row in response as List) {

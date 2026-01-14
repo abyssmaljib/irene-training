@@ -7,7 +7,7 @@ class NewTag {
   final String handoverMode; // 'force' | 'optional' | 'none'
   final List<String>? legacyTags;
   final int sortOrder;
-  final bool isActive;
+  final bool isVisible; // ถ้า false = ซ่อนจาก UI แต่ยังใช้งานได้
   final DateTime? createdAt;
 
   const NewTag({
@@ -18,7 +18,7 @@ class NewTag {
     required this.handoverMode,
     this.legacyTags,
     this.sortOrder = 0,
-    this.isActive = true,
+    this.isVisible = true,
     this.createdAt,
   });
 
@@ -66,7 +66,7 @@ class NewTag {
       handoverMode: json['handover_mode'] as String? ?? 'none',
       legacyTags: parseLegacyTags(json['legacy_tags']),
       sortOrder: json['sort_order'] as int? ?? 0,
-      isActive: json['is_active'] as bool? ?? true,
+      isVisible: json['is_visible'] as bool? ?? true,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'] as String)
           : null,
@@ -82,7 +82,7 @@ class NewTag {
       'handover_mode': handoverMode,
       'legacy_tags': legacyTags,
       'sort_order': sortOrder,
-      'is_active': isActive,
+      'is_visible': isVisible,
       'created_at': createdAt?.toIso8601String(),
     };
   }

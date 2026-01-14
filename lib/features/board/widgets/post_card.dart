@@ -187,6 +187,85 @@ class PostCard extends StatelessWidget {
     );
   }
 
+  /// Map raw database status เป็นคำที่ user เข้าใจง่าย
+  /// อ้างอิงจาก QUEUE_SYSTEM_DOCS.md
+  _LineStatusInfo _mapLineStatus(String rawStatus) {
+    // Normalize: lowercase + trim เพื่อเปรียบเทียบ
+    final normalized = rawStatus.toLowerCase().trim();
+
+    // รอส่ง (pending/waiting/Trigger fired)
+    if (normalized == 'pending' ||
+        normalized == 'waiting' ||
+        normalized.contains('trigger fired')) {
+      return _LineStatusInfo(
+        label: 'รอส่ง',
+        color: AppColors.warning,
+        icon: HugeIcons.strokeRoundedClock01,
+      );
+    }
+
+    // ส่งสำเร็จ
+    if (normalized == 'sent') {
+      return _LineStatusInfo(
+        label: 'ส่งแล้ว',
+        color: AppColors.success,
+        icon: HugeIcons.strokeRoundedCheckmarkCircle02,
+      );
+    }
+
+    // ส่งไม่สำเร็จ
+    if (normalized == 'fail') {
+      return _LineStatusInfo(
+        label: 'ส่งไม่สำเร็จ',
+        color: AppColors.error,
+        icon: HugeIcons.strokeRoundedAlert02,
+      );
+    }
+
+    // กำลังยกเลิก
+    if (normalized == 'canceling...' || normalized.contains('canceling')) {
+      return _LineStatusInfo(
+        label: 'กำลังยกเลิก',
+        color: AppColors.secondaryText,
+        icon: HugeIcons.strokeRoundedLoading03,
+      );
+    }
+
+    // ยกเลิกแล้ว
+    if (normalized == 'canceled') {
+      return _LineStatusInfo(
+        label: 'ยกเลิกแล้ว',
+        color: AppColors.secondaryText,
+        icon: HugeIcons.strokeRoundedCancel01,
+      );
+    }
+
+    // ไม่มี LINE group
+    if (normalized == 'ยังไม่ลงทะเบียน') {
+      return _LineStatusInfo(
+        label: 'ยังไม่มี LINE',
+        color: AppColors.secondaryText,
+        icon: HugeIcons.strokeRoundedUserBlock01,
+      );
+    }
+
+    // รอหัวหน้าเวรตรวจ (Vitals ผิดปกติ)
+    if (normalized == 'ผิดปกติ') {
+      return _LineStatusInfo(
+        label: 'รอตรวจสอบ',
+        color: AppColors.warning,
+        icon: HugeIcons.strokeRoundedAlertCircle,
+      );
+    }
+
+    // Default: แสดง status ดิบ (ป้องกันกรณีมี status ใหม่ที่ยังไม่ได้ map)
+    return _LineStatusInfo(
+      label: rawStatus,
+      color: AppColors.secondaryText,
+      icon: HugeIcons.strokeRoundedSent,
+    );
+  }
+
   /// Build LINE notification status row
   Widget _buildLineStatusRow({
     required BuildContext context,
@@ -195,11 +274,14 @@ class PostCard extends StatelessWidget {
     required bool canCancel,
     Future<void> Function(int queueId)? onCancel,
   }) {
+    // Map status ดิบเป็นคำที่ user เข้าใจง่าย
+    final statusInfo = _mapLineStatus(status);
+
     return Row(
       children: [
         HugeIcon(
-          icon: HugeIcons.strokeRoundedSent,
-          color: AppColors.secondaryText,
+          icon: statusInfo.icon,
+          color: statusInfo.color,
           size: AppIconSize.sm,
         ),
         SizedBox(width: 4),
@@ -212,9 +294,9 @@ class PostCard extends StatelessWidget {
         ),
         Expanded(
           child: Text(
-            status,
+            statusInfo.label,
             style: AppTypography.caption.copyWith(
-              color: AppColors.secondaryText,
+              color: statusInfo.color,
               fontWeight: FontWeight.w600,
               fontSize: 10,
             ),
@@ -333,6 +415,19 @@ class PostCard extends StatelessWidget {
     // Format as date
     return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
   }
+}
+
+/// ข้อมูล LINE status ที่แปลงแล้ว (label, color, icon)
+class _LineStatusInfo {
+  final String label;
+  final Color color;
+  final dynamic icon;
+
+  const _LineStatusInfo({
+    required this.label,
+    required this.color,
+    required this.icon,
+  });
 }
 
 /// Cancel LINE notification button

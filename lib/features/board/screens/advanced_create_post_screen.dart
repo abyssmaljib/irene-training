@@ -149,9 +149,9 @@ class _AdvancedCreatePostScreenState
       if (state.selectedTag != null) {
         tagTopics = [state.selectedTag!.name];
       }
-      // เพิ่ม "ส่งให้ญาติ" ถ้าเลือก
+      // เพิ่ม "ส่งให้หัวหน้าเวร" ถ้าเลือก
       if (state.sendToFamily) {
-        tagTopics = [...?tagTopics, 'ส่งให้ญาติ'];
+        tagTopics = [...?tagTopics, 'ส่งให้หัวหน้าเวร'];
       }
 
       // Create post
@@ -587,7 +587,7 @@ class _AdvancedCreatePostScreenState
           ),
           const SizedBox(width: 8),
           Text(
-            'ส่งให้ญาติ',
+            'ส่งให้หัวหน้าเวร',
             style: AppTypography.body.copyWith(
               color: AppColors.primaryText,
             ),
@@ -595,9 +595,7 @@ class _AdvancedCreatePostScreenState
         ],
       ),
       subtitle: Text(
-        sendToFamily
-            ? 'จะแจ้งเตือนไปยังญาติของผู้พักอาศัย'
-            : 'เลือกถ้าต้องการแจ้งญาติ',
+        'ส่งให้หัวหน้าเวรตรวจสอบและส่งให้ญาติ',
         style: AppTypography.caption.copyWith(
           color: AppColors.secondaryText,
         ),

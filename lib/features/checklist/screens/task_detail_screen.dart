@@ -1968,16 +1968,32 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
 
   // Action handlers
   Future<void> _handleComplete() async {
-    setState(() => _isLoading = true);
-
     final service = ref.read(taskServiceProvider);
     final userId = ref.read(currentUserIdProvider);
+    final userNickname = ref.read(currentUserNicknameProvider).valueOrNull;
 
-    if (userId == null) {
-      setState(() => _isLoading = false);
-      return;
-    }
+    if (userId == null) return;
 
+    // === Optimistic Update ===
+    // สร้าง task ใหม่ที่มีสถานะ complete ก่อนรอ server
+    final optimisticTask = _task.copyWith(
+      status: 'complete',
+      completedByUid: userId,
+      completedByNickname: userNickname,
+      completedAt: DateTime.now(),
+      confirmImage: _uploadedImageUrl,
+    );
+
+    // อัพเดต local state ทันที
+    setState(() {
+      _task = optimisticTask;
+      _isLoading = true;
+    });
+
+    // อัพเดต provider เพื่อให้ checklist screen เห็นผลทันที
+    final rollback = optimisticUpdateTask(ref, optimisticTask);
+
+    // === เรียก Server ===
     final success = await service.markTaskComplete(
       _task.logId,
       userId,
@@ -1985,10 +2001,17 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     );
 
     if (success) {
+      // ยืนยัน optimistic update
+      commitOptimisticUpdate(ref, _task.logId);
       refreshTasks(ref);
       if (mounted) Navigator.pop(context);
     } else {
-      setState(() => _isLoading = false);
+      // Rollback ถ้า server error
+      rollback();
+      setState(() {
+        _task = widget.task; // กลับไปใช้ task เดิม
+        _isLoading = false;
+      });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('ไม่สามารถบันทึกได้ กรุณาลองใหม่')),
@@ -2003,18 +2026,33 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     final problemData = await ProblemInputSheet.show(context, task: _task);
     if (problemData == null) return;
 
-    setState(() => _isLoading = true);
-
     final service = ref.read(taskServiceProvider);
     final userId = ref.read(currentUserIdProvider);
+    final userNickname = ref.read(currentUserNicknameProvider).valueOrNull;
 
     // ต้องมี userId ถึงจะบันทึกได้
-    if (userId == null) {
-      setState(() => _isLoading = false);
-      return;
-    }
+    if (userId == null) return;
 
-    // ส่ง userId, problemType และ description ไปบันทึก
+    // === Optimistic Update ===
+    final optimisticTask = _task.copyWith(
+      status: 'problem',
+      problemType: problemData.type.value,
+      descript: problemData.description,
+      completedByUid: userId,
+      completedByNickname: userNickname,
+      completedAt: DateTime.now(),
+    );
+
+    // อัพเดต local state ทันที
+    setState(() {
+      _task = optimisticTask;
+      _isLoading = true;
+    });
+
+    // อัพเดต provider เพื่อให้ checklist screen เห็นผลทันที
+    final rollback = optimisticUpdateTask(ref, optimisticTask);
+
+    // === เรียก Server ===
     final success = await service.markTaskProblem(
       _task.logId,
       userId,
@@ -2023,10 +2061,17 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     );
 
     if (success) {
+      // ยืนยัน optimistic update
+      commitOptimisticUpdate(ref, _task.logId);
       refreshTasks(ref);
       if (mounted) Navigator.pop(context);
     } else {
-      setState(() => _isLoading = false);
+      // Rollback ถ้า server error
+      rollback();
+      setState(() {
+        _task = widget.task;
+        _isLoading = false;
+      });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('ไม่สามารถบันทึกได้ กรุณาลองใหม่')),
@@ -2036,23 +2081,45 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
   }
 
   Future<void> _handleRefer() async {
-    setState(() => _isLoading = true);
-
     final service = ref.read(taskServiceProvider);
     final userId = ref.read(currentUserIdProvider);
+    final userNickname = ref.read(currentUserNicknameProvider).valueOrNull;
 
-    if (userId == null) {
-      setState(() => _isLoading = false);
-      return;
-    }
+    if (userId == null) return;
 
+    // === Optimistic Update ===
+    final optimisticTask = _task.copyWith(
+      status: 'refer',
+      descript: 'อยู่ที่โรงพยาบาล (Refer)',
+      completedByUid: userId,
+      completedByNickname: userNickname,
+      completedAt: DateTime.now(),
+    );
+
+    // อัพเดต local state ทันที
+    setState(() {
+      _task = optimisticTask;
+      _isLoading = true;
+    });
+
+    // อัพเดต provider เพื่อให้ checklist screen เห็นผลทันที
+    final rollback = optimisticUpdateTask(ref, optimisticTask);
+
+    // === เรียก Server ===
     final success = await service.markTaskRefer(_task.logId, userId);
 
     if (success) {
+      // ยืนยัน optimistic update
+      commitOptimisticUpdate(ref, _task.logId);
       refreshTasks(ref);
       if (mounted) Navigator.pop(context);
     } else {
-      setState(() => _isLoading = false);
+      // Rollback ถ้า server error
+      rollback();
+      setState(() {
+        _task = widget.task;
+        _isLoading = false;
+      });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('ไม่สามารถบันทึกได้ กรุณาลองใหม่')),
@@ -2081,28 +2148,55 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     // ถ้าไม่ได้กดยืนยัน ไม่ทำอะไร
     if (!confirmed) return;
 
-    setState(() => _isLoading = true);
-
     final service = ref.read(taskServiceProvider);
-    bool success;
+    final originalTask = _task; // เก็บ task เดิมสำหรับ rollback
 
-    // ถ้าเป็น postpone ต้องลบ postponed log ก่อน
-    if (_task.isPostponed && _task.postponeTo != null) {
-      success = await service.cancelPostpone(_task.logId, _task.postponeTo!);
+    // === Optimistic Update ===
+    // สร้าง task ที่ clear สถานะทั้งหมด
+    final optimisticTask = _task.copyWith(
+      clearStatus: true,
+      clearCompletedAt: true,
+      clearCompletedByUid: true,
+      clearCompletedByNickname: true,
+      clearConfirmImage: true,
+      clearProblemType: true,
+      clearDescript: true,
+    );
+
+    // อัพเดต local state ทันที
+    setState(() {
+      _task = optimisticTask;
+      _isLoading = true;
+      _uploadedImageUrl = null; // Clear uploaded image URL
+    });
+
+    // อัพเดต provider เพื่อให้ checklist screen เห็นผลทันที
+    final rollback = optimisticUpdateTask(ref, optimisticTask);
+
+    // === เรียก Server ===
+    bool success;
+    if (originalTask.isPostponed && originalTask.postponeTo != null) {
+      success = await service.cancelPostpone(originalTask.logId, originalTask.postponeTo!);
     } else {
-      // ส่ง confirmImage URL ไปด้วยเพื่อลบจาก storage
-      final imageUrl = _task.confirmImage ?? _uploadedImageUrl;
+      final imageUrl = originalTask.confirmImage ?? _uploadedImageUrl;
       success = await service.unmarkTask(
-        _task.logId,
+        originalTask.logId,
         confirmImageUrl: imageUrl,
       );
     }
 
     if (success) {
+      // ยืนยัน optimistic update
+      commitOptimisticUpdate(ref, originalTask.logId);
       refreshTasks(ref);
       if (mounted) Navigator.pop(context);
     } else {
-      setState(() => _isLoading = false);
+      // Rollback ถ้า server error
+      rollback();
+      setState(() {
+        _task = originalTask;
+        _isLoading = false;
+      });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('ไม่สามารถยกเลิกได้ กรุณาลองใหม่')),
