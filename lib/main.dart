@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:clarity_flutter/clarity_flutter.dart';
 import 'package:onesignal_flutter/onesignal_flutter.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart'; // สำหรับ initializeDateFormatting
@@ -31,6 +32,24 @@ String _clarityProjectId = '';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // เปิด Edge-to-Edge mode สำหรับ Android 15+
+  // ทำให้แอปแสดงผลเต็มจอ รวมถึง status bar และ navigation bar area
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+
+  // ตั้งค่า system overlay style ให้โปร่งใส
+  // เพื่อให้แอป render เนื้อหาใต้ status bar และ navigation bar
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      // Status bar (ด้านบน) - โปร่งใสเพื่อให้เห็นเนื้อหาด้านหลัง
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark, // icon สีเข้มสำหรับ light theme
+      // Navigation bar (ด้านล่าง) - โปร่งใสเพื่อ gesture navigation
+      systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarIconBrightness: Brightness.dark,
+      systemNavigationBarContrastEnforced: false, // ปิด contrast enforcement
+    ),
+  );
 
   // Load .env file with error handling
   try {
