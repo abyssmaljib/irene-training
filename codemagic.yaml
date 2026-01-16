@@ -68,6 +68,8 @@ workflows:
         credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
         track: internal
         submit_as_draft: false
+        # เมื่อ Google Play ต้องการ manual review จาก Console UI
+        changes_not_sent_for_review: true
 
   # ============================================
   # iOS Production Build
