@@ -2001,6 +2001,28 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     );
 
     if (success) {
+      // === Special logic สำหรับ taskType = 'จัดยา' ===
+      // ถ้าเป็นงานจัดยา และมีรูปยืนยัน ให้บันทึกลง A_Med_logs ด้วย
+      if (_isJudYa &&
+          _uploadedImageUrl != null &&
+          _task.residentId != null &&
+          _task.expectedDateTime != null) {
+        // ดึง meal จาก title (เช่น 'ก่อนอาหารเช้า', 'หลังอาหารกลางวัน')
+        final meal = _extractMealFromTitle(_task.title ?? '');
+
+        if (meal != null) {
+          // บันทึกลง A_Med_logs (3C)
+          await MedicineService.instance.upsertMedLog3C(
+            residentId: _task.residentId!,
+            meal: meal,
+            expectedDate: _task.expectedDateTime!,
+            userId: userId,
+            pictureUrl: _uploadedImageUrl!,
+            taskLogId: _task.logId,
+          );
+        }
+      }
+
       // ยืนยัน optimistic update
       commitOptimisticUpdate(ref, _task.logId);
       refreshTasks(ref);
@@ -2018,6 +2040,26 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         );
       }
     }
+  }
+
+  /// ดึงมื้อยาจาก task title
+  /// เช่น "จัดยาก่อนอาหารเช้า คุณสมชาย" → "ก่อนอาหารเช้า"
+  /// เช่น "จัดยาหลังอาหารกลางวัน คุณสมหญิง" → "หลังอาหารกลางวัน"
+  /// เช่น "จัดยาก่อนนอน คุณสมศรี" → "ก่อนนอน"
+  String? _extractMealFromTitle(String title) {
+    final beforeAfter = _medBeforeAfterExtract(title);
+    final bldb = _medBLDBExtract(title);
+
+    // ถ้าไม่มี bldb = ไม่ใช่ task ยา
+    if (bldb == null) return null;
+
+    // รวม beforeAfter + bldb เป็น meal key
+    // เช่น 'ก่อนอาหาร' + 'เช้า' = 'ก่อนอาหารเช้า'
+    // เช่น '' + 'ก่อนนอน' = 'ก่อนนอน'
+    if (beforeAfter != null && beforeAfter.isNotEmpty) {
+      return '$beforeAfter$bldb';
+    }
+    return bldb;
   }
 
   Future<void> _handleProblem() async {
@@ -2186,6 +2228,27 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     }
 
     if (success) {
+      // === Special logic สำหรับ taskType = 'จัดยา' ===
+      // ถ้าเป็นงานจัดยาที่ complete แล้ว ให้ clear ข้อมูล 3C ใน A_Med_logs ด้วย
+      if (originalTask.taskType == 'จัดยา' &&
+          originalTask.isDone &&
+          originalTask.residentId != null &&
+          originalTask.expectedDateTime != null) {
+        // ดึง meal จาก title
+        final meal = _extractMealFromTitle(originalTask.title ?? '');
+
+        if (meal != null) {
+          // Clear ข้อมูล 3C จาก A_Med_logs
+          // - ถ้ามีรูป 2C → clear เฉพาะ 3C fields
+          // - ถ้าไม่มีรูป 2C → ลบ row ทั้งหมด
+          await MedicineService.instance.clearMedLog3C(
+            residentId: originalTask.residentId!,
+            meal: meal,
+            expectedDate: originalTask.expectedDateTime!,
+          );
+        }
+      }
+
       // ยืนยัน optimistic update
       commitOptimisticUpdate(ref, originalTask.logId);
       refreshTasks(ref);

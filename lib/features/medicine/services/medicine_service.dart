@@ -848,6 +848,155 @@ extension MedicineServiceMedDB on MedicineService {
 }
 
 // ==========================================
+// Extension สำหรับจัดการ A_Med_logs (3C - การให้ยา)
+// ==========================================
+
+extension MedicineServiceMedLogs on MedicineService {
+  /// Upsert med log สำหรับ 3C (การให้ยา/เสิร์ฟยา)
+  /// ใช้เมื่อ complete task ประเภท 'จัดยา'
+  ///
+  /// Logic:
+  /// 1. ค้นหา record ที่มี meal + Created_Date + resident_id ตรงกัน
+  /// 2. ถ้าไม่มี → INSERT record ใหม่
+  /// 3. ถ้ามี → UPDATE record นั้น
+  ///
+  /// [residentId] - ID ของผู้พักอาศัย
+  /// [meal] - มื้อยา เช่น 'ก่อนอาหารเช้า', 'หลังอาหารกลางวัน'
+  /// [expectedDate] - วันที่ของ task (date only)
+  /// [userId] - ID ของ user ที่ทำ 3C
+  /// [pictureUrl] - URL รูปยืนยัน (3C picture)
+  /// [taskLogId] - ID ของ task log ที่ complete
+  ///
+  /// Returns true ถ้าสำเร็จ, false ถ้ามี error
+  Future<bool> upsertMedLog3C({
+    required int residentId,
+    required String meal,
+    required DateTime expectedDate,
+    required String userId,
+    required String pictureUrl,
+    required int taskLogId,
+  }) async {
+    try {
+      // Format date เป็น YYYY-MM-DD
+      final dateStr =
+          '${expectedDate.year}-${expectedDate.month.toString().padLeft(2, '0')}-${expectedDate.day.toString().padLeft(2, '0')}';
+
+      debugPrint('[MedicineService] upsertMedLog3C: residentId=$residentId, meal=$meal, date=$dateStr');
+
+      // 1. ค้นหา record ที่มีอยู่แล้ว
+      final existing = await _supabase
+          .from('A_Med_logs')
+          .select('id')
+          .eq('resident_id', residentId)
+          .eq('meal', meal)
+          .eq('Created_Date', dateStr)
+          .maybeSingle();
+
+      final now = DateTime.now().toUtc().toIso8601String();
+
+      if (existing == null) {
+        // 2. ไม่มี record → INSERT ใหม่
+        debugPrint('[MedicineService] upsertMedLog3C: INSERT new record');
+
+        await _supabase.from('A_Med_logs').insert({
+          'resident_id': residentId,
+          'meal': meal,
+          'Created_Date': dateStr,
+          '3C_time_stamps': now,
+          '3C_Compleated_by': userId,
+          'ThirdCPictureUrl': pictureUrl,
+          'task_id': taskLogId,
+        });
+      } else {
+        // 3. มี record อยู่แล้ว → UPDATE
+        final existingId = existing['id'];
+        debugPrint('[MedicineService] upsertMedLog3C: UPDATE existing record id=$existingId');
+
+        await _supabase.from('A_Med_logs').update({
+          '3C_time_stamps': now,
+          '3C_Compleated_by': userId,
+          'ThirdCPictureUrl': pictureUrl,
+          'task_id': taskLogId,
+        }).eq('id', existingId);
+      }
+
+      debugPrint('[MedicineService] upsertMedLog3C: SUCCESS');
+      return true;
+    } catch (e) {
+      debugPrint('[MedicineService] upsertMedLog3C error: $e');
+      return false;
+    }
+  }
+
+  /// ยกเลิก/ลบข้อมูล 3C จาก med log
+  /// ใช้เมื่อ user กด "ยกเลิกการรับทราบ" สำหรับ task จัดยา
+  ///
+  /// Logic:
+  /// 1. ค้นหา record ที่มี meal + Created_Date + resident_id ตรงกัน
+  /// 2. ถ้าไม่มี → ไม่ต้องทำอะไร
+  /// 3. ถ้ามี record:
+  ///    - ถ้ามีรูป 2C (SecondCPictureUrl) → clear เฉพาะ 3C fields เป็น null
+  ///    - ถ้าไม่มีรูป 2C → ลบ row ทั้งหมด
+  ///
+  /// Returns true ถ้าสำเร็จ, false ถ้ามี error
+  Future<bool> clearMedLog3C({
+    required int residentId,
+    required String meal,
+    required DateTime expectedDate,
+  }) async {
+    try {
+      // Format date เป็น YYYY-MM-DD
+      final dateStr =
+          '${expectedDate.year}-${expectedDate.month.toString().padLeft(2, '0')}-${expectedDate.day.toString().padLeft(2, '0')}';
+
+      debugPrint('[MedicineService] clearMedLog3C: residentId=$residentId, meal=$meal, date=$dateStr');
+
+      // 1. ค้นหา record ที่มีอยู่ พร้อมดึง SecondCPictureUrl มาด้วย
+      final existing = await _supabase
+          .from('A_Med_logs')
+          .select('id, SecondCPictureUrl')
+          .eq('resident_id', residentId)
+          .eq('meal', meal)
+          .eq('Created_Date', dateStr)
+          .maybeSingle();
+
+      if (existing == null) {
+        // 2. ไม่มี record → ไม่ต้องทำอะไร
+        debugPrint('[MedicineService] clearMedLog3C: no existing record');
+        return true;
+      }
+
+      final existingId = existing['id'];
+      final has2CPicture = existing['SecondCPictureUrl'] != null &&
+          (existing['SecondCPictureUrl'] as String).isNotEmpty;
+
+      if (has2CPicture) {
+        // 3a. มีรูป 2C → clear เฉพาะ 3C fields
+        debugPrint('[MedicineService] clearMedLog3C: has 2C picture, clearing 3C fields only');
+
+        await _supabase.from('A_Med_logs').update({
+          '3C_time_stamps': null,
+          '3C_Compleated_by': null,
+          'ThirdCPictureUrl': null,
+          'task_id': null,
+        }).eq('id', existingId);
+      } else {
+        // 3b. ไม่มีรูป 2C → ลบ row ทั้งหมด
+        debugPrint('[MedicineService] clearMedLog3C: no 2C picture, deleting row');
+
+        await _supabase.from('A_Med_logs').delete().eq('id', existingId);
+      }
+
+      debugPrint('[MedicineService] clearMedLog3C: SUCCESS');
+      return true;
+    } catch (e) {
+      debugPrint('[MedicineService] clearMedLog3C error: $e');
+      return false;
+    }
+  }
+}
+
+// ==========================================
 // Extension สำหรับจัดการ ATC Classification
 // ==========================================
 

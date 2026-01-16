@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/services/user_service.dart';
+import '../../checklist/services/task_service.dart';
 
 /// ตรวจสอบว่ารันบน desktop หรือไม่ (Windows, macOS, Linux)
 bool get _isDesktop {
@@ -206,6 +207,8 @@ class CameraService {
   /// [mealKey] - ชื่อมื้อ
   /// [date] - วันที่
   /// [photoType] - '2C' หรือ '3C'
+  ///
+  /// สำหรับรูป 3C: ถ้า med_log มี task_id จะ undone task นั้นด้วย
   Future<bool> deletePhoto({
     required int residentId,
     required String mealKey,
@@ -215,10 +218,10 @@ class CameraService {
     try {
       final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
 
-      // ค้นหา med_log
+      // ค้นหา med_log พร้อมดึง task_id มาด้วย (สำหรับ 3C)
       final existingLogs = await _supabase
           .from('A_Med_logs')
-          .select('id, SecondCPictureUrl, ThirdCPictureUrl')
+          .select('id, SecondCPictureUrl, ThirdCPictureUrl, task_id')
           .eq('resident_id', residentId)
           .eq('meal', mealKey)
           .eq('Created_Date', dateStr);
@@ -229,6 +232,7 @@ class CameraService {
       }
 
       final logId = existingLogs[0]['id'];
+      final taskId = existingLogs[0]['task_id'] as int?;
       final updateData = <String, dynamic>{};
 
       if (photoType == '2C') {
@@ -240,6 +244,13 @@ class CameraService {
         updateData['ThirdCPictureUrl'] = null;
         updateData['3C_Compleated_by'] = null;
         updateData['3C_time_stamps'] = null;
+        updateData['task_id'] = null; // clear task_id ด้วย
+
+        // ถ้ามี task_id ที่เชื่อมกับ med_log นี้ → undone task นั้นด้วย
+        if (taskId != null) {
+          debugPrint('CameraService: found linked task_id=$taskId, will undone it');
+          await TaskService.instance.unmarkTask(taskId);
+        }
       }
 
       await _supabase
