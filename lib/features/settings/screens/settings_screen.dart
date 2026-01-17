@@ -303,6 +303,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         width: 80,
                         height: 80,
                         fit: BoxFit.cover,
+                        // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
+                        cacheWidth: 200,
                         errorBuilder: (context, error, stackTrace) {
                           return _buildDefaultAvatar();
                         },
@@ -889,6 +891,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             width: 40,
                             height: 40,
                             fit: BoxFit.cover,
+                            // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
+                            cacheWidth: 100,
                             errorBuilder: (context, error, stackTrace) => Center(
                               child: HugeIcon(
                                 icon: HugeIcons.strokeRoundedUser,
@@ -1424,6 +1428,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         width: 40,
                         height: 40,
                         fit: BoxFit.cover,
+                        // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
+                        cacheWidth: 100,
                         errorBuilder: (context, error, stackTrace) => Text(
                           badge.icon ?? badge.rarityEmoji,
                           style: const TextStyle(fontSize: 24),

@@ -362,6 +362,8 @@ class _BadgeInfoDialogState extends State<BadgeInfoDialog>
                             width: 32,
                             height: 32,
                             fit: BoxFit.cover,
+                            // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
+                            cacheWidth: 100,
                             errorBuilder: (context, error, stackTrace) => Text(
                               badge.icon ?? badge.rarityEmoji,
                               style: const TextStyle(fontSize: 20),

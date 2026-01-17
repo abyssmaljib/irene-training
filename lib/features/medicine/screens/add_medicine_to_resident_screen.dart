@@ -1242,6 +1242,8 @@ class _MedicineSummaryCard extends StatelessWidget {
           width: 64,
           height: 64,
           fit: BoxFit.cover,
+          // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
+          cacheWidth: 200,
           errorBuilder: (context, error, stackTrace) => _buildPlaceholderImage(),
           loadingBuilder: (context, child, loadingProgress) {
             if (loadingProgress == null) return child;

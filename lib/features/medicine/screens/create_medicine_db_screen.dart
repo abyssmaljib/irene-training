@@ -825,6 +825,8 @@ class _ImageUploadBox extends StatelessWidget {
                         Image.network(
                           imageUrl!,
                           fit: BoxFit.cover,
+                          // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
+                          cacheWidth: 200,
                           errorBuilder: (context, error, stackTrace) =>
                               _buildPlaceholder(),
                         ),

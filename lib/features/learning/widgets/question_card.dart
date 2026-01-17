@@ -66,6 +66,8 @@ class QuestionCard extends StatelessWidget {
                 question.questionImageUrl!,
                 width: double.infinity,
                 fit: BoxFit.contain,
+                // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
+                cacheWidth: 600,
                 loadingBuilder: (context, child, loadingProgress) {
                   if (loadingProgress == null) return child;
                   return Container(

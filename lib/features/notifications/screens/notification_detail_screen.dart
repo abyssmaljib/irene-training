@@ -162,6 +162,8 @@ class NotificationDetailScreen extends StatelessWidget {
             notification.imageUrl!,
             width: double.infinity,
             fit: BoxFit.cover,
+            // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
+            cacheWidth: 800,
             errorBuilder: (context, error, stackTrace) {
               // ถ้าโหลดรูปไม่ได้ ไม่แสดงอะไร
               return SizedBox.shrink();

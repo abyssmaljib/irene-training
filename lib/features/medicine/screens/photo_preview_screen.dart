@@ -158,6 +158,8 @@ class _PhotoPreviewScreenState extends State<PhotoPreviewScreen> {
       return Image.memory(
         _imageBytes!,
         fit: BoxFit.contain,
+        // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
+        cacheWidth: 1200,
       );
     }
 

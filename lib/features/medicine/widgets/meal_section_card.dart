@@ -1317,6 +1317,8 @@ class _FullScreenPhotoView extends StatelessWidget {
                   child: Image.network(
                     photoUrl,
                     fit: BoxFit.contain,
+                    // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
+                    cacheWidth: 1200,
                     loadingBuilder: (context, child, loadingProgress) {
                       if (loadingProgress == null) return child;
                       final progress = loadingProgress.expectedTotalBytes != null
@@ -1460,6 +1462,8 @@ class _LogPhotoNetworkImageState extends State<_LogPhotoNetworkImage> {
       '${widget.imageUrl}${_retryCount > 0 ? '?retry=$_retryCount' : ''}',
       key: ValueKey('${widget.imageUrl}_$_retryCount'),
       fit: widget.fit,
+      // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
+      cacheWidth: 800,
       loadingBuilder: (context, child, loadingProgress) {
         if (loadingProgress == null) {
           // โหลดเสร็จแล้ว - cancel timer

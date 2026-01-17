@@ -517,6 +517,8 @@ class _ShiftDetailRowState extends ConsumerState<ShiftDetailRow>
                 clockSummary.sickEvident!,
                 height: 200,
                 fit: BoxFit.contain,
+                // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
+                cacheWidth: 600,
                 errorBuilder: (context, error, stack) => Container(
                   height: 100,
                   color: AppColors.background,

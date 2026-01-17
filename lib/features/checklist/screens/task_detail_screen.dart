@@ -619,6 +619,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                     width: 50,
                     height: 50,
                     fit: BoxFit.cover,
+                    // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
+                    cacheWidth: 200,
                     loadingBuilder: (context, child, loadingProgress) {
                       if (loadingProgress == null) return child;
                       return _buildProfilePlaceholder();
@@ -792,6 +794,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
               _task.sampleImageUrl!,
               width: double.infinity,
               fit: BoxFit.contain,
+              // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
+              cacheWidth: 800,
               loadingBuilder: (context, child, loadingProgress) {
                 if (loadingProgress == null) return child;
                 final total = loadingProgress.expectedTotalBytes;
@@ -922,6 +926,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                             width: 36,
                             height: 36,
                             fit: BoxFit.cover,
+                            // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
+                            cacheWidth: 100,
                             errorBuilder: (context, error, stackTrace) =>
                                 _buildCreatorPlaceholderGold(),
                           )
@@ -1110,6 +1116,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
               imageUrl,
               width: double.infinity,
               fit: BoxFit.contain,
+              // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
+              cacheWidth: 800,
               loadingBuilder: (context, child, loadingProgress) {
                 if (loadingProgress == null) return child;
                 final total = loadingProgress.expectedTotalBytes;
@@ -1247,6 +1255,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                     width: double.infinity,
                     height: 200,
                     fit: BoxFit.cover,
+                    // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
+                    cacheWidth: 800,
                     errorBuilder: (_, error, stackTrace) => _buildVideoPlaceholder(),
                   )
                 else
@@ -1355,6 +1365,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                 images.first,
                 width: double.infinity,
                 fit: BoxFit.contain,
+                // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
+                cacheWidth: 800,
                 loadingBuilder: (context, child, loadingProgress) {
                   if (loadingProgress == null) return child;
                   return Container(
@@ -1387,6 +1399,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                   child: Image.network(
                     images[index],
                     fit: BoxFit.cover,
+                    // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
+                    cacheWidth: 400,
                     loadingBuilder: (context, child, loadingProgress) {
                       if (loadingProgress == null) return child;
                       return Container(
@@ -1437,6 +1451,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                     width: double.infinity,
                     height: 200,
                     fit: BoxFit.cover,
+                    // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
+                    cacheWidth: 800,
                     errorBuilder: (context, error, stackTrace) => _buildVideoPlaceholder(),
                   )
                 else
@@ -1618,6 +1634,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
               child: Image.network(
                 imageUrl,
                 fit: BoxFit.contain,
+                // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
+                cacheWidth: 1200,
                 loadingBuilder: (context, child, loadingProgress) {
                   if (loadingProgress == null) return child;
                   final progress = loadingProgress.expectedTotalBytes != null

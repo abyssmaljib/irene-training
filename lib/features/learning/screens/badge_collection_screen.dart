@@ -448,6 +448,8 @@ class _BadgeCollectionScreenState extends State<BadgeCollectionScreen>
           width: 36,
           height: 36,
           fit: BoxFit.cover,
+          // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
+          cacheWidth: 100,
           // ถ้าโหลดรูปไม่ได้ให้แสดง emoji แทน
           errorBuilder: (context, error, stackTrace) => Text(
             badge.icon ?? badge.rarityEmoji,

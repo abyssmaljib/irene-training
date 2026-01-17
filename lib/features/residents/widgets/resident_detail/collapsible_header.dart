@@ -86,7 +86,8 @@ class CollapsibleResidentHeader extends StatelessWidget {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(6),
                 child: resident.imageUrl != null && resident.imageUrl!.isNotEmpty
-                    ? Image.network(resident.imageUrl!, fit: BoxFit.cover, errorBuilder: (_, _, _) => _buildMiniAvatar())
+                    // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
+                    ? Image.network(resident.imageUrl!, fit: BoxFit.cover, cacheWidth: 100, errorBuilder: (_, _, _) => _buildMiniAvatar())
                     : _buildMiniAvatar(),
               ),
             ),
@@ -154,6 +155,8 @@ class CollapsibleResidentHeader extends StatelessWidget {
             ? Image.network(
                 resident.imageUrl!,
                 fit: BoxFit.cover,
+                // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
+                cacheWidth: 400,
                 errorBuilder: (_, _, _) => _buildDefaultAvatar(),
               )
             : _buildDefaultAvatar(),

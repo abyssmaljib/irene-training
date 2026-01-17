@@ -216,6 +216,8 @@ class MedicinePhotoItem extends StatelessWidget {
                   child: Image.network(
                     imageUrl,
                     fit: BoxFit.contain,
+                    // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
+                    cacheWidth: 1200,
                     errorBuilder: (context, error, stackTrace) {
                       return Container(
                         height: 200,

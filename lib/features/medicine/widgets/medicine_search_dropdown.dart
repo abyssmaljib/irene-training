@@ -484,6 +484,8 @@ class _MedicineListTile extends StatelessWidget {
                       child: Image.network(
                         medicine.frontFoiled!,
                         fit: BoxFit.cover,
+                        // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
+                        cacheWidth: 100,
                         errorBuilder: (_, _, _) => _buildDefaultIcon(),
                       ),
                     )
@@ -593,6 +595,8 @@ class _SelectedMedicineCard extends StatelessWidget {
                       child: Image.network(
                         medicine.frontFoiled!,
                         fit: BoxFit.cover,
+                        // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
+                        cacheWidth: 100,
                         errorBuilder: (_, _, _) => _buildDefaultIcon(),
                       ),
                     )
