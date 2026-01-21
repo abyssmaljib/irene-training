@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hugeicons/hugeicons.dart';
@@ -8,10 +10,15 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/irene_app_bar.dart';
+import '../../../core/widgets/confirm_dialog.dart';
+import '../../../core/providers/shared_preferences_provider.dart';
+import '../models/new_tag.dart';
+import '../models/post_draft.dart';
 import '../providers/create_post_provider.dart';
 import '../providers/post_provider.dart';
 import '../services/post_action_service.dart';
 import '../services/post_media_service.dart';
+import '../services/post_draft_service.dart';
 import '../widgets/tag_picker_widget.dart';
 import '../widgets/resident_picker_widget.dart';
 import '../widgets/image_picker_bar.dart' show ImagePickerHelper;
@@ -36,11 +43,21 @@ class _AdvancedCreatePostScreenState
   final _formKey = GlobalKey<FormState>();
   bool _isSubmitting = false;
 
+  // Draft auto-save state
+  Timer? _autoSaveTimer;
+  static const _autoSaveDelay = Duration(seconds: 2);
+  PostDraftService? _draftService;
+  bool _isRestoringDraft = false;
+
   @override
   void initState() {
     super.initState();
-    // Load existing text from provider (e.g., from simple modal)
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Initialize draft service
+      final prefs = ref.read(sharedPreferencesProvider);
+      _draftService = PostDraftService(prefs);
+
       final state = ref.read(createPostProvider);
       // ถ้ามี text จาก simple modal ให้โหลดมาใส่ใน controller
       if (state.text.isNotEmpty) {
@@ -50,14 +67,175 @@ class _AdvancedCreatePostScreenState
       if (state.title != null && state.title!.isNotEmpty) {
         _titleController.text = state.title!;
       }
+
+      // ถ้า provider ว่างเปล่า ให้ตรวจสอบ draft
+      if (state.text.isEmpty && state.title == null) {
+        _checkAndRestoreDraft();
+      }
     });
+
+    // Listen for text changes เพื่อ auto-save draft
+    _titleController.addListener(_onContentChanged);
+    _textController.addListener(_onContentChanged);
   }
 
   @override
   void dispose() {
+    _autoSaveTimer?.cancel();
+    _titleController.removeListener(_onContentChanged);
+    _textController.removeListener(_onContentChanged);
     _titleController.dispose();
     _textController.dispose();
     super.dispose();
+  }
+
+  // ============================================================
+  // Draft Management Functions
+  // ============================================================
+
+  /// Callback เมื่อ content เปลี่ยน - debounce แล้ว auto-save draft
+  void _onContentChanged() {
+    if (_isRestoringDraft) return;
+
+    _autoSaveTimer?.cancel();
+    _autoSaveTimer = Timer(_autoSaveDelay, _saveDraft);
+  }
+
+  /// ตรวจสอบว่ามีข้อมูลที่ยังไม่ได้บันทึกหรือไม่
+  bool _hasUnsavedData() {
+    final state = ref.read(createPostProvider);
+    return _textController.text.trim().isNotEmpty ||
+        _titleController.text.trim().isNotEmpty ||
+        state.selectedTag != null ||
+        state.selectedResidentId != null ||
+        state.selectedImages.isNotEmpty ||
+        state.selectedVideo != null ||
+        state.hasQuiz;
+  }
+
+  /// บันทึก draft ลง SharedPreferences
+  Future<void> _saveDraft() async {
+    if (_draftService == null) return;
+
+    final userId = UserService().effectiveUserId;
+    if (userId == null) return;
+
+    final state = ref.read(createPostProvider);
+    final draft = PostDraft(
+      title: _titleController.text,
+      text: _textController.text,
+      tagId: state.selectedTag?.id,
+      tagName: state.selectedTag?.name,
+      tagEmoji: state.selectedTag?.emoji,
+      tagHandoverMode: state.selectedTag?.handoverMode,
+      isHandover: state.isHandover,
+      sendToFamily: state.sendToFamily,
+      residentId: state.selectedResidentId,
+      residentName: state.selectedResidentName,
+      imagePaths: state.selectedImages.map((f) => f.path).toList(),
+      videoPath: state.selectedVideo?.path,
+      savedAt: DateTime.now(),
+      isAdvanced: true,
+    );
+
+    await _draftService!.saveDraft(userId.toString(), draft);
+  }
+
+  /// ตรวจสอบและ restore draft ถ้ามี
+  Future<void> _checkAndRestoreDraft() async {
+    if (_draftService == null) return;
+
+    final userId = UserService().effectiveUserId;
+    if (userId == null) return;
+
+    final userIdStr = userId.toString();
+    if (!_draftService!.hasDraft(userIdStr)) return;
+
+    final draft = _draftService!.loadDraft(userIdStr);
+    if (draft == null || !draft.hasContent) return;
+
+    // แสดง dialog ถามว่าจะใช้ draft หรือไม่
+    if (!mounted) return;
+    final shouldRestore = await _showRestoreDraftDialog();
+
+    if (shouldRestore == true) {
+      _restoreDraft(draft);
+    } else {
+      await _draftService!.clearDraft(userIdStr);
+    }
+  }
+
+  /// แสดง dialog ถามว่าจะ restore draft หรือไม่
+  /// ใช้ RestoreDraftDialog จาก reusable widget
+  Future<bool?> _showRestoreDraftDialog() async {
+    return RestoreDraftDialog.show(context);
+  }
+
+  /// Restore draft ไปยัง form
+  void _restoreDraft(PostDraft draft) {
+    _isRestoringDraft = true;
+
+    // Restore title และ text
+    _titleController.text = draft.title ?? '';
+    _textController.text = draft.text;
+
+    // Restore tag (ถ้ามี)
+    if (draft.tagId != null) {
+      final tag = NewTag(
+        id: draft.tagId!,
+        name: draft.tagName ?? '',
+        emoji: draft.tagEmoji,
+        handoverMode: draft.tagHandoverMode ?? 'none',
+      );
+      ref.read(createPostProvider.notifier).selectTag(tag);
+    }
+
+    // Restore resident
+    if (draft.residentId != null) {
+      ref.read(createPostProvider.notifier).selectResident(
+            draft.residentId!,
+            draft.residentName ?? '',
+          );
+    }
+
+    // Restore handover and sendToFamily
+    ref.read(createPostProvider.notifier).setHandover(draft.isHandover);
+    ref.read(createPostProvider.notifier).setSendToFamily(draft.sendToFamily);
+
+    _isRestoringDraft = false;
+  }
+
+  /// จัดการเมื่อ user พยายามปิด screen
+  /// ใช้ ExitCreateDialog จาก reusable widget (3 ปุ่ม)
+  Future<bool> _handleCloseAttempt() async {
+    if (!_hasUnsavedData()) return true;
+
+    // ใช้ ExitCreateDialog.show() สำหรับ 3 ปุ่ม
+    final result = await ExitCreateDialog.show(context);
+
+    switch (result) {
+      case ExitCreateResult.continueEditing:
+        return false;
+      case ExitCreateResult.saveDraft:
+        await _saveDraft();
+        return true;
+      case ExitCreateResult.discard:
+        final userId = UserService().effectiveUserId;
+        if (userId != null && _draftService != null) {
+          await _draftService!.clearDraft(userId.toString());
+        }
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  /// ลบ draft หลังจาก submit สำเร็จ
+  Future<void> _clearDraftAfterSubmit() async {
+    final userId = UserService().effectiveUserId;
+    if (userId != null && _draftService != null) {
+      await _draftService!.clearDraft(userId.toString());
+    }
   }
 
   Future<void> _pickFromCamera() async {
@@ -181,6 +359,9 @@ class _AdvancedCreatePostScreenState
         // Refresh posts
         ref.invalidate(postsProvider);
 
+        // Clear draft หลังจาก submit สำเร็จ
+        await _clearDraftAfterSubmit();
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('โพสสำเร็จ')),
@@ -207,16 +388,27 @@ class _AdvancedCreatePostScreenState
   Widget build(BuildContext context) {
     final state = ref.watch(createPostProvider);
 
-    return Scaffold(
-      backgroundColor: AppColors.surface,
-      appBar: IreneSecondaryAppBar(
-        title: 'สร้างประกาศใหม่',
+    return PopScope(
+      // ไม่ให้ pop อัตโนมัติ - เราจะจัดการเอง
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+
+        final shouldClose = await _handleCloseAttempt();
+        if (shouldClose && context.mounted) {
+          Navigator.of(context).pop();
+        }
+      },
+      child: Scaffold(
         backgroundColor: AppColors.surface,
-      ),
-      body: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
+        appBar: IreneSecondaryAppBar(
+          title: 'สร้างประกาศใหม่',
+          backgroundColor: AppColors.surface,
+        ),
+        body: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -400,6 +592,7 @@ class _AdvancedCreatePostScreenState
         ),
       ),
       bottomNavigationBar: _buildBottomBar(state),
+      ),
     );
   }
 

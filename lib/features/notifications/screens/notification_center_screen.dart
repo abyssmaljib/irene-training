@@ -125,39 +125,50 @@ class _NotificationCenterScreenState extends ConsumerState<NotificationCenterScr
             ? notifications
             : notifications.where((n) => !n.isRead).toList();
 
-        if (filteredNotifications.isEmpty) {
-          return _buildEmptyState(showAll);
-        }
-
+        // Wrap ทั้ง list และ empty state ด้วย RefreshIndicator
+        // เพื่อให้ user สามารถ pull to refresh ได้แม้ไม่มีข้อมูล
         return RefreshIndicator(
           onRefresh: () => ref.read(notificationStateProvider.notifier).refresh(),
           color: AppColors.primary,
-          child: ListView.builder(
-            padding: EdgeInsets.zero,
-            itemCount: filteredNotifications.length,
-            itemBuilder: (context, index) {
-              final notification = filteredNotifications[index];
-              return NotificationItem(
-                notification: notification,
-                onTap: () => _onNotificationTap(notification),
-                onDismiss: () => _onNotificationDismiss(notification),
-                onMarkAsRead: () => _onToggleReadStatus(notification),
-              );
-            },
-          ),
+          child: filteredNotifications.isEmpty
+              ? _buildEmptyStateScrollable(showAll)
+              : ListView.builder(
+                  padding: EdgeInsets.zero,
+                  // เพิ่ม AlwaysScrollableScrollPhysics เพื่อให้ pull to refresh ทำงานได้
+                  // แม้ content จะไม่เต็มหน้าจอ
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  itemCount: filteredNotifications.length,
+                  itemBuilder: (context, index) {
+                    final notification = filteredNotifications[index];
+                    return NotificationItem(
+                      notification: notification,
+                      onTap: () => _onNotificationTap(notification),
+                      onDismiss: () => _onNotificationDismiss(notification),
+                      onMarkAsRead: () => _onToggleReadStatus(notification),
+                    );
+                  },
+                ),
         );
       },
     );
   }
 
-  Widget _buildEmptyState(bool showAll) {
-    return EmptyStateWidget(
-      message: showAll ? 'ยังไม่มีการแจ้งเตือน' : 'ไม่มีการแจ้งเตือนที่ยังไม่อ่าน',
-      subMessage: showAll 
-          ? 'การแจ้งเตือนใหม่จะปรากฏที่นี่'
-          : 'คุณอ่านการแจ้งเตือนทั้งหมดแล้ว 🎉',
+  /// Empty state ที่ scrollable ได้ เพื่อให้ RefreshIndicator ทำงาน
+  Widget _buildEmptyStateScrollable(bool showAll) {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [
+        SizedBox(height: MediaQuery.of(context).size.height * 0.3),
+        EmptyStateWidget(
+          message: showAll ? 'ยังไม่มีการแจ้งเตือน' : 'ไม่มีการแจ้งเตือนที่ยังไม่อ่าน',
+          subMessage: showAll
+              ? 'การแจ้งเตือนใหม่จะปรากฏที่นี่'
+              : 'คุณอ่านการแจ้งเตือนทั้งหมดแล้ว 🎉',
+        ),
+      ],
     );
   }
+
 
   Widget _buildErrorState(String error) {
     return Center(

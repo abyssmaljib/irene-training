@@ -131,6 +131,9 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
           refreshPosts(ref);
         },
         child: CustomScrollView(
+          // เพิ่ม AlwaysScrollableScrollPhysics เพื่อให้ pull to refresh ทำงานได้
+          // แม้ content จะไม่เต็มหน้าจอ
+          physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
             // App Bar
             IreneAppBar(

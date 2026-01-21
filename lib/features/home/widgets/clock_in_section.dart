@@ -31,11 +31,6 @@ class ClockInSection extends StatelessWidget {
   final ValueChanged<Set<int>> onBreakTimesChanged;
   final bool isLoadingBreakTimes;
 
-  // Dev mode
-  final bool devMode;
-  final String? devCurrentShift;
-  final ValueChanged<String>? onDevShiftChanged;
-
   final VoidCallback onClockIn;
   final bool isClockingIn;
 
@@ -56,9 +51,6 @@ class ClockInSection extends StatelessWidget {
     this.currentUserName,
     required this.onBreakTimesChanged,
     this.isLoadingBreakTimes = false,
-    this.devMode = false,
-    this.devCurrentShift,
-    this.onDevShiftChanged,
     required this.onClockIn,
     this.isClockingIn = false,
   });
@@ -143,9 +135,6 @@ class ClockInSection extends StatelessWidget {
           currentUserName: currentUserName,
           onChanged: onBreakTimesChanged,
           isLoading: isLoadingBreakTimes,
-          devMode: devMode,
-          devCurrentShift: devCurrentShift,
-          onDevShiftChanged: onDevShiftChanged,
         ),
 
         AppSpacing.verticalGapXl,
@@ -187,10 +176,9 @@ class ClockInSection extends StatelessWidget {
   }
 
   bool get _canClockIn =>
-      devMode || // Dev mode: always allow clock in
-      (selectedZoneIds.isNotEmpty &&
+      selectedZoneIds.isNotEmpty &&
       selectedResidentIds.isNotEmpty &&
-      _hasSelectedAllBreakTimeGroups);
+      _hasSelectedAllBreakTimeGroups;
 
   String _getValidationMessage() {
     final missing = <String>[];

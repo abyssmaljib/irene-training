@@ -6,15 +6,19 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/irene_app_bar.dart';
+import '../../../core/widgets/confirm_dialog.dart';
 import '../models/post.dart';
 import '../providers/edit_post_provider.dart';
 import '../providers/post_provider.dart';
+import '../providers/tag_provider.dart';
 import '../services/post_action_service.dart';
 import '../services/post_media_service.dart';
 import '../widgets/image_picker_bar.dart' show ImagePickerHelper;
 import '../widgets/image_preview_grid.dart';
 import '../widgets/edit_ai_summary_widget.dart';
 import '../widgets/edit_quiz_form_widget.dart';
+import '../widgets/tag_picker_widget.dart';
+import '../widgets/resident_picker_widget.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 /// Advanced Edit Post Screen - Full page version for editing posts with title/quiz
@@ -40,12 +44,20 @@ class _AdvancedEditPostScreenState
   final _formKey = GlobalKey<FormState>();
   bool _isSubmitting = false;
 
+  // เก็บค่าเริ่มต้นเพื่อเปรียบเทียบว่ามีการแก้ไขหรือไม่
+  String _initialText = '';
+  String _initialTitle = '';
+
   @override
   void initState() {
     super.initState();
     // Initialize controllers with existing post data
     _titleController.text = widget.post.title ?? '';
     _textController.text = widget.post.text ?? '';
+
+    // เก็บค่าเริ่มต้น
+    _initialText = widget.post.text ?? '';
+    _initialTitle = widget.post.title ?? '';
 
     // Initialize provider state
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -60,6 +72,45 @@ class _AdvancedEditPostScreenState
     _titleController.dispose();
     _textController.dispose();
     super.dispose();
+  }
+
+  // ============================================================
+  // Unsaved Changes Detection
+  // ============================================================
+
+  /// ตรวจสอบว่ามีการแก้ไขหรือไม่
+  bool _hasUnsavedChanges() {
+    final state = ref.read(editPostProvider(widget.post.id));
+
+    // เช็คว่า text หรือ title เปลี่ยนไหม
+    final textChanged = _textController.text != _initialText;
+    final titleChanged = _titleController.text != _initialTitle;
+
+    // เช็คว่ามีการเปลี่ยนแปลงใน state (รูป, tag, resident, handover)
+    final stateChanged = state.hasTagChanged ||
+        state.hasResidentChanged ||
+        state.newImages.isNotEmpty ||
+        state.removedExistingIndexes.isNotEmpty ||
+        state.isHandover != widget.post.isHandover;
+
+    return textChanged || titleChanged || stateChanged;
+  }
+
+  /// จัดการเมื่อ user พยายามปิด screen
+  /// ใช้ ConfirmDialog.show() จาก reusable widget
+  Future<bool> _handleCloseAttempt() async {
+    if (!_hasUnsavedChanges()) return true;
+
+    // ใช้ ConfirmDialog.show() กับ exitEdit preset
+    final confirmed = await ConfirmDialog.show(
+      context,
+      type: ConfirmDialogType.exitEdit,
+      barrierDismissible: false,
+    );
+
+    // confirmed = true หมายถึง user กด "ยกเลิกการแก้ไข" (ปิด screen)
+    // confirmed = false หมายถึง user กด "กลับไปแก้ไข" (ไม่ปิด)
+    return confirmed;
   }
 
   Future<void> _pickFromCamera() async {
@@ -115,7 +166,26 @@ class _AdvancedEditPostScreenState
         finalImageUrls.addAll(uploadedUrls);
       }
 
-      // Update post with quiz fields
+      // เตรียมข้อมูล tag และ resident (ถ้ามีการเปลี่ยนแปลง)
+      // tag: ส่งชื่อ tag ใหม่ ถ้ามีการเปลี่ยนแปลง
+      String? tagName;
+      if (state.hasTagChanged && state.selectedTag != null) {
+        tagName = state.selectedTag!.name;
+      }
+
+      // resident: ส่ง -1 ถ้าลบ resident, ส่ง id ใหม่ ถ้าเปลี่ยน, null ถ้าไม่เปลี่ยน
+      int? residentId;
+      if (state.hasResidentChanged) {
+        residentId = state.residentId ?? -1; // -1 = ลบ resident
+      }
+
+      // is_handover: ส่งค่าใหม่ถ้ามีการเปลี่ยนแปลง
+      bool? isHandover;
+      if (state.isHandover != widget.post.isHandover) {
+        isHandover = state.isHandover;
+      }
+
+      // Update post with quiz fields and tag/resident
       final success = await PostActionService.instance.updatePost(
         postId: widget.post.id,
         text: text,
@@ -130,6 +200,10 @@ class _AdvancedEditPostScreenState
         qaChoiceB: state.qaChoiceB,
         qaChoiceC: state.qaChoiceC,
         qaAnswer: state.qaAnswer,
+        // Tag and Resident updates (for shift leader+)
+        tagName: tagName,
+        residentId: residentId,
+        isHandover: isHandover,
       );
 
       if (success) {
@@ -164,7 +238,17 @@ class _AdvancedEditPostScreenState
   Widget build(BuildContext context) {
     final state = ref.watch(editPostProvider(widget.post.id));
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+
+        final shouldClose = await _handleCloseAttempt();
+        if (shouldClose && context.mounted) {
+          Navigator.of(context).pop();
+        }
+      },
+      child: Scaffold(
       backgroundColor: AppColors.surface,
       appBar: IreneSecondaryAppBar(
         title: 'แก้ไขโพส',
@@ -301,6 +385,7 @@ class _AdvancedEditPostScreenState
         ),
       ),
       bottomNavigationBar: _buildBottomBar(state),
+    ),
     );
   }
 
@@ -434,7 +519,30 @@ class _AdvancedEditPostScreenState
     );
   }
 
+  /// สร้าง section แสดง/แก้ไข tag และ resident
+  /// ถ้า user เป็นหัวหน้าเวรขึ้นไป (level >= 30) = แก้ไขได้
+  /// ถ้าไม่ใช่ = แสดงเป็น read-only
   Widget _buildReadOnlyInfo() {
+    final state = ref.watch(editPostProvider(widget.post.id));
+    final isShiftLeaderAsync = ref.watch(isAtLeastShiftLeaderProvider);
+
+    return isShiftLeaderAsync.when(
+      data: (isShiftLeader) {
+        if (isShiftLeader) {
+          // หัวหน้าเวรขึ้นไป: แสดง pickers ให้แก้ไขได้
+          return _buildEditableTagResident(state);
+        } else {
+          // พนักงานทั่วไป: แสดงแบบ read-only
+          return _buildReadOnlyTagResident();
+        }
+      },
+      loading: () => _buildReadOnlyTagResident(),
+      error: (_, _) => _buildReadOnlyTagResident(),
+    );
+  }
+
+  /// Widget แสดง tag/resident แบบ read-only (สำหรับพนักงานทั่วไป)
+  Widget _buildReadOnlyTagResident() {
     final hasTag =
         widget.post.postTags.isNotEmpty || widget.post.postTagsString != null;
     final hasResident = widget.post.residentName != null &&
@@ -512,6 +620,178 @@ class _AdvancedEditPostScreenState
                   ),
                 ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Widget แสดง tag/resident แบบ editable (สำหรับหัวหน้าเวรขึ้นไป)
+  Widget _buildEditableTagResident(EditPostState state) {
+    final tagsAsync = ref.watch(tagsProvider);
+
+    // หา tag จาก name ถ้ายังไม่มี selectedTag แต่มี originalTagName
+    if (state.selectedTag == null && state.originalTagName != null) {
+      tagsAsync.whenData((tags) {
+        final matchingTag = tags.where(
+          (t) => t.name == state.originalTagName,
+        ).firstOrNull;
+        if (matchingTag != null) {
+          // ใช้ addPostFrameCallback เพื่อหลีกเลี่ยงการ update state ระหว่าง build
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            ref.read(editPostProvider(widget.post.id).notifier)
+                .setSelectedTag(matchingTag);
+          });
+        }
+      });
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header with edit icon
+          Row(
+            children: [
+              HugeIcon(
+                icon: HugeIcons.strokeRoundedEdit02,
+                size: AppIconSize.sm,
+                color: AppColors.primary,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'แก้ไขหัวข้อและผู้พักอาศัย',
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          AppSpacing.verticalGapSm,
+
+          // Tag and Resident pickers
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              // Tag Picker
+              TagPickerCompact(
+                selectedTag: state.selectedTag,
+                isHandover: state.isHandover,
+                onTagSelected: (tag) {
+                  ref.read(editPostProvider(widget.post.id).notifier).setTag(tag);
+                },
+                onTagCleared: () {
+                  ref.read(editPostProvider(widget.post.id).notifier).clearTag();
+                },
+                onHandoverChanged: (value) {
+                  ref.read(editPostProvider(widget.post.id).notifier).setHandover(value);
+                },
+              ),
+
+              // Resident Picker
+              ResidentPickerWidget(
+                selectedResidentId: state.residentId,
+                selectedResidentName: state.residentName,
+                onResidentSelected: (id, name) {
+                  ref.read(editPostProvider(widget.post.id).notifier).setResident(id, name);
+                },
+                onResidentCleared: () {
+                  ref.read(editPostProvider(widget.post.id).notifier).clearResident();
+                },
+              ),
+            ],
+          ),
+
+          // Handover toggle (แสดงเมื่อเลือก tag แล้ว)
+          if (state.selectedTag != null) ...[
+            AppSpacing.verticalGapMd,
+            _buildHandoverToggle(state),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Toggle สำหรับส่งเวร
+  Widget _buildHandoverToggle(EditPostState state) {
+    final canToggle = state.selectedTag?.isOptionalHandover ?? false;
+    final isForce = state.selectedTag?.isForceHandover ?? false;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: state.isHandover ? AppColors.tagPassedBg : AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: state.isHandover ? AppColors.success : AppColors.alternate,
+        ),
+      ),
+      child: Row(
+        children: [
+          // Icon
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: state.isHandover
+                  ? AppColors.success.withValues(alpha: 0.1)
+                  : AppColors.alternate.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: HugeIcon(
+              icon: HugeIcons.strokeRoundedArrowLeftRight,
+              color: state.isHandover ? AppColors.success : AppColors.secondaryText,
+              size: AppIconSize.lg,
+            ),
+          ),
+          const SizedBox(width: 12),
+
+          // Text
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'ส่งเวร',
+                  style: AppTypography.body.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: state.isHandover ? AppColors.success : AppColors.primaryText,
+                  ),
+                ),
+                Text(
+                  isForce
+                      ? 'จำเป็นต้องส่งเวรสำหรับหัวข้อนี้'
+                      : 'เลือกส่งเวรถ้าเรื่องนี้สำคัญ',
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.secondaryText,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Switch
+          Switch(
+            value: state.isHandover,
+            onChanged: canToggle
+                ? (value) {
+                    ref.read(editPostProvider(widget.post.id).notifier).setHandover(value);
+                  }
+                : null,
+            activeTrackColor: AppColors.success.withValues(alpha: 0.5),
+            thumbColor: WidgetStateProperty.resolveWith((states) {
+              if (states.contains(WidgetState.selected)) {
+                return AppColors.success;
+              }
+              return AppColors.secondaryText;
+            }),
           ),
         ],
       ),

@@ -17,11 +17,6 @@ class BreakTimeSelector extends StatelessWidget {
   final ValueChanged<Set<int>> onChanged;
   final bool isLoading;
 
-  // Dev mode props
-  final bool devMode;
-  final String? devCurrentShift; // เวรปัจจุบันที่กำลังแสดง
-  final ValueChanged<String>? onDevShiftChanged;
-
   const BreakTimeSelector({
     super.key,
     required this.breakTimeOptions,
@@ -30,9 +25,6 @@ class BreakTimeSelector extends StatelessWidget {
     this.currentUserName,
     required this.onChanged,
     this.isLoading = false,
-    this.devMode = false,
-    this.devCurrentShift,
-    this.onDevShiftChanged,
   });
 
   @override
@@ -84,11 +76,6 @@ class BreakTimeSelector extends StatelessWidget {
         AppSpacing.verticalGapSm,
         // Legend
         _buildLegend(),
-        // Dev mode: shift toggle
-        if (devMode && onDevShiftChanged != null) ...[
-          AppSpacing.verticalGapSm,
-          _buildDevShiftToggle(),
-        ],
         AppSpacing.verticalGapMd,
 
         if (isLoading)
@@ -224,49 +211,6 @@ class BreakTimeSelector extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildDevShiftToggle() {
-    final isMorning = devCurrentShift == 'เวรเช้า';
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.purple.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.purple.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        children: [
-          HugeIcon(icon: HugeIcons.strokeRoundedSourceCode, size: AppIconSize.sm, color: Colors.purple),
-          const SizedBox(width: 8),
-          Text(
-            'DEV:',
-            style: AppTypography.caption.copyWith(
-              color: Colors.purple,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Row(
-              children: [
-                _ShiftToggleButton(
-                  label: 'เวรเช้า',
-                  isSelected: isMorning,
-                  onTap: () => onDevShiftChanged?.call('เวรเช้า'),
-                ),
-                const SizedBox(width: 8),
-                _ShiftToggleButton(
-                  label: 'เวรดึก',
-                  isSelected: !isMorning,
-                  onTap: () => onDevShiftChanged?.call('เวรดึก'),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -468,44 +412,6 @@ class _BreakTimeRow extends StatelessWidget {
                 ],
               ],
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// ปุ่มสลับเวร (dev mode)
-class _ShiftToggleButton extends StatelessWidget {
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _ShiftToggleButton({
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.purple : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected ? Colors.purple : Colors.purple.withValues(alpha: 0.5),
-          ),
-        ),
-        child: Text(
-          label,
-          style: AppTypography.caption.copyWith(
-            color: isSelected ? Colors.white : Colors.purple,
-            fontWeight: FontWeight.w500,
           ),
         ),
       ),

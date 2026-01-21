@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -32,20 +33,28 @@ import '../widgets/tarot_core_value_card.dart';
 import '../../dd_handover/widgets/dd_summary_card.dart';
 import '../../dd_handover/screens/dd_list_screen.dart';
 import '../../dd_handover/services/dd_service.dart';
+import '../../incident_reflection/widgets/incident_summary_card.dart';
+import '../../incident_reflection/screens/incident_list_screen.dart';
+import '../../incident_reflection/screens/incident_chat_screen.dart';
+import '../../incident_reflection/models/incident.dart';
+import '../../incident_reflection/providers/incident_provider.dart';
+import '../../dd_handover/providers/dd_provider.dart';
 import '../services/clock_realtime_service.dart';
 import '../../../main.dart' show globalRefreshNotifier;
 // NOTE: Tutorial feature ถูกซ่อนไว้ชั่วคราว
 // import '../../onboarding/widgets/replay_tutorial_button.dart';
 
 /// หน้าหลัก - Dashboard with Clock-in/Clock-out
-class HomeScreen extends StatefulWidget {
+/// ใช้ ConsumerStatefulWidget เพื่อให้ pull to refresh สามารถ invalidate
+/// Riverpod providers (DDSummaryCard, IncidentSummaryCard) ได้
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen> {
   final _zoneService = ZoneService();
   final _homeService = HomeService.instance;
   final _clockService = ClockService.instance;
@@ -75,10 +84,6 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoadingResidents = false;
   bool _isLoadingBreakTimes = false;
 
-  // Dev mode: สลับเวรสำหรับดูเวลาพัก และ skip validations
-  final bool _devMode = false; // production mode
-  String? _devShiftOverride; // null = ใช้เวลาจริง, 'เวรเช้า' หรือ 'เวรดึก'
-
   // Dashboard stats
   double _learningProgress = 0.0;
   int _topicsNotTested = 0;
@@ -102,10 +107,9 @@ class _HomeScreenState extends State<HomeScreen> {
   TarotCard? _selectedTarotCard;
 
   bool get _isClockedIn => _currentShift?.isClockedIn ?? false;
-  bool get _canClockOut => _devMode || _remainingTasksCount == 0;
+  bool get _canClockOut => _remainingTasksCount == 0;
 
   String? get _clockOutDisabledReason {
-    if (_devMode) return null; // Dev mode: ไม่แสดง reason
     final reasons = <String>[];
     if (_remainingTasksCount > 0) {
       reasons.add('$_remainingTasksCount งานค้าง');
@@ -311,13 +315,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadBreakTimeOptions() async {
     setState(() => _isLoadingBreakTimes = true);
 
-    // Dev mode: ใช้ shift ที่กำหนดแทนเวลาจริง
-    List<BreakTimeOption> options;
-    if (_devMode && _devShiftOverride != null) {
-      options = await _clockService.getBreakTimeOptions(shift: _devShiftOverride);
-    } else {
-      options = await _clockService.getBreakTimeOptionsForCurrentShift();
-    }
+    final options = await _clockService.getBreakTimeOptionsForCurrentShift();
 
     if (mounted) {
       setState(() {
@@ -379,32 +377,28 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _handleClockIn() async {
-    // Dev mode: skip validation - ใช้ค่าที่เลือกหรือค่าว่าง
-    if (!_devMode) {
-      if (_selectedZoneIds.isEmpty ||
-          _selectedResidentIds.isEmpty ||
-          _selectedBreakTimeIds.isEmpty) {
-        return;
-      }
+    // Validation: ต้องเลือกครบทุก field
+    if (_selectedZoneIds.isEmpty ||
+        _selectedResidentIds.isEmpty ||
+        _selectedBreakTimeIds.isEmpty) {
+      return;
     }
 
     // ตรวจสอบ occupied residents อีกครั้งก่อนขึ้นเวร (ป้องกัน race condition)
-    if (!_devMode) {
-      final latestOccupiedIds = await _clockService.getOccupiedResidentIds();
-      final conflictIds = _selectedResidentIds.intersection(latestOccupiedIds);
-      if (conflictIds.isNotEmpty) {
-        // มี resident ที่ถูกเลือกไปแล้ว → refresh และแจ้งเตือน
-        await _loadResidentsByZones();
-        await _loadOccupiedBreakTimes();
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('มีคนไข้ที่เพื่อนเลือกไปแล้ว กรุณาเลือกใหม่'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-        return;
-      }
+    final latestOccupiedIds = await _clockService.getOccupiedResidentIds();
+    final conflictIds = _selectedResidentIds.intersection(latestOccupiedIds);
+    if (conflictIds.isNotEmpty) {
+      // มี resident ที่ถูกเลือกไปแล้ว → refresh และแจ้งเตือน
+      await _loadResidentsByZones();
+      await _loadOccupiedBreakTimes();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('มีคนไข้ที่เพื่อนเลือกไปแล้ว กรุณาเลือกใหม่'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
     }
 
     // แสดงหน้าไพ่ทาโร่ก่อนขึ้นเวร
@@ -451,13 +445,25 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _handleClockOut() async {
     if (_currentShift == null || _currentShift!.id == null) return;
 
+    // ดึง userId และ nursinghomeId สำหรับเช็ค incidents
+    final userId = _userService.effectiveUserId;
+    final nursinghomeId = await _userService.getNursinghomeId();
+
+    if (userId == null || nursinghomeId == null) {
+      debugPrint('_handleClockOut: userId or nursinghomeId is null');
+      return;
+    }
+
+    if (!mounted) return;
+
     final result = await ClockOutDialog.show(
       context,
       clockRecordId: _currentShift!.id!,
       shift: _currentShift!.shift,
       residentIds: _currentShift!.selectedResidentIdList,
       clockInTime: _currentShift!.clockInTimestamp,
-      devMode: _devMode, // ส่ง dev mode เพื่อ skip checks
+      userId: userId,
+      nursinghomeId: nursinghomeId,
       onCreateHandover: () {
         // Navigate to create post screen with handover flag
         MainNavigationScreen.navigateToTab(context, 3); // Board tab
@@ -500,6 +506,31 @@ class _HomeScreenState extends State<HomeScreen> {
           }
         });
       },
+      onViewIncidents: (Incident incident) {
+        debugPrint('onViewIncidents called! incident: ${incident.id}');
+        // Navigate ไปหน้า chat ของ incident โดยตรง
+        // ใช้ Future.delayed เล็กน้อยเพื่อให้ dialog ปิดเสร็จก่อน แล้วค่อย navigate
+        Future.delayed(const Duration(milliseconds: 100), () {
+          if (mounted) {
+            debugPrint('Navigating to IncidentChatScreen...');
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => IncidentChatScreen(incident: incident),
+              ),
+            ).then((_) {
+              // หลังจากกลับมาจากหน้า chat ให้เปิด clock out dialog อีกครั้ง
+              // เพื่อให้ user ลงเวรต่อได้ (ถ้าเคลียร์ incidents ครบแล้ว)
+              if (mounted) {
+                debugPrint('Back from chat, re-opening clock out dialog...');
+                _handleClockOut();
+              }
+            });
+          } else {
+            debugPrint('Widget not mounted, cannot navigate');
+          }
+        });
+      },
     );
 
     if (result == true && mounted) {
@@ -523,14 +554,25 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: AppColors.background,
       body: RefreshIndicator(
         onRefresh: () async {
+          // 1. Invalidate ALL service caches
+          // เพื่อให้ทุก service โหลดข้อมูลใหม่จาก server
           _homeService.invalidateCache();
           _clockService.invalidateCache();
+          DDService.instance.invalidateCache();
+
+          // 2. Invalidate Riverpod providers
+          // สำหรับ widgets ที่ใช้ Riverpod (DDSummaryCard, IncidentSummaryCard)
+          ref.invalidate(ddRecordsProvider);
+          ref.invalidate(myIncidentsProvider);
+
+          // 3. Reload ALL data รวมถึง MonthlySummary
           await Future.wait([
             _loadZones(),
             _loadCurrentShift(forceRefresh: true),
             _loadDashboardStats(),
             _loadBreakTimeOptions(),
             _loadOccupiedBreakTimes(),
+            _loadMonthlySummary(), // เพิ่มเพื่อให้ MonthlySummaryCard refresh ด้วย
           ]);
         },
         color: AppColors.primary,
@@ -632,6 +674,17 @@ class _HomeScreenState extends State<HomeScreen> {
             );
           },
         ),
+        AppSpacing.verticalGapMd,
+
+        // Incident Reflection Summary Card (Shortcut ไปหน้าถอดบทเรียน)
+        IncidentSummaryCard(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const IncidentListScreen()),
+            );
+          },
+        ),
 
         // Clock In Section
         ClockInSection(
@@ -650,22 +703,11 @@ class _HomeScreenState extends State<HomeScreen> {
           currentUserName: _currentUserName,
           onBreakTimesChanged: (ids) => setState(() => _selectedBreakTimeIds = ids),
           isLoadingBreakTimes: _isLoadingBreakTimes,
-          devMode: _devMode,
-          devCurrentShift: _devShiftOverride ?? _clockService.getCurrentShiftType(),
-          onDevShiftChanged: _handleDevShiftChanged,
           onClockIn: _handleClockIn,
           isClockingIn: _isClockingIn,
         ),
       ],
     );
-  }
-
-  void _handleDevShiftChanged(String shift) {
-    setState(() {
-      _devShiftOverride = shift;
-      _selectedBreakTimeIds = {}; // Reset selection เมื่อเปลี่ยนเวร
-    });
-    _loadBreakTimeOptions();
   }
 
   Widget _buildOnShiftContent() {
@@ -676,6 +718,18 @@ class _HomeScreenState extends State<HomeScreen> {
           TarotCoreValueCard(card: _selectedTarotCard!),
           AppSpacing.verticalGapMd,
         ],
+
+        // Incident Reflection Summary Card - แสดงทั้งตอนขึ้นเวรและลงเวร
+        // Card มี margin bottom ของตัวเอง ไม่ต้องเพิ่ม gap
+        IncidentSummaryCard(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const IncidentListScreen()),
+            );
+          },
+        ),
+
         OnShiftCard(
           currentShift: _currentShift!,
           zones: _zones,

@@ -6,13 +6,21 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/widgets/confirm_dialog.dart';
 import '../models/post.dart';
 import '../providers/edit_post_provider.dart';
 import '../providers/post_provider.dart';
+import '../providers/tag_provider.dart';
 import '../services/post_media_service.dart';
 import '../screens/advanced_edit_post_screen.dart';
 import 'image_picker_bar.dart';
 import 'create_post_bottom_sheet.dart' show navigateToAdvancedPostScreen;
+import 'tag_picker_widget.dart';
+import 'resident_picker_widget.dart';
+
+// ============================================================
+// Edit Post Bottom Sheet - พร้อม confirmation ก่อนปิด
+// ============================================================
 
 /// Bottom Sheet สำหรับแก้ไขโพส (พื้นฐาน)
 class EditPostBottomSheet extends ConsumerStatefulWidget {
@@ -37,6 +45,10 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
   final _titleController = TextEditingController();
   bool _isUploading = false;
 
+  // เก็บค่าเริ่มต้นเพื่อเปรียบเทียบว่ามีการแก้ไขหรือไม่
+  String _initialText = '';
+  String _initialTitle = '';
+
   @override
   void initState() {
     super.initState();
@@ -44,6 +56,10 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
     // Initialize controllers with existing post data
     _textController.text = widget.post.text ?? '';
     _titleController.text = widget.post.title ?? '';
+
+    // เก็บค่าเริ่มต้น
+    _initialText = widget.post.text ?? '';
+    _initialTitle = widget.post.title ?? '';
 
     // Initialize provider state
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -60,6 +76,45 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
     super.dispose();
   }
 
+  // ============================================================
+  // Unsaved Changes Detection
+  // ============================================================
+
+  /// ตรวจสอบว่ามีการแก้ไขหรือไม่
+  bool _hasUnsavedChanges() {
+    final state = ref.read(editPostProvider(widget.post.id));
+
+    // เช็คว่า text หรือ title เปลี่ยนไหม
+    final textChanged = _textController.text != _initialText;
+    final titleChanged = _titleController.text != _initialTitle;
+
+    // เช็คว่ามีการเปลี่ยนแปลงใน state (รูป, tag, resident, handover)
+    final stateChanged = state.hasTagChanged ||
+        state.hasResidentChanged ||
+        state.newImages.isNotEmpty ||
+        state.removedExistingIndexes.isNotEmpty ||
+        state.isHandover != widget.post.isHandover;
+
+    return textChanged || titleChanged || stateChanged;
+  }
+
+  /// จัดการเมื่อ user พยายามปิด modal
+  /// ใช้ ConfirmDialog.show() จาก reusable widget
+  Future<bool> _handleCloseAttempt() async {
+    if (!_hasUnsavedChanges()) return true;
+
+    // ใช้ ConfirmDialog.show() กับ exitEdit preset
+    final confirmed = await ConfirmDialog.show(
+      context,
+      type: ConfirmDialogType.exitEdit,
+      barrierDismissible: false,
+    );
+
+    // confirmed = true หมายถึง user กด "ยกเลิกการแก้ไข" (ปิด modal)
+    // confirmed = false หมายถึง user กด "กลับไปแก้ไข" (ไม่ปิด)
+    return confirmed;
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(editPostProvider(widget.post.id));
@@ -73,18 +128,7 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Handle bar
-            Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(top: 12),
-              decoration: BoxDecoration(
-                color: AppColors.alternate,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-
-            // Header
+            // Header พร้อมปุ่มกากบาทปิด
             _buildHeader(),
 
             // Content
@@ -141,7 +185,7 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
 
   Widget _buildHeader() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+      padding: const EdgeInsets.fromLTRB(16, 16, 8, 8),
       child: Row(
         children: [
           Text(
@@ -170,6 +214,22 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
                 textStyle: AppTypography.bodySmall,
               ),
             ),
+
+          // ปุ่มกากบาทปิด modal
+          IconButton(
+            onPressed: () async {
+              final shouldClose = await _handleCloseAttempt();
+              if (shouldClose && mounted) {
+                Navigator.of(context).pop();
+              }
+            },
+            icon: HugeIcon(
+              icon: HugeIcons.strokeRoundedCancel01,
+              color: AppColors.secondaryText,
+              size: AppIconSize.lg,
+            ),
+            tooltip: 'ปิด',
+          ),
         ],
       ),
     );
@@ -253,7 +313,30 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
     );
   }
 
+  /// สร้าง section แสดง/แก้ไข tag และ resident
+  /// ถ้า user เป็นหัวหน้าเวรขึ้นไป (level >= 30) = แก้ไขได้
+  /// ถ้าไม่ใช่ = แสดงเป็น read-only
   Widget _buildReadOnlyInfo() {
+    final state = ref.watch(editPostProvider(widget.post.id));
+    final isShiftLeaderAsync = ref.watch(isAtLeastShiftLeaderProvider);
+
+    return isShiftLeaderAsync.when(
+      data: (isShiftLeader) {
+        if (isShiftLeader) {
+          // หัวหน้าเวรขึ้นไป: แสดง pickers ให้แก้ไขได้
+          return _buildEditableTagResident(state);
+        } else {
+          // พนักงานทั่วไป: แสดงแบบ read-only
+          return _buildReadOnlyTagResident();
+        }
+      },
+      loading: () => _buildReadOnlyTagResident(),
+      error: (_, _) => _buildReadOnlyTagResident(),
+    );
+  }
+
+  /// Widget แสดง tag/resident แบบ read-only (สำหรับพนักงานทั่วไป)
+  Widget _buildReadOnlyTagResident() {
     final hasTag =
         widget.post.postTags.isNotEmpty || widget.post.postTagsString != null;
     final hasResident =
@@ -334,6 +417,157 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
           ),
         ],
       ),
+    );
+  }
+
+  /// Widget แสดง tag/resident แบบ editable (สำหรับหัวหน้าเวรขึ้นไป)
+  Widget _buildEditableTagResident(EditPostState state) {
+    final tagsAsync = ref.watch(tagsProvider);
+
+    // หา tag จาก name ถ้ายังไม่มี selectedTag แต่มี originalTagName
+    if (state.selectedTag == null && state.originalTagName != null) {
+      tagsAsync.whenData((tags) {
+        final matchingTag = tags.where(
+          (t) => t.name == state.originalTagName,
+        ).firstOrNull;
+        if (matchingTag != null) {
+          // ใช้ addPostFrameCallback เพื่อหลีกเลี่ยงการ update state ระหว่าง build
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            ref.read(editPostProvider(widget.post.id).notifier)
+                .setSelectedTag(matchingTag);
+          });
+        }
+      });
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header with edit icon
+          Row(
+            children: [
+              HugeIcon(
+                icon: HugeIcons.strokeRoundedEdit02,
+                size: AppIconSize.sm,
+                color: AppColors.primary,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'แก้ไขหัวข้อและผู้พักอาศัย',
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          AppSpacing.verticalGapSm,
+
+          // Tag and Resident pickers
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              // Tag Picker
+              TagPickerCompact(
+                selectedTag: state.selectedTag,
+                isHandover: state.isHandover,
+                onTagSelected: (tag) {
+                  ref.read(editPostProvider(widget.post.id).notifier).setTag(tag);
+                },
+                onTagCleared: () {
+                  ref.read(editPostProvider(widget.post.id).notifier).clearTag();
+                },
+                onHandoverChanged: (value) {
+                  ref.read(editPostProvider(widget.post.id).notifier).setHandover(value);
+                },
+              ),
+
+              // Resident Picker
+              ResidentPickerWidget(
+                selectedResidentId: state.residentId,
+                selectedResidentName: state.residentName,
+                onResidentSelected: (id, name) {
+                  ref.read(editPostProvider(widget.post.id).notifier).setResident(id, name);
+                },
+                onResidentCleared: () {
+                  ref.read(editPostProvider(widget.post.id).notifier).clearResident();
+                },
+              ),
+            ],
+          ),
+
+          // Handover toggle (แสดงเมื่อเลือก tag แล้ว)
+          if (state.selectedTag != null) ...[
+            AppSpacing.verticalGapSm,
+            _buildHandoverToggle(state),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Toggle สำหรับส่งเวร
+  Widget _buildHandoverToggle(EditPostState state) {
+    final canToggle = state.selectedTag?.isOptionalHandover ?? false;
+    final isForce = state.selectedTag?.isForceHandover ?? false;
+
+    return Row(
+      children: [
+        // Icon
+        HugeIcon(
+          icon: HugeIcons.strokeRoundedArrowLeftRight,
+          color: state.isHandover ? AppColors.success : AppColors.secondaryText,
+          size: AppIconSize.md,
+        ),
+        const SizedBox(width: 8),
+
+        // Text
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'ส่งเวร',
+                style: AppTypography.bodySmall.copyWith(
+                  fontWeight: FontWeight.w500,
+                  color: state.isHandover ? AppColors.success : AppColors.primaryText,
+                ),
+              ),
+              Text(
+                isForce ? 'บังคับส่งเวร' : 'เลือกส่งเวร',
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.secondaryText,
+                  fontSize: 10,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Switch
+        Switch(
+          value: state.isHandover,
+          onChanged: canToggle
+              ? (value) {
+                  ref.read(editPostProvider(widget.post.id).notifier).setHandover(value);
+                }
+              : null,
+          activeTrackColor: AppColors.success.withValues(alpha: 0.5),
+          thumbColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return AppColors.success;
+            }
+            return AppColors.secondaryText;
+          }),
+        ),
+      ],
     );
   }
 
@@ -688,6 +922,25 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
         setState(() => _isUploading = false);
       }
 
+      // เตรียมข้อมูล tag และ resident (ถ้ามีการเปลี่ยนแปลง)
+      // tag: ส่งชื่อ tag ใหม่ ถ้ามีการเปลี่ยนแปลง
+      String? tagName;
+      if (state.hasTagChanged && state.selectedTag != null) {
+        tagName = state.selectedTag!.name;
+      }
+
+      // resident: ส่ง -1 ถ้าลบ resident, ส่ง id ใหม่ ถ้าเปลี่ยน, null ถ้าไม่เปลี่ยน
+      int? residentId;
+      if (state.hasResidentChanged) {
+        residentId = state.residentId ?? -1; // -1 = ลบ resident
+      }
+
+      // is_handover: ส่งค่าใหม่ถ้ามีการเปลี่ยนแปลง
+      bool? isHandover;
+      if (state.isHandover != widget.post.isHandover) {
+        isHandover = state.isHandover;
+      }
+
       // Update post
       final success = await actionService.updatePost(
         postId: widget.post.id,
@@ -696,6 +949,10 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
             ? null
             : _titleController.text.trim(),
         multiImgUrl: finalImageUrls.isEmpty ? null : finalImageUrls,
+        // Tag and Resident updates (for shift leader+)
+        tagName: tagName,
+        residentId: residentId,
+        isHandover: isHandover,
       );
 
       if (success) {
@@ -730,6 +987,7 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
 }
 
 /// Helper function to show edit post bottom sheet
+/// ใช้ _EditPostBottomSheetWrapper เพื่อจัดการ back gesture
 void showEditPostBottomSheet(
   BuildContext context,
   Post post, {
@@ -740,17 +998,73 @@ void showEditPostBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (context) => DraggableScrollableSheet(
-      initialChildSize: 0.7,
-      minChildSize: 0.5,
-      maxChildSize: 0.9,
-      builder: (context, scrollController) => EditPostBottomSheet(
-        post: post,
-        onPostUpdated: onPostUpdated,
-        onAdvancedTap: onAdvancedTap,
-      ),
+    // ปิด drag - ใช้ปุ่มกากบาทแทน
+    enableDrag: false,
+    // isDismissible: false เพื่อป้องกัน tap outside ปิด modal
+    isDismissible: false,
+    builder: (context) => _EditPostBottomSheetWrapper(
+      post: post,
+      onPostUpdated: onPostUpdated,
+      onAdvancedTap: onAdvancedTap,
     ),
   );
+}
+
+/// Wrapper widget ที่จัดการ PopScope สำหรับ back gesture
+class _EditPostBottomSheetWrapper extends ConsumerStatefulWidget {
+  final Post post;
+  final VoidCallback? onPostUpdated;
+  final VoidCallback? onAdvancedTap;
+
+  const _EditPostBottomSheetWrapper({
+    required this.post,
+    this.onPostUpdated,
+    this.onAdvancedTap,
+  });
+
+  @override
+  ConsumerState<_EditPostBottomSheetWrapper> createState() =>
+      _EditPostBottomSheetWrapperState();
+}
+
+class _EditPostBottomSheetWrapperState
+    extends ConsumerState<_EditPostBottomSheetWrapper> {
+  final GlobalKey<_EditPostBottomSheetState> _sheetKey = GlobalKey();
+
+  @override
+  Widget build(BuildContext context) {
+    // คำนวณความสูงของ modal (70% ของหน้าจอ)
+    final screenHeight = MediaQuery.of(context).size.height;
+    final modalHeight = screenHeight * 0.7;
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+
+        final sheetState = _sheetKey.currentState;
+        if (sheetState != null) {
+          final shouldClose = await sheetState._handleCloseAttempt();
+          if (shouldClose && context.mounted) {
+            Navigator.of(context).pop();
+          }
+        } else {
+          if (context.mounted) {
+            Navigator.of(context).pop();
+          }
+        }
+      },
+      child: SizedBox(
+        height: modalHeight,
+        child: EditPostBottomSheet(
+          key: _sheetKey,
+          post: widget.post,
+          onPostUpdated: widget.onPostUpdated,
+          onAdvancedTap: widget.onAdvancedTap,
+        ),
+      ),
+    );
+  }
 }
 
 /// Navigate to advanced edit post screen (for posts with title/quiz)

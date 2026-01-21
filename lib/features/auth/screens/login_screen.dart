@@ -6,7 +6,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/input_fields.dart';
-import '../../navigation/screens/main_navigation_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -68,12 +67,9 @@ class _LoginScreenState extends State<LoginScreen> {
         password: _passwordController.text,
       );
 
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
-        );
-      }
+      // ไม่ต้อง Navigator.pushReplacement เพราะ AuthWrapper ใน main.dart
+      // จะ listen auth state change และ rebuild ไป MainNavigationScreen อัตโนมัติ
+      // การทำ navigation ซ้ำจะทำให้เกิด race condition และ UI แสดงผลผิดพลาด
     } on AuthException catch (e) {
       debugPrint('AuthException: ${e.message}');
       setState(() => _errorMessage = _getThaiErrorMessage(e.message));
@@ -136,12 +132,9 @@ class _LoginScreenState extends State<LoginScreen> {
         type: OtpType.email,
       );
 
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
-        );
-      }
+      // ไม่ต้อง Navigator.pushReplacement เพราะ AuthWrapper ใน main.dart
+      // จะ listen auth state change และ rebuild ไป MainNavigationScreen อัตโนมัติ
+      // การทำ navigation ซ้ำจะทำให้เกิด race condition และ UI แสดงผลผิดพลาด
     } on AuthException catch (e) {
       setState(() => _errorMessage = _getThaiErrorMessage(e.message));
     } catch (e) {

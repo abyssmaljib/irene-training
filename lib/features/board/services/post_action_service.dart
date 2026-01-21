@@ -199,6 +199,7 @@ class PostActionService {
   }
 
   /// Update post text/title and images
+  /// For shift leader+: also supports updating tag and resident
   Future<bool> updatePost({
     required int postId,
     String? text,
@@ -212,6 +213,10 @@ class PostActionService {
     String? qaChoiceB,
     String? qaChoiceC,
     String? qaAnswer,
+    // Tag and Resident fields (for shift leader+ editing)
+    String? tagName, // ถ้าส่งมา = เปลี่ยน tag, null = ไม่เปลี่ยน
+    int? residentId, // ถ้าส่ง -1 = ลบ resident, null = ไม่เปลี่ยน, >0 = เปลี่ยน
+    bool? isHandover,
   }) async {
     try {
       final updates = <String, dynamic>{
@@ -221,6 +226,18 @@ class PostActionService {
       if (title != null) updates['title'] = title;
       if (imgUrl != null) updates['imgUrl'] = imgUrl;
       if (multiImgUrl != null) updates['multi_img_url'] = multiImgUrl;
+
+      // Handle tag update (Tag_Topics is array of tag names)
+      if (tagName != null) {
+        updates['Tag_Topics'] = [tagName];
+        debugPrint('PostActionService: updating tag to $tagName');
+      }
+
+      // Handle handover flag update
+      if (isHandover != null) {
+        updates['is_handover'] = isHandover;
+        debugPrint('PostActionService: updating is_handover to $isHandover');
+      }
 
       // Handle quiz update/create
       final hasQuizData = qaQuestion != null &&
@@ -256,8 +273,26 @@ class PostActionService {
         }
       }
 
+      // Update the Post table
       await _supabase.from('Post').update(updates).eq('id', postId);
       debugPrint('PostActionService: updated post $postId');
+
+      // Handle resident update (uses Post_Resident_id junction table)
+      if (residentId != null) {
+        // ลบ resident เดิมก่อน
+        await _supabase.from('Post_Resident_id').delete().eq('Post_id', postId);
+        debugPrint('PostActionService: deleted existing resident links for post $postId');
+
+        // เพิ่ม resident ใหม่ (ถ้า residentId > 0)
+        if (residentId > 0) {
+          await _supabase.from('Post_Resident_id').insert({
+            'Post_id': postId,
+            'resident_id': residentId,
+          });
+          debugPrint('PostActionService: linked post $postId to resident $residentId');
+        }
+      }
+
       return true;
     } catch (e) {
       debugPrint('updatePost error: $e');

@@ -523,6 +523,9 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
 
         return ListView.builder(
           padding: EdgeInsets.all(AppSpacing.md),
+          // เพิ่ม AlwaysScrollableScrollPhysics เพื่อให้ pull to refresh ทำงานได้
+          // แม้ content จะไม่เต็มหน้าจอ
+          physics: const AlwaysScrollableScrollPhysics(),
           itemCount: tasks.length,
           itemBuilder: (context, index) {
             final task = tasks[index];
@@ -577,6 +580,9 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
 
         return ListView.builder(
           padding: EdgeInsets.all(AppSpacing.md),
+          // เพิ่ม AlwaysScrollableScrollPhysics เพื่อให้ pull to refresh ทำงานได้
+          // แม้ content จะไม่เต็มหน้าจอ
+          physics: const AlwaysScrollableScrollPhysics(),
           itemCount: sortedTimeBlocks.length,
           // Optimize: cache nearby items เพื่อลดการ rebuild เมื่อ scroll
           cacheExtent: 100,

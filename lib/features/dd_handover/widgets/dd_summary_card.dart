@@ -61,7 +61,7 @@ class _DDSummaryCardState extends ConsumerState<DDSummaryCard> {
 
   Widget _buildLoadingCard() {
     return Container(
-      margin: EdgeInsets.only(bottom: AppSpacing.md),
+      margin: EdgeInsets.only(bottom: AppSpacing.sm),
       padding: EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: _backgroundColor,
@@ -92,7 +92,7 @@ class _DDSummaryCardState extends ConsumerState<DDSummaryCard> {
     return GestureDetector(
       onTap: widget.onTap,
       child: Container(
-        margin: EdgeInsets.only(bottom: AppSpacing.md),
+        margin: EdgeInsets.only(bottom: AppSpacing.sm),
         decoration: BoxDecoration(
           color: _backgroundColor,
           boxShadow: const [

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,10 +10,14 @@ import 'package:video_thumbnail/video_thumbnail.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/providers/shared_preferences_provider.dart';
+import '../../../core/widgets/confirm_dialog.dart';
 import '../models/new_tag.dart';
+import '../models/post_draft.dart';
 import '../providers/create_post_provider.dart';
 import '../providers/post_provider.dart';
 import '../providers/tag_provider.dart';
+import '../services/post_draft_service.dart';
 import '../../checklist/services/task_service.dart';
 import '../../checklist/providers/task_provider.dart' show refreshTasks;
 import 'tag_picker_widget.dart';
@@ -60,6 +66,13 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
   final _focusNode = FocusNode();
   bool _isUploading = false;
 
+  // Draft auto-save state
+  // ใช้สำหรับบันทึก draft อัตโนมัติเมื่อ user พิมพ์
+  Timer? _autoSaveTimer;
+  static const _autoSaveDelay = Duration(seconds: 2);
+  PostDraftService? _draftService;
+  bool _isRestoringDraft = false; // ป้องกันการ save ระหว่าง restore
+
   // # shortcut state (tags)
   bool _showTagSuggestions = false;
   String _tagSearchQuery = '';
@@ -88,6 +101,10 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
 
     // Reset state when opened
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Initialize draft service
+      final prefs = ref.read(sharedPreferencesProvider);
+      _draftService = PostDraftService(prefs);
+
       // Initialize state with initial values if provided
       if (widget.initialText != null ||
           widget.initialResidentId != null ||
@@ -103,7 +120,8 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
           _autoSelectTagByName(widget.initialTagName!);
         }
       } else {
-        ref.read(createPostProvider.notifier).reset();
+        // ถ้าไม่ได้มาจาก task ให้ตรวจสอบ draft
+        _checkAndRestoreDraft();
       }
 
       // [FUTURE] Listen to provider changes and update overlays when data arrives
@@ -123,9 +141,8 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
       // });
     });
 
-    // [FUTURE] Listen for # and @ shortcuts - disabled for now
-    // เก็บไว้สำหรับฟีเจอร์การสั่งงานระหว่างทีมในอนาคต
-    // _textController.addListener(_onTextChanged);
+    // Listen for text changes เพื่อ auto-save draft
+    _textController.addListener(_onContentChanged);
 
     // [FUTURE] Listen for keyboard navigation - disabled for now
     // _focusNode.onKeyEvent = _handleKeyEvent;
@@ -151,7 +168,8 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
 
   @override
   void dispose() {
-    // [FUTURE] _textController.removeListener(_onTextChanged);
+    _autoSaveTimer?.cancel();
+    _textController.removeListener(_onContentChanged);
     _removeTagOverlay();
     _removeResidentOverlay();
     _textController.dispose();
@@ -162,13 +180,190 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
   }
 
   // ============================================================
+  // Draft Management Functions
+  // ============================================================
+
+  /// Callback เมื่อ content เปลี่ยน - debounce แล้ว auto-save draft
+  void _onContentChanged() {
+    // ถ้ากำลัง restore draft อยู่ ไม่ต้อง save
+    if (_isRestoringDraft) return;
+    // ถ้ามาจาก task ไม่ต้อง save draft
+    if (widget.isFromTask) return;
+
+    _autoSaveTimer?.cancel();
+    _autoSaveTimer = Timer(_autoSaveDelay, _saveDraft);
+  }
+
+  /// ตรวจสอบว่ามีข้อมูลที่ยังไม่ได้บันทึกหรือไม่
+  bool _hasUnsavedData() {
+    final state = ref.read(createPostProvider);
+    return _textController.text.trim().isNotEmpty ||
+        state.selectedTag != null ||
+        state.selectedResidentId != null ||
+        state.selectedImages.isNotEmpty ||
+        state.selectedVideo != null;
+  }
+
+  /// บันทึก draft ลง SharedPreferences
+  Future<void> _saveDraft() async {
+    if (_draftService == null) return;
+    if (widget.isFromTask) return;
+
+    final userId = ref.read(currentUserIdProvider);
+    if (userId == null) return;
+
+    final state = ref.read(createPostProvider);
+    final draft = PostDraft(
+      text: _textController.text,
+      tagId: state.selectedTag?.id,
+      tagName: state.selectedTag?.name,
+      tagEmoji: state.selectedTag?.emoji,
+      tagHandoverMode: state.selectedTag?.handoverMode,
+      isHandover: state.isHandover,
+      sendToFamily: state.sendToFamily,
+      residentId: state.selectedResidentId,
+      residentName: state.selectedResidentName,
+      imagePaths: state.selectedImages.map((f) => f.path).toList(),
+      videoPath: state.selectedVideo?.path,
+      savedAt: DateTime.now(),
+      isAdvanced: false,
+    );
+
+    await _draftService!.saveDraft(userId.toString(), draft);
+  }
+
+  /// ตรวจสอบและ restore draft ถ้ามี
+  Future<void> _checkAndRestoreDraft() async {
+    if (_draftService == null) return;
+
+    final userId = ref.read(currentUserIdProvider);
+    if (userId == null) {
+      ref.read(createPostProvider.notifier).reset();
+      return;
+    }
+
+    final userIdStr = userId.toString();
+    if (!_draftService!.hasDraft(userIdStr)) {
+      ref.read(createPostProvider.notifier).reset();
+      return;
+    }
+
+    // โหลด draft
+    final draft = _draftService!.loadDraft(userIdStr);
+    if (draft == null || !draft.hasContent) {
+      ref.read(createPostProvider.notifier).reset();
+      return;
+    }
+
+    // ถ้า draft เป็น advanced mode ให้ข้ามไป (ไม่ restore ใน simple mode)
+    if (draft.isAdvanced) {
+      ref.read(createPostProvider.notifier).reset();
+      return;
+    }
+
+    // แสดง dialog ถามว่าจะใช้ draft หรือไม่
+    if (!mounted) return;
+    final shouldRestore = await _showRestoreDraftDialog();
+
+    if (shouldRestore == true) {
+      _restoreDraft(draft);
+    } else {
+      // ลบ draft และ reset
+      await _draftService!.clearDraft(userIdStr);
+      if (mounted) {
+        ref.read(createPostProvider.notifier).reset();
+      }
+    }
+  }
+
+  /// แสดง dialog ถามว่าจะ restore draft หรือไม่
+  /// ใช้ RestoreDraftDialog จาก reusable widget
+  Future<bool?> _showRestoreDraftDialog() async {
+    return RestoreDraftDialog.show(context);
+  }
+
+  /// Restore draft ไปยัง form
+  void _restoreDraft(PostDraft draft) {
+    _isRestoringDraft = true;
+
+    // Restore text
+    _textController.text = draft.text;
+
+    // Restore tag (ถ้ามี)
+    if (draft.tagId != null) {
+      final tag = NewTag(
+        id: draft.tagId!,
+        name: draft.tagName ?? '',
+        emoji: draft.tagEmoji,
+        handoverMode: draft.tagHandoverMode ?? 'none',
+      );
+      ref.read(createPostProvider.notifier).selectTag(tag);
+    }
+
+    // Restore resident
+    if (draft.residentId != null) {
+      ref.read(createPostProvider.notifier).selectResident(
+            draft.residentId!,
+            draft.residentName ?? '',
+          );
+    }
+
+    // Restore handover and sendToFamily
+    ref.read(createPostProvider.notifier).setHandover(draft.isHandover);
+    ref.read(createPostProvider.notifier).setSendToFamily(draft.sendToFamily);
+
+    // Note: Images และ Video ไม่ restore เพราะ file อาจถูกลบไปแล้ว
+    // ถ้าต้องการ restore ต้องตรวจสอบว่า file ยังอยู่หรือไม่
+
+    _isRestoringDraft = false;
+  }
+
+  /// จัดการเมื่อ user พยายามปิด modal
+  /// ใช้ ExitCreateDialog จาก reusable widget (3 ปุ่ม)
+  /// Returns true ถ้าควรปิด, false ถ้าไม่ควรปิด
+  Future<bool> _handleCloseAttempt() async {
+    // ถ้าไม่มีข้อมูล ปิดได้เลย
+    if (!_hasUnsavedData()) return true;
+
+    // ใช้ ExitCreateDialog.show() สำหรับ 3 ปุ่ม
+    final result = await ExitCreateDialog.show(context);
+
+    switch (result) {
+      case ExitCreateResult.continueEditing:
+        // กลับไปแก้ไข - ไม่ปิด modal
+        return false;
+      case ExitCreateResult.saveDraft:
+        // บันทึกร่าง แล้วปิด
+        await _saveDraft();
+        return true;
+      case ExitCreateResult.discard:
+        // ยกเลิก - ลบ draft แล้วปิด
+        final userId = ref.read(currentUserIdProvider);
+        if (userId != null && _draftService != null) {
+          await _draftService!.clearDraft(userId.toString());
+        }
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  /// ลบ draft หลังจาก submit สำเร็จ
+  Future<void> _clearDraftAfterSubmit() async {
+    final userId = ref.read(currentUserIdProvider);
+    if (userId != null && _draftService != null) {
+      await _draftService!.clearDraft(userId.toString());
+    }
+  }
+
+  // ============================================================
   // [FUTURE] # และ @ Shortcut Functions
   // เก็บไว้สำหรับฟีเจอร์การสั่งงานระหว่างทีมในอนาคต
   // เช่น พิมพ์ # เพื่อเลือก tag, พิมพ์ @ เพื่อ mention ผู้พัก
   // ============================================================
 
   // ignore: unused_element
-  void _onTextChanged() {
+  void _onTextChangedForShortcuts() {
     final text = _textController.text;
     final selection = _textController.selection;
 
@@ -572,18 +767,7 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Handle bar
-            Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(top: 12),
-              decoration: BoxDecoration(
-                color: AppColors.alternate,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-
-            // Header
+            // Header พร้อมปุ่มกากบาทปิด
             _buildHeader(canCreateAdvanced),
 
             // Content
@@ -692,7 +876,7 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
 
   Widget _buildHeader(bool canCreateAdvanced) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+      padding: const EdgeInsets.fromLTRB(16, 16, 8, 8),
       child: Row(
         children: [
           Text(
@@ -712,6 +896,22 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
                 textStyle: AppTypography.bodySmall,
               ),
             ),
+
+          // ปุ่มกากบาทปิด modal
+          IconButton(
+            onPressed: () async {
+              final shouldClose = await _handleCloseAttempt();
+              if (shouldClose && mounted) {
+                Navigator.of(context).pop();
+              }
+            },
+            icon: HugeIcon(
+              icon: HugeIcons.strokeRoundedCancel01,
+              color: AppColors.secondaryText,
+              size: AppIconSize.lg,
+            ),
+            tooltip: 'ปิด',
+          ),
         ],
       ),
     );
@@ -1192,6 +1392,9 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
         // Refresh posts
         refreshPosts(ref);
 
+        // Clear draft หลังจาก submit สำเร็จ
+        await _clearDraftAfterSubmit();
+
         // Reset form
         ref.read(createPostProvider.notifier).reset();
         _textController.clear();
@@ -1222,6 +1425,7 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
 }
 
 /// Helper function to show the bottom sheet
+/// ใช้ _CreatePostBottomSheetWrapper เพื่อจัดการ back gesture และ draft
 void showCreatePostBottomSheet(
   BuildContext context, {
   VoidCallback? onPostCreated,
@@ -1237,22 +1441,96 @@ void showCreatePostBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (context) => DraggableScrollableSheet(
-      initialChildSize: 0.85,
-      minChildSize: 0.6,
-      maxChildSize: 0.95,
-      builder: (context, scrollController) => CreatePostBottomSheet(
-        onPostCreated: onPostCreated,
-        onAdvancedTap: onAdvancedTap,
-        initialText: initialText,
-        initialResidentId: initialResidentId,
-        initialResidentName: initialResidentName,
-        initialTagName: initialTagName,
-        taskLogId: taskLogId,
-        taskConfirmImageUrl: taskConfirmImageUrl,
-      ),
+    // ปิด drag - ใช้ปุ่มกากบาทแทน
+    enableDrag: false,
+    // isDismissible: false เพื่อป้องกัน tap outside ปิด modal
+    isDismissible: false,
+    builder: (context) => _CreatePostBottomSheetWrapper(
+      onPostCreated: onPostCreated,
+      onAdvancedTap: onAdvancedTap,
+      initialText: initialText,
+      initialResidentId: initialResidentId,
+      initialResidentName: initialResidentName,
+      initialTagName: initialTagName,
+      taskLogId: taskLogId,
+      taskConfirmImageUrl: taskConfirmImageUrl,
     ),
   );
+}
+
+/// Wrapper widget ที่จัดการ PopScope สำหรับ back gesture
+class _CreatePostBottomSheetWrapper extends ConsumerStatefulWidget {
+  final VoidCallback? onPostCreated;
+  final VoidCallback? onAdvancedTap;
+  final String? initialText;
+  final int? initialResidentId;
+  final String? initialResidentName;
+  final String? initialTagName;
+  final int? taskLogId;
+  final String? taskConfirmImageUrl;
+
+  const _CreatePostBottomSheetWrapper({
+    this.onPostCreated,
+    this.onAdvancedTap,
+    this.initialText,
+    this.initialResidentId,
+    this.initialResidentName,
+    this.initialTagName,
+    this.taskLogId,
+    this.taskConfirmImageUrl,
+  });
+
+  @override
+  ConsumerState<_CreatePostBottomSheetWrapper> createState() =>
+      _CreatePostBottomSheetWrapperState();
+}
+
+class _CreatePostBottomSheetWrapperState
+    extends ConsumerState<_CreatePostBottomSheetWrapper> {
+  final GlobalKey<_CreatePostBottomSheetState> _sheetKey = GlobalKey();
+
+  @override
+  Widget build(BuildContext context) {
+    // คำนวณความสูงของ modal (85% ของหน้าจอ)
+    final screenHeight = MediaQuery.of(context).size.height;
+    final modalHeight = screenHeight * 0.85;
+
+    return PopScope(
+      // ไม่ให้ pop อัตโนมัติ - เราจะจัดการเอง
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+
+        // เรียก _handleCloseAttempt จาก CreatePostBottomSheet
+        final sheetState = _sheetKey.currentState;
+        if (sheetState != null) {
+          final shouldClose = await sheetState._handleCloseAttempt();
+          if (shouldClose && context.mounted) {
+            Navigator.of(context).pop();
+          }
+        } else {
+          // ถ้าไม่มี state ให้ปิดเลย
+          if (context.mounted) {
+            Navigator.of(context).pop();
+          }
+        }
+      },
+      child: SizedBox(
+        height: modalHeight,
+        child: CreatePostBottomSheet(
+          key: _sheetKey,
+          onPostCreated: widget.onPostCreated,
+          onAdvancedTap: widget.onAdvancedTap,
+          initialText: widget.initialText,
+          initialResidentId: widget.initialResidentId,
+          initialResidentName: widget.initialResidentName,
+          initialTagName: widget.initialTagName,
+          taskLogId: widget.taskLogId,
+          taskConfirmImageUrl: widget.taskConfirmImageUrl,
+        ),
+      ),
+    );
+  }
 }
 
 /// Helper function สำหรับ navigate ไป advanced screen

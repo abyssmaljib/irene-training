@@ -6,22 +6,25 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/buttons.dart';
+import '../../incident_reflection/models/incident.dart';
+import '../../incident_reflection/services/incident_service.dart';
 import '../services/clock_service.dart';
 import '../services/home_service.dart';
 import 'clock_out_survey_form.dart';
 
 /// Step ในการลงเวร
 enum ClockOutStep {
-  checking,         // กำลังตรวจสอบ
-  hasPendingTasks,  // มี tasks ค้าง
-  hasUnreadPosts,   // มีโพสไม่ได้อ่าน
-  noHandover,       // ยังไม่ handover
-  survey,           // แสดง survey form
-  submitting,       // กำลัง submit
-  success,          // ลงเวรสำเร็จ (แสดง confetti)
+  checking,           // กำลังตรวจสอบ
+  hasPendingTasks,    // มี tasks ค้าง
+  hasPendingIncidents,// มี incidents ที่ยังไม่ถอดบทเรียน
+  hasUnreadPosts,     // มีโพสไม่ได้อ่าน
+  noHandover,         // ยังไม่ handover
+  survey,             // แสดง survey form
+  submitting,         // กำลัง submit
+  success,            // ลงเวรสำเร็จ (แสดง confetti)
 }
 
-/// Dialog สำหรับยืนยันการลงเวร พร้อมเช็ค tasks, posts, handover และ survey
+/// Dialog สำหรับยืนยันการลงเวร พร้อมเช็ค tasks, posts, handover, incidents และ survey
 class ClockOutDialog extends StatefulWidget {
   final int clockRecordId;
   final String shift;
@@ -30,8 +33,15 @@ class ClockOutDialog extends StatefulWidget {
   final VoidCallback onCreateHandover;
   final VoidCallback onViewPosts;
 
-  /// Dev mode: skip ทุก checks ไปที่ survey เลย
-  final bool devMode;
+  /// Callback เมื่อต้องไปถอดบทเรียน - รับ incident ที่ต้องการถอดบทเรียน
+  /// ถ้าไม่ส่งมา จะไปหน้า list แทน
+  final void Function(Incident incident) onViewIncidents;
+
+  /// User ID สำหรับเช็ค incidents
+  final String userId;
+
+  /// Nursinghome ID สำหรับเช็ค incidents
+  final int nursinghomeId;
 
   const ClockOutDialog({
     super.key,
@@ -41,7 +51,9 @@ class ClockOutDialog extends StatefulWidget {
     this.clockInTime,
     required this.onCreateHandover,
     required this.onViewPosts,
-    this.devMode = false,
+    required this.onViewIncidents,
+    required this.userId,
+    required this.nursinghomeId,
   });
 
   /// Show the clock out dialog
@@ -53,7 +65,9 @@ class ClockOutDialog extends StatefulWidget {
     DateTime? clockInTime,
     required VoidCallback onCreateHandover,
     required VoidCallback onViewPosts,
-    bool devMode = false,
+    required void Function(Incident incident) onViewIncidents,
+    required String userId,
+    required int nursinghomeId,
   }) async {
     return showDialog<bool>(
       context: context,
@@ -65,7 +79,9 @@ class ClockOutDialog extends StatefulWidget {
         clockInTime: clockInTime,
         onCreateHandover: onCreateHandover,
         onViewPosts: onViewPosts,
-        devMode: devMode,
+        onViewIncidents: onViewIncidents,
+        userId: userId,
+        nursinghomeId: nursinghomeId,
       ),
     );
   }
@@ -77,11 +93,14 @@ class ClockOutDialog extends StatefulWidget {
 class _ClockOutDialogState extends State<ClockOutDialog> {
   final _clockService = ClockService.instance;
   final _homeService = HomeService.instance;
+  final _incidentService = IncidentService.instance;
   late ConfettiController _confettiController;
 
   ClockOutStep _step = ClockOutStep.checking;
   int _remainingTasksCount = 0;
   List<Map<String, dynamic>> _remainingTasks = [];
+  int _pendingIncidentsCount = 0;
+  List<Incident> _pendingIncidents = [];
   int _unreadPostsCount = 0;
   bool _hasHandover = false;
   bool _isSubmitting = false;
@@ -102,21 +121,13 @@ class _ClockOutDialogState extends State<ClockOutDialog> {
   Future<void> _runChecks() async {
     setState(() => _step = ClockOutStep.checking);
 
-    // Dev mode: skip ทุก checks ไปที่ survey เลย
-    if (widget.devMode) {
-      await Future.delayed(const Duration(milliseconds: 500)); // แสดงหน้า checking สักครู่
-      setState(() => _step = ClockOutStep.survey);
-      return;
-    }
-
-    // 1. Check remaining tasks (ใช้เวลา clock in คำนวณ adjust_date)
+    // 1. Check remaining tasks
     _remainingTasksCount = await _homeService.getRemainingTasksCount(
       shift: widget.shift,
       clockInTime: widget.clockInTime,
     );
 
     if (_remainingTasksCount > 0) {
-      // ดึงรายการงานค้าง (แสดงสูงสุด 5 รายการ)
       _remainingTasks = await _homeService.getRemainingTasks(
         shift: widget.shift,
         clockInTime: widget.clockInTime,
@@ -126,7 +137,24 @@ class _ClockOutDialogState extends State<ClockOutDialog> {
       return;
     }
 
-    // 2. Check unread posts
+    // 2. Check pending incidents
+    final allIncidents = await _incidentService.getMyIncidents(
+      widget.userId,
+      widget.nursinghomeId,
+      forceRefresh: true,
+    );
+
+    _pendingIncidents = allIncidents
+        .where((i) => i.reflectionStatus != ReflectionStatus.completed)
+        .toList();
+    _pendingIncidentsCount = _pendingIncidents.length;
+
+    if (_pendingIncidentsCount > 0) {
+      setState(() => _step = ClockOutStep.hasPendingIncidents);
+      return;
+    }
+
+    // 3. Check unread posts
     _unreadPostsCount = await _clockService.getUnreadAnnouncementsCount();
 
     if (_unreadPostsCount > 0) {
@@ -134,7 +162,7 @@ class _ClockOutDialogState extends State<ClockOutDialog> {
       return;
     }
 
-    // 3. Check handover
+    // 4. Check handover
     _hasHandover = await _clockService.hasHandoverPost();
 
     if (!_hasHandover) {
@@ -254,6 +282,8 @@ class _ClockOutDialogState extends State<ClockOutDialog> {
         return _buildCheckingContent();
       case ClockOutStep.hasPendingTasks:
         return _buildPendingTasksContent();
+      case ClockOutStep.hasPendingIncidents:
+        return _buildPendingIncidentsContent();
       case ClockOutStep.hasUnreadPosts:
         return _buildUnreadPostsContent();
       case ClockOutStep.noHandover:
@@ -421,6 +451,193 @@ class _ClockOutDialogState extends State<ClockOutDialog> {
     );
   }
 
+  /// UI สำหรับแสดง pending incidents ที่ยังไม่ได้ถอดบทเรียน
+  Widget _buildPendingIncidentsContent() {
+    return SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Title
+          Text(
+            'มี Incident ที่ต้องถอดบทเรียน',
+            style: AppTypography.heading3,
+            textAlign: TextAlign.center,
+          ),
+
+          AppSpacing.verticalGapMd,
+
+          // Cat image
+          Image.asset(
+            'assets/images/checking_cat.webp',
+            width: 160,
+            height: 160,
+          ),
+
+          AppSpacing.verticalGapMd,
+
+          // Message
+          RichText(
+            textAlign: TextAlign.center,
+            text: TextSpan(
+              style: AppTypography.body.copyWith(
+                color: AppColors.secondaryText,
+              ),
+              children: [
+                const TextSpan(text: 'มี '),
+                TextSpan(
+                  text: '$_pendingIncidentsCount เหตุการณ์',
+                  style: AppTypography.body.copyWith(
+                    color: AppColors.warning,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const TextSpan(text: ' ที่ต้องถอดบทเรียน\nกรุณาทำให้เสร็จก่อนลงเวร'),
+              ],
+            ),
+          ),
+
+          AppSpacing.verticalGapMd,
+
+          // Incident List (แสดงสูงสุด 5 รายการ)
+          if (_pendingIncidents.isNotEmpty) ...[
+            Container(
+              constraints: const BoxConstraints(maxHeight: 200),
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: _pendingIncidents.length > 5 ? 5 : _pendingIncidents.length,
+                itemBuilder: (context, index) {
+                  final incident = _pendingIncidents[index];
+                  return _buildIncidentItem(incident);
+                },
+              ),
+            ),
+            if (_pendingIncidentsCount > 5) ...[
+              AppSpacing.verticalGapSm,
+              Text(
+                'และอีก ${_pendingIncidentsCount - 5} เหตุการณ์...',
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.secondaryText,
+                ),
+              ),
+            ],
+          ],
+
+          AppSpacing.verticalGapLg,
+
+          // Go to Incidents Button - ไปยังหน้า chat ของ incident แรก
+          PrimaryButton(
+            text: 'ไปถอดบทเรียน',
+            onPressed: () {
+              debugPrint('Button pressed! _pendingIncidents.length = ${_pendingIncidents.length}');
+              Navigator.of(context).pop(false);
+              // ส่ง incident แรกที่ยังไม่เสร็จไปให้ callback
+              if (_pendingIncidents.isNotEmpty) {
+                debugPrint('Calling onViewIncidents with incident: ${_pendingIncidents.first.id}');
+                widget.onViewIncidents(_pendingIncidents.first);
+              } else {
+                debugPrint('ERROR: _pendingIncidents is empty!');
+              }
+            },
+            icon: HugeIcons.strokeRoundedArrowRight01,
+          ),
+
+          AppSpacing.verticalGapSm,
+
+          // Cancel Button
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(
+              'ยกเลิก',
+              style: AppTypography.body.copyWith(
+                color: AppColors.secondaryText,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// สร้าง item แสดง incident แต่ละรายการ
+  Widget _buildIncidentItem(Incident incident) {
+    // แสดงสถานะด้วยสีต่างกัน
+    final statusColor = incident.reflectionStatus == ReflectionStatus.pending
+        ? AppColors.warning
+        : AppColors.info;
+    final statusText = incident.reflectionStatus == ReflectionStatus.pending
+        ? 'รอถอดบทเรียน'
+        : 'กำลังถอดบทเรียน';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.tagPendingBg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          HugeIcon(
+            icon: HugeIcons.strokeRoundedAlert02,
+            color: statusColor,
+            size: 20,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  incident.description ?? 'ไม่มีรายละเอียด',
+                  style: AppTypography.bodySmall.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                AppSpacing.verticalGapXs,
+                Row(
+                  children: [
+                    // Resident name
+                    if (incident.residentName != null) ...[
+                      Text(
+                        incident.residentName!,
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.secondaryText,
+                        ),
+                      ),
+                      const Text(' • '),
+                    ],
+                    // Status badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        statusText,
+                        style: AppTypography.caption.copyWith(
+                          color: statusColor,
+                          fontWeight: FontWeight.w500,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildUnreadPostsContent() {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -565,7 +782,6 @@ class _ClockOutDialogState extends State<ClockOutDialog> {
     return ClockOutSurveyForm(
       onSubmit: _handleSurveySubmit,
       isLoading: _isSubmitting,
-      devMode: widget.devMode,
     );
   }
 

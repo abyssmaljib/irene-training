@@ -45,13 +45,11 @@ class _ShiftSummaryScreenState extends ConsumerState<ShiftSummaryScreen> {
         onRefresh: _onRefresh,
         color: AppColors.primary,
         child: summariesAsync.when(
-          loading: () => const Center(
-            child: CircularProgressIndicator(color: AppColors.primary),
-          ),
-          error: (error, stack) => _buildErrorState(error.toString()),
+          loading: () => _buildLoadingScrollable(),
+          error: (error, stack) => _buildErrorScrollable(error.toString()),
           data: (summaries) {
             if (summaries.isEmpty) {
-              return _buildEmptyState();
+              return _buildEmptyScrollable();
             }
             // Auto-open popup if specified
             _autoOpenPopupIfNeeded();
@@ -77,6 +75,9 @@ class _ShiftSummaryScreenState extends ConsumerState<ShiftSummaryScreen> {
         // List
         Expanded(
           child: ListView.separated(
+            // เพิ่ม AlwaysScrollableScrollPhysics เพื่อให้ pull to refresh ทำงานได้
+            // แม้ content จะไม่เต็มหน้าจอ
+            physics: const AlwaysScrollableScrollPhysics(),
             padding: EdgeInsets.symmetric(
               horizontal: AppSpacing.sm,
               vertical: AppSpacing.sm,
@@ -194,39 +195,64 @@ class _ShiftSummaryScreenState extends ConsumerState<ShiftSummaryScreen> {
     });
   }
 
-  Widget _buildEmptyState() {
-    return const EmptyStateWidget(message: 'ยังไม่มีข้อมูลเวร');
+  /// Loading state ที่ scrollable ได้ เพื่อให้ RefreshIndicator ทำงาน
+  Widget _buildLoadingScrollable() {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [
+        SizedBox(height: MediaQuery.of(context).size.height * 0.3),
+        const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+      ],
+    );
   }
 
-  Widget _buildErrorState(String error) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          HugeIcon(
-            icon: HugeIcons.strokeRoundedAlert02,
-            size: AppIconSize.display,
-            color: AppColors.error,
-          ),
-          SizedBox(height: AppSpacing.md),
-          Text(
-            'เกิดข้อผิดพลาด',
-            style: AppTypography.body.copyWith(
-              color: AppColors.secondaryText,
-            ),
-          ),
-          SizedBox(height: AppSpacing.sm),
-          TextButton(
-            onPressed: _onRefresh,
-            child: Text(
-              'ลองใหม่',
-              style: AppTypography.body.copyWith(
-                color: AppColors.primary,
+  /// Empty state ที่ scrollable ได้ เพื่อให้ RefreshIndicator ทำงาน
+  Widget _buildEmptyScrollable() {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [
+        SizedBox(height: MediaQuery.of(context).size.height * 0.3),
+        const EmptyStateWidget(message: 'ยังไม่มีข้อมูลเวร'),
+      ],
+    );
+  }
+
+  /// Error state ที่ scrollable ได้ เพื่อให้ RefreshIndicator ทำงาน
+  Widget _buildErrorScrollable(String error) {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [
+        SizedBox(height: MediaQuery.of(context).size.height * 0.25),
+        Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              HugeIcon(
+                icon: HugeIcons.strokeRoundedAlert02,
+                size: AppIconSize.display,
+                color: AppColors.error,
               ),
-            ),
+              SizedBox(height: AppSpacing.md),
+              Text(
+                'เกิดข้อผิดพลาด',
+                style: AppTypography.body.copyWith(
+                  color: AppColors.secondaryText,
+                ),
+              ),
+              SizedBox(height: AppSpacing.sm),
+              TextButton(
+                onPressed: _onRefresh,
+                child: Text(
+                  'ลองใหม่',
+                  style: AppTypography.body.copyWith(
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

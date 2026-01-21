@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/post.dart';
+import '../models/new_tag.dart';
 
 /// State for Edit Post form
 class EditPostState {
@@ -41,6 +42,17 @@ class EditPostState {
   final String? aiQuizChoiceC;
   final String? aiQuizAnswer;
 
+  // Tag and Resident fields (for shift leader+ editing)
+  // Original values from post (for tracking changes)
+  final int? originalResidentId;
+  final String? originalResidentName;
+  final String? originalTagName;
+  // Current/edited values
+  final int? residentId;
+  final String? residentName;
+  final NewTag? selectedTag;
+  final bool isHandover;
+
   const EditPostState({
     required this.postId,
     this.text = '',
@@ -67,6 +79,14 @@ class EditPostState {
     this.aiQuizChoiceB,
     this.aiQuizChoiceC,
     this.aiQuizAnswer,
+    // Tag and Resident
+    this.originalResidentId,
+    this.originalResidentName,
+    this.originalTagName,
+    this.residentId,
+    this.residentName,
+    this.selectedTag,
+    this.isHandover = false,
   });
 
   /// Get final list of existing image URLs (excluding removed ones)
@@ -95,7 +115,15 @@ class EditPostState {
   bool get hasChanges =>
       text.isNotEmpty ||
       newImages.isNotEmpty ||
-      removedExistingIndexes.isNotEmpty;
+      removedExistingIndexes.isNotEmpty ||
+      residentId != originalResidentId ||
+      selectedTag?.name != originalTagName;
+
+  /// Check if tag has changed
+  bool get hasTagChanged => selectedTag?.name != originalTagName;
+
+  /// Check if resident has changed
+  bool get hasResidentChanged => residentId != originalResidentId;
 
   /// Check if quiz is complete (has question and all choices)
   bool get hasQuiz =>
@@ -142,6 +170,16 @@ class EditPostState {
     String? aiQuizChoiceC,
     String? aiQuizAnswer,
     bool clearAiQuizPreview = false,
+    // Tag and Resident
+    int? originalResidentId,
+    String? originalResidentName,
+    String? originalTagName,
+    int? residentId,
+    String? residentName,
+    NewTag? selectedTag,
+    bool? isHandover,
+    bool clearResident = false,
+    bool clearTag = false,
   }) {
     return EditPostState(
       postId: postId ?? this.postId,
@@ -170,6 +208,15 @@ class EditPostState {
       aiQuizChoiceB: clearAiQuizPreview ? null : (aiQuizChoiceB ?? this.aiQuizChoiceB),
       aiQuizChoiceC: clearAiQuizPreview ? null : (aiQuizChoiceC ?? this.aiQuizChoiceC),
       aiQuizAnswer: clearAiQuizPreview ? null : (aiQuizAnswer ?? this.aiQuizAnswer),
+      // Tag and Resident - original values preserved
+      originalResidentId: originalResidentId ?? this.originalResidentId,
+      originalResidentName: originalResidentName ?? this.originalResidentName,
+      originalTagName: originalTagName ?? this.originalTagName,
+      // Current/edited values
+      residentId: clearResident ? null : (residentId ?? this.residentId),
+      residentName: clearResident ? null : (residentName ?? this.residentName),
+      selectedTag: clearTag ? null : (selectedTag ?? this.selectedTag),
+      isHandover: isHandover ?? this.isHandover,
     );
   }
 }
@@ -180,6 +227,9 @@ class EditPostNotifier extends StateNotifier<EditPostState> {
 
   /// Initialize from existing post
   void initFromPost(Post post) {
+    // Get tag name from post (postTagsString is comma-separated, take first)
+    final tagName = post.postTagsString?.split(',').first.trim();
+
     state = EditPostState(
       postId: post.id,
       text: post.text ?? '',
@@ -192,8 +242,25 @@ class EditPostNotifier extends StateNotifier<EditPostState> {
       qaChoiceB: post.qaChoiceB,
       qaChoiceC: post.qaChoiceC,
       qaAnswer: post.qaAnswer,
+      // Load existing tag and resident (for shift leader+ editing)
+      originalResidentId: post.residentId,
+      originalResidentName: post.residentName,
+      originalTagName: tagName,
+      residentId: post.residentId,
+      residentName: post.residentName,
+      isHandover: post.isHandover,
     );
     debugPrint('EditPostNotifier: initialized from post ${post.id}');
+  }
+
+  /// Initialize with a tag (when tag is loaded from provider)
+  void setSelectedTag(NewTag? tag) {
+    state = state.copyWith(
+      selectedTag: tag,
+      // Auto-set handover based on tag's handover mode
+      isHandover: tag?.isForceHandover ?? state.isHandover,
+    );
+    debugPrint('EditPostNotifier: set tag to ${tag?.name}');
   }
 
   void setText(String value) {
@@ -329,6 +396,41 @@ class EditPostNotifier extends StateNotifier<EditPostState> {
 
   void clearAiQuizPreview() {
     state = state.copyWith(clearAiQuizPreview: true);
+  }
+
+  // Tag and Resident methods (for shift leader+ editing)
+  void setResident(int id, String name) {
+    state = state.copyWith(residentId: id, residentName: name);
+    debugPrint('EditPostNotifier: set resident to $name (id: $id)');
+  }
+
+  void clearResident() {
+    state = state.copyWith(clearResident: true);
+    debugPrint('EditPostNotifier: cleared resident');
+  }
+
+  void setTag(NewTag tag) {
+    state = state.copyWith(
+      selectedTag: tag,
+      // Auto-set handover based on tag's handover mode
+      isHandover: tag.isForceHandover ? true : state.isHandover,
+    );
+    debugPrint('EditPostNotifier: set tag to ${tag.name}');
+  }
+
+  void clearTag() {
+    state = state.copyWith(clearTag: true);
+    debugPrint('EditPostNotifier: cleared tag');
+  }
+
+  void setHandover(bool value) {
+    // ไม่สามารถปิด handover ได้ถ้า tag เป็น force handover
+    if (state.selectedTag?.isForceHandover == true && !value) {
+      debugPrint('EditPostNotifier: cannot disable handover for force-handover tag');
+      return;
+    }
+    state = state.copyWith(isHandover: value);
+    debugPrint('EditPostNotifier: set handover to $value');
   }
 
   void reset() {

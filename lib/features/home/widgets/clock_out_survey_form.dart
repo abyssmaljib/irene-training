@@ -14,14 +14,10 @@ class ClockOutSurveyForm extends StatefulWidget {
   }) onSubmit;
   final bool isLoading;
 
-  /// Dev mode: skip validation, ใช้ค่า default
-  final bool devMode;
-
   const ClockOutSurveyForm({
     super.key,
     required this.onSubmit,
     this.isLoading = false,
-    this.devMode = false,
   });
 
   @override
@@ -35,10 +31,9 @@ class _ClockOutSurveyFormState extends State<ClockOutSurveyForm> {
   final _bugSurveyController = TextEditingController();
 
   bool get _isValid =>
-      widget.devMode || // Dev mode: skip validation
-      (_shiftScore > 0 &&
+      _shiftScore > 0 &&
       _selfScore > 0 &&
-      _shiftSurveyController.text.trim().isNotEmpty);
+      _shiftSurveyController.text.trim().isNotEmpty;
 
   @override
   void dispose() {
@@ -50,17 +45,10 @@ class _ClockOutSurveyFormState extends State<ClockOutSurveyForm> {
   void _handleSubmit() {
     if (!_isValid || widget.isLoading) return;
 
-    // Dev mode: ใช้ค่า default ถ้าไม่ได้กรอก
-    final shiftScore = _shiftScore > 0 ? _shiftScore : 5;
-    final selfScore = _selfScore > 0 ? _selfScore : 5;
-    final shiftSurvey = _shiftSurveyController.text.trim().isNotEmpty
-        ? _shiftSurveyController.text.trim()
-        : 'DEV MODE - ลงเวรทดสอบ';
-
     widget.onSubmit(
-      shiftScore: shiftScore,
-      selfScore: selfScore,
-      shiftSurvey: shiftSurvey,
+      shiftScore: _shiftScore,
+      selfScore: _selfScore,
+      shiftSurvey: _shiftSurveyController.text.trim(),
       bugSurvey: _bugSurveyController.text.trim().isNotEmpty
           ? _bugSurveyController.text.trim()
           : null,

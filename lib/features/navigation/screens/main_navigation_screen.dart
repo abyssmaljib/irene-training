@@ -17,6 +17,7 @@ import '../../notifications/providers/notification_provider.dart';
 // NOTE: Tutorial/Onboarding feature ถูกซ่อนไว้ชั่วคราว
 // import '../../onboarding/providers/onboarding_provider.dart';
 import '../../board/providers/post_provider.dart';
+import '../../incident_reflection/providers/incident_provider.dart';
 import '../../onboarding/models/tutorial_target.dart';
 // import '../../onboarding/widgets/whats_new_dialog.dart';
 import '../../onboarding/widgets/new_feature_badge.dart';
@@ -345,7 +346,7 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
     );
   }
 
-  /// Build profile nav item with notification badge for pending absences and notifications
+  /// Build profile nav item with notification badge for pending absences, notifications, and incidents
   Widget _buildProfileNavItem() {
     final pendingAbsenceAsync = ref.watch(pendingAbsenceCountProvider);
     final hasPendingAbsence = pendingAbsenceAsync.maybeWhen(
@@ -358,6 +359,10 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
       data: (count) => count > 0,
       orElse: () => false,
     );
+
+    // เพิ่ม: ตรวจสอบ pending incidents (รวม pending + in_progress)
+    final pendingIncidentCount = ref.watch(pendingIncidentCountProvider);
+    final hasPendingIncidents = pendingIncidentCount > 0;
 
     final isSelected = _currentIndex == 4;
 
@@ -383,8 +388,8 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
                   color: isSelected ? AppColors.primary : AppColors.secondaryText,
                   size: AppIconSize.xl,
                 ),
-                // Red dot for unread notifications or pending absences
-                if (hasUnreadNotifications || hasPendingAbsence)
+                // Red dot for unread notifications, pending absences, or pending incidents
+                if (hasUnreadNotifications || hasPendingAbsence || hasPendingIncidents)
                   Positioned(
                     right: -4,
                     top: -4,

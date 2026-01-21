@@ -117,13 +117,11 @@ class _DDListScreenState extends ConsumerState<DDListScreen>
       onRefresh: _onRefresh,
       color: AppColors.primary,
       child: recordsAsync.when(
-        loading: () => const Center(
-          child: CircularProgressIndicator(color: AppColors.primary),
-        ),
-        error: (error, _) => _buildErrorState(error.toString()),
+        loading: () => _buildLoadingScrollable(),
+        error: (error, _) => _buildErrorScrollable(error.toString()),
         data: (records) {
           if (records.isEmpty) {
-            return _buildEmptyState('ไม่มีงาน DD ที่รอทำ');
+            return _buildEmptyScrollable('ไม่มีงาน DD ที่รอทำ');
           }
           return _buildRecordList(records, showCreateHint: true);
         },
@@ -138,13 +136,11 @@ class _DDListScreenState extends ConsumerState<DDListScreen>
       onRefresh: _onRefresh,
       color: AppColors.primary,
       child: recordsAsync.when(
-        loading: () => const Center(
-          child: CircularProgressIndicator(color: AppColors.primary),
-        ),
-        error: (error, _) => _buildErrorState(error.toString()),
+        loading: () => _buildLoadingScrollable(),
+        error: (error, _) => _buildErrorScrollable(error.toString()),
         data: (records) {
           if (records.isEmpty) {
-            return _buildEmptyState('ยังไม่มีงาน DD ที่ทำเสร็จ');
+            return _buildEmptyScrollable('ยังไม่มีงาน DD ที่ทำเสร็จ');
           }
           return _buildRecordList(records, showCreateHint: false);
         },
@@ -170,6 +166,9 @@ class _DDListScreenState extends ConsumerState<DDListScreen>
 
     return ListView.builder(
       padding: EdgeInsets.all(AppSpacing.md),
+      // เพิ่ม AlwaysScrollableScrollPhysics เพื่อให้ pull to refresh ทำงานได้
+      // แม้ content จะไม่เต็มหน้าจอ
+      physics: const AlwaysScrollableScrollPhysics(),
       itemCount: records.length,
       itemBuilder: (context, index) {
         final record = records[index];
@@ -193,39 +192,64 @@ class _DDListScreenState extends ConsumerState<DDListScreen>
     );
   }
 
-  Widget _buildEmptyState(String message) {
-    return EmptyStateWidget(message: message);
+  /// Loading state ที่ scrollable ได้ เพื่อให้ RefreshIndicator ทำงาน
+  Widget _buildLoadingScrollable() {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [
+        SizedBox(height: MediaQuery.of(context).size.height * 0.3),
+        const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+      ],
+    );
   }
 
-  Widget _buildErrorState(String error) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          HugeIcon(
-            icon: HugeIcons.strokeRoundedAlert02,
-            size: AppIconSize.display,
-            color: AppColors.error,
-          ),
-          SizedBox(height: AppSpacing.md),
-          Text(
-            'เกิดข้อผิดพลาด',
-            style: AppTypography.body.copyWith(
-              color: AppColors.secondaryText,
-            ),
-          ),
-          SizedBox(height: AppSpacing.sm),
-          TextButton(
-            onPressed: _onRefresh,
-            child: Text(
-              'ลองใหม่',
-              style: AppTypography.body.copyWith(
-                color: AppColors.primary,
+  /// Empty state ที่ scrollable ได้ เพื่อให้ RefreshIndicator ทำงาน
+  Widget _buildEmptyScrollable(String message) {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [
+        SizedBox(height: MediaQuery.of(context).size.height * 0.3),
+        EmptyStateWidget(message: message),
+      ],
+    );
+  }
+
+  /// Error state ที่ scrollable ได้ เพื่อให้ RefreshIndicator ทำงาน
+  Widget _buildErrorScrollable(String error) {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [
+        SizedBox(height: MediaQuery.of(context).size.height * 0.25),
+        Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              HugeIcon(
+                icon: HugeIcons.strokeRoundedAlert02,
+                size: AppIconSize.display,
+                color: AppColors.error,
               ),
-            ),
+              SizedBox(height: AppSpacing.md),
+              Text(
+                'เกิดข้อผิดพลาด',
+                style: AppTypography.body.copyWith(
+                  color: AppColors.secondaryText,
+                ),
+              ),
+              SizedBox(height: AppSpacing.sm),
+              TextButton(
+                onPressed: _onRefresh,
+                child: Text(
+                  'ลองใหม่',
+                  style: AppTypography.body.copyWith(
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

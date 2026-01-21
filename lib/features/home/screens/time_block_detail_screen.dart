@@ -96,16 +96,38 @@ class _TimeBlockDetailScreenState extends State<TimeBlockDetailScreen> {
         backgroundColor: AppColors.surface,
         centerTitle: true,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _timeBlocks.isEmpty
-              ? _buildEmptyState()
-              : _buildContent(),
+      // Wrap ทั้ง body ด้วย RefreshIndicator เพื่อให้ pull to refresh ได้ทุกสถานะ
+      body: RefreshIndicator(
+        onRefresh: _loadData,
+        child: _isLoading
+            ? _buildLoadingScrollable()
+            : _timeBlocks.isEmpty
+                ? _buildEmptyScrollable()
+                : _buildContent(),
+      ),
     );
   }
 
-  Widget _buildEmptyState() {
-    return const EmptyStateWidget(message: 'ไม่มีงานในวันนี้');
+  /// Loading state ที่ scrollable ได้ เพื่อให้ RefreshIndicator ทำงาน
+  Widget _buildLoadingScrollable() {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [
+        SizedBox(height: MediaQuery.of(context).size.height * 0.3),
+        const Center(child: CircularProgressIndicator()),
+      ],
+    );
+  }
+
+  /// Empty state ที่ scrollable ได้ เพื่อให้ RefreshIndicator ทำงาน
+  Widget _buildEmptyScrollable() {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [
+        SizedBox(height: MediaQuery.of(context).size.height * 0.3),
+        const EmptyStateWidget(message: 'ไม่มีงานในวันนี้'),
+      ],
+    );
   }
 
   Widget _buildContent() {
@@ -117,23 +139,23 @@ class _TimeBlockDetailScreenState extends State<TimeBlockDetailScreen> {
       completedTasks += block.completedTasks;
     }
 
-    return RefreshIndicator(
-      onRefresh: _loadData,
-      child: ListView(
-        padding: AppSpacing.paddingMd,
-        children: [
-          // Overall Summary Card
-          _buildSummaryCard(totalTasks, completedTasks),
+    return ListView(
+      // เพิ่ม AlwaysScrollableScrollPhysics เพื่อให้ pull to refresh ทำงานได้
+      // แม้ content จะไม่เต็มหน้าจอ
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: AppSpacing.paddingMd,
+      children: [
+        // Overall Summary Card
+        _buildSummaryCard(totalTasks, completedTasks),
 
-          AppSpacing.verticalGapMd,
+        AppSpacing.verticalGapMd,
 
-          // Time Blocks List
-          ..._timeBlocks.map((block) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _buildTimeBlockItem(block),
-              )),
-        ],
-      ),
+        // Time Blocks List
+        ..._timeBlocks.map((block) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _buildTimeBlockItem(block),
+            )),
+      ],
     );
   }
 

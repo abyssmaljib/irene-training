@@ -27,6 +27,24 @@ final nursinghomeIdProvider = FutureProvider<int?>((ref) async {
   return userService.getNursinghomeId();
 });
 
+/// Provider สำหรับ user's role level (สำหรับตรวจสอบสิทธิ์)
+/// Returns role level (0-50) where:
+/// - 30+ = shift leader (หัวหน้าเวร) - can edit tag/resident of any post
+/// - 40+ = manager (ผู้จัดการ)
+/// - 50 = owner (เจ้าของ)
+final userRoleLevelProvider = FutureProvider<int>((ref) async {
+  final userService = UserService();
+  final systemRole = await userService.getSystemRole();
+  return systemRole?.level ?? 0;
+});
+
+/// Provider ตรวจสอบว่า user เป็นหัวหน้าเวรขึ้นไปหรือไม่
+final isAtLeastShiftLeaderProvider = FutureProvider<bool>((ref) async {
+  final level = await ref.watch(userRoleLevelProvider.future);
+  // Shift leader level = 30
+  return level >= 30;
+});
+
 /// Counter เพื่อ trigger refresh
 final postRefreshCounterProvider = StateProvider<int>((ref) => 0);
 

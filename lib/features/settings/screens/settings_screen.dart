@@ -28,6 +28,8 @@ import '../../dd_handover/providers/dd_provider.dart';
 import '../../dd_handover/services/dd_service.dart';
 import '../../notifications/screens/notification_center_screen.dart';
 import '../../notifications/providers/notification_provider.dart';
+import '../../incident_reflection/screens/incident_list_screen.dart';
+import '../../incident_reflection/providers/incident_provider.dart';
 // NOTE: Tutorial feature ถูกซ่อนไว้ชั่วคราว
 // import '../../navigation/screens/main_navigation_screen.dart';
 
@@ -457,6 +459,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           Divider(height: 1, color: AppColors.alternate),
           _buildDDMenuItem(),
           Divider(height: 1, color: AppColors.alternate),
+          _buildIncidentReflectionMenuItem(),
+          Divider(height: 1, color: AppColors.alternate),
           _buildMenuItem(
             icon: HugeIcons.strokeRoundedAlert02,
             label: 'ใบเตือน',
@@ -525,6 +529,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const DDListScreen()),
+        );
+      },
+    );
+  }
+
+  /// Build incident reflection menu item with badge for pending incidents
+  Widget _buildIncidentReflectionMenuItem() {
+    final badgeCount = ref.watch(pendingIncidentCountProvider);
+
+    return _buildMenuItem(
+      icon: HugeIcons.strokeRoundedBrain,
+      label: 'ถอดบทเรียน',
+      badgeCount: badgeCount,
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const IncidentListScreen()),
         );
       },
     );
