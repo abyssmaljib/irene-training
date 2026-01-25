@@ -10,6 +10,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/buttons.dart';
 import '../../../core/widgets/irene_app_bar.dart';
 import '../../../core/widgets/network_image.dart';
+import '../../../core/widgets/success_popup.dart';
 import '../providers/create_medicine_db_provider.dart';
 import '../services/medicine_service.dart';
 
@@ -218,14 +219,9 @@ class _CreateMedicineDBScreenState
     final result = await notifier.submit();
 
     if (result != null && mounted) {
-      // สำเร็จ - กลับพร้อมส่ง MedDB กลับไป
-      Navigator.pop(context, result);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('เพิ่มยา "${result.displayName}" สำเร็จ'),
-          backgroundColor: AppColors.success,
-        ),
-      );
+      // สำเร็จ - แสดง popup แล้วกลับพร้อมส่ง MedDB กลับไป
+      await SuccessPopup.show(context, emoji: '💊', message: 'เพิ่มยาสำเร็จ');
+      if (mounted) Navigator.pop(context, result);
     }
   }
 

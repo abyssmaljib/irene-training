@@ -4,6 +4,7 @@ import '../../../core/services/sound_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/buttons.dart';
 import '../../../core/widgets/nps_scale.dart';
 import '../../../core/widgets/success_popup.dart';
 
@@ -274,9 +275,9 @@ class _DifficultyRatingDialogState extends State<DifficultyRatingDialog> {
 
             SizedBox(height: AppSpacing.sm),
 
-            // Hint text บอกว่าลากแล้วปล่อย = ยืนยัน
+            // Hint text บอกวิธีใช้ (ปล่อยมือ หรือ กดปุ่มก็ได้)
             Text(
-              '👆 ลากไปมาแล้วปล่อยเพื่อยืนยัน',
+              '👆 ลากไปมาแล้วปล่อย หรือกดปุ่มยืนยัน',
               style: AppTypography.caption.copyWith(
                 color: AppColors.secondaryText,
                 fontStyle: FontStyle.italic,
@@ -331,12 +332,23 @@ class _DifficultyRatingDialogState extends State<DifficultyRatingDialog> {
 
             SizedBox(height: AppSpacing.md),
 
+            // ปุ่มยืนยัน (primary button + floppy disk icon)
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+              child: PrimaryButton(
+                text: 'ยืนยัน',
+                icon: HugeIcons.strokeRoundedFloppyDisk,
+                width: double.infinity,
+                onPressed: _handleConfirm,
+              ),
+            ),
+
             // ปุ่มข้าม (ไม่ให้คะแนน)
             if (widget.allowSkip)
               Padding(
                 padding: EdgeInsets.fromLTRB(
                   AppSpacing.md,
-                  0,
+                  AppSpacing.xs,
                   AppSpacing.md,
                   AppSpacing.md,
                 ),

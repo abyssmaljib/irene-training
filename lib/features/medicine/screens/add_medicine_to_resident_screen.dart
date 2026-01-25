@@ -7,6 +7,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/buttons.dart';
 import '../../../core/widgets/irene_app_bar.dart';
 import '../../../core/widgets/network_image.dart';
+import '../../../core/widgets/success_popup.dart';
 import '../../../core/services/user_service.dart';
 import '../../checklist/models/system_role.dart';
 import '../models/med_db.dart';
@@ -188,13 +189,8 @@ class _AddMedicineToResidentScreenState
     final success = await notifier.submit();
 
     if (success && mounted) {
-      Navigator.pop(context, true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('เพิ่มยาให้คนไข้สำเร็จ'),
-          backgroundColor: AppColors.success,
-        ),
-      );
+      await SuccessPopup.show(context, emoji: '💊', message: 'เพิ่มยาให้คนไข้สำเร็จ');
+      if (mounted) Navigator.pop(context, true);
     }
   }
 

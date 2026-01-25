@@ -6,6 +6,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/confirm_dialog.dart';
 import '../../../core/widgets/irene_app_bar.dart';
+import '../../../core/widgets/success_popup.dart';
 import '../providers/vital_sign_form_provider.dart';
 import '../widgets/create_vital_sign/vital_input_section.dart';
 import '../widgets/create_vital_sign/care_input_section.dart';
@@ -102,33 +103,8 @@ class EditVitalSignScreen extends ConsumerWidget {
       final success = await notifier.delete();
 
       if (success && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                HugeIcon(
-                  icon: HugeIcons.strokeRoundedTick02,
-                  color: Colors.white,
-                  size: AppIconSize.xl,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'ลบสำเร็จ',
-                  style: AppTypography.body.copyWith(
-                    color: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-            backgroundColor: AppColors.success,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-        Navigator.of(context).pop(true);
+        await SuccessPopup.show(context, emoji: '🗑️', message: 'ลบสำเร็จ');
+        if (context.mounted) Navigator.of(context).pop(true);
       }
     }
   }
@@ -213,33 +189,8 @@ class EditVitalSignScreen extends ConsumerWidget {
                       final success = await notifier.update();
 
                       if (success && context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Row(
-                              children: [
-                                HugeIcon(
-                                  icon: HugeIcons.strokeRoundedTick02,
-                                  color: Colors.white,
-                                  size: AppIconSize.xl,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'บันทึกสำเร็จ',
-                                  style: AppTypography.body.copyWith(
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            backgroundColor: AppColors.success,
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            duration: const Duration(seconds: 2),
-                          ),
-                        );
-                        Navigator.of(context).pop(true);
+                        await SuccessPopup.show(context, emoji: '📝', message: 'บันทึกสำเร็จ');
+                        if (context.mounted) Navigator.of(context).pop(true);
                       } else if (!success && context.mounted && data.errorMessage != null) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(

@@ -5,6 +5,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/irene_app_bar.dart';
 import '../../../core/widgets/toggle_switch.dart';
+import '../../../core/widgets/success_popup.dart';
 import '../../../core/services/user_service.dart';
 import '../../checklist/models/system_role.dart';
 import '../models/meal_photo_group.dart';
@@ -374,12 +375,7 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
       _hasDataChanged = true;
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('บันทึกรูปเรียบร้อยแล้ว'),
-            backgroundColor: AppColors.tagPassedText,
-          ),
-        );
+        await SuccessPopup.show(context, emoji: '📷', message: 'บันทึกรูปเรียบร้อย');
       }
     } catch (e) {
       // ปิด loading dialog ถ้ายังเปิดอยู่
@@ -444,12 +440,7 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
           _hasDataChanged = true;
 
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('ยกเลิกการตรวจเรียบร้อยแล้ว'),
-                backgroundColor: AppColors.primary,
-              ),
-            );
+            await SuccessPopup.show(context, emoji: '↩️', message: 'ยกเลิกการตรวจแล้ว');
           }
         } else {
           throw Exception('Delete failed');
@@ -493,12 +484,7 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
         _hasDataChanged = true;
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('บันทึกผลตรวจ "$status" เรียบร้อยแล้ว'),
-              backgroundColor: AppColors.tagPassedText,
-            ),
-          );
+          await SuccessPopup.show(context, emoji: '✅', message: 'บันทึกผลตรวจแล้ว');
         }
       } else {
         throw Exception('Save failed');
@@ -543,12 +529,7 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
         _hasDataChanged = true;
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('ลบรูปเรียบร้อยแล้ว'),
-              backgroundColor: AppColors.tagPassedText,
-            ),
-          );
+          await SuccessPopup.show(context, emoji: '🗑️', message: 'ลบรูปเรียบร้อย');
         }
       } else {
         throw Exception('Delete failed');

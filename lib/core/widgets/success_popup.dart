@@ -168,10 +168,19 @@ class _SuccessPopupState extends State<SuccessPopup>
               if (widget.emoji != null) ...[
                 Text(
                   widget.emoji!,
-                  style: const TextStyle(fontSize: 48),
+                  style: const TextStyle(fontSize: 28),
                 ),
-                SizedBox(height: AppSpacing.sm),
+                SizedBox(height: AppSpacing.xs),
               ],
+
+              // Dabbing cat image
+              Image.asset(
+                'assets/images/dabbing cat5.webp',
+                width: 120,
+                height: 120,
+                fit: BoxFit.contain,
+              ),
+              SizedBox(height: AppSpacing.sm),
 
               // Animated checkmark
               SizedBox(

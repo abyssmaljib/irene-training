@@ -7,6 +7,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/buttons.dart';
 import '../../../core/widgets/irene_app_bar.dart';
 import '../../../core/widgets/network_image.dart';
+import '../../../core/widgets/success_popup.dart';
 import '../models/medicine_summary.dart';
 import '../providers/edit_medicine_form_provider.dart';
 import '../widgets/time_slot_chips.dart';
@@ -96,13 +97,8 @@ class _EditMedicineScreenState extends ConsumerState<EditMedicineScreen> {
     final success = await notifier.submit();
 
     if (success && mounted) {
-      Navigator.pop(context, true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('แก้ไขยาสำเร็จ'),
-          backgroundColor: AppColors.success,
-        ),
-      );
+      await SuccessPopup.show(context, emoji: '💊', message: 'แก้ไขยาสำเร็จ');
+      if (mounted) Navigator.pop(context, true);
     }
   }
 

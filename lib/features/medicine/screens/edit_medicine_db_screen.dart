@@ -10,6 +10,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/buttons.dart';
 import '../../../core/widgets/irene_app_bar.dart';
 import '../../../core/widgets/network_image.dart';
+import '../../../core/widgets/success_popup.dart';
 import '../providers/create_medicine_db_provider.dart';
 import '../providers/edit_medicine_db_form_provider.dart';
 import '../services/medicine_service.dart';
@@ -216,14 +217,9 @@ class _EditMedicineDBScreenState extends ConsumerState<EditMedicineDBScreen> {
     final result = await notifier.submit();
 
     if (result != null && mounted) {
-      // สำเร็จ - กลับพร้อมส่ง true เพื่อบอกว่าแก้ไขสำเร็จ
-      Navigator.pop(context, true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('บันทึก "${result.displayName}" สำเร็จ'),
-          backgroundColor: AppColors.success,
-        ),
-      );
+      // สำเร็จ - แสดง popup แล้วกลับ
+      await SuccessPopup.show(context, emoji: '💊', message: 'บันทึกสำเร็จ');
+      if (mounted) Navigator.pop(context, true);
     }
   }
 
@@ -234,14 +230,9 @@ class _EditMedicineDBScreenState extends ConsumerState<EditMedicineDBScreen> {
     final result = await notifier.duplicate();
 
     if (result != null && mounted) {
-      // สำเร็จ - กลับพร้อมส่ง MedDB ใหม่
-      Navigator.pop(context, result);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('สร้างซ้ำ "${result.displayName}" สำเร็จ'),
-          backgroundColor: AppColors.success,
-        ),
-      );
+      // สำเร็จ - แสดง popup แล้วกลับพร้อมส่ง MedDB ใหม่
+      await SuccessPopup.show(context, emoji: '📋', message: 'สร้างซ้ำสำเร็จ');
+      if (mounted) Navigator.pop(context, result);
     }
   }
 
