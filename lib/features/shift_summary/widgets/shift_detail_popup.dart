@@ -59,6 +59,26 @@ class _ShiftDetailPopupState extends ConsumerState<ShiftDetailPopup> {
     });
   }
 
+  /// Scroll ไปยังวันที่ขาดงานแรกที่เจอ และ highlight ด้วย animation กระพริบ
+  void _scrollToAbsentDay(List details) {
+    // หา index ของวันที่ขาดงาน (isAbsent == true && isSick == false)
+    final absentIndex = details.indexWhere(
+      (d) => d.isAbsent == true && d.isSick != true,
+    );
+
+    if (absentIndex < 0) return;
+
+    // คำนวณ offset สำหรับ scroll (ประมาณ 50px ต่อ row)
+    final offset = absentIndex * 50.0;
+
+    // Scroll ไปยัง row ที่ขาดงาน
+    _scrollController.animateTo(
+      offset,
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeOut,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final monthYear = MonthYear(month: widget.month, year: widget.year);
@@ -92,8 +112,20 @@ class _ShiftDetailPopupState extends ConsumerState<ShiftDetailPopup> {
         children: [
           // Header
           _buildHeader(context, title),
-          // Monthly Summary Section
-          if (widget.monthlySummary != null) _buildMonthlySummary(),
+          // Monthly Summary Section (ต้องใช้ Consumer เพื่อเข้าถึง details สำหรับ scroll)
+          if (widget.monthlySummary != null)
+            Consumer(
+              builder: (context, ref, _) {
+                final detailsAsync = ref.watch(shiftDetailsProvider(
+                  MonthYear(month: widget.month, year: widget.year),
+                ));
+                return detailsAsync.when(
+                  loading: () => _buildMonthlySummary(details: []),
+                  error: (error, stack) => _buildMonthlySummary(details: []),
+                  data: (details) => _buildMonthlySummary(details: details),
+                );
+              },
+            ),
           // Table header with checkbox toggle
           _buildTableHeader(),
           // Content
@@ -214,7 +246,7 @@ class _ShiftDetailPopupState extends ConsumerState<ShiftDetailPopup> {
 
         return detailsAsync.when(
           loading: () => _buildTableHeaderContent(ref, const []),
-          error: (_, _) => _buildTableHeaderContent(ref, const []),
+          error: (error, stack) => _buildTableHeaderContent(ref, const []),
           data: (details) => _buildTableHeaderContent(ref, details),
         );
       },
@@ -297,7 +329,9 @@ class _ShiftDetailPopupState extends ConsumerState<ShiftDetailPopup> {
     );
   }
 
-  Widget _buildMonthlySummary() {
+  /// สร้าง summary section ด้านบน
+  /// [details] - รายการเวรทั้งหมด ใช้สำหรับ scroll ไปยังวันที่ขาดงานเมื่อกด A
+  Widget _buildMonthlySummary({required List<dynamic> details}) {
     final summary = widget.monthlySummary;
     if (summary == null) return const SizedBox.shrink();
 
@@ -341,10 +375,14 @@ class _ShiftDetailPopupState extends ConsumerState<ShiftDetailPopup> {
               _buildSummaryCell('pDD', '${summary.pdd ?? 0}'),
               _buildSummaryCell('Inc', '${summary.inchargeCount}'),
               _buildSummaryCell('S', '${summary.sickCount}'),
+              // A (Absent) - กดแล้ว scroll ไปยังวันที่ขาดงาน
               _buildSummaryCellWithBadge(
                 'A',
                 '${summary.absentCount}',
                 showBadge: summary.absentCount > 0,
+                onTap: summary.absentCount > 0
+                    ? () => _scrollToAbsentDay(details)
+                    : null,
               ),
               _buildSummaryCell('Sup', '${summary.supportCount}'),
             ],
@@ -427,52 +465,61 @@ class _ShiftDetailPopupState extends ConsumerState<ShiftDetailPopup> {
   }
 
   /// Summary cell with notification badge
-  Widget _buildSummaryCellWithBadge(String label, String value,
-      {bool showBadge = false}) {
+  /// [onTap] - callback เมื่อกดที่ cell (ใช้สำหรับ scroll ไปยังวันที่ขาดงาน)
+  Widget _buildSummaryCellWithBadge(
+    String label,
+    String value, {
+    bool showBadge = false,
+    VoidCallback? onTap,
+  }) {
     return Expanded(
-      child: Container(
-        padding: EdgeInsets.symmetric(vertical: 2),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label,
-              style: AppTypography.caption.copyWith(
-                color: AppColors.secondaryText,
-                fontWeight: FontWeight.w600,
-                fontSize: 11,
-              ),
-            ),
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Text(
-                  value,
-                  style: AppTypography.body.copyWith(
-                    fontWeight: FontWeight.w500,
-                    fontSize: 15,
-                  ),
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          padding: EdgeInsets.symmetric(vertical: 2),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.secondaryText,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 11,
                 ),
-                if (showBadge)
-                  Positioned(
-                    right: -8,
-                    top: -2,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: AppColors.error,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: AppColors.surface,
-                          width: 1,
+              ),
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Text(
+                    value,
+                    style: AppTypography.body.copyWith(
+                      fontWeight: FontWeight.w500,
+                      fontSize: 15,
+                    ),
+                  ),
+                  if (showBadge)
+                    Positioned(
+                      right: -8,
+                      top: -2,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: AppColors.error,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.surface,
+                            width: 1,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

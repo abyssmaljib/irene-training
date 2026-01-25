@@ -10,7 +10,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/config/supabase_config.dart';
 import 'core/providers/shared_preferences_provider.dart';
+import 'core/services/app_version_service.dart';
+import 'core/services/force_update_service.dart';
 import 'core/services/onesignal_service.dart';
+import 'core/widgets/force_update_dialog.dart';
 import 'features/auth/screens/login_screen.dart';
 import 'features/navigation/screens/main_navigation_screen.dart';
 
@@ -131,6 +134,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
   Session? _session;
   late final StreamSubscription<AuthState> _authSubscription;
 
+  // Flag เพื่อป้องกันการเช็ค force update ซ้ำ
+  bool _hasCheckedForceUpdate = false;
+
   @override
   void initState() {
     super.initState();
@@ -153,12 +159,46 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
           // Initialize OneSignal and login with user ID
           OneSignalService.instance.initialize();
+
+          // อัพเดตข้อมูล app version ไปที่ user_info
+          // เพื่อให้ admin ดูได้ว่า user ใช้ version อะไร
+          AppVersionService.instance.updateVersionInfo();
+
+          // เช็ค force update หลัง login
+          // ใช้ addPostFrameCallback เพื่อให้ context พร้อมใช้งาน
+          _checkForceUpdate();
         } else {
           // Logout from OneSignal
           OneSignalService.instance.clearToken();
+          // Reset flag เมื่อ logout เพื่อให้เช็คใหม่ตอน login ครั้งหน้า
+          _hasCheckedForceUpdate = false;
         }
       }
     });
+  }
+
+  /// ตรวจสอบว่าต้อง force update หรือไม่
+  /// ถ้าต้อง update จะแสดง dialog ที่ปิดไม่ได้
+  Future<void> _checkForceUpdate() async {
+    // ป้องกันการเช็คซ้ำ
+    if (_hasCheckedForceUpdate) return;
+    _hasCheckedForceUpdate = true;
+
+    try {
+      final isUpdateRequired =
+          await ForceUpdateService.instance.isUpdateRequired();
+
+      if (isUpdateRequired && mounted) {
+        // รอให้ frame build เสร็จก่อนแสดง dialog
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && navigatorKey.currentContext != null) {
+            ForceUpdateDialog.show(navigatorKey.currentContext!);
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('AuthWrapper: Error checking force update: $e');
+    }
   }
 
   @override
