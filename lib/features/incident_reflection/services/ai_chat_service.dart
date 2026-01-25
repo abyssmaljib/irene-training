@@ -64,12 +64,29 @@ class PillarContent {
 /// รองรับกรณี:
 /// 1. ข้อความ + JSON metadata: "ข้อความ...", "pillars_progress": {...}
 /// 2. ขึ้นต้นด้วย {"ai_message": แต่ไม่ใช่ valid JSON
+/// 3. ขึ้นต้นด้วย ai_message": "... (JSON ที่ถูกตัดมาไม่สมบูรณ์)
 String _cleanAiMessage(String message) {
   if (message.isEmpty) return message;
 
   var cleanedMessage = message.trim();
 
-  // กรณีที่ขึ้นต้นด้วย { และมี "ai_message" - ลอง extract ข้อความออกมา
+  // กรณีที่ 3: ขึ้นต้นด้วย ai_message": "... (ไม่มี { และ " นำหน้า)
+  // เช่น: ai_message": "ขออภัยค่ะ พี่อาจจะสรุปเร็วไปนิดนึง..."
+  if (cleanedMessage.startsWith('ai_message')) {
+    // ลอง extract ข้อความที่อยู่หลัง ai_message": "
+    final partialJsonRegex = RegExp(r'ai_message"\s*:\s*"([^"]*(?:\\.[^"]*)*)"?');
+    final match = partialJsonRegex.firstMatch(cleanedMessage);
+    if (match != null && match.group(1) != null) {
+      // Unescape JSON string
+      cleanedMessage = match.group(1)!
+          .replaceAll(r'\"', '"')
+          .replaceAll(r'\\', r'\');
+      debugPrint('_cleanAiMessage: Extracted from partial JSON (ai_message prefix)');
+      return cleanedMessage;
+    }
+  }
+
+  // กรณีที่ 2: ขึ้นต้นด้วย { และมี "ai_message" - ลอง extract ข้อความออกมา
   if (cleanedMessage.startsWith('{') && cleanedMessage.contains('"ai_message"')) {
     // ใช้ regex extract ai_message (กรณี JSON ไม่สมบูรณ์)
     final aiMessageRegex = RegExp(r'"ai_message"\s*:\s*"([^"]*(?:\\.[^"]*)*)"');

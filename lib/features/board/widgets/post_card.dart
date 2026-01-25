@@ -313,15 +313,33 @@ class PostCard extends StatelessWidget {
   Widget _buildFooter() {
     return Row(
       children: [
-        // Author
+        // Author avatar - ใช้ Image.network กับ cacheWidth
+        // เพื่อไม่ให้โหลดรูป full-size เข้า memory (ป้องกัน OOM บนมือถือสเปคต่ำ)
         CircleAvatar(
           radius: 12,
           backgroundColor: AppColors.accent1,
-          backgroundImage:
-              post.photoUrl != null ? NetworkImage(post.photoUrl!) : null,
-          child: post.photoUrl == null
-              ? HugeIcon(icon: HugeIcons.strokeRoundedUser, size: AppIconSize.xs, color: AppColors.primary)
-              : null,
+          child: post.photoUrl != null
+              ? ClipOval(
+                  child: Image.network(
+                    post.photoUrl!,
+                    width: 24,
+                    height: 24,
+                    fit: BoxFit.cover,
+                    // cache ที่ 48px (2x สำหรับ high DPI screens)
+                    cacheWidth: 48,
+                    // ถ้าโหลดรูปไม่ได้ แสดง icon แทน
+                    errorBuilder: (context, error, stackTrace) => HugeIcon(
+                      icon: HugeIcons.strokeRoundedUser,
+                      size: AppIconSize.xs,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                )
+              : HugeIcon(
+                  icon: HugeIcons.strokeRoundedUser,
+                  size: AppIconSize.xs,
+                  color: AppColors.primary,
+                ),
         ),
         AppSpacing.horizontalGapSm,
         Expanded(

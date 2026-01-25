@@ -6,6 +6,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/buttons.dart';
 import '../../../core/widgets/irene_app_bar.dart';
+import '../../../core/widgets/network_image.dart';
 import '../../../core/services/user_service.dart';
 import '../../checklist/models/system_role.dart';
 import '../models/med_db.dart';
@@ -1234,22 +1235,17 @@ class _MedicineSummaryCard extends StatelessWidget {
     // ใช้ frontFoiled เหมือนกับ _SelectedMedicineCard
     final imageUrl = medicine.frontFoiled;
 
+    // รูปยา - ใช้ IreneNetworkImage ที่มี timeout และ retry
     if (medicine.hasAnyImage && imageUrl != null && imageUrl.isNotEmpty) {
-      return ClipRRect(
+      return IreneNetworkImage(
+        imageUrl: imageUrl,
+        width: 64,
+        height: 64,
+        fit: BoxFit.cover,
+        memCacheWidth: 200,
         borderRadius: BorderRadius.circular(12),
-        child: Image.network(
-          imageUrl,
-          width: 64,
-          height: 64,
-          fit: BoxFit.cover,
-          // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
-          cacheWidth: 200,
-          errorBuilder: (context, error, stackTrace) => _buildPlaceholderImage(),
-          loadingBuilder: (context, child, loadingProgress) {
-            if (loadingProgress == null) return child;
-            return _buildPlaceholderImage();
-          },
-        ),
+        compact: true,
+        errorPlaceholder: _buildPlaceholderImage(),
       );
     }
 

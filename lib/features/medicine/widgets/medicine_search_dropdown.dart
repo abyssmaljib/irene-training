@@ -5,6 +5,7 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/network_image.dart';
 import '../models/med_db.dart';
 
 /// Widget สำหรับค้นหาและเลือกยาจากฐานข้อมูล
@@ -471,6 +472,7 @@ class _MedicineListTile extends StatelessWidget {
         child: Row(
           children: [
             // Icon ยา
+            // รูปยา - ใช้ IreneNetworkImage ที่มี timeout และ retry
             Container(
               width: 40,
               height: 40,
@@ -479,15 +481,15 @@ class _MedicineListTile extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: medicine.hasAnyImage && medicine.frontFoiled != null
-                  ? ClipRRect(
+                  ? IreneNetworkImage(
+                      imageUrl: medicine.frontFoiled!,
+                      width: 40,
+                      height: 40,
+                      fit: BoxFit.cover,
+                      memCacheWidth: 100,
                       borderRadius: BorderRadius.circular(8),
-                      child: Image.network(
-                        medicine.frontFoiled!,
-                        fit: BoxFit.cover,
-                        // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
-                        cacheWidth: 100,
-                        errorBuilder: (_, _, _) => _buildDefaultIcon(),
-                      ),
+                      compact: true,
+                      errorPlaceholder: _buildDefaultIcon(),
                     )
                   : _buildDefaultIcon(),
             ),
@@ -581,7 +583,7 @@ class _SelectedMedicineCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // รูปยา หรือ icon default
+            // รูปยา - ใช้ IreneNetworkImage ที่มี timeout และ retry
             Container(
               width: 48,
               height: 48,
@@ -590,15 +592,15 @@ class _SelectedMedicineCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: medicine.hasAnyImage && medicine.frontFoiled != null
-                  ? ClipRRect(
+                  ? IreneNetworkImage(
+                      imageUrl: medicine.frontFoiled!,
+                      width: 48,
+                      height: 48,
+                      fit: BoxFit.cover,
+                      memCacheWidth: 100,
                       borderRadius: BorderRadius.circular(8),
-                      child: Image.network(
-                        medicine.frontFoiled!,
-                        fit: BoxFit.cover,
-                        // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
-                        cacheWidth: 100,
-                        errorBuilder: (_, _, _) => _buildDefaultIcon(),
-                      ),
+                      compact: true,
+                      errorPlaceholder: _buildDefaultIcon(),
                     )
                   : _buildDefaultIcon(),
             ),

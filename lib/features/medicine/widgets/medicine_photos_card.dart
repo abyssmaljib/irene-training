@@ -43,8 +43,8 @@ class _MedicinePhotosCardState extends State<MedicinePhotosCard> {
         _mealStatus = status;
         _isLoading = false;
       });
-    } catch (e) {
-      debugPrint('Error loading meal status: $e');
+    } catch (_) {
+      // Error loading meal status - แสดง empty state แทน
       setState(() => _isLoading = false);
     }
   }

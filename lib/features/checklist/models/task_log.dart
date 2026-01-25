@@ -81,6 +81,14 @@ class TaskLog {
   // Task start date (วันที่เริ่มต้น task)
   final DateTime? startDate;
 
+  // Difficulty score fields - คะแนนความยากของงาน (1-10)
+  // 1 = ง่ายที่สุด, 8 = ยากที่สุดแต่ทำคนเดียวได้, 9-10 = ต้องมีคนช่วย
+  // null = ยังไม่ประเมิน หรือ user กดข้าม
+  final int? difficultyScore;
+  final String? difficultyRatedBy; // UUID ของ user ที่ให้คะแนน
+  final String? difficultyRaterNickname; // ชื่อ user ที่ให้คะแนน
+  final double? avgDifficultyScore30d; // ค่าเฉลี่ยย้อนหลัง 30 วัน
+
   const TaskLog({
     required this.logId,
     this.taskId,
@@ -136,6 +144,10 @@ class TaskLog {
     this.creatorPhotoUrl,
     this.creatorGroupName,
     this.startDate,
+    this.difficultyScore, // null = ยังไม่ประเมิน/ข้าม
+    this.difficultyRatedBy,
+    this.difficultyRaterNickname,
+    this.avgDifficultyScore30d,
   });
 
   /// Parse จาก Supabase response
@@ -197,6 +209,11 @@ class TaskLog {
       creatorPhotoUrl: json['creator_photo_url'] as String?,
       creatorGroupName: json['creator_group_name'] as String?,
       startDate: _parseDateTime(json['start_Date']),
+      // Difficulty score fields (null = ยังไม่ประเมิน/ข้าม)
+      difficultyScore: json['difficulty_score'] as int?,
+      difficultyRatedBy: json['difficulty_rated_by'] as String?,
+      difficultyRaterNickname: json['difficulty_rater_nickname'] as String?,
+      avgDifficultyScore30d: (json['avg_difficulty_score_30d'] as num?)?.toDouble(),
     );
   }
 
@@ -400,6 +417,10 @@ class TaskLog {
     String? creatorPhotoUrl,
     String? creatorGroupName,
     DateTime? startDate,
+    int? difficultyScore,
+    String? difficultyRatedBy,
+    String? difficultyRaterNickname,
+    double? avgDifficultyScore30d,
     // ใช้สำหรับ clear ค่าเป็น null (เช่น ยกเลิก status)
     bool clearStatus = false,
     bool clearCompletedAt = false,
@@ -408,6 +429,8 @@ class TaskLog {
     bool clearConfirmImage = false,
     bool clearProblemType = false,
     bool clearDescript = false,
+    bool clearDifficultyScore = false,
+    bool clearDifficultyRatedBy = false,
   }) {
     return TaskLog(
       logId: logId ?? this.logId,
@@ -464,6 +487,10 @@ class TaskLog {
       creatorPhotoUrl: creatorPhotoUrl ?? this.creatorPhotoUrl,
       creatorGroupName: creatorGroupName ?? this.creatorGroupName,
       startDate: startDate ?? this.startDate,
+      difficultyScore: clearDifficultyScore ? null : (difficultyScore ?? this.difficultyScore),
+      difficultyRatedBy: clearDifficultyRatedBy ? null : (difficultyRatedBy ?? this.difficultyRatedBy),
+      difficultyRaterNickname: clearDifficultyRatedBy ? null : (difficultyRaterNickname ?? this.difficultyRaterNickname),
+      avgDifficultyScore30d: avgDifficultyScore30d ?? this.avgDifficultyScore30d,
     );
   }
 }

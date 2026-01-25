@@ -167,11 +167,15 @@ class TaskService {
 
   /// Mark task เป็น complete
   /// video จะดึงจาก Post ผ่าน post_id ใน view แทน
+  /// [difficultyScore] - คะแนนความยากของงาน 1-10 (optional)
+  /// [difficultyRatedBy] - UUID ของ user ที่ให้คะแนน (optional, ถ้าไม่ระบุจะใช้ userId)
   Future<bool> markTaskComplete(
     int logId,
     String userId, {
     String? imageUrl,
     int? postId,
+    int? difficultyScore,
+    String? difficultyRatedBy,
   }) async {
     try {
       await _supabase.from('A_Task_logs_ver2').update({
@@ -180,13 +184,43 @@ class TaskService {
         'completed_at': DateTime.now().toIso8601String(),
         if (imageUrl != null) 'confirmImage': imageUrl,
         if (postId != null) 'post_id': postId,
+        // Difficulty score - ถ้าไม่ระบุจะใช้ default 5 ที่ตั้งไว้ใน database
+        if (difficultyScore != null) 'difficulty_score': difficultyScore,
+        if (difficultyScore != null)
+          'difficulty_rated_by': difficultyRatedBy ?? userId,
       }).eq('id', logId);
 
       invalidateCache();
-      debugPrint('markTaskComplete: log $logId marked as complete (postId: $postId)');
+      debugPrint(
+          'markTaskComplete: log $logId marked as complete (postId: $postId, difficulty: $difficultyScore)');
       return true;
     } catch (e) {
       debugPrint('markTaskComplete error: $e');
+      return false;
+    }
+  }
+
+  /// อัพเดตคะแนนความยากของงาน (สำหรับแก้ไขภายหลัง)
+  /// [logId] - ID ของ task log ที่ต้องการอัพเดต
+  /// [difficultyScore] - คะแนนความยากใหม่ (1-10)
+  /// [ratedBy] - UUID ของผู้ให้คะแนน
+  Future<bool> updateDifficultyScore(
+    int logId,
+    int difficultyScore,
+    String ratedBy,
+  ) async {
+    try {
+      await _supabase.from('A_Task_logs_ver2').update({
+        'difficulty_score': difficultyScore,
+        'difficulty_rated_by': ratedBy,
+      }).eq('id', logId);
+
+      invalidateCache();
+      debugPrint(
+          'updateDifficultyScore: log $logId updated to $difficultyScore');
+      return true;
+    } catch (e) {
+      debugPrint('updateDifficultyScore error: $e');
       return false;
     }
   }
@@ -250,6 +284,9 @@ class TaskService {
         'completed_at': null,
         'confirmImage': null,
         'Descript': null,
+        'problem_type': null,
+        'difficulty_score': null,
+        'difficulty_rated_by': null,
       }).eq('id', logId);
 
       invalidateCache();
@@ -419,12 +456,17 @@ class TaskService {
       // 1. Delete the postponed log
       await _supabase.from('A_Task_logs_ver2').delete().eq('id', postponedLogId);
 
-      // 2. Reset original log
+      // 2. Reset original log - clear ทุก field ที่เกี่ยวข้องกับ completion/status
       await _supabase.from('A_Task_logs_ver2').update({
         'status': null,
         'completed_by': null,
         'completed_at': null,
         'postpone_to': null,
+        'problem_type': null,
+        'Descript': null,
+        'confirmImage': null,
+        'difficulty_score': null,
+        'difficulty_rated_by': null,
       }).eq('id', originalLogId);
 
       invalidateCache();

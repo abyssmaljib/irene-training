@@ -8,6 +8,72 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/irene_app_bar.dart';
 
+/// ขนาดสูงสุดของรูปก่อนหมุน (ป้องกัน memory overflow)
+/// ถ้ารูปใหญ่กว่านี้จะ resize ก่อนหมุน
+const int _maxImageDimension = 1920;
+
+/// Parameters สำหรับส่งไป isolate
+/// ต้องเป็น top-level class เพราะ compute() ต้องการ serializable data
+class _RotateImageParams {
+  final Uint8List bytes;
+  final int angle;
+
+  const _RotateImageParams({required this.bytes, required this.angle});
+}
+
+/// ฟังก์ชันหมุนรูปที่รันใน isolate แยก
+/// ต้องเป็น top-level function เพราะ compute() ไม่รองรับ instance method
+///
+/// ขั้นตอน:
+/// 1. Decode รูปจาก bytes
+/// 2. Resize ถ้ารูปใหญ่เกินไป (ป้องกัน memory overflow)
+/// 3. หมุนรูปตาม angle ที่ระบุ
+/// 4. Encode กลับเป็น JPEG
+Uint8List _rotateImageInIsolate(_RotateImageParams params) {
+  // Decode รูป
+  final image = img.decodeImage(params.bytes);
+  if (image == null) {
+    throw Exception('Cannot decode image');
+  }
+
+  // Resize ถ้ารูปใหญ่เกินไป เพื่อลด memory usage
+  // ใช้ copyResize แทน resize เพื่อไม่แก้ไข original image
+  img.Image processedImage = image;
+  if (image.width > _maxImageDimension || image.height > _maxImageDimension) {
+    // หา scale factor เพื่อให้ด้านที่ยาวที่สุดไม่เกิน _maxImageDimension
+    final scale = _maxImageDimension /
+        (image.width > image.height ? image.width : image.height);
+    final newWidth = (image.width * scale).round();
+    final newHeight = (image.height * scale).round();
+
+    processedImage = img.copyResize(
+      image,
+      width: newWidth,
+      height: newHeight,
+      interpolation: img.Interpolation.linear,
+    );
+  }
+
+  // หมุนรูป
+  img.Image rotated;
+  switch (params.angle) {
+    case 90:
+      rotated = img.copyRotate(processedImage, angle: 90);
+      break;
+    case 180:
+      rotated = img.copyRotate(processedImage, angle: 180);
+      break;
+    case 270:
+      rotated = img.copyRotate(processedImage, angle: 270);
+      break;
+    default:
+      rotated = processedImage;
+  }
+
+  // Encode เป็น JPEG พร้อม compression
+  return Uint8List.fromList(img.encodeJpg(rotated, quality: 85));
+}
+
 /// หน้า Preview รูปก่อน upload
 /// ให้ user ดูรูป หมุนรูป และยืนยันก่อน upload
 class PhotoPreviewScreen extends StatefulWidget {
@@ -116,36 +182,21 @@ class _PhotoPreviewScreenState extends State<PhotoPreviewScreen> {
   }
 
   /// หมุนรูปและบันทึกเป็นไฟล์ใหม่
+  /// ใช้ compute() เพื่อรันใน isolate แยก ป้องกัน crash จาก memory ใน main thread
   Future<File> _rotateImage(File file, int angle) async {
     final bytes = await file.readAsBytes();
-    final image = img.decodeImage(bytes);
 
-    if (image == null) {
-      throw Exception('Cannot decode image');
-    }
-
-    img.Image rotated;
-    switch (angle) {
-      case 90:
-        rotated = img.copyRotate(image, angle: 90);
-        break;
-      case 180:
-        rotated = img.copyRotate(image, angle: 180);
-        break;
-      case 270:
-        rotated = img.copyRotate(image, angle: 270);
-        break;
-      default:
-        rotated = image;
-    }
-
-    // Encode เป็น JPEG
-    final rotatedBytes = img.encodeJpg(rotated, quality: 85);
+    // ใช้ compute() เพื่อ process รูปใน isolate แยก
+    // ป้องกัน crash บน main thread และช่วยให้ UI ไม่ค้าง
+    final rotatedBytes = await compute(
+      _rotateImageInIsolate,
+      _RotateImageParams(bytes: bytes, angle: angle),
+    );
 
     // บันทึกเป็นไฟล์ใหม่
     final newPath = file.path.replaceAll('.jpg', '_rotated.jpg');
     final newFile = File(newPath);
-    await newFile.writeAsBytes(Uint8List.fromList(rotatedBytes));
+    await newFile.writeAsBytes(rotatedBytes);
 
     return newFile;
   }

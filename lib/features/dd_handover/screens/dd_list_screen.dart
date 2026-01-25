@@ -7,6 +7,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/irene_app_bar.dart';
 import '../../board/providers/create_post_provider.dart';
+import '../../board/providers/tag_provider.dart';
 import '../../board/screens/advanced_create_post_screen.dart';
 import '../../shift_summary/screens/shift_summary_screen.dart';
 import '../models/dd_record.dart';
@@ -42,26 +43,34 @@ class _DDListScreenState extends ConsumerState<DDListScreen>
     await ref.read(ddRecordsProvider.future);
   }
 
-  void _onCardTap(DDRecord record) {
-    // Init create post provider with DD data
+  /// เปิดหน้าสร้าง post พร้อม auto-tag "พบแพทย์"
+  Future<void> _onCardTap(DDRecord record) async {
+    // หา tag "พบแพทย์" จาก tagsProvider เพื่อ auto-tag
+    final tags = await ref.read(tagsProvider.future);
+    final doctorTag = tags.where((t) => t.name == 'พบแพทย์').firstOrNull;
+
+    // Init create post provider with DD data + preselected tag
     ref.read(createPostProvider.notifier).initFromDD(
           ddId: record.ddId,
           templateText: record.templateText,
           residentId: record.appointmentResidentId,
           residentName: record.appointmentResidentName,
           title: record.templateTitle,
+          preselectedTag: doctorTag,
         );
 
     // Navigate to advanced create post
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const AdvancedCreatePostScreen(),
-      ),
-    ).then((_) {
-      // Refresh when returning
-      refreshDDRecords(ref);
-    });
+    if (mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const AdvancedCreatePostScreen(),
+        ),
+      ).then((_) {
+        // Refresh when returning
+        refreshDDRecords(ref);
+      });
+    }
   }
 
   void _onCompletedCardTap(DDRecord record) {

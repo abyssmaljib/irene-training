@@ -7,6 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/confirm_dialog.dart';
+import '../../../core/widgets/checkbox_tile.dart';
 import '../models/post.dart';
 import '../providers/edit_post_provider.dart';
 import '../providers/post_provider.dart';
@@ -503,71 +504,36 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
             ],
           ),
 
-          // Handover toggle (แสดงเมื่อเลือก tag แล้ว)
-          if (state.selectedTag != null) ...[
-            AppSpacing.verticalGapSm,
-            _buildHandoverToggle(state),
-          ],
+          // Handover toggle (แสดงตลอดเพื่อให้เลือกได้ไม่ต้องมี tag)
+          AppSpacing.verticalGapSm,
+          _buildHandoverToggle(state),
         ],
       ),
     );
   }
 
   /// Toggle สำหรับส่งเวร
+  /// - ถ้าไม่มี tag: เลือกได้อิสระ (canToggle = true)
+  /// - ถ้ามี tag และเป็น optional handover: เลือกได้
+  /// - ถ้ามี tag และเป็น force handover: ถูกบังคับเปิด (canToggle = false)
   Widget _buildHandoverToggle(EditPostState state) {
-    final canToggle = state.selectedTag?.isOptionalHandover ?? false;
     final isForce = state.selectedTag?.isForceHandover ?? false;
+    // ถ้าไม่มี tag หรือ tag เป็น optional handover = toggle ได้
+    final canToggle = state.selectedTag == null ||
+        (state.selectedTag?.isOptionalHandover ?? false);
 
-    return Row(
-      children: [
-        // Icon
-        HugeIcon(
-          icon: HugeIcons.strokeRoundedArrowLeftRight,
-          color: state.isHandover ? AppColors.success : AppColors.secondaryText,
-          size: AppIconSize.md,
-        ),
-        const SizedBox(width: 8),
-
-        // Text
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'ส่งเวร',
-                style: AppTypography.bodySmall.copyWith(
-                  fontWeight: FontWeight.w500,
-                  color: state.isHandover ? AppColors.success : AppColors.primaryText,
-                ),
-              ),
-              Text(
-                isForce ? 'บังคับส่งเวร' : 'เลือกส่งเวร',
-                style: AppTypography.caption.copyWith(
-                  color: AppColors.secondaryText,
-                  fontSize: 10,
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        // Switch
-        Switch(
-          value: state.isHandover,
-          onChanged: canToggle
-              ? (value) {
-                  ref.read(editPostProvider(widget.post.id).notifier).setHandover(value);
-                }
-              : null,
-          activeTrackColor: AppColors.success.withValues(alpha: 0.5),
-          thumbColor: WidgetStateProperty.resolveWith((states) {
-            if (states.contains(WidgetState.selected)) {
-              return AppColors.success;
-            }
-            return AppColors.secondaryText;
-          }),
-        ),
-      ],
+    return CheckboxTile(
+      value: state.isHandover,
+      onChanged: canToggle
+          ? (value) => ref.read(editPostProvider(widget.post.id).notifier).setHandover(value)
+          : null,
+      icon: HugeIcons.strokeRoundedArrowLeftRight,
+      title: 'ส่งเวร',
+      subtitle: isForce
+          ? 'จำเป็นต้องส่งเวรสำหรับหัวข้อนี้'
+          : 'หากมีอาการผิดปกติ ผิดแปลกไปจากเดิม หรือเป็นเรื่องที่สำคัญ',
+      subtitleColor: AppColors.error,
+      isRequired: isForce,
     );
   }
 

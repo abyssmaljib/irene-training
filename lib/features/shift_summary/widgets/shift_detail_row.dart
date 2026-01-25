@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../board/providers/create_post_provider.dart';
+import '../../board/providers/tag_provider.dart';
 import '../../board/screens/advanced_create_post_screen.dart';
 import '../../board/screens/board_screen.dart';
 import '../../dd_handover/services/dd_service.dart';
@@ -428,6 +429,7 @@ class _ShiftDetailRowState extends ConsumerState<ShiftDetailRow>
   }
 
   /// เปิดหน้าสร้าง post สำหรับ DD ที่ยังไม่ได้ส่งเวร
+  /// Auto-tag "พบแพทย์" ให้อัตโนมัติ
   Future<void> _openCreatePost(BuildContext context, WidgetRef ref, int ddRecordId) async {
     // Show loading indicator
     showDialog(
@@ -454,13 +456,19 @@ class _ShiftDetailRowState extends ConsumerState<ShiftDetailRow>
         return;
       }
 
+      // หา tag "พบแพทย์" จาก tagsProvider เพื่อ auto-tag
+      final tags = await ref.read(tagsProvider.future);
+      final doctorTag = tags.where((t) => t.name == 'พบแพทย์').firstOrNull;
+
       // ใช้ template text จาก DDRecord model ซึ่งมี format เหมือนกับตอนกด DD
+      // พร้อม preselect tag "พบแพทย์" อัตโนมัติ
       ref.read(createPostProvider.notifier).initFromDD(
         ddId: ddRecordId,
         templateText: ddRecord.templateText,
         residentId: ddRecord.appointmentResidentId,
         residentName: ddRecord.appointmentResidentName,
         title: ddRecord.templateTitle,
+        preselectedTag: doctorTag,
       );
 
       // Navigate to AdvancedCreatePostScreen

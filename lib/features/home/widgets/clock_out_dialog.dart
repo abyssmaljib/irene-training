@@ -5,6 +5,7 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/blocking_check_dialog.dart';
 import '../../../core/widgets/buttons.dart';
 import '../../incident_reflection/models/incident.dart';
 import '../../incident_reflection/services/incident_service.dart';
@@ -452,189 +453,72 @@ class _ClockOutDialogState extends State<ClockOutDialog> {
   }
 
   /// UI สำหรับแสดง pending incidents ที่ยังไม่ได้ถอดบทเรียน
+  /// ใช้ BlockingCheckDialog reusable widget
   Widget _buildPendingIncidentsContent() {
-    return SingleChildScrollView(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+    // แปลง incidents เป็น BlockingItemData
+    final items = _pendingIncidents.map((incident) {
+      // กำหนด status และ text ตาม reflectionStatus
+      final (status, statusText) = switch (incident.reflectionStatus) {
+        ReflectionStatus.pending => (
+            BlockingItemStatus.pending,
+            'รอถอดบทเรียน',
+          ),
+        ReflectionStatus.inProgress => (
+            BlockingItemStatus.inProgress,
+            'กำลังดำเนินการ',
+          ),
+        _ => (BlockingItemStatus.pending, 'รอถอดบทเรียน'),
+      };
+
+      return BlockingItemData(
+        title: incident.description ?? 'ไม่มีรายละเอียด',
+        subtitle: incident.residentName,
+        status: status,
+        statusText: statusText,
+        icon: HugeIcons.strokeRoundedAlert02,
+      );
+    }).toList();
+
+    // สร้าง rich message พร้อมจำนวนที่เน้น
+    final richMessage = RichText(
+      textAlign: TextAlign.center,
+      text: TextSpan(
+        style: AppTypography.body.copyWith(
+          color: AppColors.secondaryText,
+        ),
         children: [
-          // Title
-          Text(
-            'มี Incident ที่ต้องถอดบทเรียน',
-            style: AppTypography.heading3,
-            textAlign: TextAlign.center,
-          ),
-
-          AppSpacing.verticalGapMd,
-
-          // Cat image
-          Image.asset(
-            'assets/images/checking_cat.webp',
-            width: 160,
-            height: 160,
-          ),
-
-          AppSpacing.verticalGapMd,
-
-          // Message
-          RichText(
-            textAlign: TextAlign.center,
-            text: TextSpan(
-              style: AppTypography.body.copyWith(
-                color: AppColors.secondaryText,
-              ),
-              children: [
-                const TextSpan(text: 'มี '),
-                TextSpan(
-                  text: '$_pendingIncidentsCount เหตุการณ์',
-                  style: AppTypography.body.copyWith(
-                    color: AppColors.warning,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const TextSpan(text: ' ที่ต้องถอดบทเรียน\nกรุณาทำให้เสร็จก่อนลงเวร'),
-              ],
+          const TextSpan(text: 'มี '),
+          TextSpan(
+            text: '$_pendingIncidentsCount เหตุการณ์',
+            style: AppTypography.body.copyWith(
+              color: AppColors.warning,
+              fontWeight: FontWeight.w600,
             ),
           ),
-
-          AppSpacing.verticalGapMd,
-
-          // Incident List (แสดงสูงสุด 5 รายการ)
-          if (_pendingIncidents.isNotEmpty) ...[
-            Container(
-              constraints: const BoxConstraints(maxHeight: 200),
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: _pendingIncidents.length > 5 ? 5 : _pendingIncidents.length,
-                itemBuilder: (context, index) {
-                  final incident = _pendingIncidents[index];
-                  return _buildIncidentItem(incident);
-                },
-              ),
-            ),
-            if (_pendingIncidentsCount > 5) ...[
-              AppSpacing.verticalGapSm,
-              Text(
-                'และอีก ${_pendingIncidentsCount - 5} เหตุการณ์...',
-                style: AppTypography.caption.copyWith(
-                  color: AppColors.secondaryText,
-                ),
-              ),
-            ],
-          ],
-
-          AppSpacing.verticalGapLg,
-
-          // Go to Incidents Button - ไปยังหน้า chat ของ incident แรก
-          PrimaryButton(
-            text: 'ไปถอดบทเรียน',
-            onPressed: () {
-              debugPrint('Button pressed! _pendingIncidents.length = ${_pendingIncidents.length}');
-              Navigator.of(context).pop(false);
-              // ส่ง incident แรกที่ยังไม่เสร็จไปให้ callback
-              if (_pendingIncidents.isNotEmpty) {
-                debugPrint('Calling onViewIncidents with incident: ${_pendingIncidents.first.id}');
-                widget.onViewIncidents(_pendingIncidents.first);
-              } else {
-                debugPrint('ERROR: _pendingIncidents is empty!');
-              }
-            },
-            icon: HugeIcons.strokeRoundedArrowRight01,
-          ),
-
-          AppSpacing.verticalGapSm,
-
-          // Cancel Button
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(
-              'ยกเลิก',
-              style: AppTypography.body.copyWith(
-                color: AppColors.secondaryText,
-              ),
-            ),
-          ),
+          const TextSpan(text: ' ที่ต้องถอดบทเรียน\nกรุณาทำให้เสร็จก่อนลงเวร'),
         ],
       ),
     );
-  }
 
-  /// สร้าง item แสดง incident แต่ละรายการ
-  Widget _buildIncidentItem(Incident incident) {
-    // แสดงสถานะด้วยสีต่างกัน
-    final statusColor = incident.reflectionStatus == ReflectionStatus.pending
-        ? AppColors.warning
-        : AppColors.info;
-    final statusText = incident.reflectionStatus == ReflectionStatus.pending
-        ? 'รอถอดบทเรียน'
-        : 'กำลังถอดบทเรียน';
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.tagPendingBg,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: statusColor.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        children: [
-          HugeIcon(
-            icon: HugeIcons.strokeRoundedAlert02,
-            color: statusColor,
-            size: 20,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  incident.description ?? 'ไม่มีรายละเอียด',
-                  style: AppTypography.bodySmall.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                AppSpacing.verticalGapXs,
-                Row(
-                  children: [
-                    // Resident name
-                    if (incident.residentName != null) ...[
-                      Text(
-                        incident.residentName!,
-                        style: AppTypography.caption.copyWith(
-                          color: AppColors.secondaryText,
-                        ),
-                      ),
-                      const Text(' • '),
-                    ],
-                    // Status badge
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        statusText,
-                        style: AppTypography.caption.copyWith(
-                          color: statusColor,
-                          fontWeight: FontWeight.w500,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+    return BlockingCheckContent(
+      title: 'มี Incident ที่ต้องถอดบทเรียน',
+      imageAsset: 'assets/images/checking_cat.webp',
+      imageSize: 160,
+      richMessage: richMessage,
+      items: items,
+      totalCount: _pendingIncidentsCount,
+      displayLimit: 5,
+      primaryButtonText: 'ไปถอดบทเรียน',
+      primaryButtonIcon: HugeIcons.strokeRoundedArrowRight01,
+      onPrimaryPressed: () {
+        Navigator.of(context).pop(false);
+        // ส่ง incident แรกที่ยังไม่เสร็จไปให้ callback
+        if (_pendingIncidents.isNotEmpty) {
+          widget.onViewIncidents(_pendingIncidents.first);
+        }
+      },
+      cancelButtonText: 'ยกเลิก',
+      onCancelPressed: () => Navigator.of(context).pop(false),
     );
   }
 

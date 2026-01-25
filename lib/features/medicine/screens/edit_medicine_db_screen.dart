@@ -9,6 +9,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/buttons.dart';
 import '../../../core/widgets/irene_app_bar.dart';
+import '../../../core/widgets/network_image.dart';
 import '../providers/create_medicine_db_provider.dart';
 import '../providers/edit_medicine_db_form_provider.dart';
 import '../services/medicine_service.dart';
@@ -913,13 +914,13 @@ class _ImageUploadBox extends StatelessWidget {
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
-                        Image.network(
-                          imageUrl!,
+                        // รูปยา - ใช้ IreneNetworkImage ที่มี timeout และ retry
+                        IreneNetworkImage(
+                          imageUrl: imageUrl!,
                           fit: BoxFit.cover,
-                          // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
-                          cacheWidth: 200,
-                          errorBuilder: (context, error, stackTrace) =>
-                              _buildPlaceholder(),
+                          memCacheWidth: 200,
+                          compact: true,
+                          errorPlaceholder: _buildPlaceholder(),
                         ),
                         // Label overlay
                         Positioned(

@@ -25,7 +25,7 @@ class PostDraft {
 
   /// Paths ของไฟล์ที่เลือก (local file paths)
   final List<String> imagePaths;
-  final String? videoPath;
+  final List<String> videoPaths;
 
   /// เวลาที่บันทึก draft
   final DateTime savedAt;
@@ -46,7 +46,7 @@ class PostDraft {
     this.residentId,
     this.residentName,
     this.imagePaths = const [],
-    this.videoPath,
+    this.videoPaths = const [],
     required this.savedAt,
     this.isAdvanced = false,
   });
@@ -59,7 +59,7 @@ class PostDraft {
       tagId != null ||
       residentId != null ||
       imagePaths.isNotEmpty ||
-      videoPath != null;
+      videoPaths.isNotEmpty;
 
   /// แปลงเป็น JSON Map
   Map<String, dynamic> toJson() {
@@ -75,7 +75,7 @@ class PostDraft {
       'residentId': residentId,
       'residentName': residentName,
       'imagePaths': imagePaths,
-      'videoPath': videoPath,
+      'videoPaths': videoPaths,
       'savedAt': savedAt.toIso8601String(),
       'isAdvanced': isAdvanced,
     };
@@ -98,7 +98,11 @@ class PostDraft {
               ?.map((e) => e as String)
               .toList() ??
           [],
-      videoPath: json['videoPath'] as String?,
+      // รองรับทั้ง videoPaths (ใหม่) และ videoPath (เดิม) สำหรับ backward compatibility
+      videoPaths: (json['videoPaths'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          (json['videoPath'] != null ? [json['videoPath'] as String] : []),
       savedAt: json['savedAt'] != null
           ? DateTime.parse(json['savedAt'] as String)
           : DateTime.now(),
@@ -127,7 +131,7 @@ class PostDraft {
     int? residentId,
     String? residentName,
     List<String>? imagePaths,
-    String? videoPath,
+    List<String>? videoPaths,
     DateTime? savedAt,
     bool? isAdvanced,
   }) {
@@ -143,7 +147,7 @@ class PostDraft {
       residentId: residentId ?? this.residentId,
       residentName: residentName ?? this.residentName,
       imagePaths: imagePaths ?? this.imagePaths,
-      videoPath: videoPath ?? this.videoPath,
+      videoPaths: videoPaths ?? this.videoPaths,
       savedAt: savedAt ?? this.savedAt,
       isAdvanced: isAdvanced ?? this.isAdvanced,
     );

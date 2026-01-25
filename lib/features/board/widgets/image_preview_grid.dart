@@ -1,9 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/widgets/network_image.dart';
 
 /// Widget สำหรับแสดง preview รูปภาพที่เลือก
 class ImagePreviewGrid extends StatelessWidget {
@@ -110,31 +110,25 @@ class ImagePreviewGrid extends StatelessWidget {
       margin: const EdgeInsets.only(right: 8),
       child: Stack(
         children: [
-          // Image
+          // Image - ใช้ IreneNetworkImage ที่มี timeout และ retry
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
-            child: CachedNetworkImage(
+            child: IreneNetworkImage(
               imageUrl: url,
               width: 80,
               height: 80,
               fit: BoxFit.cover,
-              placeholder: (context, url) => Container(
+              memCacheWidth: 160, // 2x สำหรับ high DPI
+              compact: true, // ใช้ UI แบบ compact เพราะรูปเล็ก
+              errorPlaceholder: Container(
+                width: 80,
+                height: 80,
                 color: AppColors.alternate,
                 child: Center(
-                  child: SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: AppColors.primary,
-                    ),
+                  child: HugeIcon(
+                    icon: HugeIcons.strokeRoundedImage01,
+                    color: AppColors.secondaryText,
                   ),
-                ),
-              ),
-              errorWidget: (context, url, error) => Container(
-                color: AppColors.alternate,
-                child: Center(
-                  child: HugeIcon(icon: HugeIcons.strokeRoundedImage01, color: AppColors.secondaryText),
                 ),
               ),
             ),
@@ -254,14 +248,16 @@ class ImagePreviewCompact extends StatelessWidget {
       child: ListView(
         scrollDirection: Axis.horizontal,
         children: [
-          // Uploaded images first
+          // Uploaded images first - ใช้ IreneNetworkImage ที่มี timeout และ retry
           ...uploadedUrls.asMap().entries.map((entry) {
             return _buildThumbnail(
-              child: CachedNetworkImage(
+              child: IreneNetworkImage(
                 imageUrl: entry.value,
                 width: 60,
                 height: 60,
                 fit: BoxFit.cover,
+                memCacheWidth: 120, // 2x สำหรับ high DPI
+                compact: true,
               ),
               onRemove:
                   onRemoveUploaded != null ? () => onRemoveUploaded!(entry.key) : null,

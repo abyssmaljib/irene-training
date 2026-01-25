@@ -41,7 +41,8 @@ class PillarProgressIndicator extends StatelessWidget {
           _buildConnector(progress.whyItMattersCompleted),
           _buildPillarDot(
             label: 'สาเหตุ',
-            icon: HugeIcons.strokeRoundedSearch01,
+            // Search01 มีปัญหา render บน Android เปลี่ยนเป็น SearchArea แทน
+            icon: HugeIcons.strokeRoundedSearchArea,
             isCompleted: progress.rootCauseCompleted,
           ),
           _buildConnector(progress.rootCauseCompleted),

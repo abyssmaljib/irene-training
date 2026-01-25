@@ -192,6 +192,44 @@ List<TaskLog> _filterByZonesResidentsRoleAndType(
   return filtered;
 }
 
+/// Helper function สำหรับ merge optimistic updates กับ server data
+/// ใช้ optimistic เฉพาะเมื่อ status ยังไม่ตรงกับ server
+/// ถ้า status ตรงกันแล้ว = server sync เสร็จ → ใช้ server data
+/// Returns: (mergedTasks, syncedLogIds) - logIds ที่ sync เสร็จแล้วสามารถ cleanup ได้
+(List<TaskLog>, Set<int>) _mergeOptimisticUpdatesWithCleanup(
+  List<TaskLog> serverTasks,
+  Map<int, TaskLog> optimisticUpdates,
+) {
+  if (optimisticUpdates.isEmpty) return (serverTasks, {});
+
+  final syncedLogIds = <int>{};
+
+  final merged = serverTasks.map((serverTask) {
+    final optimistic = optimisticUpdates[serverTask.logId];
+    if (optimistic == null) return serverTask;
+
+    // Compare status: ถ้าตรงกัน = server sync เสร็จแล้ว → ใช้ server data
+    // ถ้าไม่ตรง = server ยังไม่ sync → ใช้ optimistic ต่อไป
+    if (serverTask.status == optimistic.status) {
+      syncedLogIds.add(serverTask.logId); // mark สำหรับ cleanup
+      return serverTask;
+    }
+
+    return optimistic;
+  }).toList();
+
+  return (merged, syncedLogIds);
+}
+
+/// Simple merge function (ไม่มี cleanup tracking)
+List<TaskLog> _mergeOptimisticUpdates(
+  List<TaskLog> serverTasks,
+  Map<int, TaskLog> optimisticUpdates,
+) {
+  final (merged, _) = _mergeOptimisticUpdatesWithCleanup(serverTasks, optimisticUpdates);
+  return merged;
+}
+
 /// Provider สำหรับ filtered tasks ตาม view mode
 /// ใช้ optimistic updates เพื่อให้ UI ตอบสนองทันที
 final filteredTasksProvider = Provider<AsyncValue<List<TaskLog>>>((ref) {
@@ -212,10 +250,8 @@ final filteredTasksProvider = Provider<AsyncValue<List<TaskLog>>>((ref) {
 
   return tasksAsync.when(
     data: (tasks) {
-      // รวม optimistic updates เข้ากับ tasks
-      final mergedTasks = optimisticUpdates.isEmpty
-          ? tasks
-          : tasks.map((task) => optimisticUpdates[task.logId] ?? task).toList();
+      // รวม optimistic updates เข้ากับ tasks (ใช้ smart merge)
+      final mergedTasks = _mergeOptimisticUpdates(tasks, optimisticUpdates);
 
       final shift = shiftAsync.valueOrNull;
 
@@ -255,10 +291,8 @@ final groupedTasksProvider =
 
   return tasksAsync.when(
     data: (tasks) {
-      // รวม optimistic updates เข้ากับ tasks
-      final mergedTasks = optimisticUpdates.isEmpty
-          ? tasks
-          : tasks.map((task) => optimisticUpdates[task.logId] ?? task).toList();
+      // รวม optimistic updates เข้ากับ tasks (ใช้ smart merge)
+      final mergedTasks = _mergeOptimisticUpdates(tasks, optimisticUpdates);
 
       // Apply zone, resident, role, and task type filter
       final filteredTasks = _filterByZonesResidentsRoleAndType(
@@ -288,10 +322,8 @@ final taskCountsProvider = Provider<Map<TaskViewMode, int>>((ref) {
 
   final allTasks = tasksAsync.value!;
 
-  // รวม optimistic updates เข้ากับ tasks
-  final mergedTasks = optimisticUpdates.isEmpty
-      ? allTasks
-      : allTasks.map((task) => optimisticUpdates[task.logId] ?? task).toList();
+  // รวม optimistic updates เข้ากับ tasks (ใช้ smart merge)
+  final mergedTasks = _mergeOptimisticUpdates(allTasks, optimisticUpdates);
 
   // Apply zone, resident, role, and task type filter
   final tasks = _filterByZonesResidentsRoleAndType(
@@ -545,8 +577,11 @@ void refreshTasks(WidgetRef ref) {
 }
 
 /// Helper function to refresh tasks using ProviderContainer (for realtime callbacks)
+/// ไม่ clear optimistic state ที่นี่ เพราะ realtime event อาจมาก่อน server sync เสร็จ
+/// merge logic ใน filteredTasksProvider จะ compare status และใช้ server data เมื่อ sync เสร็จแล้ว
 void refreshTasksWithContainer(ProviderContainer container) {
   TaskService.instance.invalidateCache();
+  // ไม่ต้อง clear optimistic - ให้ merge logic จัดการ compare เอง
   container.read(taskRefreshCounterProvider.notifier).state++;
   container.invalidate(tasksProvider);
   container.invalidate(userShiftProvider);
@@ -630,16 +665,9 @@ final tasksWithOptimisticProvider = Provider<AsyncValue<List<TaskLog>>>((ref) {
 
   return tasksAsync.when(
     data: (tasks) {
-      if (optimisticUpdates.isEmpty) {
-        return AsyncValue.data(tasks);
-      }
-
-      // แทนที่ tasks ด้วย optimistic updates
-      final updatedTasks = tasks.map((task) {
-        return optimisticUpdates[task.logId] ?? task;
-      }).toList();
-
-      return AsyncValue.data(updatedTasks);
+      // ใช้ smart merge ที่ compare status
+      final mergedTasks = _mergeOptimisticUpdates(tasks, optimisticUpdates);
+      return AsyncValue.data(mergedTasks);
     },
     loading: () => const AsyncValue.loading(),
     error: (e, st) => AsyncValue.error(e, st),

@@ -464,6 +464,8 @@ class _ShiftSummaryScreenState extends State<ShiftSummaryScreen> {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
+          // ลบ onChanged ออก - ใช้ ValueListenableBuilder ใน button แทน
+          // เพื่อไม่ให้ rebuild ทั้งหน้าทุกครั้งที่พิมพ์
           TextField(
             controller: _shiftSurveyController,
             decoration: InputDecoration(
@@ -474,7 +476,6 @@ class _ShiftSummaryScreenState extends State<ShiftSummaryScreen> {
             ),
             minLines: 3,
             maxLines: 5,
-            onChanged: (v) => setState((){}), 
           ),
           const SizedBox(height: 16),
           Text(
@@ -538,14 +539,24 @@ class _ShiftSummaryScreenState extends State<ShiftSummaryScreen> {
     );
   }
 
+  /// ใช้ ValueListenableBuilder เพื่อ rebuild เฉพาะ button
+  /// เมื่อ user พิมพ์ใน TextField (ไม่ rebuild ทั้งหน้า)
   Widget _buildOffDutyButton() {
-    final isDisabled = _remainingTasks > 0 || _shiftSurveyController.text.trim().isEmpty || _isClockingOut;
-    
-    return PrimaryButton(
-      text: 'ลงเวร (เหลืออีก $_remainingTasks)',
-      onPressed: isDisabled ? null : _handleClockOut,
-      isLoading: _isClockingOut,
-      icon: HugeIcons.strokeRoundedLogout01,
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: _shiftSurveyController,
+      builder: (context, value, child) {
+        // คำนวณ isDisabled ใน builder เพื่อให้ update เมื่อ text เปลี่ยน
+        final isDisabled = _remainingTasks > 0 ||
+            value.text.trim().isEmpty ||
+            _isClockingOut;
+
+        return PrimaryButton(
+          text: 'ลงเวร (เหลืออีก $_remainingTasks)',
+          onPressed: isDisabled ? null : _handleClockOut,
+          isLoading: _isClockingOut,
+          icon: HugeIcons.strokeRoundedLogout01,
+        );
+      },
     );
   }
 }

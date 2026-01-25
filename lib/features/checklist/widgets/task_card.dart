@@ -3,6 +3,7 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/nps_scale.dart';
 import '../models/problem_type.dart';
 import '../models/task_log.dart';
 
@@ -328,10 +329,13 @@ class TaskCard extends StatelessWidget {
           color: AppColors.tagPendingBg,
           borderRadius: BorderRadius.circular(6),
         ),
-        child: HugeIcon(
-          icon: HugeIcons.strokeRoundedAlert02,
-          color: AppColors.tagPendingText,
-          size: 18,
+        // wrap Center เพื่อให้ icon อยู่ตรงกลาง Container
+        child: Center(
+          child: HugeIcon(
+            icon: HugeIcons.strokeRoundedAlert02,
+            color: AppColors.tagPendingText,
+            size: 18,
+          ),
         ),
       );
     }
@@ -344,10 +348,13 @@ class TaskCard extends StatelessWidget {
           color: AppColors.secondary,
           borderRadius: BorderRadius.circular(6),
         ),
-        child: HugeIcon(
-          icon: HugeIcons.strokeRoundedHospital01,
-          color: Colors.white,
-          size: 16,
+        // wrap Center เพื่อให้ icon อยู่ตรงกลาง Container
+        child: Center(
+          child: HugeIcon(
+            icon: HugeIcons.strokeRoundedHospital01,
+            color: Colors.white,
+            size: 16,
+          ),
         ),
       );
     }
@@ -370,8 +377,11 @@ class TaskCard extends StatelessWidget {
           width: 2,
         ),
       ),
+      // wrap Center เพื่อให้ icon อยู่ตรงกลาง Container
       child: isComplete
-          ? HugeIcon(icon: HugeIcons.strokeRoundedCheckmarkSquare02, color: Colors.white, size: AppIconSize.sm)
+          ? Center(
+              child: HugeIcon(icon: HugeIcons.strokeRoundedTick01, color: Colors.white, size: AppIconSize.sm),
+            )
           : null,
     );
   }
@@ -506,13 +516,24 @@ class TaskCard extends StatelessWidget {
     }
   }
 
-  /// สร้าง column ด้านขวา (status badge + task type icons)
+  /// สร้าง column ด้านขวา (status badge + task type icons + difficulty)
   Widget _buildRightColumn() {
     final items = <Widget>[];
 
     // Status badge (ติดปัญหา, เลื่อน, ไม่อยู่ศูนย์)
     if (task.isProblem || task.isPostponed || task.isReferred) {
       items.add(_buildStatusBadge());
+    }
+
+    // Difficulty badge (คะแนนความยากที่ user ให้ไว้)
+    final difficultyBadge = _buildDifficultyBadge();
+    if (difficultyBadge != null) {
+      items.add(
+        Padding(
+          padding: EdgeInsets.only(top: items.isEmpty ? 0 : 6),
+          child: difficultyBadge,
+        ),
+      );
     }
 
     // กล้อง = งานที่มีรูปตัวอย่าง หรือต้องถ่ายรูป
@@ -781,6 +802,66 @@ class TaskCard extends StatelessWidget {
             style: AppTypography.caption.copyWith(
               color: AppColors.textPrimary,
               fontSize: 10,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Emoji สำหรับแต่ละคะแนน (1-10)
+  static const _scoreEmojis = {
+    1: '😎',
+    2: '🤗',
+    3: '🙂',
+    4: '😀',
+    5: '😃',
+    6: '🤔',
+    7: '😥',
+    8: '😫',
+    9: '😱',
+    10: '🤯',
+  };
+
+  /// Badge แสดงคะแนนความยากที่ user ให้ไว้
+  /// แสดงเฉพาะเมื่อ task.difficultyRatedBy == currentUserId
+  Widget? _buildDifficultyBadge() {
+    // ต้องมีคะแนน และ user ปัจจุบันเป็นคนให้คะแนน
+    if (task.difficultyScore == null) return null;
+    if (currentUserId == null || task.difficultyRatedBy != currentUserId) {
+      return null;
+    }
+
+    final score = task.difficultyScore!;
+    final emoji = _scoreEmojis[score] ?? '🤔';
+
+    // หาสีจาก kDifficultyThresholds
+    Color color = AppColors.secondaryText;
+    for (final threshold in kDifficultyThresholds) {
+      if (score >= threshold.from && score <= threshold.to) {
+        color = threshold.color;
+        break;
+      }
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 12)),
+          const SizedBox(width: 2),
+          Text(
+            '$score',
+            style: AppTypography.caption.copyWith(
+              color: color,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],

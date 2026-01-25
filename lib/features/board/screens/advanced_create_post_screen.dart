@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -25,11 +26,53 @@ import '../widgets/image_picker_bar.dart' show ImagePickerHelper;
 import '../widgets/image_preview_grid.dart';
 import '../widgets/quiz_form_widget.dart';
 import '../widgets/ai_summary_widget.dart';
+import '../../../core/widgets/checkbox_tile.dart';
+import '../providers/tag_provider.dart';
+import '../../../core/widgets/success_popup.dart';
+import '../../../core/widgets/buttons.dart';
+import '../../checklist/services/task_service.dart';
+import '../../checklist/providers/task_provider.dart'
+    show
+        refreshTasks,
+        tasksProvider,
+        currentUserNicknameProvider,
+        optimisticUpdateTask,
+        commitOptimisticUpdate;
+import '../../checklist/widgets/difficulty_rating_dialog.dart';
 
 /// Advanced Create Post Screen - Full page version for supervisors+
 /// Features: Title, AI summarize, Quiz, Tag, Resident, Images/Video
+///
+/// รองรับทั้งการสร้างโพสปกติ และการสร้างโพสจาก task (complete by post)
 class AdvancedCreatePostScreen extends ConsumerStatefulWidget {
-  const AdvancedCreatePostScreen({super.key});
+  /// Callback เมื่อโพสสำเร็จ
+  final VoidCallback? onPostCreated;
+
+  /// Initial values สำหรับ pre-fill form
+  final String? initialTitle;
+  final String? initialText;
+  final int? initialResidentId;
+  final String? initialResidentName;
+  final String? initialTagName;
+
+  /// Task completion fields (สำหรับ complete task เมื่อโพสสำเร็จ)
+  final int? taskLogId;
+  final String? taskConfirmImageUrl;
+
+  /// ตรวจสอบว่ามาจาก task หรือไม่
+  bool get isFromTask => taskLogId != null;
+
+  const AdvancedCreatePostScreen({
+    super.key,
+    this.onPostCreated,
+    this.initialTitle,
+    this.initialText,
+    this.initialResidentId,
+    this.initialResidentName,
+    this.initialTagName,
+    this.taskLogId,
+    this.taskConfirmImageUrl,
+  });
 
   @override
   ConsumerState<AdvancedCreatePostScreen> createState() =>
@@ -53,30 +96,88 @@ class _AdvancedCreatePostScreenState
   void initState() {
     super.initState();
 
+    // ถ้ามาจาก task ให้ใส่ค่าใน controller ทันที
+    if (widget.isFromTask) {
+      // Title จาก task (lock ไว้)
+      if (widget.initialTitle != null) {
+        _titleController.text = widget.initialTitle!;
+      }
+      // Text (description) จาก task
+      if (widget.initialText != null) {
+        _textController.text = widget.initialText!;
+      }
+    } else if (widget.initialText != null) {
+      // กรณีปกติ - ใส่ initialText ถ้ามี
+      _textController.text = widget.initialText!;
+    }
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Initialize draft service
       final prefs = ref.read(sharedPreferencesProvider);
       _draftService = PostDraftService(prefs);
 
-      final state = ref.read(createPostProvider);
-      // ถ้ามี text จาก simple modal ให้โหลดมาใส่ใน controller
-      if (state.text.isNotEmpty) {
-        _textController.text = state.text;
-      }
-      // ถ้ามี title ให้โหลดมาด้วย
-      if (state.title != null && state.title!.isNotEmpty) {
-        _titleController.text = state.title!;
-      }
+      // ถ้ามาจาก task หรือมี initial values ให้ใช้ค่าจาก widget
+      if (widget.isFromTask ||
+          widget.initialResidentId != null ||
+          widget.initialTagName != null) {
+        // Initialize provider state จาก task parameters
+        ref.read(createPostProvider.notifier).initFromTask(
+              text: widget.initialText ?? '',
+              residentId: widget.initialResidentId,
+              residentName: widget.initialResidentName,
+            );
 
-      // ถ้า provider ว่างเปล่า ให้ตรวจสอบ draft
-      if (state.text.isEmpty && state.title == null) {
-        _checkAndRestoreDraft();
+        // Auto-select tag ถ้ามี initialTagName
+        if (widget.initialTagName != null) {
+          _autoSelectTagByName(widget.initialTagName!);
+        }
+
+        // ถ้ามาจาก task ให้ตั้งค่า sendToFamily = true (บังคับส่งให้ญาติ)
+        if (widget.isFromTask) {
+          ref.read(createPostProvider.notifier).setSendToFamily(true);
+        }
+      } else {
+        // ถ้าไม่ได้มาจาก task ให้ตรวจสอบ state จาก provider หรือ draft
+        final state = ref.read(createPostProvider);
+        // ถ้ามี text จาก simple modal ให้โหลดมาใส่ใน controller
+        if (state.text.isNotEmpty) {
+          _textController.text = state.text;
+        }
+        // ถ้ามี title ให้โหลดมาด้วย
+        if (state.title != null && state.title!.isNotEmpty) {
+          _titleController.text = state.title!;
+        }
+
+        // ถ้า provider ว่างเปล่า ให้ตรวจสอบ draft
+        if (state.text.isEmpty && state.title == null) {
+          _checkAndRestoreDraft();
+        }
       }
     });
 
     // Listen for text changes เพื่อ auto-save draft
     _titleController.addListener(_onContentChanged);
     _textController.addListener(_onContentChanged);
+  }
+
+  /// Auto-select tag by name (ใช้เมื่อมาจาก task)
+  Future<void> _autoSelectTagByName(String tagName) async {
+    // รอให้ tags โหลดเสร็จก่อน
+    final tags = await ref.read(tagsProvider.future);
+
+    // หา tag ที่ชื่อตรงกับ tagName หรืออยู่ใน legacy_tags
+    NewTag? matchingTag;
+    for (final tag in tags) {
+      if (tag.name == tagName ||
+          (tag.legacyTags?.contains(tagName) ?? false)) {
+        matchingTag = tag;
+        break;
+      }
+    }
+
+    if (matchingTag != null && mounted) {
+      ref.read(createPostProvider.notifier).selectTag(matchingTag);
+    }
   }
 
   @override
@@ -109,7 +210,7 @@ class _AdvancedCreatePostScreenState
         state.selectedTag != null ||
         state.selectedResidentId != null ||
         state.selectedImages.isNotEmpty ||
-        state.selectedVideo != null ||
+        state.selectedVideos.isNotEmpty ||
         state.hasQuiz;
   }
 
@@ -133,7 +234,7 @@ class _AdvancedCreatePostScreenState
       residentId: state.selectedResidentId,
       residentName: state.selectedResidentName,
       imagePaths: state.selectedImages.map((f) => f.path).toList(),
-      videoPath: state.selectedVideo?.path,
+      videoPaths: state.selectedVideos.map((f) => f.path).toList(),
       savedAt: DateTime.now(),
       isAdvanced: true,
     );
@@ -264,16 +365,12 @@ class _AdvancedCreatePostScreenState
   }
 
   Future<void> _pickVideo() async {
-    if (ref.read(createPostProvider).hasVideo) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('สามารถเลือกได้ 1 วีดีโอ')),
-      );
-      return;
-    }
-
+    // จำกัดแค่ 1 วิดีโอ - ถ้ามีอยู่แล้วจะแทนที่
     final file = await ImagePickerHelper.pickVideoFromGallery();
     if (file != null && mounted) {
-      ref.read(createPostProvider.notifier).setVideo(file);
+      // Clear existing video แล้วเพิ่มใหม่
+      ref.read(createPostProvider.notifier).clearVideos();
+      ref.read(createPostProvider.notifier).addVideos([file]);
     }
   }
 
@@ -283,12 +380,7 @@ class _AdvancedCreatePostScreenState
     final state = ref.read(createPostProvider);
     final text = _textController.text.trim();
 
-    if (text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('กรุณาใส่รายละเอียด')),
-      );
-      return;
-    }
+    // รายละเอียดไม่บังคับ - ไม่ต้อง check text.isEmpty
 
     setState(() => _isSubmitting = true);
 
@@ -305,21 +397,31 @@ class _AdvancedCreatePostScreenState
       final nursinghomeId = userInfo['nursinghome_id'] as int;
 
       // Upload images if any
-      List<String> imageUrls = [...state.uploadedImageUrls];
+      // รวมทั้งรูปและวิดีโอเข้า multi_img_url array เดียวกัน
+      List<String> allMediaUrls = [
+        ...state.uploadedImageUrls,
+        ...state.uploadedVideoUrls,
+      ];
+
+      // Upload new images
       if (state.selectedImages.isNotEmpty) {
         final uploadedUrls = await PostMediaService.instance.uploadImages(
           state.selectedImages,
         );
-        imageUrls.addAll(uploadedUrls);
+        allMediaUrls.addAll(uploadedUrls);
       }
 
-      // Upload video if any
-      String? videoUrl;
-      if (state.selectedVideo != null) {
-        videoUrl = await PostMediaService.instance.uploadVideo(
-          state.selectedVideo!,
-          userId: userId,
-        );
+      // Upload new videos (หลายไฟล์)
+      if (state.selectedVideos.isNotEmpty) {
+        for (final video in state.selectedVideos) {
+          final videoUrl = await PostMediaService.instance.uploadVideo(
+            video,
+            userId: userId,
+          );
+          if (videoUrl != null) {
+            allMediaUrls.add(videoUrl);
+          }
+        }
       }
 
       // Build tag topics list
@@ -327,9 +429,12 @@ class _AdvancedCreatePostScreenState
       if (state.selectedTag != null) {
         tagTopics = [state.selectedTag!.name];
       }
-      // เพิ่ม "ส่งให้หัวหน้าเวร" ถ้าเลือก
+      // เพิ่ม tag ตาม sendToFamily
+      // - ถ้ามาจาก task: ใช้ "ส่งให้ญาติ" (ส่งตรงไปญาติเลย)
+      // - ถ้าไม่ได้มาจาก task: ใช้ "ส่งให้หัวหน้าเวร" (ให้หัวหน้าเวรตรวจก่อน)
       if (state.sendToFamily) {
-        tagTopics = [...?tagTopics, 'ส่งให้หัวหน้าเวร'];
+        final familyTag = widget.isFromTask ? 'ส่งให้ญาติ' : 'ส่งให้หัวหน้าเวร';
+        tagTopics = [...?tagTopics, familyTag];
       }
 
       // Create post
@@ -343,8 +448,7 @@ class _AdvancedCreatePostScreenState
         tagTopics: tagTopics,
         isHandover: state.isHandover,
         residentId: state.selectedResidentId,
-        imageUrls: imageUrls.isEmpty ? null : imageUrls,
-        youtubeUrl: videoUrl,
+        imageUrls: allMediaUrls.isEmpty ? null : allMediaUrls,
         // Quiz fields
         qaQuestion: state.qaQuestion,
         qaChoiceA: state.qaChoiceA,
@@ -356,6 +460,72 @@ class _AdvancedCreatePostScreenState
       );
 
       if (postId != null) {
+        // ถ้ามี taskLogId ให้ complete task ด้วย
+        if (widget.taskLogId != null && mounted) {
+          // === Optimistic Update - อัพเดต UI ทันทีก่อนรอ server ===
+          // หา task จาก provider เพื่อสร้าง optimistic version
+          final tasksAsync = ref.read(tasksProvider);
+          void Function()? rollback;
+
+          if (tasksAsync.hasValue) {
+            final tasks = tasksAsync.value!;
+            final taskToUpdate = tasks
+                .where((t) => t.logId == widget.taskLogId)
+                .firstOrNull;
+
+            if (taskToUpdate != null) {
+              // ดึง nickname ของ user ปัจจุบัน
+              final nickname =
+                  await ref.read(currentUserNicknameProvider.future);
+
+              // สร้าง optimistic task ที่แสดงว่า completed แล้ว
+              final optimisticTask = taskToUpdate.copyWith(
+                status: 'completed',
+                completedAt: DateTime.now(),
+                completedByUid: userId,
+                completedByNickname: nickname,
+                confirmImage: widget.taskConfirmImageUrl,
+              );
+
+              // อัพเดต UI ทันที (ก่อนรอ API)
+              rollback = optimisticUpdateTask(ref, optimisticTask);
+            }
+          }
+
+          // === แสดง Dialog ให้ประเมินความยากของงาน ===
+          if (!mounted) return;
+          final difficultyResult = await DifficultyRatingDialog.show(
+            context,
+            taskTitle: widget.initialTitle,
+            allowSkip: true, // ให้ข้ามได้
+          );
+
+          // คะแนนความยากที่ user ให้ (null = ปิด dialog หรือข้าม)
+          final difficultyScore = difficultyResult?.score;
+
+          try {
+            // Complete task พร้อม difficulty score
+            await TaskService.instance.markTaskComplete(
+              widget.taskLogId!,
+              userId,
+              imageUrl: widget.taskConfirmImageUrl,
+              postId: postId,
+              difficultyScore: difficultyScore,
+              difficultyRatedBy: difficultyScore != null ? userId : null,
+            );
+
+            // Commit optimistic update (ลบ optimistic state)
+            commitOptimisticUpdate(ref, widget.taskLogId!);
+
+            // Refresh tasks เพื่อ sync กับ server
+            refreshTasks(ref);
+          } catch (e) {
+            // Rollback ถ้า API error
+            rollback?.call();
+            rethrow;
+          }
+        }
+
         // Refresh posts
         ref.invalidate(postsProvider);
 
@@ -363,10 +533,22 @@ class _AdvancedCreatePostScreenState
         await _clearDraftAfterSubmit();
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('โพสสำเร็จ')),
-          );
-          Navigator.of(context).pop(true);
+          // แสดง success popup (ถ้ายังไม่ได้แสดงจาก DifficultyRatingDialog)
+          if (!widget.isFromTask) {
+            await SuccessPopup.show(
+              context,
+              emoji: '📝',
+              message: 'โพสสำเร็จ',
+              autoCloseDuration: const Duration(milliseconds: 1000),
+            );
+          }
+
+          // เรียก callback (ถ้ามี)
+          widget.onPostCreated?.call();
+
+          if (mounted) {
+            Navigator.of(context).pop(true);
+          }
         }
       } else {
         throw Exception('Failed to create post');
@@ -413,37 +595,87 @@ class _AdvancedCreatePostScreenState
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Title field
-              _buildSectionLabel('หัวข้อ (ถ้ามี)'),
+              // ถ้ามาจาก task จะแสดง "หัวข้อ" และ lock ไว้
+              // ถ้าไม่ได้มาจาก task จะแสดง "หัวข้อ (ถ้ามี)" และแก้ไขได้
+              _buildSectionLabel(
+                widget.isFromTask ? 'หัวข้อ' : 'หัวข้อ (ถ้ามี)',
+              ),
               const SizedBox(height: 8),
               TextFormField(
                 controller: _titleController,
-                maxLength: 30,
+                maxLength: widget.isFromTask ? null : 30, // ไม่แสดง counter เมื่อ lock
+                readOnly: widget.isFromTask, // Lock เมื่อมาจาก task
+                enabled: !widget.isFromTask, // Disable interaction เมื่อมาจาก task
                 decoration: InputDecoration(
-                  hintText: 'หัวข้อประกาศ',
+                  hintText: widget.isFromTask ? null : 'หัวข้อประกาศ',
                   hintStyle: AppTypography.body.copyWith(
                     color: AppColors.secondaryText,
                   ),
                   filled: true,
-                  fillColor: AppColors.background,
+                  // สีเทาเข้มขึ้นเมื่อ disabled เพื่อแสดงว่า lock อยู่
+                  fillColor: widget.isFromTask
+                      ? AppColors.alternate
+                      : AppColors.background,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
+                  ),
+                  // เพิ่ม border เมื่อ lock เพื่อให้เห็นชัดว่าเป็น locked field
+                  enabledBorder: widget.isFromTask
+                      ? OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: AppColors.alternate,
+                            width: 1,
+                          ),
+                        )
+                      : OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                  disabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: AppColors.alternate,
+                      width: 1,
+                    ),
                   ),
                   contentPadding: const EdgeInsets.all(16),
                   counterStyle: AppTypography.caption.copyWith(
                     color: AppColors.secondaryText,
                   ),
+                  // แสดง icon lock เมื่อมาจาก task (wrap Center เพื่อให้อยู่กลางแนวตั้ง)
+                  suffixIcon: widget.isFromTask
+                      ? Center(
+                          widthFactor: 1,
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: HugeIcon(
+                              icon: HugeIcons.strokeRoundedSquareLock02,
+                              size: AppIconSize.md,
+                              color: AppColors.secondaryText,
+                            ),
+                          ),
+                        )
+                      : null,
                 ),
-                style: AppTypography.body,
-                onChanged: (value) {
-                  ref.read(createPostProvider.notifier).setTitle(value);
-                },
+                style: AppTypography.body.copyWith(
+                  // สีข้อความเข้มเมื่อ disabled เพื่อให้อ่านได้ชัด
+                  color: widget.isFromTask
+                      ? AppColors.primaryText
+                      : AppColors.primaryText,
+                ),
+                onChanged: widget.isFromTask
+                    ? null // ไม่ทำอะไรเมื่อ lock
+                    : (value) {
+                        ref.read(createPostProvider.notifier).setTitle(value);
+                      },
               ),
 
               AppSpacing.verticalGapLg,
 
-              // Description field
-              _buildSectionLabel('รายละเอียด', required: true),
+              // Description field (ไม่บังคับกรอก)
+              _buildSectionLabel('รายละเอียด'),
               const SizedBox(height: 8),
               TextFormField(
                 controller: _textController,
@@ -463,12 +695,6 @@ class _AdvancedCreatePostScreenState
                   contentPadding: const EdgeInsets.all(16),
                 ),
                 style: AppTypography.body,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'กรุณาใส่รายละเอียด';
-                  }
-                  return null;
-                },
                 onChanged: (value) {
                   ref.read(createPostProvider.notifier).setText(value);
                 },
@@ -486,27 +712,30 @@ class _AdvancedCreatePostScreenState
 
               AppSpacing.verticalGapLg,
 
-              // Divider
-              Divider(color: AppColors.alternate, height: 1),
+              // Quiz form (ซ่อนเมื่อมาจาก task)
+              if (!widget.isFromTask) ...[
+                // Divider
+                Divider(color: AppColors.alternate, height: 1),
 
-              AppSpacing.verticalGapLg,
+                AppSpacing.verticalGapLg,
 
-              // Quiz form
-              QuizFormWidget(postText: _textController.text),
+                // Quiz form
+                QuizFormWidget(postText: _textController.text),
 
-              AppSpacing.verticalGapLg,
+                AppSpacing.verticalGapLg,
 
-              // Divider
-              Divider(color: AppColors.alternate, height: 1),
+                // Divider
+                Divider(color: AppColors.alternate, height: 1),
 
-              AppSpacing.verticalGapLg,
+                AppSpacing.verticalGapLg,
+              ],
 
               // Resident & Tag pickers
               _buildSectionLabel('ตั้งค่าเพิ่มเติม'),
               const SizedBox(height: 12),
               Row(
                 children: [
-                  // Resident picker
+                  // Resident picker (lock เมื่อมาจาก task)
                   ResidentPickerWidget(
                     selectedResidentId: state.selectedResidentId,
                     selectedResidentName: state.selectedResidentName,
@@ -518,9 +747,10 @@ class _AdvancedCreatePostScreenState
                     onResidentCleared: () {
                       ref.read(createPostProvider.notifier).clearResident();
                     },
+                    disabled: widget.isFromTask, // Lock เมื่อมาจาก task
                   ),
                   const SizedBox(width: 8),
-                  // Tag picker
+                  // Tag picker (lock เมื่อมาจาก task)
                   TagPickerCompact(
                     selectedTag: state.selectedTag,
                     isHandover: state.isHandover,
@@ -533,6 +763,7 @@ class _AdvancedCreatePostScreenState
                     onHandoverChanged: (value) {
                       ref.read(createPostProvider.notifier).setHandover(value);
                     },
+                    disabled: widget.isFromTask, // Lock เมื่อมาจาก task
                   ),
                 ],
               ),
@@ -598,7 +829,16 @@ class _AdvancedCreatePostScreenState
 
   Widget _buildBottomBar(CreatePostState state) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-    final canSubmit = _textController.text.trim().isNotEmpty && !_isSubmitting;
+
+    // Mutual exclusion: เลือกได้อย่างเดียว รูป หรือ วิดีโอ
+    final hasImages = state.hasImages;
+    final hasVideo = state.hasVideo;
+    final hasMedia = hasImages || hasVideo;
+
+    // เงื่อนไขการโพส:
+    // - ถ้ามาจาก task: ต้องมีรูป หรือ วิดีโออย่างน้อย 1 อัน (รายละเอียดไม่บังคับ)
+    // - ถ้าไม่ได้มาจาก task: โพสได้เลย (ไม่บังคับอะไร)
+    final canSubmit = !_isSubmitting && (!widget.isFromTask || hasMedia);
 
     return Container(
       padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + bottomInset),
@@ -612,66 +852,37 @@ class _AdvancedCreatePostScreenState
         child: Row(
           children: [
             // Media picker buttons
+            // เลือกได้อย่างเดียว: รูป หรือ วิดีโอ (ไม่ใช่ทั้งคู่)
             Wrap(
               spacing: 8,
               children: [
                 _buildIconButton(
                   icon: HugeIcons.strokeRoundedCamera01,
-                  onTap: _isSubmitting || state.hasVideo ? null : _pickFromCamera,
-                  tooltip: 'ถ่ายรูป',
+                  // Disable ถ้ามี video หรือกำลัง submit
+                  onTap: (_isSubmitting || hasVideo) ? null : _pickFromCamera,
+                  tooltip: hasVideo ? 'ลบวิดีโอก่อนถึงจะถ่ายรูปได้' : 'ถ่ายรูป',
                 ),
                 _buildIconButton(
                   icon: HugeIcons.strokeRoundedImageComposition,
-                  onTap: _isSubmitting || state.hasVideo ? null : _pickFromGallery,
-                  tooltip: 'เลือกจากแกลเลอรี่',
+                  // Disable ถ้ามี video หรือกำลัง submit
+                  onTap: (_isSubmitting || hasVideo) ? null : _pickFromGallery,
+                  tooltip: hasVideo ? 'ลบวิดีโอก่อนถึงจะเลือกรูปได้' : 'เลือกจากแกลเลอรี่',
                 ),
                 _buildIconButton(
                   icon: HugeIcons.strokeRoundedVideo01,
-                  onTap: _isSubmitting || state.hasImages ? null : _pickVideo,
-                  tooltip: 'เลือกวีดีโอ',
+                  // Disable ถ้ามี images หรือกำลัง submit
+                  onTap: (_isSubmitting || hasImages) ? null : _pickVideo,
+                  tooltip: hasImages ? 'ลบรูปก่อนถึงจะเลือกวิดีโอได้' : 'เลือกวีดีโอ',
                 ),
               ],
             ),
             const Spacer(),
-            // Submit button
-            ElevatedButton(
+            // Submit button - ใช้ PrimaryButton จาก theme
+            PrimaryButton(
+              text: 'โพส',
+              icon: HugeIcons.strokeRoundedFloppyDisk,
               onPressed: canSubmit ? _submit : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: AppColors.alternate,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: _isSubmitting
-                  ? SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        HugeIcon(
-                          icon: HugeIcons.strokeRoundedFloppyDisk,
-                          size: AppIconSize.md,
-                          color: Colors.white,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'โพส',
-                          style: AppTypography.body.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
+              isLoading: _isSubmitting,
             ),
           ],
         ),
@@ -734,116 +945,145 @@ class _AdvancedCreatePostScreenState
     final isForce = state.selectedTag?.isForceHandover ?? false;
     final isHandover = state.isHandover;
 
-    return SwitchListTile(
+    return CheckboxTile(
       value: isHandover,
       onChanged: canToggle
-          ? (value) {
-              ref.read(createPostProvider.notifier).setHandover(value);
-            }
+          ? (value) => ref.read(createPostProvider.notifier).setHandover(value)
           : null,
-      title: Text(
-        'ส่งเวร',
-        style: AppTypography.body.copyWith(
-          color: AppColors.primaryText,
-        ),
-      ),
-      subtitle: Text(
-        isForce
-            ? 'Tag นี้บังคับส่งเวร'
-            : isHandover
-                ? 'โพสนี้จะถูกส่งต่อให้เวรถัดไป'
-                : 'โพสนี้จะไม่ถูกส่งต่อ',
-        style: AppTypography.caption.copyWith(
-          color: AppColors.secondaryText,
-        ),
-      ),
-      activeTrackColor: AppColors.primary,
-      contentPadding: EdgeInsets.zero,
-      dense: true,
+      icon: HugeIcons.strokeRoundedArrowLeftRight,
+      title: 'ส่งเวร',
+      subtitle: isForce
+          ? 'จำเป็นต้องส่งเวรสำหรับหัวข้อนี้'
+          : 'หากมีอาการผิดปกติ ผิดแปลกไปจากเดิม หรือเป็นเรื่องที่สำคัญ',
+      subtitleColor: AppColors.error,
+      isRequired: isForce,
     );
   }
 
   Widget _buildSendToFamilyToggle(CreatePostState state) {
     final sendToFamily = state.sendToFamily;
+    // ถ้ามาจาก task จะบังคับให้ติ๊กและ disable checkbox + แสดงข้อความ "ส่งให้ญาติ"
+    final isFromTask = widget.isFromTask;
 
-    return SwitchListTile(
+    return CheckboxTile(
       value: sendToFamily,
-      onChanged: (value) {
-        ref.read(createPostProvider.notifier).setSendToFamily(value);
-      },
-      title: Row(
-        children: [
-          HugeIcon(
-            icon: HugeIcons.strokeRoundedUserGroup,
-            size: AppIconSize.lg,
-            color: sendToFamily ? AppColors.primary : AppColors.secondaryText,
-          ),
-          const SizedBox(width: 8),
-          Text(
-            'ส่งให้หัวหน้าเวร',
-            style: AppTypography.body.copyWith(
-              color: AppColors.primaryText,
-            ),
-          ),
-        ],
-      ),
-      subtitle: Text(
-        'ส่งให้หัวหน้าเวรตรวจสอบและส่งให้ญาติ',
-        style: AppTypography.caption.copyWith(
-          color: AppColors.secondaryText,
-        ),
-      ),
-      activeTrackColor: AppColors.primary,
-      contentPadding: EdgeInsets.zero,
-      dense: true,
+      // ถ้า isFromTask = true จะ disable (onChanged = null)
+      onChanged: isFromTask
+          ? null
+          : (value) => ref.read(createPostProvider.notifier).setSendToFamily(value),
+      icon: HugeIcons.strokeRoundedUserGroup,
+      // ถ้ามาจาก task แสดง "ส่งให้ญาติ" โดยตรง
+      title: isFromTask ? 'ส่งให้ญาติ' : 'ส่งให้หัวหน้าเวร',
+      subtitle: isFromTask
+          ? 'งานนี้จะถูกส่งให้ญาติโดยอัตโนมัติ'
+          : 'ส่งให้หัวหน้าเวรตรวจสอบและส่งให้ญาติ',
+      isRequired: isFromTask,
     );
   }
 
+  /// สร้าง video preview รองรับหลายไฟล์
   Widget _buildVideoPreview(CreatePostState state) {
-    return Container(
-      height: 120,
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Stack(
-        children: [
-          // Video thumbnail or placeholder
-          Center(
-            child: HugeIcon(
-              icon: HugeIcons.strokeRoundedVideo01,
-              size: AppIconSize.xxxl,
-              color: AppColors.secondaryText,
+    // รวม local videos และ uploaded video URLs
+    final allVideos = [
+      ...state.selectedVideos.map((f) => _VideoItem(file: f)),
+      ...state.uploadedVideoUrls.map((url) => _VideoItem(url: url)),
+    ];
+
+    return SizedBox(
+      height: 100,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: allVideos.length,
+        separatorBuilder: (context, index) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final video = allVideos[index];
+          final isLocal = video.file != null;
+          final fileName = isLocal
+              ? video.file!.path.split('/').last
+              : video.url!.split('/').last.split('?').first;
+
+          return Container(
+            width: 100,
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(12),
             ),
-          ),
-          // Video path indicator
-          Positioned(
-            left: 8,
-            bottom: 8,
-            right: 40,
-            child: Text(
-              state.selectedVideo?.path.split('/').last ?? 'Video',
-              style: AppTypography.caption.copyWith(
-                color: AppColors.secondaryText,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            child: Stack(
+              children: [
+                // Video icon
+                Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      HugeIcon(
+                        icon: HugeIcons.strokeRoundedVideo01,
+                        size: AppIconSize.xl,
+                        color: AppColors.secondaryText,
+                      ),
+                      const SizedBox(height: 4),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Text(
+                          fileName,
+                          style: AppTypography.caption.copyWith(
+                            color: AppColors.secondaryText,
+                            fontSize: 10,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Remove button
+                Positioned(
+                  top: 2,
+                  right: 2,
+                  child: GestureDetector(
+                    onTap: () {
+                      if (isLocal) {
+                        // หา index ใน selectedVideos
+                        final localIndex = state.selectedVideos.indexOf(video.file!);
+                        if (localIndex >= 0) {
+                          ref.read(createPostProvider.notifier).removeVideo(localIndex);
+                        }
+                      } else {
+                        // หา index ใน uploadedVideoUrls
+                        final uploadedIndex = state.uploadedVideoUrls.indexOf(video.url!);
+                        if (uploadedIndex >= 0) {
+                          ref.read(createPostProvider.notifier).removeUploadedVideo(uploadedIndex);
+                        }
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: AppColors.error.withValues(alpha: 0.9),
+                        shape: BoxShape.circle,
+                      ),
+                      child: HugeIcon(
+                        icon: HugeIcons.strokeRoundedCancel01,
+                        size: 16,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ),
-          // Remove button
-          Positioned(
-            top: 4,
-            right: 4,
-            child: IconButton(
-              icon: HugeIcon(icon: HugeIcons.strokeRoundedCancel01, color: AppColors.error),
-              onPressed: () {
-                ref.read(createPostProvider.notifier).clearVideo();
-              },
-              iconSize: 24,
-            ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
+}
+
+/// Helper class สำหรับ video item (local file หรือ uploaded URL)
+class _VideoItem {
+  final File? file;
+  final String? url;
+
+  _VideoItem({this.file, this.url});
 }

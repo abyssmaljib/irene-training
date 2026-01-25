@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/confirm_dialog.dart';
+import '../../../core/widgets/network_image.dart';
 import '../../checklist/models/system_role.dart';
 import '../models/med_log.dart';
 import '../models/med_error_log.dart';
@@ -1307,53 +1308,17 @@ class _FullScreenPhotoView extends StatelessWidget {
             // Background - tap to close
             Container(color: Colors.transparent),
 
-            // Image with Hero - ใช้ Image.network ที่จะโหลดจนกว่าจะเสร็จ
+            // Image with Hero - ใช้ IreneNetworkImage ที่มี timeout และ retry
             Center(
               child: Hero(
                 tag: heroTag,
                 child: InteractiveViewer(
                   minScale: 0.5,
                   maxScale: 4.0,
-                  child: Image.network(
-                    photoUrl,
+                  child: IreneNetworkImage(
+                    imageUrl: photoUrl,
                     fit: BoxFit.contain,
-                    // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
-                    cacheWidth: 1200,
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      final progress = loadingProgress.expectedTotalBytes != null
-                          ? loadingProgress.cumulativeBytesLoaded /
-                              loadingProgress.expectedTotalBytes!
-                          : null;
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            CircularProgressIndicator(
-                              value: progress,
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                            if (progress != null) ...[
-                              const SizedBox(height: 8),
-                              Text(
-                                '${(progress * 100).toInt()}%',
-                                style: AppTypography.caption.copyWith(
-                                  color: Colors.white70,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      );
-                    },
-                    errorBuilder: (context, error, stackTrace) {
-                      return HugeIcon(
-                        icon: HugeIcons.strokeRoundedImage01,
-                        size: AppIconSize.display,
-                        color: Colors.white54,
-                      );
-                    },
+                    memCacheWidth: 1200,
                   ),
                 ),
               ),

@@ -25,6 +25,8 @@ import 'resident_picker_widget.dart';
 import 'image_picker_bar.dart';
 import 'image_preview_grid.dart';
 import '../services/post_media_service.dart';
+import '../../../core/widgets/success_popup.dart';
+import '../../../core/widgets/checkbox_tile.dart';
 
 /// Bottom Sheet สำหรับสร้างโพสแบบรวดเร็ว
 class CreatePostBottomSheet extends ConsumerStatefulWidget {
@@ -201,7 +203,7 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
         state.selectedTag != null ||
         state.selectedResidentId != null ||
         state.selectedImages.isNotEmpty ||
-        state.selectedVideo != null;
+        state.selectedVideos.isNotEmpty;
   }
 
   /// บันทึก draft ลง SharedPreferences
@@ -224,7 +226,7 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
       residentId: state.selectedResidentId,
       residentName: state.selectedResidentName,
       imagePaths: state.selectedImages.map((f) => f.path).toList(),
-      videoPath: state.selectedVideo?.path,
+      videoPaths: state.selectedVideos.map((f) => f.path).toList(),
       savedAt: DateTime.now(),
       isAdvanced: false,
     );
@@ -961,94 +963,39 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
     final isForce = state.selectedTag?.isForceHandover ?? false;
     final isHandover = state.isHandover;
 
-    return SwitchListTile(
+    return CheckboxTile(
       value: isHandover,
       onChanged: canToggle
           ? (value) => ref.read(createPostProvider.notifier).setHandover(value)
           : null,
-      title: Row(
-        children: [
-          HugeIcon(
-            icon: HugeIcons.strokeRoundedArrowLeftRight,
-            size: AppIconSize.lg,
-            color: isHandover ? AppColors.success : AppColors.secondaryText,
-          ),
-          const SizedBox(width: 8),
-          Text(
-            'ส่งเวร',
-            style: AppTypography.body.copyWith(
-              color: isHandover ? AppColors.success : AppColors.primaryText,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          if (isForce) ...[
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: AppColors.tagFailedBg,
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                'จำเป็น',
-                style: AppTypography.caption.copyWith(
-                  color: AppColors.error,
-                  fontSize: 10,
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-      subtitle: Text(
-        isForce ? 'จำเป็นต้องส่งเวรสำหรับหัวข้อนี้' : 'เลือกส่งเวรถ้าเรื่องนี้สำคัญ',
-        style: AppTypography.caption.copyWith(
-          color: AppColors.secondaryText,
-        ),
-      ),
-      activeTrackColor: AppColors.success.withValues(alpha: 0.5),
-      activeThumbColor: AppColors.success,
-      inactiveThumbColor: AppColors.secondaryText,
-      contentPadding: EdgeInsets.zero,
-      dense: true,
+      icon: HugeIcons.strokeRoundedArrowLeftRight,
+      title: 'ส่งเวร',
+      subtitle: isForce
+          ? 'จำเป็นต้องส่งเวรสำหรับหัวข้อนี้'
+          : 'หากมีอาการผิดปกติ ผิดแปลกไปจากเดิม หรือเป็นเรื่องที่สำคัญ',
+      subtitleColor: AppColors.error,
+      isRequired: isForce,
     );
   }
 
   Widget _buildSendToFamilyToggle(CreatePostState state) {
     final sendToFamily = state.sendToFamily;
+    // ถ้ามาจาก task จะบังคับให้ติ๊กและ disable checkbox + แสดงข้อความ "ส่งให้ญาติ"
+    final isFromTask = widget.isFromTask;
 
-    return SwitchListTile(
+    return CheckboxTile(
       value: sendToFamily,
-      onChanged: (value) =>
-          ref.read(createPostProvider.notifier).setSendToFamily(value),
-      title: Row(
-        children: [
-          HugeIcon(
-            icon: HugeIcons.strokeRoundedUserGroup,
-            size: AppIconSize.lg,
-            color: sendToFamily ? AppColors.primary : AppColors.secondaryText,
-          ),
-          const SizedBox(width: 8),
-          Text(
-            'ส่งให้หัวหน้าเวร',
-            style: AppTypography.body.copyWith(
-              color: sendToFamily ? AppColors.primary : AppColors.primaryText,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-      subtitle: Text(
-        'ส่งให้หัวหน้าเวรตรวจสอบและส่งให้ญาติ',
-        style: AppTypography.caption.copyWith(
-          color: AppColors.secondaryText,
-        ),
-      ),
-      activeTrackColor: AppColors.primary.withValues(alpha: 0.5),
-      activeThumbColor: AppColors.primary,
-      inactiveThumbColor: AppColors.secondaryText,
-      contentPadding: EdgeInsets.zero,
-      dense: true,
+      // ถ้า isFromTask = true จะ disable (onChanged = null)
+      onChanged: isFromTask
+          ? null
+          : (value) => ref.read(createPostProvider.notifier).setSendToFamily(value),
+      icon: HugeIcons.strokeRoundedUserGroup,
+      // ถ้ามาจาก task แสดง "ส่งให้ญาติ" โดยตรง
+      title: isFromTask ? 'ส่งให้ญาติ' : 'ส่งให้หัวหน้าเวร',
+      subtitle: isFromTask
+          ? 'งานนี้จะถูกส่งให้ญาติโดยอัตโนมัติ'
+          : 'ส่งให้หัวหน้าเวรตรวจสอบและส่งให้ญาติ',
+      isRequired: isFromTask,
     );
   }
 
@@ -1201,14 +1148,17 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
   }
 
   Future<void> _pickVideo() async {
+    // Simple mode ยังคงเลือกได้ 1 video (ล้างของเดิมก่อนเพิ่มใหม่)
     final file = await ImagePickerHelper.pickVideoFromGallery();
     if (file != null) {
-      ref.read(createPostProvider.notifier).setVideo(file);
+      ref.read(createPostProvider.notifier).clearVideos();
+      ref.read(createPostProvider.notifier).addVideos([file]);
     }
   }
 
   Widget _buildVideoPreview(CreatePostState state) {
-    final videoFile = state.selectedVideo;
+    // Simple mode แสดงแค่ video แรก
+    final videoFile = state.selectedVideos.isNotEmpty ? state.selectedVideos.first : null;
 
     return Container(
       margin: EdgeInsets.only(bottom: AppSpacing.sm),
@@ -1258,7 +1208,7 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
             right: 8,
             child: GestureDetector(
               onTap: () {
-                ref.read(createPostProvider.notifier).clearVideo();
+                ref.read(createPostProvider.notifier).clearVideos();
               },
               child: Container(
                 width: 32,
@@ -1325,7 +1275,7 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
       List<String> mediaUrls = [...state.uploadedImageUrls];
       String? videoThumbnailUrl; // สำหรับเก็บ video thumbnail ใน imgUrl
 
-      if (state.selectedImages.isNotEmpty || state.selectedVideo != null) {
+      if (state.selectedImages.isNotEmpty || state.selectedVideos.isNotEmpty) {
         setState(() => _isUploading = true);
 
         // Upload images
@@ -1337,15 +1287,16 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
           mediaUrls.addAll(imageUrls);
         }
 
-        // Upload video พร้อม thumbnail
-        if (state.selectedVideo != null) {
+        // Upload videos พร้อม thumbnail (simple mode จะมีแค่ 1 video)
+        for (final videoFile in state.selectedVideos) {
           final result = await PostMediaService.instance.uploadVideoWithThumbnail(
-            state.selectedVideo!,
+            videoFile,
             userId: userId,
           );
           if (result.videoUrl != null) {
             mediaUrls.add(result.videoUrl!);
-            videoThumbnailUrl = result.thumbnailUrl;
+            // ใช้ thumbnail ของ video แรกเป็น imgUrl
+            videoThumbnailUrl ??= result.thumbnailUrl;
           }
         }
 
@@ -1357,9 +1308,12 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
       if (state.selectedTag != null) {
         tagTopics = [state.selectedTag!.name];
       }
-      // เพิ่ม "ส่งให้หัวหน้าเวร" ถ้าเลือก
+      // เพิ่ม tag สำหรับส่งให้ญาติ/หัวหน้าเวร ถ้าเลือก
       if (state.sendToFamily) {
-        tagTopics = [...?tagTopics, 'ส่งให้หัวหน้าเวร'];
+        // ถ้ามาจาก task ใช้ "ส่งให้ญาติ" โดยตรง (automation จะส่งให้ญาติเลย)
+        // ถ้าไม่ใช่ ใช้ "ส่งให้หัวหน้าเวร" (หัวหน้าเวรตรวจสอบก่อนส่งให้ญาติ)
+        final familyTag = widget.isFromTask ? 'ส่งให้ญาติ' : 'ส่งให้หัวหน้าเวร';
+        tagTopics = [...?tagTopics, familyTag];
       }
 
       // Create post
@@ -1399,14 +1353,19 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
         ref.read(createPostProvider.notifier).reset();
         _textController.clear();
 
-        // Close sheet
+        // Close sheet และแสดง success popup
         if (mounted) {
           Navigator.pop(context);
-          widget.onPostCreated?.call();
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(widget.taskLogId != null ? 'โพสและบันทึกงานสำเร็จ' : 'โพสสำเร็จ')),
+          // แสดง success popup พร้อม animated checkmark
+          await SuccessPopup.show(
+            context,
+            emoji: '📝',
+            message: widget.taskLogId != null ? 'โพสและบันทึกงานสำเร็จ' : 'โพสสำเร็จ',
+            autoCloseDuration: const Duration(milliseconds: 1000),
           );
+
+          widget.onPostCreated?.call();
         }
       } else {
         throw Exception('ไม่สามารถสร้างโพสได้');

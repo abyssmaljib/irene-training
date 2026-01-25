@@ -13,8 +13,9 @@ class CreatePostState {
   final String? selectedResidentName;
   final List<File> selectedImages;
   final List<String> uploadedImageUrls;
-  final File? selectedVideo;
-  final String? uploadedVideoUrl;
+  // รองรับหลาย video - เก็บรวมกับรูปใน multi_img_url array ตอน submit
+  final List<File> selectedVideos;
+  final List<String> uploadedVideoUrls;
   final bool isSubmitting;
   final String? error;
 
@@ -49,8 +50,8 @@ class CreatePostState {
     this.selectedResidentName,
     this.selectedImages = const [],
     this.uploadedImageUrls = const [],
-    this.selectedVideo,
-    this.uploadedVideoUrl,
+    this.selectedVideos = const [],
+    this.uploadedVideoUrls = const [],
     this.isSubmitting = false,
     this.error,
     // Advanced fields
@@ -82,7 +83,7 @@ class CreatePostState {
 
   bool get hasImages => selectedImages.isNotEmpty || uploadedImageUrls.isNotEmpty;
 
-  bool get hasVideo => selectedVideo != null || uploadedVideoUrl != null;
+  bool get hasVideo => selectedVideos.isNotEmpty || uploadedVideoUrls.isNotEmpty;
 
   bool get hasQuiz =>
       qaQuestion != null &&
@@ -111,9 +112,9 @@ class CreatePostState {
     String? selectedResidentName,
     List<File>? selectedImages,
     List<String>? uploadedImageUrls,
-    File? selectedVideo,
-    bool? clearVideo,
-    String? uploadedVideoUrl,
+    List<File>? selectedVideos,
+    bool? clearVideos,
+    List<String>? uploadedVideoUrls,
     bool? isSubmitting,
     String? error,
     bool? clearError,
@@ -155,11 +156,11 @@ class CreatePostState {
           : (selectedResidentName ?? this.selectedResidentName),
       selectedImages: selectedImages ?? this.selectedImages,
       uploadedImageUrls: uploadedImageUrls ?? this.uploadedImageUrls,
-      selectedVideo:
-          clearVideo == true ? null : (selectedVideo ?? this.selectedVideo),
-      uploadedVideoUrl: clearVideo == true
-          ? null
-          : (uploadedVideoUrl ?? this.uploadedVideoUrl),
+      selectedVideos:
+          clearVideos == true ? const [] : (selectedVideos ?? this.selectedVideos),
+      uploadedVideoUrls: clearVideos == true
+          ? const []
+          : (uploadedVideoUrls ?? this.uploadedVideoUrls),
       isSubmitting: isSubmitting ?? this.isSubmitting,
       error: clearError == true ? null : (error ?? this.error),
       // Advanced fields
@@ -303,6 +304,7 @@ class CreatePostNotifier extends StateNotifier<CreatePostState> {
   }
 
   /// Initialize state with pre-filled values (สำหรับ task completion by post)
+  /// sendToFamily = true เพื่อให้ระบบ automation ส่งให้หัวหน้าเวรตรวจสอบและส่งให้ญาติ
   void initFromTask({
     required String text,
     int? residentId,
@@ -312,6 +314,7 @@ class CreatePostNotifier extends StateNotifier<CreatePostState> {
       text: text,
       selectedResidentId: residentId,
       selectedResidentName: residentName,
+      sendToFamily: true, // auto-enable เมื่อมาจาก task
     );
   }
 
@@ -320,19 +323,38 @@ class CreatePostNotifier extends StateNotifier<CreatePostState> {
     state = state.copyWith(selectedImages: []);
   }
 
-  /// เพิ่มวีดีโอ
-  void setVideo(File video) {
-    state = state.copyWith(selectedVideo: video, clearError: true);
+  /// เพิ่มวีดีโอ (รองรับหลายไฟล์)
+  void addVideos(List<File> videos) {
+    final newVideos = [...state.selectedVideos, ...videos];
+    state = state.copyWith(selectedVideos: newVideos, clearError: true);
   }
 
-  /// ลบวีดีโอ
-  void clearVideo() {
-    state = state.copyWith(clearVideo: true, clearError: true);
+  /// ลบวีดีโอตาม index
+  void removeVideo(int index) {
+    final newVideos = List<File>.from(state.selectedVideos);
+    if (index >= 0 && index < newVideos.length) {
+      newVideos.removeAt(index);
+      state = state.copyWith(selectedVideos: newVideos);
+    }
   }
 
-  /// Set uploaded video URL
-  void setUploadedVideoUrl(String url) {
-    state = state.copyWith(uploadedVideoUrl: url);
+  /// ลบ uploaded video URL ตาม index
+  void removeUploadedVideo(int index) {
+    final newUrls = List<String>.from(state.uploadedVideoUrls);
+    if (index >= 0 && index < newUrls.length) {
+      newUrls.removeAt(index);
+      state = state.copyWith(uploadedVideoUrls: newUrls);
+    }
+  }
+
+  /// ล้างวีดีโอทั้งหมด
+  void clearVideos() {
+    state = state.copyWith(clearVideos: true, clearError: true);
+  }
+
+  /// Set uploaded video URLs
+  void setUploadedVideoUrls(List<String> urls) {
+    state = state.copyWith(uploadedVideoUrls: urls);
   }
 
   // === Advanced Post Methods ===
@@ -442,13 +464,18 @@ class CreatePostNotifier extends StateNotifier<CreatePostState> {
   // === DD Record Methods ===
 
   /// Initialize state for DD record post creation
+  /// รองรับ preselect tag เช่น "พบแพทย์" เมื่อสร้าง post จาก DD
   void initFromDD({
     required int ddId,
     required String templateText,
     int? residentId,
     String? residentName,
     String? title,
+    NewTag? preselectedTag,
   }) {
+    // ถ้ามี preselectedTag ให้ set handover ตาม mode ของ tag นั้น
+    final isHandover = preselectedTag?.isForceHandover ?? false;
+
     state = CreatePostState(
       text: templateText,
       ddId: ddId,
@@ -456,6 +483,8 @@ class CreatePostNotifier extends StateNotifier<CreatePostState> {
       selectedResidentId: residentId,
       selectedResidentName: residentName,
       title: title,
+      selectedTag: preselectedTag,
+      isHandover: isHandover,
     );
   }
 

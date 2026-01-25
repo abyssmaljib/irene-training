@@ -83,12 +83,15 @@ class CollapsibleResidentHeader extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppColors.inputBorder, width: 1.5),
               ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: resident.imageUrl != null && resident.imageUrl!.isNotEmpty
-                    // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
-                    ? Image.network(resident.imageUrl!, fit: BoxFit.cover, cacheWidth: 100, errorBuilder: (_, _, _) => _buildMiniAvatar())
-                    : _buildMiniAvatar(),
+              // RepaintBoundary แยก layer ไม่ให้ repaint ทุก scroll frame
+              child: RepaintBoundary(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: resident.imageUrl != null && resident.imageUrl!.isNotEmpty
+                      // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
+                      ? Image.network(resident.imageUrl!, fit: BoxFit.cover, cacheWidth: 100, errorBuilder: (context, error, stackTrace) => _buildMiniAvatar())
+                      : _buildMiniAvatar(),
+                ),
               ),
             ),
             SizedBox(width: 8),
@@ -149,17 +152,20 @@ class CollapsibleResidentHeader extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.inputBorder, width: 2),
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
-        child: resident.imageUrl != null && resident.imageUrl!.isNotEmpty
-            ? Image.network(
-                resident.imageUrl!,
-                fit: BoxFit.cover,
-                // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
-                cacheWidth: 400,
-                errorBuilder: (_, _, _) => _buildDefaultAvatar(),
-              )
-            : _buildDefaultAvatar(),
+      // RepaintBoundary แยก layer ไม่ให้ repaint ทุก scroll frame
+      child: RepaintBoundary(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: resident.imageUrl != null && resident.imageUrl!.isNotEmpty
+              ? Image.network(
+                  resident.imageUrl!,
+                  fit: BoxFit.cover,
+                  // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
+                  cacheWidth: 400,
+                  errorBuilder: (context, error, stackTrace) => _buildDefaultAvatar(),
+                )
+              : _buildDefaultAvatar(),
+        ),
       ),
     );
   }

@@ -9,6 +9,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/confirm_dialog.dart';
 import '../../../core/widgets/irene_app_bar.dart';
+import '../../../core/widgets/network_image.dart';
 import '../../medicine/models/medicine_summary.dart';
 import '../../medicine/screens/photo_preview_screen.dart';
 import '../../medicine/services/camera_service.dart';
@@ -19,7 +20,9 @@ import '../providers/task_provider.dart';
 import '../services/task_service.dart';
 import '../models/problem_type.dart';
 import '../widgets/problem_input_sheet.dart';
-import '../../board/widgets/create_post_bottom_sheet.dart';
+import '../widgets/difficulty_rating_dialog.dart';
+import '../../../core/widgets/nps_scale.dart';
+import '../../board/screens/advanced_create_post_screen.dart';
 import '../../board/widgets/video_player_widget.dart';
 
 /// หน้ารายละเอียด Task แบบ Full Page
@@ -263,6 +266,12 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
 
                     // Info badges
                     _buildInfoBadges(),
+
+                    // Difficulty score badge (แยกบรรทัดเพราะ height ไม่เท่า badge อื่น)
+                    if (_shouldShowDifficultyBadge) ...[
+                      AppSpacing.verticalGapSm,
+                      _buildDifficultyBadge(_task.difficultyScore!),
+                    ],
                     AppSpacing.verticalGapMd,
 
                     // RecurNote (ถ้ามี)
@@ -503,6 +512,125 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     );
   }
 
+  /// ตรวจสอบว่าควรแสดง difficulty badge หรือไม่
+  bool get _shouldShowDifficultyBadge =>
+      _task.difficultyScore != null &&
+      _task.difficultyRatedBy == ref.read(currentUserIdProvider);
+
+  /// Emoji สำหรับแต่ละคะแนน (1-10)
+  static const _scoreEmojis = {
+    1: '😎',
+    2: '🤗',
+    3: '🙂',
+    4: '😀',
+    5: '😃',
+    6: '🤔',
+    7: '😥',
+    8: '😫',
+    9: '😱',
+    10: '🤯',
+  };
+
+  /// Badge แสดงคะแนนความยากที่ user ให้ไว้ (กดเพื่อแก้ไขได้)
+  Widget _buildDifficultyBadge(int score) {
+    final emoji = _scoreEmojis[score] ?? '🤔';
+
+    // หาสีและ label จาก kDifficultyThresholds
+    Color color = AppColors.secondaryText;
+    String label = 'ความยาก';
+
+    for (final threshold in kDifficultyThresholds) {
+      if (score >= threshold.from && score <= threshold.to) {
+        color = threshold.color;
+        label = threshold.label ?? 'ความยาก';
+        break;
+      }
+    }
+
+    return GestureDetector(
+      onTap: _handleEditDifficulty,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withValues(alpha: 0.4)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(emoji, style: const TextStyle(fontSize: 14)),
+            const SizedBox(width: 4),
+            Text(
+              '$score - $label',
+              style: AppTypography.caption.copyWith(
+                color: color,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(width: 6),
+            // Pencil icon แสดงว่ากดแก้ไขได้
+            HugeIcon(
+              icon: HugeIcons.strokeRoundedPencilEdit01,
+              size: 14,
+              color: color,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// จัดการเมื่อกด badge ความยาก เพื่อแก้ไขคะแนน
+  Future<void> _handleEditDifficulty() async {
+    final userId = ref.read(currentUserIdProvider);
+    if (userId == null) return;
+
+    // แสดง dialog เพื่อแก้ไขคะแนน (เริ่มต้นที่คะแนนเดิม)
+    final result = await DifficultyRatingDialog.show(
+      context,
+      taskTitle: _task.title,
+      allowSkip: false, // ไม่ให้ข้ามเพราะเป็นการแก้ไข
+      initialScore: _task.difficultyScore, // คะแนนเดิมเป็น default
+    );
+
+    // ถ้า user กด back หรือปิด dialog → ไม่ทำอะไร
+    if (result == null || result.score == null) return;
+
+    final newScore = result.score!;
+
+    // Optimistic update - อัพเดต UI ทันที
+    final optimisticTask = _task.copyWith(
+      difficultyScore: newScore,
+      difficultyRatedBy: userId,
+    );
+    setState(() => _task = optimisticTask);
+
+    // เรียก API อัพเดตคะแนน
+    final success = await TaskService.instance.updateDifficultyScore(
+      _task.logId,
+      newScore,
+      userId,
+    );
+
+    if (success) {
+      // Refresh tasks เพื่อ sync กับ server
+      refreshTasks(ref);
+    } else {
+      // Rollback ถ้า error (ใช้ค่าเดิม)
+      if (mounted) {
+        setState(() {
+          _task = _task.copyWith(
+            difficultyScore: _task.difficultyScore,
+          );
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('ไม่สามารถอัพเดตคะแนนได้')),
+        );
+      }
+    }
+  }
+
   Widget _buildBadge({
     required dynamic icon,
     required String text,
@@ -610,25 +738,16 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       ),
       child: Row(
         children: [
-          // Profile image
-          ClipRRect(
-            borderRadius: BorderRadius.circular(25),
-            child: _task.residentPictureUrl != null
-                ? Image.network(
-                    _task.residentPictureUrl!,
-                    width: 50,
-                    height: 50,
-                    fit: BoxFit.cover,
-                    // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
-                    cacheWidth: 200,
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return _buildProfilePlaceholder();
-                    },
-                    errorBuilder: (_, error, stackTrace) =>
-                        _buildProfilePlaceholder(),
-                  )
-                : _buildProfilePlaceholder(),
+          // Profile image - ใช้ IreneNetworkAvatar ที่มี timeout และ retry
+          IreneNetworkAvatar(
+            imageUrl: _task.residentPictureUrl,
+            radius: 25,
+            backgroundColor: AppColors.accent1,
+            fallbackIcon: HugeIcon(
+              icon: HugeIcons.strokeRoundedUser,
+              size: 24,
+              color: AppColors.primary,
+            ),
           ),
           AppSpacing.horizontalGapMd,
 
@@ -692,17 +811,6 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
               ),
             ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildProfilePlaceholder() {
-    return Container(
-      width: 50,
-      height: 50,
-      color: AppColors.accent1,
-      child: Center(
-        child: HugeIcon(icon: HugeIcons.strokeRoundedUser, color: AppColors.primary, size: AppIconSize.xl),
       ),
     );
   }
@@ -786,83 +894,15 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           style: AppTypography.subtitle.copyWith(fontWeight: FontWeight.w600),
         ),
         AppSpacing.verticalGapSm,
+        // รูปตัวอย่าง - ใช้ IreneNetworkImage ที่มี timeout และ retry
         GestureDetector(
           onTap: () => _showExpandedImage(_task.sampleImageUrl!),
-          child: ClipRRect(
+          child: IreneNetworkImage(
+            imageUrl: _task.sampleImageUrl!,
+            height: 300,
+            fit: BoxFit.contain,
+            memCacheWidth: 800,
             borderRadius: BorderRadius.circular(12),
-            child: Image.network(
-              _task.sampleImageUrl!,
-              width: double.infinity,
-              fit: BoxFit.contain,
-              // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
-              cacheWidth: 800,
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                final total = loadingProgress.expectedTotalBytes;
-                final loaded = loadingProgress.cumulativeBytesLoaded;
-                final progress = total != null ? loaded / total : null;
-                // แสดงขนาดที่โหลดแล้ว (KB/MB)
-                String loadedText;
-                if (loaded < 1024) {
-                  loadedText = '$loaded B';
-                } else if (loaded < 1024 * 1024) {
-                  loadedText = '${(loaded / 1024).toStringAsFixed(0)} KB';
-                } else {
-                  loadedText =
-                      '${(loaded / (1024 * 1024)).toStringAsFixed(1)} MB';
-                }
-                return Container(
-                  height: 300,
-                  color: AppColors.background,
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        CircularProgressIndicator(
-                          value: progress,
-                          color: AppColors.primary,
-                          strokeWidth: 2,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          progress != null
-                              ? '${(progress * 100).toInt()}%'
-                              : 'กำลังโหลด... $loadedText',
-                          style: AppTypography.caption.copyWith(
-                            color: AppColors.secondaryText,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-              errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  height: 300,
-                  color: AppColors.background,
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        HugeIcon(
-                          icon: HugeIcons.strokeRoundedImage01,
-                          size: 32,
-                          color: AppColors.secondaryText,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'โหลดรูปไม่สำเร็จ',
-                          style: AppTypography.caption.copyWith(
-                            color: AppColors.secondaryText,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
           ),
         ),
         // ผู้ถ่ายรูปตัวอย่าง (ถ้ามี) - Badge เกียรติยศ
@@ -918,20 +958,16 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                       ),
                     ],
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(18),
-                    child: _task.sampleImageCreatorPhotoUrl != null
-                        ? Image.network(
-                            _task.sampleImageCreatorPhotoUrl!,
-                            width: 36,
-                            height: 36,
-                            fit: BoxFit.cover,
-                            // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
-                            cacheWidth: 100,
-                            errorBuilder: (context, error, stackTrace) =>
-                                _buildCreatorPlaceholderGold(),
-                          )
-                        : _buildCreatorPlaceholderGold(),
+                  // Avatar ผู้สร้างสรรค์ - ใช้ IreneNetworkAvatar ที่มี timeout และ retry
+                  child: IreneNetworkAvatar(
+                    imageUrl: _task.sampleImageCreatorPhotoUrl,
+                    radius: 18,
+                    backgroundColor: const Color(0xFFFDE68A), // amber-200
+                    fallbackIcon: HugeIcon(
+                      icon: HugeIcons.strokeRoundedUser,
+                      size: 18,
+                      color: const Color(0xFFB45309), // amber-700
+                    ),
                   ),
                 ),
                 AppSpacing.horizontalGapMd,
@@ -1040,30 +1076,6 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     );
   }
 
-  /// Placeholder สำหรับรูป profile ผู้ถ่ายรูปตัวอย่าง (Gold theme)
-  Widget _buildCreatorPlaceholderGold() {
-    return Container(
-      width: 36,
-      height: 36,
-      decoration: const BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: LinearGradient(
-          colors: [
-            Color(0xFFFEF3C7), // amber-100
-            Color(0xFFFDE68A), // amber-200
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: HugeIcon(
-        icon: HugeIcons.strokeRoundedUser,
-        size: 18,
-        color: Color(0xFFB45309), // amber-700
-      ),
-    );
-  }
-
   Widget _buildConfirmImage() {
     final imageUrl = _uploadedImageUrl ?? _task.confirmImage;
     if (imageUrl == null) return const SizedBox.shrink();
@@ -1108,82 +1120,15 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           ],
         ),
         AppSpacing.verticalGapSm,
+        // รูป task - ใช้ IreneNetworkImage ที่มี timeout และ retry
         GestureDetector(
           onTap: () => _showExpandedImage(imageUrl),
-          child: ClipRRect(
+          child: IreneNetworkImage(
+            imageUrl: imageUrl,
+            height: 300,
+            fit: BoxFit.contain,
+            memCacheWidth: 800,
             borderRadius: BorderRadius.circular(12),
-            child: Image.network(
-              imageUrl,
-              width: double.infinity,
-              fit: BoxFit.contain,
-              // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
-              cacheWidth: 800,
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                final total = loadingProgress.expectedTotalBytes;
-                final loaded = loadingProgress.cumulativeBytesLoaded;
-                final progress = total != null ? loaded / total : null;
-                String loadedText;
-                if (loaded < 1024) {
-                  loadedText = '$loaded B';
-                } else if (loaded < 1024 * 1024) {
-                  loadedText = '${(loaded / 1024).toStringAsFixed(0)} KB';
-                } else {
-                  loadedText =
-                      '${(loaded / (1024 * 1024)).toStringAsFixed(1)} MB';
-                }
-                return Container(
-                  height: 300,
-                  color: AppColors.background,
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        CircularProgressIndicator(
-                          value: progress,
-                          color: AppColors.primary,
-                          strokeWidth: 2,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          progress != null
-                              ? '${(progress * 100).toInt()}%'
-                              : 'กำลังโหลด... $loadedText',
-                          style: AppTypography.caption.copyWith(
-                            color: AppColors.secondaryText,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-              errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  height: 300,
-                  color: AppColors.background,
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        HugeIcon(
-                          icon: HugeIcons.strokeRoundedImage01,
-                          size: 32,
-                          color: AppColors.secondaryText,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'โหลดรูปไม่สำเร็จ',
-                          style: AppTypography.caption.copyWith(
-                            color: AppColors.secondaryText,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
           ),
         ),
 
@@ -1248,16 +1193,15 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
             onTap: () => FullScreenVideoPlayer.show(context, videoUrl),
             child: Stack(
               children: [
-                // Thumbnail หรือ placeholder
+                // Thumbnail วิดีโอ - ใช้ IreneNetworkImage ที่มี timeout และ retry
                 if (thumbnailUrl != null && thumbnailUrl.isNotEmpty)
-                  Image.network(
-                    thumbnailUrl,
+                  IreneNetworkImage(
+                    imageUrl: thumbnailUrl,
                     width: double.infinity,
                     height: 200,
                     fit: BoxFit.cover,
-                    // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
-                    cacheWidth: 800,
-                    errorBuilder: (_, error, stackTrace) => _buildVideoPlaceholder(),
+                    memCacheWidth: 800,
+                    errorPlaceholder: _buildVideoPlaceholder(),
                   )
                 else
                   _buildVideoPlaceholder(),
@@ -1355,31 +1299,19 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           ),
         ),
         AppSpacing.verticalGapSm,
-        // ถ้ามี 1 รูป แสดงเต็มความกว้าง
+        // ถ้ามี 1 รูป แสดงเต็มความกว้าง - ใช้ IreneNetworkImage ที่มี timeout และ retry
         if (images.length == 1)
           GestureDetector(
             onTap: () => _showExpandedImage(images.first),
-            child: ClipRRect(
+            child: IreneNetworkImage(
+              imageUrl: images.first,
+              height: 200,
+              fit: BoxFit.contain,
+              memCacheWidth: 800,
               borderRadius: BorderRadius.circular(12),
-              child: Image.network(
-                images.first,
-                width: double.infinity,
-                fit: BoxFit.contain,
-                // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
-                cacheWidth: 800,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return Container(
-                    height: 200,
-                    color: AppColors.background,
-                    child: const Center(child: CircularProgressIndicator()),
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) => _buildImageErrorPlaceholder(),
-              ),
             ),
           )
-        // ถ้ามีหลายรูป แสดงเป็น grid
+        // ถ้ามีหลายรูป แสดงเป็น grid - ใช้ IreneNetworkImage ที่มี timeout และ retry
         else
           GridView.builder(
             shrinkWrap: true,
@@ -1394,24 +1326,12 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
             itemBuilder: (context, index) {
               return GestureDetector(
                 onTap: () => _showExpandedImage(images[index]),
-                child: ClipRRect(
+                child: IreneNetworkImage(
+                  imageUrl: images[index],
+                  fit: BoxFit.cover,
+                  memCacheWidth: 400,
                   borderRadius: BorderRadius.circular(8),
-                  child: Image.network(
-                    images[index],
-                    fit: BoxFit.cover,
-                    // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
-                    cacheWidth: 400,
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return Container(
-                        color: AppColors.background,
-                        child: const Center(
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      );
-                    },
-                    errorBuilder: (context, error, stackTrace) => _buildImageErrorPlaceholder(),
-                  ),
+                  compact: true,
                 ),
               );
             },
@@ -1444,16 +1364,15 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
             onTap: () => FullScreenVideoPlayer.show(context, videoUrl),
             child: Stack(
               children: [
-                // Thumbnail หรือ placeholder
+                // Thumbnail วิดีโอ Post - ใช้ IreneNetworkImage ที่มี timeout และ retry
                 if (thumbnailUrl != null && thumbnailUrl.isNotEmpty)
-                  Image.network(
-                    thumbnailUrl,
+                  IreneNetworkImage(
+                    imageUrl: thumbnailUrl,
                     width: double.infinity,
                     height: 200,
                     fit: BoxFit.cover,
-                    // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
-                    cacheWidth: 800,
-                    errorBuilder: (context, error, stackTrace) => _buildVideoPlaceholder(),
+                    memCacheWidth: 800,
+                    errorPlaceholder: _buildVideoPlaceholder(),
                   )
                 else
                   _buildVideoPlaceholder(),
@@ -1510,19 +1429,6 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildImageErrorPlaceholder() {
-    return Container(
-      color: AppColors.background,
-      child: Center(
-        child: HugeIcon(
-          icon: HugeIcons.strokeRoundedImage01,
-          size: 32,
-          color: AppColors.secondaryText,
-        ),
-      ),
     );
   }
 
@@ -1629,39 +1535,13 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
             backgroundColor: Colors.black,
             foregroundColor: Colors.white,
           ),
+          // รูปเต็มจอ - ใช้ IreneNetworkImage ที่มี timeout และ retry
           body: InteractiveViewer(
             child: Center(
-              child: Image.network(
-                imageUrl,
+              child: IreneNetworkImage(
+                imageUrl: imageUrl,
                 fit: BoxFit.contain,
-                // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
-                cacheWidth: 1200,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  final progress = loadingProgress.expectedTotalBytes != null
-                      ? loadingProgress.cumulativeBytesLoaded /
-                            loadingProgress.expectedTotalBytes!
-                      : null;
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        CircularProgressIndicator(
-                          value: progress,
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                        if (progress != null) ...[
-                          const SizedBox(height: 8),
-                          Text(
-                            '${(progress * 100).toInt()}%',
-                            style: const TextStyle(color: Colors.white70),
-                          ),
-                        ],
-                      ],
-                    ),
-                  );
-                },
+                memCacheWidth: 1200,
               ),
             ),
           ),
@@ -1992,6 +1872,22 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
 
     if (userId == null) return;
 
+    // === แสดง Dialog ให้ประเมินความยากของงาน ===
+    // ถ้า user ปิด dialog (กด back) จะได้ null → ยกเลิก completion
+    final difficultyResult = await DifficultyRatingDialog.show(
+      context,
+      taskTitle: _task.title,
+      allowSkip: true, // ให้ข้ามได้
+      avgScore: _task.avgDifficultyScore30d, // ค่าเฉลี่ยย้อนหลัง 30 วัน
+    );
+
+    // ถ้า user ปิด dialog โดยไม่ทำอะไร → ยกเลิก
+    if (difficultyResult == null) return;
+    if (!mounted) return;
+
+    // คะแนนความยากที่ user ให้ (null = ข้าม → ใช้ default 5)
+    final difficultyScore = difficultyResult.score;
+
     // === Optimistic Update ===
     // สร้าง task ใหม่ที่มีสถานะ complete ก่อนรอ server
     final optimisticTask = _task.copyWith(
@@ -2000,6 +1896,9 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       completedByNickname: userNickname,
       completedAt: DateTime.now(),
       confirmImage: _uploadedImageUrl,
+      difficultyScore: difficultyScore ?? 5, // default 5 ถ้า skip
+      difficultyRatedBy: userId,
+      difficultyRaterNickname: userNickname,
     );
 
     // อัพเดต local state ทันที
@@ -2016,6 +1915,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       _task.logId,
       userId,
       imageUrl: _uploadedImageUrl,
+      difficultyScore: difficultyScore, // null = ใช้ default ใน database
+      difficultyRatedBy: userId,
     );
 
     if (success) {
@@ -2041,9 +1942,10 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         }
       }
 
-      // ยืนยัน optimistic update
-      commitOptimisticUpdate(ref, _task.logId);
-      refreshTasks(ref);
+      // === Optimistic Update Strategy ===
+      // ไม่ต้อง commitOptimisticUpdate หรือ refreshTasks ก่อน pop
+      // เพื่อให้ ChecklistScreen เห็น optimistic state ทันที
+      // Realtime event จะมา trigger refresh และ clear optimistic state ภายหลัง
       if (mounted) Navigator.pop(context);
     } else {
       // Rollback ถ้า server error
@@ -2121,9 +2023,10 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     );
 
     if (success) {
-      // ยืนยัน optimistic update
-      commitOptimisticUpdate(ref, _task.logId);
-      refreshTasks(ref);
+      // === Optimistic Update Strategy ===
+      // ไม่ต้อง commitOptimisticUpdate หรือ refreshTasks ก่อน pop
+      // เพื่อให้ ChecklistScreen เห็น optimistic state ทันที
+      // Realtime event จะมา trigger refresh และ clear optimistic state ภายหลัง
       if (mounted) Navigator.pop(context);
     } else {
       // Rollback ถ้า server error
@@ -2169,9 +2072,10 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     final success = await service.markTaskRefer(_task.logId, userId);
 
     if (success) {
-      // ยืนยัน optimistic update
-      commitOptimisticUpdate(ref, _task.logId);
-      refreshTasks(ref);
+      // === Optimistic Update Strategy ===
+      // ไม่ต้อง commitOptimisticUpdate หรือ refreshTasks ก่อน pop
+      // เพื่อให้ ChecklistScreen เห็น optimistic state ทันที
+      // Realtime event จะมา trigger refresh และ clear optimistic state ภายหลัง
       if (mounted) Navigator.pop(context);
     } else {
       // Rollback ถ้า server error
@@ -2221,6 +2125,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       clearConfirmImage: true,
       clearProblemType: true,
       clearDescript: true,
+      clearDifficultyScore: true,
+      clearDifficultyRatedBy: true,
     );
 
     // อัพเดต local state ทันที
@@ -2267,9 +2173,10 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         }
       }
 
-      // ยืนยัน optimistic update
-      commitOptimisticUpdate(ref, originalTask.logId);
-      refreshTasks(ref);
+      // === Optimistic Update Strategy ===
+      // ไม่ต้อง commitOptimisticUpdate หรือ refreshTasks ก่อน pop
+      // เพื่อให้ ChecklistScreen เห็น optimistic state ทันที
+      // Realtime event จะมา trigger refresh และ clear optimistic state ภายหลัง
       if (mounted) Navigator.pop(context);
     } else {
       // Rollback ถ้า server error
@@ -2373,22 +2280,26 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     }
   }
 
-  /// เปิด CreatePostBottomSheet พร้อมข้อมูลจาก task
+  /// เปิด AdvancedCreatePostScreen พร้อมข้อมูลจาก task
+  /// ใช้ full-screen แทน modal เพื่อให้มีพื้นที่พิมพ์ description มากขึ้น
   void _handleCompleteByPost() {
-    showCreatePostBottomSheet(
+    Navigator.push(
       context,
-      initialText: _task.title ?? '',
-      initialResidentId: _task.residentId,
-      initialResidentName: _task.residentName,
-      initialTagName: 'งานเช็คลิสต์', // ใช้ tag "งานเช็คลิสต์" สำหรับทุก task
-      taskLogId: _task.logId,
-      taskConfirmImageUrl: _uploadedImageUrl, // รูปที่ถ่ายไว้ (ถ้ามี)
-      onPostCreated: () {
-        // เมื่อโพสสำเร็จ task จะถูก complete โดย CreatePostBottomSheet แล้ว
-        // เพียงแค่ refresh tasks และกลับไปหน้า checklist
-        refreshTasks(ref);
-        if (mounted) Navigator.pop(context);
-      },
+      MaterialPageRoute(
+        builder: (context) => AdvancedCreatePostScreen(
+          initialTitle: _task.title ?? '', // หัวข้อจาก task (lock ไว้)
+          initialResidentId: _task.residentId,
+          initialResidentName: _task.residentName,
+          initialTagName: 'งานเช็คลิสต์', // ใช้ tag "งานเช็คลิสต์" สำหรับทุก task
+          taskLogId: _task.logId,
+          taskConfirmImageUrl: _uploadedImageUrl, // รูปที่ถ่ายไว้ (ถ้ามี)
+          onPostCreated: () {
+            // เมื่อโพสสำเร็จ task จะถูก complete โดย AdvancedCreatePostScreen แล้ว
+            // เพียงแค่กลับไปหน้า checklist
+            if (mounted) Navigator.pop(context);
+          },
+        ),
+      ),
     );
   }
 

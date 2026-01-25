@@ -99,6 +99,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   MonthlySummary? _currentMonthSummary;
 
   // Clock out requirements
+  // เริ่มต้น loading = true เพื่อให้ปุ่มลงเวร disabled ไว้ก่อนจนกว่าจะโหลดข้อมูลเสร็จ
+  bool _isLoadingClockOutRequirements = true;
   int _remainingTasksCount = 0;
   int _unreadPostsCount = 0;
   bool _hasHandover = false;
@@ -107,9 +109,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   TarotCard? _selectedTarotCard;
 
   bool get _isClockedIn => _currentShift?.isClockedIn ?? false;
-  bool get _canClockOut => _remainingTasksCount == 0;
+  // ปุ่มลงเวรจะ enabled ก็ต่อเมื่อ: โหลดข้อมูลเสร็จแล้ว + ไม่มีงานค้าง
+  bool get _canClockOut =>
+      !_isLoadingClockOutRequirements && _remainingTasksCount == 0;
 
   String? get _clockOutDisabledReason {
+    // ถ้ากำลังโหลดข้อมูล แสดงข้อความ loading
+    if (_isLoadingClockOutRequirements) {
+      return 'กำลังตรวจสอบ...';
+    }
     final reasons = <String>[];
     if (_remainingTasksCount > 0) {
       reasons.add('$_remainingTasksCount งานค้าง');
@@ -192,7 +200,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Future<void> _loadClockOutRequirements() async {
-    if (!_isClockedIn || _currentShift == null) return;
+    // ถ้าไม่ได้อยู่ในเวร ไม่ต้องโหลด และ set loading = false
+    if (!_isClockedIn || _currentShift == null) {
+      if (mounted) {
+        setState(() => _isLoadingClockOutRequirements = false);
+      }
+      return;
+    }
+
+    // เริ่มโหลด (ถ้าเป็นการ refresh จะ reset loading state)
+    if (mounted) {
+      setState(() => _isLoadingClockOutRequirements = true);
+    }
 
     final results = await Future.wait([
       // งานทั้งหมดทั้งบ้าน ทุกโซน (ใช้เวลา clock in คำนวณ adjust_date)
@@ -209,6 +228,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         _remainingTasksCount = results[0] as int;
         _unreadPostsCount = results[1] as int;
         _hasHandover = results[2] as bool;
+        // โหลดเสร็จแล้ว
+        _isLoadingClockOutRequirements = false;
       });
     }
   }

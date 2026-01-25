@@ -436,13 +436,15 @@ class _BadgeCollectionScreenState extends State<BadgeCollectionScreen>
   /// สร้าง Badge icon
   ///
   /// ถ้ามี imageUrl จะแสดงรูป ถ้าไม่มีจะแสดง emoji
-  /// ถ้ายังไม่ได้รับจะใส่ ColorFiltered เป็น greyscale
+  /// ถ้ายังไม่ได้รับจะแสดงเป็น greyscale
+  ///
+  /// Performance: แยก ColorFiltered ใช้เฉพาะ network image
+  /// เพราะ ColorFiltered เป็น expensive GPU operation
+  /// สำหรับ emoji ใช้สีเทาโดยตรงแทน
   Widget _buildBadgeIcon(Badge badge, bool isEarned) {
-    Widget iconWidget;
-
+    // กรณีมีรูปจาก URL
     if (badge.imageUrl != null) {
-      // แสดงรูปจาก URL
-      iconWidget = ClipOval(
+      Widget imageWidget = ClipOval(
         child: Image.network(
           badge.imageUrl!,
           width: 36,
@@ -450,33 +452,40 @@ class _BadgeCollectionScreenState extends State<BadgeCollectionScreen>
           fit: BoxFit.cover,
           // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
           cacheWidth: 100,
-          // ถ้าโหลดรูปไม่ได้ให้แสดง emoji แทน
+          // ถ้าโหลดรูปไม่ได้ให้แสดง emoji แทน (สีเทาถ้ายังไม่ได้)
           errorBuilder: (context, error, stackTrace) => Text(
             badge.icon ?? badge.rarityEmoji,
-            style: const TextStyle(fontSize: 20),
+            style: TextStyle(
+              fontSize: 20,
+              color: isEarned ? null : Colors.grey,
+            ),
           ),
         ),
       );
-    } else {
-      // แสดง emoji
-      iconWidget = Text(
-        badge.icon ?? badge.rarityEmoji,
-        style: const TextStyle(fontSize: 24),
-      );
+
+      // ใช้ ColorFiltered เฉพาะ network image เท่านั้น
+      if (!isEarned) {
+        return ColorFiltered(
+          colorFilter: const ColorFilter.mode(
+            Colors.grey,
+            BlendMode.saturation,
+          ),
+          child: imageWidget,
+        );
+      }
+      return imageWidget;
     }
 
-    // ถ้ายังไม่ได้รับ ใส่ greyscale filter
-    if (!isEarned) {
-      return ColorFiltered(
-        colorFilter: const ColorFilter.mode(
-          Colors.grey,
-          BlendMode.saturation,
-        ),
-        child: iconWidget,
-      );
-    }
-
-    return iconWidget;
+    // กรณีเป็น emoji - ใช้สีเทาโดยตรง (ไม่ใช้ ColorFiltered)
+    // เพราะ Text widget รองรับ color property อยู่แล้ว
+    return Text(
+      badge.icon ?? badge.rarityEmoji,
+      style: TextStyle(
+        fontSize: 24,
+        // ถ้ายังไม่ได้รับ ใช้สีเทา (ไม่ต้องใช้ ColorFiltered)
+        color: isEarned ? null : Colors.grey,
+      ),
+    );
   }
 
   /// สร้าง status indicator (checkmark/lock)

@@ -54,24 +54,14 @@ class MonthlySummaryCard extends StatelessWidget {
                 if (onTap != null)
                   Row(
                     children: [
-                      // Absent notification badge
+                      // Absent notification badge - จุดแดงเตือน
                       if (absentCount > 0) ...[
                         Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: AppSpacing.xs,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
                             color: AppColors.error,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            'A$absentCount',
-                            style: AppTypography.caption.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 11,
-                            ),
+                            shape: BoxShape.circle,
                           ),
                         ),
                         AppSpacing.horizontalGapXs,
@@ -171,6 +161,52 @@ class MonthlySummaryCard extends StatelessWidget {
                 ],
               ),
             ),
+
+            // ข้อความเตือนเมื่อมีการขาดเวร
+            if (absentCount > 0) ...[
+              AppSpacing.verticalGapSm,
+              Container(
+                padding: EdgeInsets.all(AppSpacing.sm),
+                decoration: BoxDecoration(
+                  color: AppColors.error.withValues(alpha: 0.1),
+                  borderRadius: AppRadius.smallRadius,
+                  border: Border.all(
+                    color: AppColors.error.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    // หัวข้อเตือน
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        HugeIcon(
+                          icon: HugeIcons.strokeRoundedAlert02,
+                          color: AppColors.error,
+                          size: AppIconSize.sm,
+                        ),
+                        AppSpacing.horizontalGapXs,
+                        Text(
+                          'ขาดเวร $absentCount ครั้ง = ยินยอมให้หัก ${absentCount * 3} เวร',
+                          style: AppTypography.bodySmall.copyWith(
+                            color: AppColors.error,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    AppSpacing.verticalGapXs,
+                    // คำแนะนำ
+                    Text(
+                      'กรุณาแนบใบรับรองแพทย์หรือติดต่อหัวหน้าเวรโดยเร็ว',
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.error.withValues(alpha: 0.8),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),
