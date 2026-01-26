@@ -27,6 +27,9 @@ class MealSectionCard extends StatefulWidget {
   final Future<void> Function(String mealKey, String photoType)? onDeletePhoto; // callback สำหรับลบรูป
   final Future<void> Function(String mealKey, String photoType, String status)? onQCPhoto; // callback สำหรับ QC
 
+  // Shared constant - ลด object creation สำหรับ border radius 4px
+  static const kSmallRadius = BorderRadius.all(Radius.circular(4));
+
   const MealSectionCard({
     super.key,
     required this.mealGroup,
@@ -457,48 +460,52 @@ class _MealSectionCardState extends State<MealSectionCard>
         : medLog?.picture3CUrl;
     final hasLogPhoto = logPhotoUrl != null && logPhotoUrl.isNotEmpty;
 
+    // Layout: Side by Side (รูปตัวอย่างซ้าย, รูปถ่ายขวา) - ทุกมุมมี radius 4px
+    const crossAxisCount = 2;
+
     return Container(
-      padding: EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        0,
-        AppSpacing.md,
-        AppSpacing.md,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      // ชิดขอบซ้าย-ขวา มี padding แค่ด้านล่าง
+      padding: EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Grid รูปตัวอย่างยา - 2 คอลัมน์ (ใหญ่ขึ้น ดูชัดขึ้น)
-          GridView.builder(
-            shrinkWrap: true,
-            physics: NeverScrollableScrollPhysics(),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: AppSpacing.xs,
-              mainAxisSpacing: AppSpacing.xs,
-              childAspectRatio: 1.0,
+          // ฝั่งซ้าย: Grid รูปตัวอย่างยา - ทุกมุมมี radius 4px
+          Expanded(
+            child: GridView.builder(
+              shrinkWrap: true,
+              physics: NeverScrollableScrollPhysics(),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: crossAxisCount,
+                crossAxisSpacing: 0,
+                mainAxisSpacing: 0,
+                childAspectRatio: 1.0,
+              ),
+              itemCount: medicines.length,
+              itemBuilder: (context, index) {
+                return MedicinePhotoItem(
+                  medicine: medicines[index],
+                  showFoiled: widget.showFoiled,
+                  showOverlay: widget.showOverlay,
+                  borderRadius: MealSectionCard.kSmallRadius,
+                );
+              },
             ),
-            itemCount: medicines.length,
-            itemBuilder: (context, index) {
-              return MedicinePhotoItem(
-                medicine: medicines[index],
-                showFoiled: widget.showFoiled,
-                showOverlay: widget.showOverlay,
-              );
-            },
           ),
 
-          SizedBox(height: AppSpacing.sm),
+          // ไม่มี spacing - ชิดกันเลย
 
-          // รูปจัดยา/ให้ยา (2C/3C) หรือปุ่มถ่ายรูป - อยู่ด้านล่าง
-          hasLogPhoto
-              ? _buildLogPhoto(logPhotoUrl, medLog!)
-              : _buildCameraButton(),
+          // ฝั่งขวา: รูปจัดยา/ให้ยา (2C/3C) หรือปุ่มถ่ายรูป
+          Expanded(
+            child: hasLogPhoto
+                ? _buildLogPhoto(logPhotoUrl, medLog!)
+                : _buildCameraButton(),
+          ),
         ],
       ),
     );
   }
 
-  /// ปุ่มถ่ายรูป - แบบยาวเต็มความกว้าง
+  /// ปุ่มถ่ายรูป - แบบ compact สำหรับ layout side by side
   Widget _buildCameraButton() {
     final photoType = widget.showFoiled ? '2C' : '3C';
     final label = widget.showFoiled ? 'ถ่ายรูปจัดยา' : 'ถ่ายรูปเสิร์ฟยา';
@@ -506,60 +513,57 @@ class _MealSectionCardState extends State<MealSectionCard>
         ? const Color(0xFF0EA5E9)
         : const Color(0xFF10B981);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.05),
-        borderRadius: AppRadius.smallRadius,
-        border: Border.all(
-          color: color.withValues(alpha: 0.3),
-          width: 2,
-          style: BorderStyle.solid,
+    // ใช้ AspectRatio 1:1 เพื่อให้สูงเท่ากับรูปตัวอย่างยาฝั่งซ้าย
+    return AspectRatio(
+      aspectRatio: 1.0,
+      child: Container(
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.05),
+          borderRadius: MealSectionCard.kSmallRadius,
+          border: Border.all(
+            color: color.withValues(alpha: 0.3),
+            width: 1,
+          ),
         ),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: widget.onTakePhoto != null
-              ? () => widget.onTakePhoto!(widget.mealGroup.mealKey, photoType)
-              : null,
-          borderRadius: AppRadius.smallRadius,
-          child: Padding(
-            padding: EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-            child: Row(
+        clipBehavior: Clip.antiAlias,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: widget.onTakePhoto != null
+                ? () => widget.onTakePhoto!(widget.mealGroup.mealKey, photoType)
+                : null,
+            borderRadius: MealSectionCard.kSmallRadius,
+            child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
-                  padding: EdgeInsets.all(10),
+                  padding: EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: color.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
                   child: HugeIcon(
                     icon: HugeIcons.strokeRoundedCamera01,
-                    size: AppIconSize.xl,
+                    size: AppIconSize.xxl,
                     color: color,
                   ),
                 ),
-                SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      label,
-                      style: AppTypography.body.copyWith(
-                        color: color,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      'กดเพื่อถ่ายรูป',
-                      style: AppTypography.caption.copyWith(
-                        color: AppColors.textSecondary,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
+                SizedBox(height: 8),
+                Text(
+                  label,
+                  style: AppTypography.body.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'กดเพื่อถ่ายรูป',
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.textSecondary,
+                    fontSize: 11,
+                  ),
                 ),
               ],
             ),
@@ -631,12 +635,12 @@ class _MealSectionCardState extends State<MealSectionCard>
         child: Container(
           decoration: BoxDecoration(
             color: AppColors.background,
-            borderRadius: AppRadius.smallRadius,
-            border: Border.all(color: borderColor, width: 2),
+            borderRadius: MealSectionCard.kSmallRadius,
+            border: Border.all(color: borderColor, width: 1),
           ),
           clipBehavior: Clip.antiAlias,
           child: AspectRatio(
-            aspectRatio: 4 / 3, // รูปยาวขึ้น ดูชัดขึ้น
+            aspectRatio: 1.0, // 1:1 ให้ match กับ grid ฝั่งซ้าย
             child: Stack(
               fit: StackFit.expand,
               children: [

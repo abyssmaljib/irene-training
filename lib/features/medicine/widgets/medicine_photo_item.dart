@@ -14,6 +14,7 @@ class MedicinePhotoItem extends StatelessWidget {
   final bool showFoiled; // true = แผง (2C), false = เม็ดยา (3C)
   final bool showOverlay; // แสดง overlay จำนวนเม็ดยา
   final VoidCallback? onTap;
+  final BorderRadius? borderRadius; // custom border radius สำหรับ grid layout ที่ชนกัน
 
   const MedicinePhotoItem({
     super.key,
@@ -21,6 +22,7 @@ class MedicinePhotoItem extends StatelessWidget {
     this.showFoiled = true,
     this.showOverlay = true,
     this.onTap,
+    this.borderRadius,
   });
 
   @override
@@ -28,98 +30,83 @@ class MedicinePhotoItem extends StatelessWidget {
     final photoUrl = showFoiled ? medicine.photo2C : medicine.photo3C;
     final hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
 
+    // ใช้ borderRadius ที่ส่งมา หรือ default เป็น smallRadius
+    final effectiveRadius = borderRadius ?? AppRadius.smallRadius;
+
     return GestureDetector(
       onTap: onTap ?? (hasPhoto ? () => _showFullImage(context, photoUrl) : null),
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.background,
-          borderRadius: AppRadius.smallRadius,
+          borderRadius: effectiveRadius,
           border: Border.all(color: AppColors.inputBorder),
         ),
         clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        // ใช้ Stack เพื่อให้ชื่อยาซ้อนบนรูป
+        child: Stack(
+          fit: StackFit.expand,
           children: [
-            // Photo area with overlay
-            Expanded(
-              flex: 3,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  // รูปยา - ใช้ ClipRect + FittedBox เพื่อให้ cover แบบไม่บิดเบี้ยว
-                  hasPhoto
-                      ? ClipRect(
-                          child: _MedicineNetworkImage(
-                            imageUrl: photoUrl,
-                            fit: BoxFit.cover,
-                            placeholder: Container(
-                              color: AppColors.background,
-                              child: Center(
-                                child: CircularProgressIndicator(
-                                  color: AppColors.primary,
-                                  strokeWidth: 2,
-                                ),
-                              ),
-                            ),
-                            errorWidget: _buildPlaceholder(),
-                          ),
-                        )
-                      : _buildPlaceholder(),
-
-                  // Overlay จำนวนเม็ดยา
-                  if (showOverlay && medicine.takeTab != null && medicine.takeTab! > 0)
-                    Positioned.fill(
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          return OverlayMedWidget(
-                            width: constraints.maxWidth,
-                            height: constraints.maxHeight,
-                            takeTab: medicine.takeTab,
-                          );
-                        },
+            // รูปยา - เต็มพื้นที่
+            hasPhoto
+                ? _MedicineNetworkImage(
+                    imageUrl: photoUrl,
+                    fit: BoxFit.cover,
+                    placeholder: Container(
+                      color: AppColors.background,
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          color: AppColors.primary,
+                          strokeWidth: 2,
+                        ),
                       ),
                     ),
-                ],
-              ),
-            ),
+                    errorWidget: _buildPlaceholder(),
+                  )
+                : _buildPlaceholder(),
 
-            // Info area
-            Container(
-              padding: EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppColors.secondaryBackground,
-                border: Border(
-                  top: BorderSide(color: AppColors.inputBorder),
+            // Overlay จำนวนเม็ดยา
+            if (showOverlay && medicine.takeTab != null && medicine.takeTab! > 0)
+              Positioned.fill(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return OverlayMedWidget(
+                      width: constraints.maxWidth,
+                      height: constraints.maxHeight,
+                      takeTab: medicine.takeTab,
+                    );
+                  },
                 ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Medicine name + strength
-                  Text(
-                    medicine.str != null && medicine.str!.isNotEmpty
-                        ? '${medicine.displayName} ${medicine.str}'
-                        : medicine.displayName,
-                    style: AppTypography.caption.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
 
-                  // Dosage
-                  if (medicine.displayDosage.isNotEmpty)
-                    Text(
-                      medicine.displayDosage,
-                      style: AppTypography.caption.copyWith(
-                        color: AppColors.textSecondary,
-                        fontSize: 10,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                ],
+            // ชื่อยา - ซ้อนด้านล่างแบบ gradient ใส
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.7),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+                child: Text(
+                  medicine.str != null && medicine.str!.isNotEmpty
+                      ? '${medicine.displayName} ${medicine.str}'
+                      : medicine.displayName,
+                  style: AppTypography.caption.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 10,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ),
           ],
