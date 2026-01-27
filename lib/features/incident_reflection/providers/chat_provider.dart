@@ -7,7 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/chat_message.dart';
 import '../models/incident.dart';
 import '../models/reflection_pillars.dart';
-import '../services/ai_chat_service.dart' show AiChatService, PillarContent;
+import '../services/ai_chat_service.dart' show AiChatService, AvailableCoreValue, PillarContent;
 import '../services/incident_service.dart';
 import 'incident_provider.dart';
 
@@ -38,6 +38,22 @@ class ChatState {
   /// สรุปผลที่ได้จาก AI (เก็บไว้แสดงใน popup)
   final ReflectionSummary? currentSummary;
 
+  /// Flag บอกว่าต้องแสดง Core Value picker หรือไม่
+  /// เมื่อเป็น true จะแสดง UI ให้ user เลือก Core Values แทนช่องพิมพ์
+  final bool showCoreValuePicker;
+
+  /// รายการ Core Values ที่สามารถเลือกได้ (สำหรับแสดงใน picker)
+  final List<AvailableCoreValue> availableCoreValues;
+
+  /// Pillar ที่กำลังถามอยู่ (1-4)
+  /// 1 = ความสำคัญ, 2 = สาเหตุ, 3 = Core Values, 4 = การป้องกัน
+  /// null = ไม่ได้ถามเรื่องใดเฉพาะ (ทักทาย/ปิดสนทนา)
+  final int? currentPillar;
+
+  /// ข้อความที่ส่งไม่สำเร็จ (สำหรับ retry)
+  /// เก็บไว้เพื่อให้ user กด "ส่งอีกครั้ง" ได้
+  final String? failedMessage;
+
   const ChatState({
     this.messages = const [],
     this.isSending = false,
@@ -47,6 +63,10 @@ class ChatState {
     this.error,
     this.shouldShowSummaryPopup = false,
     this.currentSummary,
+    this.showCoreValuePicker = false,
+    this.availableCoreValues = const [],
+    this.currentPillar,
+    this.failedMessage,
   });
 
   /// สร้าง copy พร้อมเปลี่ยนค่าบางส่วน
@@ -61,6 +81,12 @@ class ChatState {
     bool? shouldShowSummaryPopup,
     ReflectionSummary? currentSummary,
     bool clearSummary = false,
+    bool? showCoreValuePicker,
+    List<AvailableCoreValue>? availableCoreValues,
+    int? currentPillar,
+    bool clearCurrentPillar = false,
+    String? failedMessage,
+    bool clearFailedMessage = false,
   }) {
     return ChatState(
       messages: messages ?? this.messages,
@@ -73,6 +99,12 @@ class ChatState {
           shouldShowSummaryPopup ?? this.shouldShowSummaryPopup,
       currentSummary:
           clearSummary ? null : (currentSummary ?? this.currentSummary),
+      showCoreValuePicker: showCoreValuePicker ?? this.showCoreValuePicker,
+      availableCoreValues: availableCoreValues ?? this.availableCoreValues,
+      currentPillar:
+          clearCurrentPillar ? null : (currentPillar ?? this.currentPillar),
+      failedMessage:
+          clearFailedMessage ? null : (failedMessage ?? this.failedMessage),
     );
   }
 }
@@ -212,6 +244,11 @@ class ChatNotifier extends StateNotifier<ChatState> {
           pillarsProgress: response.pillarsProgress,
           isComplete: response.isComplete,
           clearError: true,
+          // อัพเดต Core Value picker state
+          showCoreValuePicker: response.showCoreValuePicker,
+          availableCoreValues: response.availableCoreValues,
+          // อัพเดต current pillar ที่กำลังถามอยู่
+          currentPillar: response.currentPillar,
         );
 
         // บันทึก chat history
@@ -284,6 +321,11 @@ class ChatNotifier extends StateNotifier<ChatState> {
           isComplete: response.isComplete,
           // Trigger popup ถ้าครบครั้งแรก
           shouldShowSummaryPopup: shouldTriggerPopup,
+          // อัพเดต Core Value picker state
+          showCoreValuePicker: response.showCoreValuePicker,
+          availableCoreValues: response.availableCoreValues,
+          // อัพเดต current pillar ที่กำลังถามอยู่
+          currentPillar: response.currentPillar,
         );
 
         // บันทึก chat history
@@ -302,20 +344,29 @@ class ChatNotifier extends StateNotifier<ChatState> {
         }
 
         debugPrint(
-            'ChatNotifier: message sent, progress: ${response.pillarsProgress.completedCount}/4');
+            'ChatNotifier: message sent, progress: ${response.pillarsProgress.completedCount}/4, showPicker: ${response.showCoreValuePicker}');
       } else {
-        // ลบ loading message และแสดง error
+        // ลบ loading message และ user message ที่ส่งไม่สำเร็จ แล้วแสดง error
+        // เก็บ content ไว้ใน failedMessage เพื่อให้ retry ได้
         state = state.copyWith(
-          messages: state.messages.where((m) => !m.isLoading).toList(),
+          messages: state.messages
+              .where((m) => !m.isLoading && m.content != content)
+              .toList(),
           isSending: false,
-          error: 'ไม่สามารถส่งข้อความได้ กรุณาลองใหม่',
+          error: 'ไม่สามารถส่งข้อความได้',
+          failedMessage: content,
         );
       }
     } catch (e) {
+      // ลบ loading message และ user message ที่ส่งไม่สำเร็จ
+      // เก็บ content ไว้ใน failedMessage เพื่อให้ retry ได้
       state = state.copyWith(
-        messages: state.messages.where((m) => !m.isLoading).toList(),
+        messages: state.messages
+            .where((m) => !m.isLoading && m.content != content)
+            .toList(),
         isSending: false,
-        error: 'เกิดข้อผิดพลาด: $e',
+        error: 'เกิดข้อผิดพลาด กรุณาลองใหม่',
+        failedMessage: content,
       );
     }
   }
@@ -473,9 +524,43 @@ class ChatNotifier extends StateNotifier<ChatState> {
     }
   }
 
-  /// ล้าง error
+  /// ล้าง error และ failed message
   void clearError() {
-    state = state.copyWith(clearError: true);
+    state = state.copyWith(clearError: true, clearFailedMessage: true);
+  }
+
+  /// ส่งข้อความที่ส่งไม่สำเร็จอีกครั้ง
+  /// ใช้เมื่อ user กดปุ่ม "ส่งอีกครั้ง"
+  Future<void> retryFailedMessage() async {
+    final failedMsg = state.failedMessage;
+    if (failedMsg == null || failedMsg.isEmpty) return;
+
+    // ล้าง error และ failedMessage ก่อน แล้วส่งใหม่
+    state = state.copyWith(clearError: true, clearFailedMessage: true);
+
+    // ส่งข้อความอีกครั้ง
+    await sendMessage(failedMsg);
+  }
+
+  /// ส่ง Core Values ที่ user เลือก
+  /// **สำคัญ**: บันทึกลง DB โดยตรงก่อน แล้วค่อยส่งข้อความให้ AI
+  /// ไม่พึ่งพา AI parse เพราะอาจพลาดได้
+  Future<void> sendCoreValuesSelection(List<String> selectedValues) async {
+    if (_currentIncident == null || selectedValues.isEmpty) return;
+
+    debugPrint('ChatNotifier: saving Core Values directly: $selectedValues');
+
+    // 1. บันทึก Core Values ลง DB โดยตรง (ไม่รอ AI)
+    await _incidentService.updatePillarContent(
+      _currentIncident!.id,
+      violatedCoreValues: selectedValues,
+    );
+
+    debugPrint('ChatNotifier: Core Values saved to DB');
+
+    // 2. ส่งข้อความไปให้ AI (เพื่อให้ AI ตอบกลับ)
+    final message = 'ฉันคิดว่าเกี่ยวข้องกับ: ${selectedValues.join(', ')}';
+    await sendMessage(message);
   }
 
   /// Reset state (เมื่อออกจากหน้า chat)

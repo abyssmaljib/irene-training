@@ -1,6 +1,7 @@
 // หน้า Chat กับ AI Coach สำหรับการถอดบทเรียน (5 Whys)
 // แสดง chat messages, pillar progress, และ input bar
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hugeicons/hugeicons.dart';
@@ -17,6 +18,7 @@ import '../services/incident_service.dart';
 import '../widgets/chat_message_bubble.dart';
 import '../widgets/pillar_progress_indicator.dart';
 import '../widgets/chat_input_bar.dart';
+import '../widgets/core_value_picker.dart';
 import '../widgets/reflection_summary_popup.dart';
 
 /// หน้า Chat กับ AI Coach
@@ -82,6 +84,15 @@ class _IncidentChatScreenState extends ConsumerState<IncidentChatScreen> {
     _scrollToBottom();
   }
 
+  /// Handle เมื่อ user เลือก Core Values เสร็จแล้ว
+  /// บันทึกลง DB โดยตรง แล้วส่งข้อความให้ AI
+  void _handleCoreValuesSelected(List<String> selectedValues) {
+    // ใช้ method ใหม่ที่บันทึก Core Values ลง DB โดยตรง
+    // ไม่พึ่งพา AI parse เพราะอาจพลาดได้
+    ref.read(chatProvider.notifier).sendCoreValuesSelection(selectedValues);
+    _scrollToBottom();
+  }
+
   /// แสดง dialog ยืนยันการ reset บทสนทนา
   Future<void> _handleResetConversation() async {
     // ใช้ ConfirmDialog reusable widget
@@ -144,7 +155,7 @@ class _IncidentChatScreenState extends ConsumerState<IncidentChatScreen> {
                 _buildSummarySection('สาเหตุที่แท้จริง', summary.rootCause),
                 AppSpacing.verticalGapMd,
                 _buildSummarySection('Core Values ที่เกี่ยวข้อง',
-                    summary.violatedCoreValues.map((v) => v.nameTh).join(', ')),
+                    summary.violatedCoreValues.join(', ')),
                 AppSpacing.verticalGapMd,
                 _buildSummarySection('แนวทางป้องกัน', summary.preventionPlan),
               ],
@@ -353,10 +364,13 @@ class _IncidentChatScreenState extends ConsumerState<IncidentChatScreen> {
       ),
       body: Column(
         children: [
-          // Pillar progress indicator
-          PillarProgressIndicator(progress: chatState.pillarsProgress),
+          // Pillar progress indicator พร้อม highlight pillar ที่กำลังถามอยู่
+          PillarProgressIndicator(
+            progress: chatState.pillarsProgress,
+            currentPillar: chatState.currentPillar,
+          ),
 
-          // Chat messages
+          // Chat messages พร้อม Core Value picker (ถ้ามี)
           Expanded(
             child: chatState.messages.isEmpty
                 ? _buildInitialLoading()
@@ -366,8 +380,20 @@ class _IncidentChatScreenState extends ConsumerState<IncidentChatScreen> {
                       horizontal: 16,
                       vertical: 12,
                     ),
-                    itemCount: chatState.messages.length,
+                    // เพิ่ม 1 item ถ้าต้องแสดง Core Value picker
+                    itemCount: chatState.messages.length +
+                        (chatState.showCoreValuePicker &&
+                                chatState.availableCoreValues.isNotEmpty
+                            ? 1
+                            : 0),
                     itemBuilder: (context, index) {
+                      // ถ้าเป็น item สุดท้ายและต้องแสดง picker
+                      if (index == chatState.messages.length &&
+                          chatState.showCoreValuePicker &&
+                          chatState.availableCoreValues.isNotEmpty) {
+                        // แสดง Core Value picker ใน chat
+                        return _buildInlineCoreValuePicker(chatState);
+                      }
                       return ChatMessageBubble(
                         message: chatState.messages[index],
                       );
@@ -375,32 +401,98 @@ class _IncidentChatScreenState extends ConsumerState<IncidentChatScreen> {
                   ),
           ),
 
-          // Error message (ถ้ามี)
+          // Error message พร้อมปุ่ม retry (ถ้ามี failed message)
           if (chatState.error != null)
             Container(
-              padding: AppSpacing.paddingHorizontalMd,
+              padding: AppSpacing.paddingMd,
               margin: const EdgeInsets.only(bottom: 8),
-              child: Row(
+              decoration: BoxDecoration(
+                color: AppColors.error.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  HugeIcon(
-                    icon: HugeIcons.strokeRoundedAlert02,
-                    color: AppColors.error,
-                    size: 16,
-                  ),
-                  AppSpacing.horizontalGapSm,
-                  Expanded(
-                    child: Text(
-                      chatState.error!,
-                      style: AppTypography.bodySmall.copyWith(
+                  Row(
+                    children: [
+                      HugeIcon(
+                        icon: HugeIcons.strokeRoundedAlert02,
                         color: AppColors.error,
+                        size: 18,
+                      ),
+                      AppSpacing.horizontalGapSm,
+                      Expanded(
+                        child: Text(
+                          chatState.error!,
+                          style: AppTypography.body.copyWith(
+                            color: AppColors.error,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  // แสดงปุ่ม retry ถ้ามี failed message
+                  if (chatState.failedMessage != null) ...[
+                    AppSpacing.verticalGapSm,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        // ปุ่มปิด
+                        TextButton(
+                          onPressed: () =>
+                              ref.read(chatProvider.notifier).clearError(),
+                          child: Text(
+                            'ปิด',
+                            style: AppTypography.bodySmall.copyWith(
+                              color: AppColors.secondaryText,
+                            ),
+                          ),
+                        ),
+                        AppSpacing.horizontalGapSm,
+                        // ปุ่มส่งอีกครั้ง
+                        ElevatedButton.icon(
+                          onPressed: chatState.isSending
+                              ? null
+                              : () {
+                                  ref
+                                      .read(chatProvider.notifier)
+                                      .retryFailedMessage();
+                                  _scrollToBottom();
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.error,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                          ),
+                          icon: HugeIcon(
+                            icon: HugeIcons.strokeRoundedRefresh,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                          label: const Text('ส่งอีกครั้ง'),
+                        ),
+                      ],
+                    ),
+                  ] else ...[
+                    // ถ้าไม่มี failed message แสดงแค่ปุ่มปิด
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () =>
+                            ref.read(chatProvider.notifier).clearError(),
+                        child: Text(
+                          'ปิด',
+                          style: AppTypography.bodySmall.copyWith(
+                            color: AppColors.error,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                  TextButton(
-                    onPressed: () =>
-                        ref.read(chatProvider.notifier).clearError(),
-                    child: const Text('ปิด'),
-                  ),
+                  ],
                 ],
               ),
             ),
@@ -447,8 +539,18 @@ class _IncidentChatScreenState extends ConsumerState<IncidentChatScreen> {
               ),
             ),
 
-          // Chat input bar (ซ่อนถ้าสรุปเสร็จแล้ว)
-          if (!chatState.isComplete)
+          // DEV MODE: ปุ่ม auto-generate คำตอบสำหรับทดสอบ
+          // แสดงเฉพาะใน debug mode และยังไม่เสร็จ
+          if (kDebugMode &&
+              !chatState.isComplete &&
+              !(chatState.showCoreValuePicker &&
+                  chatState.availableCoreValues.isNotEmpty))
+            _buildDevAutoResponseButton(chatState),
+
+          // Chat input bar (ซ่อนถ้าสรุปเสร็จแล้ว หรือกำลังแสดง Core Value picker)
+          if (!chatState.isComplete &&
+              !(chatState.showCoreValuePicker &&
+                  chatState.availableCoreValues.isNotEmpty))
             ChatInputBar(
               onSend: _handleSend,
               enabled: !chatState.isSending,
@@ -459,6 +561,72 @@ class _IncidentChatScreenState extends ConsumerState<IncidentChatScreen> {
               // เพื่อให้ user เห็นข้อความล่าสุดเสมอ
               onAutofocused: _scrollToBottom,
             ),
+        ],
+      ),
+    );
+  }
+
+  /// สร้าง Core Value picker แบบ inline ใน chat
+  /// แสดงเป็น card ใน chat list แทนที่จะเป็น fixed widget ด้านล่าง
+  Widget _buildInlineCoreValuePicker(ChatState chatState) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 16),
+      child: CoreValuePicker(
+        coreValues: chatState.availableCoreValues,
+        isLoading: chatState.isSending,
+        onConfirm: _handleCoreValuesSelected,
+      ),
+    );
+  }
+
+  /// DEV MODE: ปุ่ม auto-generate คำตอบตาม pillar ปัจจุบัน
+  /// แสดงเฉพาะใน debug mode สำหรับทดสอบ flow
+  Widget _buildDevAutoResponseButton(ChatState chatState) {
+    // คำตอบ sample สำหรับแต่ละ pillar
+    final sampleResponses = {
+      1: 'เหตุการณ์นี้สำคัญเพราะอาจส่งผลต่อความปลอดภัยของผู้สูงอายุ และทำให้ครอบครัวไม่ไว้วางใจในการดูแล',
+      2: 'สาเหตุที่แท้จริงคือ การขาดการสื่อสารระหว่างทีม และไม่มีระบบตรวจสอบซ้ำก่อนให้ยา',
+      3: 'ฉันคิดว่าเกี่ยวข้องกับ: Speak Up (กล้าพูด กล้าสื่อสาร), System Focus (ใช้ระบบแทนความจำ เพื่อใช้ศักยภาพทำเรื่องสำคัญ)',
+      4: 'แนวทางป้องกัน: 1) ใช้ระบบ double-check ก่อนให้ยา 2) สร้างช่องทางสื่อสารที่ชัดเจนในทีม 3) ทบทวน protocol ทุกเดือน',
+    };
+
+    // หาคำตอบที่เหมาะสมตาม pillar ปัจจุบัน
+    final currentPillar = chatState.currentPillar ?? 1;
+    final response = sampleResponses[currentPillar] ?? sampleResponses[1]!;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: chatState.isSending
+                  ? null
+                  : () {
+                      _handleSend(response);
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF8B5CF6), // Purple
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              icon: HugeIcon(
+                icon: HugeIcons.strokeRoundedMagicWand01,
+                color: Colors.white,
+                size: 18,
+              ),
+              label: Text(
+                'DEV: Auto Response (Pillar $currentPillar)',
+                style: AppTypography.bodySmall.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );

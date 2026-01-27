@@ -191,7 +191,7 @@ class IncidentService {
       whyItMatters: summary.whyItMatters,
       rootCause: summary.rootCause,
       coreValueAnalysis: summary.coreValueAnalysis,
-      violatedCoreValues: summary.violatedCoreValues.map((v) => v.code).toList(),
+      violatedCoreValues: summary.violatedCoreValues, // เป็น List<String> อยู่แล้ว
       preventionPlan: summary.preventionPlan,
     );
   }

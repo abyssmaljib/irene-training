@@ -134,6 +134,27 @@ String _cleanAiMessage(String message) {
   return cleanedMessage;
 }
 
+/// Core Value ที่ได้จาก API สำหรับแสดงใน picker
+class AvailableCoreValue {
+  final int id;
+  final String name;
+  final String? description;
+
+  const AvailableCoreValue({
+    required this.id,
+    required this.name,
+    this.description,
+  });
+
+  factory AvailableCoreValue.fromJson(Map<String, dynamic> json) {
+    return AvailableCoreValue(
+      id: json['id'] as int,
+      name: json['name'] as String,
+      description: json['description'] as String?,
+    );
+  }
+}
+
 /// Response จาก Edge Function: five-whys-chat
 class AiChatResponse {
   /// ข้อความตอบกลับจาก AI
@@ -148,11 +169,26 @@ class AiChatResponse {
   /// เสร็จสิ้นการถอดบทเรียนหรือยัง
   final bool isComplete;
 
+  /// Flag บอกว่าต้องแสดง Core Value picker หรือไม่
+  /// เมื่อเป็น true จะแสดง UI ให้ user เลือก Core Values แทนการพิมพ์
+  final bool showCoreValuePicker;
+
+  /// รายการ Core Values ที่สามารถเลือกได้ (ส่งมาเมื่อ showCoreValuePicker = true)
+  final List<AvailableCoreValue> availableCoreValues;
+
+  /// Pillar ที่กำลังถามอยู่ (1-4)
+  /// 1 = ความสำคัญ, 2 = สาเหตุ, 3 = Core Values, 4 = การป้องกัน
+  /// null = ไม่ได้ถามเรื่องใดเฉพาะ (ทักทาย/ปิดสนทนา)
+  final int? currentPillar;
+
   const AiChatResponse({
     required this.message,
     required this.pillarsProgress,
     this.pillarContent,
     required this.isComplete,
+    this.showCoreValuePicker = false,
+    this.availableCoreValues = const [],
+    this.currentPillar,
   });
 
   /// Parse จาก JSON response
@@ -170,11 +206,29 @@ class AiChatResponse {
     final rawMessage = json['ai_message'] as String? ?? '';
     final cleanedMessage = _cleanAiMessage(rawMessage);
 
+    // Parse available_core_values ถ้ามี (สำหรับแสดง picker)
+    final coreValuesJson = json['available_core_values'] as List<dynamic>?;
+    final availableCoreValues = coreValuesJson != null
+        ? coreValuesJson
+            .map((cv) => AvailableCoreValue.fromJson(cv as Map<String, dynamic>))
+            .toList()
+        : <AvailableCoreValue>[];
+
+    // Parse current_pillar (1-4 หรือ null)
+    final rawPillar = json['current_pillar'];
+    int? currentPillar;
+    if (rawPillar is int && rawPillar >= 1 && rawPillar <= 4) {
+      currentPillar = rawPillar;
+    }
+
     return AiChatResponse(
       message: cleanedMessage,
       pillarsProgress: ReflectionPillars.fromJson(pillarsJson),
       pillarContent: pillarContent,
       isComplete: json['is_complete'] as bool? ?? false,
+      showCoreValuePicker: json['show_core_value_picker'] as bool? ?? false,
+      availableCoreValues: availableCoreValues,
+      currentPillar: currentPillar,
     );
   }
 }

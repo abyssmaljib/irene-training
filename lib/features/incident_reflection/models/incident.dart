@@ -110,7 +110,8 @@ class Incident {
   final String? coreValueAnalysis;
 
   /// Pillar 3: รายการ Core Values ที่ถูกละเมิด
-  final List<CoreValue> violatedCoreValues;
+  /// เก็บเป็น String ตามที่อยู่ใน DB (เช่น "ใช้ระบบแทนความจำ เพื่อใช้ศักยภาพทำเรื่องสำคัญ")
+  final List<String> violatedCoreValues;
 
   /// Pillar 4: แนวทางป้องกัน
   final String? preventionPlan;
@@ -205,14 +206,13 @@ class Incident {
       }
     }
 
-    // Parse violated_core_values จาก text array
-    List<CoreValue> violatedCoreValues = [];
+    // Parse violated_core_values จาก text array (เก็บเป็น string ตรงๆ)
+    List<String> violatedCoreValues = [];
     if (json['violated_core_values'] != null) {
       if (json['violated_core_values'] is List) {
-        final codes = (json['violated_core_values'] as List)
+        violatedCoreValues = (json['violated_core_values'] as List)
             .map((e) => e.toString())
             .toList();
-        violatedCoreValues = CoreValue.fromCodes(codes);
       }
     }
 
@@ -322,7 +322,7 @@ class Incident {
   /// รายการ Core Values ที่ละเมิดเป็น text
   String get violatedCoreValuesText {
     if (violatedCoreValues.isEmpty) return '-';
-    return violatedCoreValues.map((v) => v.nameTh).join(', ');
+    return violatedCoreValues.join(', ');
   }
 
   /// สร้าง copy พร้อมเปลี่ยนค่าบางส่วน
@@ -347,7 +347,7 @@ class Incident {
     String? whyItMatters,
     String? rootCause,
     String? coreValueAnalysis,
-    List<CoreValue>? violatedCoreValues,
+    List<String>? violatedCoreValues,
     String? preventionPlan,
     List<ChatMessage>? chatHistory,
     ReflectionStatus? reflectionStatus,

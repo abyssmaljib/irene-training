@@ -154,8 +154,9 @@ class ReflectionSummary {
   /// การวิเคราะห์ Core Values ที่ถูกละเมิด
   final String coreValueAnalysis;
 
-  /// รายการ Core Values ที่ถูกละเมิด
-  final List<CoreValue> violatedCoreValues;
+  /// รายการ Core Values ที่เกี่ยวข้อง (เก็บเป็น String ตามที่อยู่ใน DB)
+  /// เช่น ["กล้าพูด กล้าสื่อสาร", "ซื่อสัตย์และรับผิดชอบต่อชีวิตคนที่เราดูแล"]
+  final List<String> violatedCoreValues;
 
   /// แนวทางป้องกันไม่ให้เกิดซ้ำ
   final String preventionPlan;
@@ -170,8 +171,8 @@ class ReflectionSummary {
 
   /// สร้างจาก JSON response ของ AI
   factory ReflectionSummary.fromJson(Map<String, dynamic> json) {
-    // Parse violated_core_values จาก list of strings
-    final violatedCodes = (json['violated_core_values'] as List<dynamic>?)
+    // Parse violated_core_values จาก list of strings (เก็บตรงๆ ไม่ต้อง convert เป็น enum)
+    final violatedValues = (json['violated_core_values'] as List<dynamic>?)
             ?.map((e) => e.toString())
             .toList() ??
         [];
@@ -180,7 +181,7 @@ class ReflectionSummary {
       whyItMatters: json['why_it_matters'] as String? ?? '',
       rootCause: json['root_cause'] as String? ?? '',
       coreValueAnalysis: json['core_value_analysis'] as String? ?? '',
-      violatedCoreValues: CoreValue.fromCodes(violatedCodes),
+      violatedCoreValues: violatedValues,
       preventionPlan: json['prevention_plan'] as String? ?? '',
     );
   }
@@ -191,8 +192,7 @@ class ReflectionSummary {
       'why_it_matters': whyItMatters,
       'root_cause': rootCause,
       'core_value_analysis': coreValueAnalysis,
-      'violated_core_values':
-          violatedCoreValues.map((v) => v.code).toList(),
+      'violated_core_values': violatedCoreValues,
       'prevention_plan': preventionPlan,
     };
   }

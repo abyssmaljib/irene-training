@@ -168,7 +168,7 @@ class ReflectionSummaryPopup extends StatelessWidget {
                       title: '3. Core Values ที่เกี่ยวข้อง',
                       content: summary.violatedCoreValues.isNotEmpty
                           ? summary.violatedCoreValues
-                              .map((v) => '• ${v.displayName}')
+                              .map((v) => '• $v')
                               .join('\n')
                           : '-',
                     ),
