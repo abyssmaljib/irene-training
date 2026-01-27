@@ -168,6 +168,14 @@ class _AdvancedEditPostScreenState
     final state = ref.read(editPostProvider(widget.post.id));
     final text = _textController.text.trim();
 
+    // ถ้าติ๊กส่งเวร บังคับต้องกรอกรายละเอียด (แสดง error ที่ชัดเจนกว่า)
+    if (text.isEmpty && state.isHandover) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('กรุณากรอกรายละเอียดเมื่อติ๊กส่งเวร')),
+      );
+      return;
+    }
+
     if (text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('กรุณาใส่รายละเอียด')),

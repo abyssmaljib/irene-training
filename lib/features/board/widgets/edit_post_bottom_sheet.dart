@@ -1102,6 +1102,15 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
 
   Future<void> _handleSubmit(EditPostState state) async {
     final text = _textController.text.trim();
+
+    // ถ้าติ๊กส่งเวร บังคับต้องกรอกรายละเอียด
+    if (text.isEmpty && state.isHandover) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('กรุณากรอกรายละเอียดเมื่อติ๊กส่งเวร')),
+      );
+      return;
+    }
+
     if (text.isEmpty) return;
 
     ref.read(editPostProvider(widget.post.id).notifier).setSubmitting(true);
