@@ -574,7 +574,9 @@ class _MedicineNetworkImageState extends State<_MedicineNetworkImage> {
       fadeInDuration: const Duration(milliseconds: 150),
       // ใช้แค่ memCacheWidth เพื่อรักษา aspect ratio ของรูปต้นฉบับ
       // (ถ้าใส่ทั้ง width และ height จะบังคับให้รูปเป็น 1:1 ทำให้บิดเบี้ยว)
-      memCacheWidth: 400,
+      // ลดจาก 400 เป็น 200 เพื่อลด memory usage บน iOS
+      // (รูปตัวอย่างยาใน grid มีขนาดเล็กอยู่แล้ว ไม่ต้องใช้ resolution สูง)
+      memCacheWidth: 200,
       // placeholder แสดงระหว่างโหลด
       placeholder: (context, url) => widget.placeholder,
       // errorWidget เรียก _onImageError เพื่อ update state

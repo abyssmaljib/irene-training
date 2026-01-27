@@ -470,10 +470,16 @@ class _MealSectionCardState extends State<MealSectionCard>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // ฝั่งซ้าย: Grid รูปตัวอย่างยา - ทุกมุมมี radius 4px
+          // ใช้ addAutomaticKeepAlives: false เพื่อลด memory usage บน iOS
+          // (ไม่เก็บ state ของ items ที่ scroll ออกไปแล้ว)
           Expanded(
             child: GridView.builder(
               shrinkWrap: true,
               physics: NeverScrollableScrollPhysics(),
+              // ปิด automatic keep alives เพื่อลด memory
+              // iOS จะ crash ถ้าโหลดรูปเยอะเกินพร้อมกัน
+              addAutomaticKeepAlives: false,
+              addRepaintBoundaries: false,
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: crossAxisCount,
                 crossAxisSpacing: 0,
@@ -1432,7 +1438,8 @@ class _LogPhotoNetworkImageState extends State<_LogPhotoNetworkImage> {
       key: ValueKey('${widget.imageUrl}_$_retryCount'),
       fit: widget.fit,
       // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
-      cacheWidth: 800,
+      // ลดจาก 800 เป็น 400 เพื่อลด memory usage (รูปใน grid มีขนาดเล็ก)
+      cacheWidth: 400,
       loadingBuilder: (context, child, loadingProgress) {
         if (loadingProgress == null) {
           // โหลดเสร็จแล้ว - cancel timer

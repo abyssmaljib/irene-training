@@ -1,5 +1,9 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:clarity_flutter/clarity_flutter.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:onesignal_flutter/onesignal_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,6 +13,7 @@ import 'package:intl/date_symbol_data_local.dart'; // สำหรับ initial
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/config/supabase_config.dart';
+import 'firebase_options.dart';
 import 'core/providers/shared_preferences_provider.dart';
 import 'core/services/app_version_service.dart';
 import 'core/services/force_update_service.dart';
@@ -35,6 +40,25 @@ String _clarityProjectId = '';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Firebase
+  // ต้องเรียกก่อน services อื่นๆ ที่ใช้ Firebase (เช่น Crashlytics)
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  // Setup Crashlytics (ไม่รองรับ Web)
+  // จะจับ errors ทั้งหมดและส่งไป Firebase Console
+  if (!kIsWeb) {
+    // จับ Flutter framework errors (เช่น widget build errors)
+    FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+
+    // จับ async errors ที่ไม่ได้ถูก catch (เช่น errors ใน Future, Stream)
+    PlatformDispatcher.instance.onError = (error, stack) {
+      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+      return true;
+    };
+  }
 
   // เปิด Edge-to-Edge mode สำหรับ Android 15+
   // ทำให้แอปแสดงผลเต็มจอ รวมถึง status bar และ navigation bar area
@@ -155,7 +179,11 @@ class _AuthWrapperState extends State<AuthWrapper> {
           final userId = data.session!.user.id;
           // Set in Clarity
           Clarity.setCustomUserId(userId);
-          // Set in Crashlytics (NOT supported on Web)
+          // Set in Crashlytics (ไม่รองรับ Web)
+          // ช่วยให้รู้ว่า crash เกิดจาก user คนไหน
+          if (!kIsWeb) {
+            FirebaseCrashlytics.instance.setUserIdentifier(userId);
+          }
 
           // Initialize OneSignal and login with user ID
           OneSignalService.instance.initialize();
