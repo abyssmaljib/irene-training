@@ -19,6 +19,15 @@ class EditPostState {
   /// New images to upload (local files)
   final List<File> newImages;
 
+  /// Existing video URLs (from the post)
+  final List<String> existingVideoUrls;
+
+  /// Indexes of existing videos that user wants to remove
+  final Set<int> removedExistingVideoIndexes;
+
+  /// New videos to upload (local files) - จำกัด 1 ไฟล์ เหมือน create
+  final List<File> newVideos;
+
   final bool isSubmitting;
   final String? error;
 
@@ -60,6 +69,9 @@ class EditPostState {
     this.existingImageUrls = const [],
     this.removedExistingIndexes = const {},
     this.newImages = const [],
+    this.existingVideoUrls = const [],
+    this.removedExistingVideoIndexes = const {},
+    this.newVideos = const [],
     this.isSubmitting = false,
     this.error,
     // AI Summary
@@ -99,15 +111,41 @@ class EditPostState {
         .toList();
   }
 
+  /// Get final list of existing video URLs (excluding removed ones)
+  List<String> get finalExistingVideoUrls {
+    return existingVideoUrls
+        .asMap()
+        .entries
+        .where((e) => !removedExistingVideoIndexes.contains(e.key))
+        .map((e) => e.value)
+        .toList();
+  }
+
   /// Count of remaining existing images
   int get remainingExistingCount =>
       existingImageUrls.length - removedExistingIndexes.length;
 
+  /// Count of remaining existing videos
+  int get remainingExistingVideoCount =>
+      existingVideoUrls.length - removedExistingVideoIndexes.length;
+
   /// Total image count (existing + new)
   int get totalImageCount => remainingExistingCount + newImages.length;
 
+  /// Total video count (existing + new)
+  int get totalVideoCount => remainingExistingVideoCount + newVideos.length;
+
+  /// Check if has any images
+  bool get hasImages => totalImageCount > 0;
+
+  /// Check if has any videos
+  bool get hasVideo => totalVideoCount > 0;
+
   /// Max 5 images allowed
-  bool get canAddMoreImages => totalImageCount < 5;
+  bool get canAddMoreImages => totalImageCount < 5 && !hasVideo;
+
+  /// Can add video (mutual exclusion with images, max 1 video)
+  bool get canAddVideo => totalVideoCount < 1 && !hasImages;
 
   /// How many more images can be added
   int get remainingImageSlots => 5 - totalImageCount;
@@ -148,6 +186,10 @@ class EditPostState {
     List<String>? existingImageUrls,
     Set<int>? removedExistingIndexes,
     List<File>? newImages,
+    List<String>? existingVideoUrls,
+    Set<int>? removedExistingVideoIndexes,
+    List<File>? newVideos,
+    bool clearVideos = false,
     bool? isSubmitting,
     String? error,
     // AI Summary
@@ -189,6 +231,9 @@ class EditPostState {
       removedExistingIndexes:
           removedExistingIndexes ?? this.removedExistingIndexes,
       newImages: newImages ?? this.newImages,
+      existingVideoUrls: clearVideos ? const [] : (existingVideoUrls ?? this.existingVideoUrls),
+      removedExistingVideoIndexes: clearVideos ? const {} : (removedExistingVideoIndexes ?? this.removedExistingVideoIndexes),
+      newVideos: clearVideos ? const [] : (newVideos ?? this.newVideos),
       isSubmitting: isSubmitting ?? this.isSubmitting,
       error: error,
       // AI Summary
@@ -235,6 +280,7 @@ class EditPostNotifier extends StateNotifier<EditPostState> {
       text: post.text ?? '',
       title: post.title,
       existingImageUrls: post.allImageUrls,
+      existingVideoUrls: post.videoUrls,
       // Load existing quiz data
       qaId: post.qaId,
       qaQuestion: post.qaQuestion,
@@ -250,17 +296,20 @@ class EditPostNotifier extends StateNotifier<EditPostState> {
       residentName: post.residentName,
       isHandover: post.isHandover,
     );
-    debugPrint('EditPostNotifier: initialized from post ${post.id}');
+    debugPrint('EditPostNotifier: initialized from post ${post.id}, videos: ${post.videoUrls.length}');
   }
 
   /// Initialize with a tag (when tag is loaded from provider)
+  /// เรียกเมื่อโหลด tag จาก originalTagName หลังจาก initFromPost
+  /// ต้องไม่ override isHandover ที่โหลดมาจาก post เดิม
   void setSelectedTag(NewTag? tag) {
     state = state.copyWith(
       selectedTag: tag,
-      // Auto-set handover based on tag's handover mode
-      isHandover: tag?.isForceHandover ?? state.isHandover,
+      // ถ้า tag เป็น force handover → บังคับ true
+      // ถ้าไม่ใช่ → เก็บค่าเดิมจาก state (ที่โหลดมาจาก post)
+      isHandover: tag?.isForceHandover == true ? true : state.isHandover,
     );
-    debugPrint('EditPostNotifier: set tag to ${tag?.name}');
+    debugPrint('EditPostNotifier: set tag to ${tag?.name}, isHandover=${state.isHandover}');
   }
 
   void setText(String value) {
@@ -310,6 +359,53 @@ class EditPostNotifier extends StateNotifier<EditPostState> {
     updated.remove(index);
     state = state.copyWith(removedExistingIndexes: updated);
     debugPrint('EditPostNotifier: restored existing image $index');
+  }
+
+  // ========== Video Methods ==========
+
+  /// Add new video (local file) to upload - จำกัด 1 ไฟล์
+  void addNewVideo(File video) {
+    // ถ้ามีวีดีโอแล้ว (existing หรือ new) ไม่เพิ่ม
+    if (!state.canAddVideo) {
+      debugPrint('EditPostNotifier: cannot add video - already has video or images');
+      return;
+    }
+
+    state = state.copyWith(newVideos: [video]);
+    debugPrint('EditPostNotifier: added new video');
+  }
+
+  /// Remove new video by index
+  void removeNewVideo(int index) {
+    if (index < 0 || index >= state.newVideos.length) return;
+
+    final updated = [...state.newVideos];
+    updated.removeAt(index);
+    state = state.copyWith(newVideos: updated);
+    debugPrint('EditPostNotifier: removed new video at index $index');
+  }
+
+  /// Mark an existing video for removal
+  void removeExistingVideo(int index) {
+    if (index < 0 || index >= state.existingVideoUrls.length) return;
+
+    final updated = {...state.removedExistingVideoIndexes, index};
+    state = state.copyWith(removedExistingVideoIndexes: updated);
+    debugPrint('EditPostNotifier: marked existing video $index for removal');
+  }
+
+  /// Restore a previously removed existing video
+  void restoreExistingVideo(int index) {
+    final updated = {...state.removedExistingVideoIndexes};
+    updated.remove(index);
+    state = state.copyWith(removedExistingVideoIndexes: updated);
+    debugPrint('EditPostNotifier: restored existing video $index');
+  }
+
+  /// Clear all videos (existing and new)
+  void clearAllVideos() {
+    state = state.copyWith(clearVideos: true);
+    debugPrint('EditPostNotifier: cleared all videos');
   }
 
   void setSubmitting(bool value) {

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:dio/dio.dart' as dio;
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
@@ -209,6 +210,142 @@ class PostMediaService {
 
     return (videoUrl: videoUrl, thumbnailUrl: thumbnailUrl);
   }
+
+  /// Upload video พร้อม generate thumbnail และ REAL progress callback ผ่าน dio
+  /// [DEPRECATED] ใช้ uploadVideoWithTus() แทน สำหรับ resumable uploads
+  /// Progress: 0-10% thumbnail generation, 10-90% video upload (real), 90-100% thumbnail upload
+  /// Returns ({videoUrl, thumbnailUrl}) หรือ null ถ้า video upload failed
+  Future<({String? videoUrl, String? thumbnailUrl})> uploadVideoWithProgress(
+    File videoFile, {
+    String? userId,
+    void Function(double progress)? onProgress,
+    dio.CancelToken? cancelToken,
+  }) async {
+    try {
+      // Stage 1: Generate thumbnail (0-10%)
+      onProgress?.call(0.02);
+      debugPrint('PostMediaService: [Progress 2%] Starting thumbnail generation...');
+
+      final thumbnailFile = await generateVideoThumbnail(videoFile);
+      onProgress?.call(0.10);
+      debugPrint('PostMediaService: [Progress 10%] Thumbnail generated');
+
+      // Stage 2: Upload video ด้วย dio (10-90%) - REAL progress tracking
+      onProgress?.call(0.10);
+      debugPrint('PostMediaService: [Progress 10%] Starting video upload with streaming...');
+
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final extension = _getFileExtension(videoFile.path);
+      final safeExt = extension.isNotEmpty ? extension : '.mp4';
+      final fileName = '${userId ?? 'unknown'}_$timestamp$safeExt';
+      final filePath = 'videos/$fileName';
+
+      // ดึง file size สำหรับแสดง info
+      final fileSize = await videoFile.length();
+      final fileSizeMB = fileSize / 1024 / 1024;
+      debugPrint('PostMediaService: Video size: ${fileSizeMB.toStringAsFixed(2)} MB');
+
+      // สร้าง Supabase Storage upload URL
+      // Format: https://<project>.supabase.co/storage/v1/object/<bucket>/<path>
+      // ใช้ rest.url และแทนที่ /rest/v1 เป็น /storage/v1
+      final supabaseUrl = _supabase.rest.url.replaceAll('/rest/v1', '');
+      final uploadUrl = '$supabaseUrl/storage/v1/object/$_bucketName/$filePath';
+
+      // ดึง access token สำหรับ authorization
+      final session = _supabase.auth.currentSession;
+      final accessToken = session?.accessToken ?? '';
+
+      // สร้าง dio instance สำหรับ upload
+      final dioClient = dio.Dio();
+
+      // ใช้ streaming upload ด้วย dio - จะได้ REAL progress
+      // อ่านไฟล์เป็น stream แทนที่จะโหลดทั้งหมดเข้า memory
+      final formData = dio.FormData.fromMap({
+        'file': await dio.MultipartFile.fromFile(
+          videoFile.path,
+          filename: fileName,
+          contentType: dio.DioMediaType('video', 'mp4'),
+        ),
+      });
+
+      debugPrint('PostMediaService: Uploading to $uploadUrl');
+
+      // Upload ด้วย dio พร้อม onSendProgress callback
+      final response = await dioClient.post(
+        uploadUrl,
+        data: formData,
+        cancelToken: cancelToken,
+        options: dio.Options(
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            // ไม่ใช้ x-upsert เพราะเราใช้ชื่อไฟล์ unique (timestamp) อยู่แล้ว
+            // และ x-upsert ต้องผ่านทั้ง INSERT + UPDATE policy
+          },
+        ),
+        // นี่คือ REAL progress - dio จะ report ทุกครั้งที่ส่งข้อมูลไป server
+        onSendProgress: (sent, total) {
+          // แปลง progress จาก 10-90% (80% ของ total)
+          final uploadProgress = sent / total;
+          final overallProgress = 0.10 + (uploadProgress * 0.80);
+          onProgress?.call(overallProgress);
+
+          // Log progress ทุก 10%
+          final percent = (uploadProgress * 100).toInt();
+          if (percent % 10 == 0) {
+            final sentMB = (sent / 1024 / 1024).toStringAsFixed(1);
+            final totalMB = (total / 1024 / 1024).toStringAsFixed(1);
+            debugPrint(
+                'PostMediaService: [Upload $percent%] $sentMB MB / $totalMB MB');
+          }
+        },
+      );
+
+      // ตรวจสอบ response
+      if (response.statusCode != 200) {
+        debugPrint('PostMediaService: Upload failed with status ${response.statusCode}');
+        debugPrint('PostMediaService: Response: ${response.data}');
+        return (videoUrl: null, thumbnailUrl: null);
+      }
+
+      final videoUrl = _supabase.storage.from(_bucketName).getPublicUrl(filePath);
+      onProgress?.call(0.90);
+      debugPrint('PostMediaService: [Progress 90%] Video uploaded successfully');
+      debugPrint('PostMediaService: Video URL: $videoUrl');
+
+      // Stage 3: Upload thumbnail (90-100%)
+      String? thumbnailUrl;
+      if (thumbnailFile != null) {
+        onProgress?.call(0.92);
+        debugPrint('PostMediaService: [Progress 92%] Starting thumbnail upload...');
+
+        thumbnailUrl = await uploadThumbnail(thumbnailFile, userId: userId);
+
+        // ลบ temp file
+        try {
+          await thumbnailFile.delete();
+        } catch (_) {}
+      }
+
+      onProgress?.call(1.0);
+      debugPrint('PostMediaService: [Progress 100%] Upload complete!');
+
+      return (videoUrl: videoUrl, thumbnailUrl: thumbnailUrl);
+    } on dio.DioException catch (e) {
+      if (e.type == dio.DioExceptionType.cancel) {
+        debugPrint('PostMediaService: Upload cancelled by user');
+        return (videoUrl: null, thumbnailUrl: null);
+      }
+      debugPrint('PostMediaService uploadVideoWithProgress DioError: ${e.message}');
+      debugPrint('PostMediaService DioError response: ${e.response?.data}');
+      return (videoUrl: null, thumbnailUrl: null);
+    } catch (e) {
+      debugPrint('PostMediaService uploadVideoWithProgress error: $e');
+      return (videoUrl: null, thumbnailUrl: null);
+    }
+  }
+
+  /// สร้าง CancelToken สำหรับยกเลิก upload (สำหรับ dio)
+  dio.CancelToken createCancelToken() => dio.CancelToken();
 
   /// ดึง file extension จาก path
   String _getFileExtension(String filePath) {

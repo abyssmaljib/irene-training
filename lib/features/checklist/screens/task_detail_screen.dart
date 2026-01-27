@@ -29,6 +29,9 @@ import '../../board/widgets/video_player_widget.dart';
 class TaskDetailScreen extends ConsumerStatefulWidget {
   final TaskLog task;
 
+  // Shared constant - ลด object creation สำหรับ border radius 4px
+  static const kSmallRadius = BorderRadius.all(Radius.circular(4));
+
   const TaskDetailScreen({super.key, required this.task});
 
   @override
@@ -300,9 +303,10 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                     else if (_task.hasSampleImage)
                       _buildSampleImage(),
 
-                    // Confirm image (ถ้ามี)
-                    if (_task.confirmImage != null ||
-                        _uploadedImageUrl != null) ...[
+                    // Confirm image (ถ้ามี) - ไม่แสดงสำหรับงานจัดยา เพราะรวมใน side-by-side แล้ว
+                    if (!_isJudYa &&
+                        (_task.confirmImage != null ||
+                            _uploadedImageUrl != null)) ...[
                       AppSpacing.verticalGapMd,
                       _buildConfirmImage(),
                     ],
@@ -851,6 +855,62 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       );
     }
 
+    // ตรวจสอบว่ามีรูปยืนยันหรือยัง
+    final imageUrl = _uploadedImageUrl ?? _task.confirmImage;
+    final hasImage = imageUrl != null && imageUrl.isNotEmpty;
+
+    // ถ้ามีรูปยืนยัน → แสดง side-by-side (grid ซ้าย, รูปขวา)
+    // ถ้ายังไม่มีรูป → แสดงแค่ grid ยา (ปุ่มถ่ายอยู่ด้านล่างเหมือนเดิม)
+    if (hasImage) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'รายการยา (${_medicines!.length} รายการ)',
+            style: AppTypography.subtitle.copyWith(fontWeight: FontWeight.w600),
+          ),
+          AppSpacing.verticalGapSm,
+          // Layout: Side by Side (รูปตัวอย่างยาซ้าย, รูปยืนยันขวา)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ฝั่งซ้าย: Grid รูปตัวอย่างยา (2 คอลัมน์, no spacing)
+              Expanded(
+                child: GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 0, // no spacing
+                    mainAxisSpacing: 0, // no spacing
+                    childAspectRatio: 1.0, // 1:1 สำหรับ side-by-side
+                  ),
+                  itemCount: _medicines!.length,
+                  itemBuilder: (context, index) {
+                    final med = _medicines![index];
+                    return MedicinePhotoItem(
+                      medicine: med,
+                      showFoiled: false, // ใช้ frontNude (รูปเม็ดยา 3C)
+                      showOverlay: true, // แสดง overlay จำนวนเม็ดยา
+                      borderRadius: TaskDetailScreen.kSmallRadius,
+                    );
+                  },
+                ),
+              ),
+
+              // ไม่มี spacing - ชิดกันเลย
+
+              // ฝั่งขวา: รูปยืนยัน
+              Expanded(
+                child: _buildMedicineConfirmImage(imageUrl),
+              ),
+            ],
+          ),
+        ],
+      );
+    }
+
+    // ยังไม่มีรูปยืนยัน → แสดงแค่ grid ยา (ปุ่มถ่ายอยู่ด้านล่างเหมือนเดิม)
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -859,17 +919,15 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           style: AppTypography.subtitle.copyWith(fontWeight: FontWeight.w600),
         ),
         AppSpacing.verticalGapSm,
-        // ใช้ MedicinePhotoItem จากหน้าจัดยา
-        // showFoiled = false → แสดง frontNude (รูปเม็ดยาตอนเสิร์ฟ)
-        // showOverlay = true → แสดง overlay จำนวนเม็ดยา
+        // Grid รูปตัวอย่างยา (2 คอลัมน์, no spacing)
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
-            crossAxisSpacing: 8,
-            mainAxisSpacing: 8,
-            childAspectRatio: 0.75, // ปรับให้รูปแนวตั้งดูดีขึ้น
+            crossAxisSpacing: 0, // no spacing
+            mainAxisSpacing: 0, // no spacing
+            childAspectRatio: 1.0, // 1:1
           ),
           itemCount: _medicines!.length,
           itemBuilder: (context, index) {
@@ -878,10 +936,84 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
               medicine: med,
               showFoiled: false, // ใช้ frontNude (รูปเม็ดยา 3C)
               showOverlay: true, // แสดง overlay จำนวนเม็ดยา
+              borderRadius: TaskDetailScreen.kSmallRadius,
             );
           },
         ),
       ],
+    );
+  }
+
+  /// รูปยืนยันสำหรับ layout side-by-side (งานจัดยา)
+  Widget _buildMedicineConfirmImage(String imageUrl) {
+    // สามารถลบได้ถ้ายังไม่ complete
+    final canDelete = _uploadedImageUrl != null && !_task.isDone;
+
+    return GestureDetector(
+      onTap: () => _showExpandedImage(imageUrl),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.background,
+          borderRadius: TaskDetailScreen.kSmallRadius,
+          border: Border.all(color: AppColors.tagPassedText, width: 1),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: AspectRatio(
+          aspectRatio: 1.0, // 1:1 ให้ match กับ grid ฝั่งซ้าย
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // รูป
+              IreneNetworkImage(
+                imageUrl: imageUrl,
+                fit: BoxFit.cover,
+                memCacheWidth: 400,
+              ),
+              // Label "รูปยืนยัน" ที่มุมบนซ้าย
+              Positioned(
+                top: 4,
+                left: 4,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.tagPassedText,
+                    borderRadius: TaskDetailScreen.kSmallRadius,
+                  ),
+                  child: Text(
+                    'รูปยืนยัน',
+                    style: AppTypography.caption.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 10,
+                    ),
+                  ),
+                ),
+              ),
+              // ปุ่มลบ (ถ้าเป็นรูปที่เพิ่งถ่าย)
+              if (canDelete)
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: GestureDetector(
+                    onTap: _handleDeletePhoto,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: AppColors.error,
+                        shape: BoxShape.circle,
+                      ),
+                      child: HugeIcon(
+                        icon: HugeIcons.strokeRoundedDelete01,
+                        size: 14,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

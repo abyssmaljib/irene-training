@@ -191,6 +191,12 @@ class PostActionService {
       }
 
       debugPrint('PostActionService: created post $postId (handover: $isHandover)');
+
+      // Auto-acknowledge: ผู้สร้างโพสให้ถือว่ารับทราบโพสตัวเองโดยอัตโนมัติ
+      // เพื่อไม่ต้องกลับมากด like โพสตัวเองอีกรอบ
+      await likePost(postId, userId);
+      debugPrint('PostActionService: auto-acknowledged post $postId for creator');
+
       return postId;
     } catch (e) {
       debugPrint('createPost error: $e');

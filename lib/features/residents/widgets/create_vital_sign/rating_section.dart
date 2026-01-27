@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../../core/widgets/nps_scale.dart';
 import '../../providers/vital_sign_form_provider.dart';
 import 'package:hugeicons/hugeicons.dart';
 
@@ -194,28 +195,27 @@ class _RatingCardState extends State<_RatingCard> {
           ),
         const SizedBox(height: 12),
 
-        // Star rating (5 stars)
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(5, (index) {
-            final starValue = index + 1;
-            final isSelected = widget.currentRating != null &&
-                               widget.currentRating! >= starValue;
-
-            return GestureDetector(
-              onTap: () => widget.onRatingChanged(starValue),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: HugeIcon(
-                  icon: HugeIcons.strokeRoundedStar,
-                  size: 40,
-                  color: isSelected
-                      ? AppColors.warning
-                      : AppColors.alternate,
-                ),
-              ),
-            );
-          }),
+        // NPS-style rating scale (1-5)
+        // ใช้ NpsScale widget แทน Star rating เพื่อ UX ที่ดีขึ้น
+        // - รองรับ drag gesture เลือกค่าได้ง่าย
+        // - มีสีตามระดับคะแนน
+        NpsScale(
+          selectedValue: widget.currentRating,
+          onChanged: widget.onRatingChanged,
+          minValue: 1,
+          maxValue: 5,
+          // กำหนดสีตามระดับ rating 1-5
+          // 1 = แดง (แย่มาก), 2 = ส้ม (แย่), 3 = เหลือง (ปานกลาง)
+          // 4 = เขียวอ่อน (ดี), 5 = เขียว (ดีมาก)
+          thresholds: const [
+            NpsThreshold(from: 1, to: 1, color: Color(0xFFE53935)), // แดง
+            NpsThreshold(from: 2, to: 2, color: Color(0xFFFF9800)), // ส้ม
+            NpsThreshold(from: 3, to: 3, color: Color(0xFFFFC107)), // เหลือง
+            NpsThreshold(from: 4, to: 4, color: Color(0xFF8BC34A)), // เขียวอ่อน
+            NpsThreshold(from: 5, to: 5, color: Color(0xFF0D9488)), // เขียว (primary)
+          ],
+          minLabel: 'แย่มาก',
+          maxLabel: 'ดีมาก',
         ),
         const SizedBox(height: 12),
 

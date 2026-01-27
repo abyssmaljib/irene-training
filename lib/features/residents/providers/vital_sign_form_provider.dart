@@ -9,7 +9,8 @@ final vitalSignServiceProvider = Provider<VitalSignService>((ref) {
 });
 
 /// Provider for Vital Sign form state
-final vitalSignFormProvider = StateNotifierProvider.family<
+/// ใช้ autoDispose เพื่อ reset state เมื่อออกจากหน้า create
+final vitalSignFormProvider = StateNotifierProvider.family.autoDispose<
     VitalSignFormNotifier,
     AsyncValue<VitalSignFormState>,
     int>((ref, residentId) {
@@ -293,6 +294,50 @@ class VitalSignFormNotifier
     state.whenData((data) {
       state = AsyncValue.data(data.copyWith(reportN: value));
     });
+  }
+
+  // ==========================================
+  // Validation
+  // ==========================================
+
+  /// ตรวจสอบว่ามี vital sign อย่างน้อย 1 ค่าหรือไม่
+  bool _hasAnyVitalSign() {
+    final currentState = state.value;
+    if (currentState == null) return false;
+
+    return (currentState.temp != null && currentState.temp!.isNotEmpty) ||
+        (currentState.rr != null && currentState.rr!.isNotEmpty) ||
+        (currentState.o2 != null && currentState.o2!.isNotEmpty) ||
+        (currentState.sBP != null && currentState.sBP!.isNotEmpty) ||
+        (currentState.dBP != null && currentState.dBP!.isNotEmpty) ||
+        (currentState.pr != null && currentState.pr!.isNotEmpty);
+  }
+
+  /// Validate form ก่อนแสดง Preview
+  /// Return error message ถ้ามี, null ถ้า valid
+  String? validateForPreview() {
+    final currentState = state.value;
+    if (currentState == null) return 'ไม่พบข้อมูล';
+
+    // ต้องกรอกสัญญาณชีพอย่างน้อย 1 รายการ
+    if (!_hasAnyVitalSign()) {
+      return 'กรุณากรอกสัญญาณชีพอย่างน้อย 1 รายการ';
+    }
+
+    // Full Report: ต้องเลือกสถานะการขับถ่าย
+    if (currentState.isFullReport && currentState.defecation == null) {
+      return 'กรุณาเลือกสถานะการขับถ่าย';
+    }
+
+    // Full Report: ต้องให้คะแนนครบทุกหัวข้อ
+    if (currentState.isFullReport && !currentState.allRatingsComplete) {
+      final incompleteCount = currentState.ratings.values
+          .where((r) => !r.isComplete)
+          .length;
+      return 'กรุณาให้คะแนนครบทุกหัวข้อ (เหลืออีก $incompleteCount หัวข้อ)';
+    }
+
+    return null; // Valid
   }
 
   // ==========================================

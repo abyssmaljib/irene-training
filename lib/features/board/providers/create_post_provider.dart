@@ -8,7 +8,7 @@ class CreatePostState {
   final String text;
   final NewTag? selectedTag;
   final bool isHandover;
-  final bool sendToFamily; // ส่งให้หัวหน้าเวร
+  final bool sendToFamily; // ส่งให้ญาติ
   final int? selectedResidentId;
   final String? selectedResidentName;
   final List<File> selectedImages;
@@ -16,6 +16,13 @@ class CreatePostState {
   // รองรับหลาย video - เก็บรวมกับรูปใน multi_img_url array ตอน submit
   final List<File> selectedVideos;
   final List<String> uploadedVideoUrls;
+
+  // Video upload state (for optimistic background upload)
+  final bool isUploadingVideo;
+  final double videoUploadProgress; // 0.0 - 1.0
+  final String? videoUploadError;
+  final String? videoThumbnailUrl; // thumbnail จาก video ที่อัพโหลดสำเร็จ
+
   final bool isSubmitting;
   final String? error;
 
@@ -52,6 +59,10 @@ class CreatePostState {
     this.uploadedImageUrls = const [],
     this.selectedVideos = const [],
     this.uploadedVideoUrls = const [],
+    this.isUploadingVideo = false,
+    this.videoUploadProgress = 0.0,
+    this.videoUploadError,
+    this.videoThumbnailUrl,
     this.isSubmitting = false,
     this.error,
     // Advanced fields
@@ -83,7 +94,12 @@ class CreatePostState {
 
   bool get hasImages => selectedImages.isNotEmpty || uploadedImageUrls.isNotEmpty;
 
-  bool get hasVideo => selectedVideos.isNotEmpty || uploadedVideoUrls.isNotEmpty;
+  // รวม upload states ด้วย เพื่อแสดง UI ตอน uploading/error
+  bool get hasVideo =>
+      selectedVideos.isNotEmpty ||
+      uploadedVideoUrls.isNotEmpty ||
+      isUploadingVideo ||
+      videoUploadError != null;
 
   bool get hasQuiz =>
       qaQuestion != null &&
@@ -115,6 +131,12 @@ class CreatePostState {
     List<File>? selectedVideos,
     bool? clearVideos,
     List<String>? uploadedVideoUrls,
+    bool? isUploadingVideo,
+    double? videoUploadProgress,
+    String? videoUploadError,
+    bool? clearVideoUploadError,
+    String? videoThumbnailUrl,
+    bool? clearVideoThumbnail,
     bool? isSubmitting,
     String? error,
     bool? clearError,
@@ -161,6 +183,14 @@ class CreatePostState {
       uploadedVideoUrls: clearVideos == true
           ? const []
           : (uploadedVideoUrls ?? this.uploadedVideoUrls),
+      isUploadingVideo: clearVideos == true ? false : (isUploadingVideo ?? this.isUploadingVideo),
+      videoUploadProgress: clearVideos == true ? 0.0 : (videoUploadProgress ?? this.videoUploadProgress),
+      videoUploadError: clearVideos == true || clearVideoUploadError == true
+          ? null
+          : (videoUploadError ?? this.videoUploadError),
+      videoThumbnailUrl: clearVideos == true || clearVideoThumbnail == true
+          ? null
+          : (videoThumbnailUrl ?? this.videoThumbnailUrl),
       isSubmitting: isSubmitting ?? this.isSubmitting,
       error: clearError == true ? null : (error ?? this.error),
       // Advanced fields
@@ -240,23 +270,36 @@ class CreatePostNotifier extends StateNotifier<CreatePostState> {
     state = state.copyWith(isHandover: value, clearError: true);
   }
 
-  /// Toggle ส่งให้หัวหน้าเวร
+  /// Toggle ส่งให้ญาติ
   void setSendToFamily(bool value) {
     state = state.copyWith(sendToFamily: value, clearError: true);
   }
 
   /// เลือก resident
+  /// เมื่อเลือก resident จะ reset handover เป็น false (ถ้า tag ไม่ได้บังคับส่งเวร)
+  /// เพื่อป้องกันการติ๊กส่งเวรพร่ำเพรื่อโดยไม่มีเหตุผล
   void selectResident(int id, String name) {
+    // ถ้า tag ไม่บังคับส่งเวร → reset handover เป็น false
+    final shouldResetHandover = state.selectedTag != null &&
+        !state.selectedTag!.isForceHandover;
+
     state = state.copyWith(
       selectedResidentId: id,
       selectedResidentName: name,
+      // reset handover เมื่อเลือก resident และ tag ไม่บังคับส่งเวร
+      isHandover: shouldResetHandover ? false : state.isHandover,
       clearError: true,
     );
   }
 
   /// ยกเลิกการเลือก resident
+  /// เมื่อไม่มี resident = เรื่องส่วนกลาง → บังคับส่งเวร
   void clearResident() {
-    state = state.copyWith(clearResident: true, clearError: true);
+    state = state.copyWith(
+      clearResident: true,
+      isHandover: true, // auto-enable ส่งเวรเมื่อไม่มี resident
+      clearError: true,
+    );
   }
 
   /// เพิ่มรูปภาพ
@@ -304,7 +347,7 @@ class CreatePostNotifier extends StateNotifier<CreatePostState> {
   }
 
   /// Initialize state with pre-filled values (สำหรับ task completion by post)
-  /// sendToFamily = true เพื่อให้ระบบ automation ส่งให้หัวหน้าเวรตรวจสอบและส่งให้ญาติ
+  /// sendToFamily = true เพื่อให้ระบบ automation ส่งให้ญาติ
   void initFromTask({
     required String text,
     int? residentId,
@@ -355,6 +398,58 @@ class CreatePostNotifier extends StateNotifier<CreatePostState> {
   /// Set uploaded video URLs
   void setUploadedVideoUrls(List<String> urls) {
     state = state.copyWith(uploadedVideoUrls: urls);
+  }
+
+  // === Video Upload State Methods (for optimistic background upload) ===
+
+  /// เริ่มอัพโหลดวีดีโอ - set uploading state
+  void startVideoUpload(File videoFile) {
+    state = state.copyWith(
+      selectedVideos: [videoFile],
+      isUploadingVideo: true,
+      videoUploadProgress: 0.0,
+      clearVideoUploadError: true,
+    );
+  }
+
+  /// อัพเดท progress (0.0 - 1.0)
+  void setVideoUploadProgress(double progress) {
+    state = state.copyWith(videoUploadProgress: progress.clamp(0.0, 1.0));
+  }
+
+  /// อัพโหลดสำเร็จ - เก็บ URL และ thumbnail
+  void setVideoUploadSuccess(String videoUrl, String? thumbnailUrl) {
+    state = state.copyWith(
+      isUploadingVideo: false,
+      videoUploadProgress: 1.0,
+      uploadedVideoUrls: [videoUrl],
+      videoThumbnailUrl: thumbnailUrl,
+      selectedVideos: const [], // clear local file - ใช้ URL แทน
+    );
+  }
+
+  /// อัพโหลดล้มเหลว - เก็บ error message
+  void setVideoUploadError(String error) {
+    state = state.copyWith(
+      isUploadingVideo: false,
+      videoUploadError: error,
+    );
+  }
+
+  /// Clear video upload error (สำหรับ retry)
+  void clearVideoUploadError() {
+    state = state.copyWith(clearVideoUploadError: true);
+  }
+
+  /// ยกเลิกวีดีโอที่กำลังอัพโหลดหรืออัพโหลดแล้ว
+  void cancelVideoUpload() {
+    state = state.copyWith(
+      clearVideos: true,
+      isUploadingVideo: false,
+      videoUploadProgress: 0.0,
+      clearVideoUploadError: true,
+      clearVideoThumbnail: true,
+    );
   }
 
   // === Advanced Post Methods ===

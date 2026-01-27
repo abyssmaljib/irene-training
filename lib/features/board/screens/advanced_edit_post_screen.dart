@@ -7,7 +7,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/irene_app_bar.dart';
 import '../../../core/widgets/confirm_dialog.dart';
-import '../../../core/widgets/checkbox_tile.dart';
+import '../widgets/handover_toggle_widget.dart';
 import '../models/post.dart';
 import '../providers/edit_post_provider.dart';
 import '../providers/post_provider.dart';
@@ -18,8 +18,7 @@ import '../widgets/image_picker_bar.dart' show ImagePickerHelper;
 import '../widgets/image_preview_grid.dart';
 import '../widgets/edit_ai_summary_widget.dart';
 import '../widgets/edit_quiz_form_widget.dart';
-import '../widgets/tag_picker_widget.dart';
-import '../widgets/resident_picker_widget.dart';
+import '../widgets/resident_tag_picker_row.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 /// Advanced Edit Post Screen - Full page version for editing posts with title/quiz
@@ -42,8 +41,12 @@ class _AdvancedEditPostScreenState
     extends ConsumerState<AdvancedEditPostScreen> {
   final _titleController = TextEditingController();
   final _textController = TextEditingController();
+  final _descriptionFocusNode = FocusNode(); // FocusNode สำหรับ focus เมื่อติ๊กส่งเวร
   final _formKey = GlobalKey<FormState>();
   bool _isSubmitting = false;
+
+  // Upload progress state - แสดงสถานะการอัพโหลดให้ user ทราบ
+  String? _uploadStatusMessage;
 
   // เก็บค่าเริ่มต้นเพื่อเปรียบเทียบว่ามีการแก้ไขหรือไม่
   String _initialText = '';
@@ -72,6 +75,7 @@ class _AdvancedEditPostScreenState
   void dispose() {
     _titleController.dispose();
     _textController.dispose();
+    _descriptionFocusNode.dispose();
     super.dispose();
   }
 
@@ -87,11 +91,13 @@ class _AdvancedEditPostScreenState
     final textChanged = _textController.text != _initialText;
     final titleChanged = _titleController.text != _initialTitle;
 
-    // เช็คว่ามีการเปลี่ยนแปลงใน state (รูป, tag, resident, handover)
+    // เช็คว่ามีการเปลี่ยนแปลงใน state (รูป, วีดีโอ, tag, resident, handover)
     final stateChanged = state.hasTagChanged ||
         state.hasResidentChanged ||
         state.newImages.isNotEmpty ||
         state.removedExistingIndexes.isNotEmpty ||
+        state.newVideos.isNotEmpty ||
+        state.removedExistingVideoIndexes.isNotEmpty ||
         state.isHandover != widget.post.isHandover;
 
     return textChanged || titleChanged || stateChanged;
@@ -138,6 +144,24 @@ class _AdvancedEditPostScreenState
     }
   }
 
+  /// เลือกวีดีโอจาก gallery (จำกัด 1 ไฟล์, mutual exclusive กับรูปภาพ)
+  Future<void> _pickVideo() async {
+    final state = ref.read(editPostProvider(widget.post.id));
+
+    // เช็คว่าสามารถเพิ่มวีดีโอได้หรือไม่
+    if (!state.canAddVideo) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ไม่สามารถเพิ่มวีดีโอได้ (มีรูปภาพหรือวีดีโออยู่แล้ว)')),
+      );
+      return;
+    }
+
+    final file = await ImagePickerHelper.pickVideoFromGallery();
+    if (file != null && mounted) {
+      ref.read(editPostProvider(widget.post.id).notifier).addNewVideo(file);
+    }
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -157,15 +181,43 @@ class _AdvancedEditPostScreenState
       final userId = ref.read(currentUserIdProvider);
       if (userId == null) throw Exception('Not authenticated');
 
-      // Upload new images if any
+      // Upload new images if any พร้อมแสดง progress
       List<String> finalImageUrls = [...state.finalExistingUrls];
       if (state.newImages.isNotEmpty) {
+        setState(() => _uploadStatusMessage = 'กำลังอัพโหลดรูปภาพ...');
+
         final uploadedUrls = await PostMediaService.instance.uploadImages(
           state.newImages,
           userId: userId,
         );
         finalImageUrls.addAll(uploadedUrls);
       }
+
+      // Upload new videos if any พร้อมแสดง progress และ error handling
+      List<String> finalVideoUrls = [...state.finalExistingVideoUrls];
+      if (state.newVideos.isNotEmpty) {
+        setState(() => _uploadStatusMessage = 'กำลังอัพโหลดวีดีโอ...');
+
+        for (final videoFile in state.newVideos) {
+          final result = await PostMediaService.instance.uploadVideoWithThumbnail(
+            videoFile,
+            userId: userId,
+          );
+
+          // ถ้าอัพโหลดไม่สำเร็จ ให้ throw error แทนที่จะ skip
+          if (result.videoUrl == null) {
+            throw Exception('อัพโหลดวีดีโอไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+          }
+
+          finalVideoUrls.add(result.videoUrl!);
+        }
+      }
+
+      // Clear upload status
+      setState(() => _uploadStatusMessage = null);
+
+      // รวม image และ video URLs เข้าด้วยกัน (เก็บใน multi_img_url เดียวกัน)
+      final List<String> allMediaUrls = [...finalImageUrls, ...finalVideoUrls];
 
       // เตรียมข้อมูล tag และ resident (ถ้ามีการเปลี่ยนแปลง)
       // tag: ส่งชื่อ tag ใหม่ ถ้ามีการเปลี่ยนแปลง
@@ -193,7 +245,7 @@ class _AdvancedEditPostScreenState
         title: _titleController.text.trim().isEmpty
             ? null
             : _titleController.text.trim(),
-        multiImgUrl: finalImageUrls.isEmpty ? null : finalImageUrls,
+        multiImgUrl: allMediaUrls.isEmpty ? null : allMediaUrls,
         // Quiz fields
         existingQaId: state.qaId,
         qaQuestion: state.qaQuestion,
@@ -229,8 +281,12 @@ class _AdvancedEditPostScreenState
         );
       }
     } finally {
+      // Clear upload status และ submitting state ทุกกรณี
       if (mounted) {
-        setState(() => _isSubmitting = false);
+        setState(() {
+          _isSubmitting = false;
+          _uploadStatusMessage = null;
+        });
       }
     }
   }
@@ -379,6 +435,43 @@ class _AdvancedEditPostScreenState
                 AppSpacing.verticalGapMd,
               ],
 
+              // Existing videos
+              if (state.existingVideoUrls.isNotEmpty) ...[
+                _buildSectionLabel('วีดีโอเดิม'),
+                const SizedBox(height: 8),
+                _buildExistingVideos(state),
+                AppSpacing.verticalGapMd,
+              ],
+
+              // New videos
+              if (state.newVideos.isNotEmpty) ...[
+                _buildSectionLabel('วีดีโอใหม่'),
+                const SizedBox(height: 8),
+                _buildNewVideos(state),
+                AppSpacing.verticalGapMd,
+              ],
+
+              // Upload status indicator
+              if (_uploadStatusMessage != null) ...[
+                Row(
+                  children: [
+                    const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _uploadStatusMessage!,
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ],
+                ),
+                AppSpacing.verticalGapMd,
+              ],
+
               // Bottom padding for safe area
               const SizedBox(height: 100),
             ],
@@ -392,8 +485,10 @@ class _AdvancedEditPostScreenState
 
   Widget _buildBottomBar(EditPostState state) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    // ต้องมีข้อความ + ต้องมี tag (เดิมหรือเลือกใหม่) + ไม่กำลัง submit
+    final hasTag = state.selectedTag != null || state.originalTagName != null;
     final canSubmit =
-        _textController.text.trim().isNotEmpty && !_isSubmitting;
+        _textController.text.trim().isNotEmpty && hasTag && !_isSubmitting;
 
     return Container(
       padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + bottomInset),
@@ -406,7 +501,7 @@ class _AdvancedEditPostScreenState
       child: SafeArea(
         child: Row(
           children: [
-            // Media picker buttons
+            // Media picker buttons (images and video)
             Wrap(
               spacing: 8,
               children: [
@@ -423,6 +518,13 @@ class _AdvancedEditPostScreenState
                       ? null
                       : _pickFromGallery,
                   tooltip: 'เลือกจากแกลเลอรี่',
+                ),
+                _buildIconButton(
+                  icon: HugeIcons.strokeRoundedVideo01,
+                  onTap: _isSubmitting || !state.canAddVideo
+                      ? null
+                      : _pickVideo,
+                  tooltip: 'เลือกวีดีโอ',
                 ),
               ],
             ),
@@ -676,70 +778,46 @@ class _AdvancedEditPostScreenState
           ),
           AppSpacing.verticalGapSm,
 
-          // Tag and Resident pickers
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              // Tag Picker
-              TagPickerCompact(
-                selectedTag: state.selectedTag,
-                isHandover: state.isHandover,
-                onTagSelected: (tag) {
-                  ref.read(editPostProvider(widget.post.id).notifier).setTag(tag);
-                },
-                onTagCleared: () {
-                  ref.read(editPostProvider(widget.post.id).notifier).clearTag();
-                },
-                onHandoverChanged: (value) {
-                  ref.read(editPostProvider(widget.post.id).notifier).setHandover(value);
-                },
-              ),
-
-              // Resident Picker
-              ResidentPickerWidget(
-                selectedResidentId: state.residentId,
-                selectedResidentName: state.residentName,
-                onResidentSelected: (id, name) {
-                  ref.read(editPostProvider(widget.post.id).notifier).setResident(id, name);
-                },
-                onResidentCleared: () {
-                  ref.read(editPostProvider(widget.post.id).notifier).clearResident();
-                },
-              ),
-            ],
+          // Resident and Tag pickers (ใช้ reusable widget)
+          ResidentTagPickerRow(
+            selectedResidentId: state.residentId,
+            selectedResidentName: state.residentName,
+            onResidentSelected: (id, name) {
+              ref.read(editPostProvider(widget.post.id).notifier).setResident(id, name);
+            },
+            onResidentCleared: () {
+              ref.read(editPostProvider(widget.post.id).notifier).clearResident();
+            },
+            selectedTag: state.selectedTag,
+            isHandover: state.isHandover,
+            onTagSelected: (tag) {
+              ref.read(editPostProvider(widget.post.id).notifier).setTag(tag);
+            },
+            onTagCleared: () {
+              ref.read(editPostProvider(widget.post.id).notifier).clearTag();
+            },
+            onHandoverChanged: (value) {
+              ref.read(editPostProvider(widget.post.id).notifier).setHandover(value);
+            },
+            originalTagName: state.originalTagName,
           ),
 
           // Handover toggle (แสดงตลอดเพื่อให้เลือกได้ไม่ต้องมี tag)
           AppSpacing.verticalGapMd,
-          _buildHandoverToggle(state),
+          HandoverToggleWidget(
+            selectedTag: state.selectedTag,
+            isHandover: state.isHandover,
+            selectedResidentId: state.residentId, // EditPostState ใช้ residentId
+            onHandoverChanged: (value) {
+              ref.read(editPostProvider(widget.post.id).notifier).setHandover(value);
+            },
+            descriptionFocusNode: _descriptionFocusNode,
+            descriptionText: _textController.text,
+            // Edit mode: ไม่บังคับส่งเวรเมื่อไม่มี resident
+            forceHandoverWhenNoResident: false,
+          ),
         ],
       ),
-    );
-  }
-
-  /// Toggle สำหรับส่งเวร
-  /// - ถ้าไม่มี tag: เลือกได้อิสระ (canToggle = true)
-  /// - ถ้ามี tag และเป็น optional handover: เลือกได้
-  /// - ถ้ามี tag และเป็น force handover: ถูกบังคับเปิด (canToggle = false)
-  Widget _buildHandoverToggle(EditPostState state) {
-    final isForce = state.selectedTag?.isForceHandover ?? false;
-    // ถ้าไม่มี tag หรือ tag เป็น optional handover = toggle ได้
-    final canToggle = state.selectedTag == null ||
-        (state.selectedTag?.isOptionalHandover ?? false);
-
-    return CheckboxTile(
-      value: state.isHandover,
-      onChanged: canToggle
-          ? (value) => ref.read(editPostProvider(widget.post.id).notifier).setHandover(value)
-          : null,
-      icon: HugeIcons.strokeRoundedArrowLeftRight,
-      title: 'ส่งเวร',
-      subtitle: isForce
-          ? 'จำเป็นต้องส่งเวรสำหรับหัวข้อนี้'
-          : 'หากมีอาการผิดปกติ ผิดแปลกไปจากเดิม หรือเป็นเรื่องที่สำคัญ',
-      subtitleColor: AppColors.error,
-      isRequired: isForce,
     );
   }
 
@@ -833,6 +911,183 @@ class _AdvancedEditPostScreenState
                       ),
                     ),
                   ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// แสดงวีดีโอเดิมที่มีอยู่ในโพส
+  Widget _buildExistingVideos(EditPostState state) {
+    return SizedBox(
+      height: 100,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: state.existingVideoUrls.length,
+        itemBuilder: (context, index) {
+          final isRemoved = state.removedExistingVideoIndexes.contains(index);
+
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Stack(
+              children: [
+                // Video placeholder with icon
+                Opacity(
+                  opacity: isRemoved ? 0.3 : 1.0,
+                  child: Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      color: AppColors.background,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.alternate),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        HugeIcon(
+                          icon: HugeIcons.strokeRoundedVideo01,
+                          color: AppColors.primary,
+                          size: AppIconSize.xxl,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'วีดีโอ ${index + 1}',
+                          style: AppTypography.caption.copyWith(
+                            color: AppColors.secondaryText,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                // Remove/Restore button
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: GestureDetector(
+                    onTap: () {
+                      if (isRemoved) {
+                        ref
+                            .read(editPostProvider(widget.post.id).notifier)
+                            .restoreExistingVideo(index);
+                      } else {
+                        ref
+                            .read(editPostProvider(widget.post.id).notifier)
+                            .removeExistingVideo(index);
+                      }
+                    },
+                    child: Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: isRemoved
+                            ? AppColors.success
+                            : Colors.black.withValues(alpha: 0.6),
+                        shape: BoxShape.circle,
+                      ),
+                      child: HugeIcon(
+                        icon: isRemoved
+                            ? HugeIcons.strokeRoundedRefresh
+                            : HugeIcons.strokeRoundedCancelCircle,
+                        color: Colors.white,
+                        size: AppIconSize.sm,
+                      ),
+                    ),
+                  ),
+                ),
+                // Removed overlay
+                if (isRemoved)
+                  Positioned.fill(
+                    child: Center(
+                      child: HugeIcon(
+                        icon: HugeIcons.strokeRoundedDelete01,
+                        color: AppColors.error,
+                        size: AppIconSize.xxl,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// แสดงวีดีโอใหม่ที่เลือก (ยังไม่ได้อัพโหลด)
+  Widget _buildNewVideos(EditPostState state) {
+    return SizedBox(
+      height: 100,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: state.newVideos.length,
+        itemBuilder: (context, index) {
+          final file = state.newVideos[index];
+
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Stack(
+              children: [
+                // Video placeholder with filename
+                Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    color: AppColors.accent1,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.primary),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      HugeIcon(
+                        icon: HugeIcons.strokeRoundedVideo01,
+                        color: AppColors.primary,
+                        size: AppIconSize.xxl,
+                      ),
+                      const SizedBox(height: 4),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Text(
+                          file.path.split('/').last.split('\\').last,
+                          style: AppTypography.caption.copyWith(
+                            color: AppColors.primary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Remove button
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: GestureDetector(
+                    onTap: () {
+                      ref
+                          .read(editPostProvider(widget.post.id).notifier)
+                          .removeNewVideo(index);
+                    },
+                    child: Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.6),
+                        shape: BoxShape.circle,
+                      ),
+                      child: HugeIcon(
+                        icon: HugeIcons.strokeRoundedCancelCircle,
+                        color: Colors.white,
+                        size: AppIconSize.sm,
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           );

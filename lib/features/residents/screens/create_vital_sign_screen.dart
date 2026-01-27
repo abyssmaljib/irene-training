@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hugeicons/hugeicons.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -11,6 +12,7 @@ import '../widgets/create_vital_sign/vital_input_section.dart';
 import '../widgets/create_vital_sign/care_input_section.dart';
 import '../widgets/create_vital_sign/rating_section.dart';
 import '../widgets/create_vital_sign/shift_card.dart';
+import '../widgets/create_vital_sign/preview_vital_sign_dialog.dart';
 
 /// Single-page scrollable form for creating vital sign records
 class CreateVitalSignScreen extends ConsumerWidget {
@@ -153,40 +155,115 @@ class CreateVitalSignScreen extends ConsumerWidget {
               onPressed: data.isLoading
                   ? null
                   : () async {
-                      // Clear previous error before submit
-                      final currentError = data.errorMessage;
-
-                      final success = await notifier.submit();
-
-                      if (success && context.mounted) {
-                        await SuccessPopup.show(context, emoji: '📝', message: 'บันทึกสำเร็จ');
-                        if (context.mounted) Navigator.of(context).pop(true);
-                      } else if (!success && context.mounted && data.errorMessage != currentError) {
-                        // Show error snackbar if validation fails
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Row(
-                              children: [
-                                HugeIcon(icon: HugeIcons.strokeRoundedAlert02, color: Colors.white, size: AppIconSize.xl),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    data.errorMessage ?? 'เกิดข้อผิดพลาด',
-                                    style: AppTypography.body.copyWith(
-                                      color: Colors.white,
+                      // 1. Validate ก่อนแสดง Preview
+                      final validationError = notifier.validateForPreview();
+                      if (validationError != null) {
+                        // แสดง error snackbar
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Row(
+                                children: [
+                                  HugeIcon(
+                                    icon: HugeIcons.strokeRoundedAlert02,
+                                    color: Colors.white,
+                                    size: AppIconSize.xl,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      validationError,
+                                      style: AppTypography.body.copyWith(
+                                        color: Colors.white,
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
+                              backgroundColor: AppColors.error,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              duration: const Duration(seconds: 3),
                             ),
-                            backgroundColor: AppColors.error,
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
+                          );
+                        }
+                        return;
+                      }
+
+                      // 2. ดึงข้อมูล user สำหรับแสดงใน preview
+                      String? userFullName;
+                      String? userNickname;
+                      try {
+                        final userId = Supabase.instance.client.auth.currentUser?.id;
+                        if (userId != null) {
+                          final userInfo = await Supabase.instance.client
+                              .from('user_info')
+                              .select('full_name, nickname')
+                              .eq('id', userId)
+                              .maybeSingle();
+                          if (userInfo != null) {
+                            userFullName = userInfo['full_name'] as String?;
+                            userNickname = userInfo['nickname'] as String?;
+                          }
+                        }
+                      } catch (_) {
+                        // ถ้าดึงไม่ได้ก็ไม่เป็นไร ใช้ค่าว่างแทน
+                      }
+
+                      // 3. แสดง Preview Dialog
+                      if (!context.mounted) return;
+                      final confirmed = await PreviewVitalSignDialog.show(
+                        context,
+                        formState: data,
+                        residentName: residentName ?? '',
+                        userFullName: userFullName,
+                        userNickname: userNickname,
+                      );
+
+                      // 4. ถ้ายืนยัน → submit
+                      if (confirmed == true && context.mounted) {
+                        final success = await notifier.submit();
+
+                        if (success && context.mounted) {
+                          await SuccessPopup.show(
+                            context,
+                            emoji: '📝',
+                            message: 'บันทึกสำเร็จ',
+                          );
+                          if (context.mounted) Navigator.of(context).pop(true);
+                        } else if (!success && context.mounted) {
+                          // แสดง error snackbar ถ้า submit ไม่สำเร็จ
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Row(
+                                children: [
+                                  HugeIcon(
+                                    icon: HugeIcons.strokeRoundedAlert02,
+                                    color: Colors.white,
+                                    size: AppIconSize.xl,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      data.errorMessage ?? 'เกิดข้อผิดพลาด',
+                                      style: AppTypography.body.copyWith(
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              backgroundColor: AppColors.error,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              duration: const Duration(seconds: 3),
                             ),
-                            duration: const Duration(seconds: 3),
-                          ),
-                        );
+                          );
+                        }
                       }
                     },
               style: ElevatedButton.styleFrom(

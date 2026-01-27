@@ -193,6 +193,7 @@ class TagPickerCompact extends ConsumerWidget {
   final VoidCallback? onTagCleared;
   final ValueChanged<bool> onHandoverChanged;
   final bool disabled; // ถ้า true จะไม่สามารถเปลี่ยนได้
+  final bool isRequired; // แสดง * สีแดง บังคับเลือก
 
   const TagPickerCompact({
     super.key,
@@ -202,6 +203,7 @@ class TagPickerCompact extends ConsumerWidget {
     this.onTagCleared,
     required this.onHandoverChanged,
     this.disabled = false,
+    this.isRequired = false,
   });
 
   @override
@@ -270,7 +272,10 @@ class TagPickerCompact extends ConsumerWidget {
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.alternate),
+          // ถ้า required และยังไม่เลือก → border สีแดง
+          border: Border.all(
+            color: isRequired ? AppColors.error : AppColors.alternate,
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -278,7 +283,7 @@ class TagPickerCompact extends ConsumerWidget {
             Text(
               '#',
               style: AppTypography.body.copyWith(
-                color: AppColors.secondaryText,
+                color: isRequired ? AppColors.error : AppColors.secondaryText,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -286,14 +291,24 @@ class TagPickerCompact extends ConsumerWidget {
             Text(
               'เลือกหัวข้อ',
               style: AppTypography.bodySmall.copyWith(
-                color: AppColors.secondaryText,
+                color: isRequired ? AppColors.error : AppColors.secondaryText,
               ),
             ),
+            // แสดง * สีแดงถ้า required
+            if (isRequired) ...[
+              Text(
+                ' *',
+                style: AppTypography.bodySmall.copyWith(
+                  color: AppColors.error,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
             const SizedBox(width: 4),
             HugeIcon(
               icon: HugeIcons.strokeRoundedArrowDown01,
               size: AppIconSize.sm,
-              color: AppColors.secondaryText,
+              color: isRequired ? AppColors.error : AppColors.secondaryText,
             ),
           ],
         ),
