@@ -544,12 +544,12 @@ class _AdvancedCreatePostScreenState
                   await ref.read(currentUserNicknameProvider.future);
 
               // สร้าง optimistic task ที่แสดงว่า completed แล้ว
+              // ไม่ใส่ confirmImage เพราะรูปจะดึงจาก post_id แทน
               final optimisticTask = taskToUpdate.copyWith(
                 status: 'completed',
                 completedAt: DateTime.now(),
                 completedByUid: userId,
                 completedByNickname: nickname,
-                confirmImage: widget.taskConfirmImageUrl,
               );
 
               // อัพเดต UI ทันที (ก่อนรอ API)
@@ -570,10 +570,12 @@ class _AdvancedCreatePostScreenState
 
           try {
             // Complete task พร้อม difficulty score
+            // ไม่ส่ง imageUrl เพราะรูปอยู่ใน Post แล้ว (ผ่าน post_id)
+            // ป้องกันการบันทึกซ้ำซ้อนและเข้าคิวส่งซ้ำ
             await TaskService.instance.markTaskComplete(
               widget.taskLogId!,
               userId,
-              imageUrl: widget.taskConfirmImageUrl,
+              // imageUrl: widget.taskConfirmImageUrl, // ไม่บันทึก confirmImage เพราะดึงจาก post_id แทน
               postId: postId,
               difficultyScore: difficultyScore,
               difficultyRatedBy: difficultyScore != null ? userId : null,

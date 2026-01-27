@@ -1604,12 +1604,13 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
 
       if (postId != null) {
         // ถ้ามี taskLogId ให้ complete task ด้วย
-        // video จะดึงจาก Post ผ่าน post_id ใน view แทน
+        // ไม่ส่ง imageUrl เพราะรูปอยู่ใน Post แล้ว (ผ่าน post_id)
+        // ป้องกันการบันทึกซ้ำซ้อนและเข้าคิวส่งซ้ำ
         if (widget.taskLogId != null) {
           await TaskService.instance.markTaskComplete(
             widget.taskLogId!,
             userId,
-            imageUrl: widget.taskConfirmImageUrl,
+            // imageUrl: widget.taskConfirmImageUrl, // ไม่บันทึก confirmImage เพราะดึงจาก post_id แทน
             postId: postId,
           );
           // Refresh tasks

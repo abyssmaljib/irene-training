@@ -1209,6 +1209,10 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
   }
 
   Widget _buildConfirmImage() {
+    // ถ้ามีรูปจาก Post แล้ว ไม่ต้องแสดง confirmImage ซ้ำ
+    // เพราะรูปจะแสดงใน _buildPostImages() แทน (ดึงจาก post_id)
+    if (_task.postImagesOnly.isNotEmpty) return const SizedBox.shrink();
+
     final imageUrl = _uploadedImageUrl ?? _task.confirmImage;
     if (imageUrl == null) return const SizedBox.shrink();
 
