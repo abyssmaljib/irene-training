@@ -1,5 +1,30 @@
+// =============================================================================
+// CRASH FIX LOG - MealSectionCard (Card แสดงยาแต่ละมื้อ)
+// =============================================================================
+//
+// ปัญหา: User report ว่าแอป crash ตอน scroll รูปตัวอย่างยา บน iOS
+//
+// สาเหตุที่พบและแก้ไข (28 ม.ค. 2026):
+//
+// 1. addRepaintBoundaries: false ใน GridView.builder (LINE ~484)
+//    ปัญหา: ปิด repaint boundary ทำให้ทุก item ถูก repaint พร้อมกัน
+//           → memory spike → crash บน iOS
+//    แก้ไข: ลบออก ใช้ค่า default (true)
+//
+// 2. _LogPhotoNetworkImage ใช้ Image.network โดยตรง (LINE ~1435)
+//    ปัญหา: ไม่มี disk caching ต้องโหลดซ้ำทุกครั้งที่ rebuild
+//    แก้ไข: เปลี่ยนเป็น CachedNetworkImage + memCacheWidth: 400
+//
+// 3. Performance optimizations:
+//    - addAutomaticKeepAlives: false (เก็บไว้) - ลด memory จาก keep alive
+//    - memCacheWidth: 200-400 - จำกัดขนาดรูปใน memory
+//    - CachedNetworkImage - cache รูปไว้ใน disk
+//
+// =============================================================================
+
 import 'dart:async';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
@@ -479,7 +504,8 @@ class _MealSectionCardState extends State<MealSectionCard>
               // ปิด automatic keep alives เพื่อลด memory
               // iOS จะ crash ถ้าโหลดรูปเยอะเกินพร้อมกัน
               addAutomaticKeepAlives: false,
-              addRepaintBoundaries: false,
+              // หมายเหตุ: ไม่ปิด addRepaintBoundaries เพราะจะทำให้ทุก item
+              // repaint พร้อมกันตอน scroll ทำให้ memory spike และ crash บน iOS
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: crossAxisCount,
                 crossAxisSpacing: 0,
@@ -1432,47 +1458,26 @@ class _LogPhotoNetworkImageState extends State<_LogPhotoNetworkImage> {
     if (_timedOut) return _buildTimeoutWidget();
     if (_hasError) return _buildErrorWidget();
 
-    return Image.network(
-      // เพิ่ม query param เพื่อ bypass cache เมื่อ retry
-      '${widget.imageUrl}${_retryCount > 0 ? '?retry=$_retryCount' : ''}',
+    // ใช้ CachedNetworkImage แทน Image.network เพื่อ:
+    // 1. Cache รูปไว้ใน disk ไม่ต้องโหลดซ้ำทุกครั้ง
+    // 2. จัดการ memory ได้ดีกว่า
+    // 3. ลด network request ซ้ำซ้อน
+    return CachedNetworkImage(
       key: ValueKey('${widget.imageUrl}_$_retryCount'),
+      imageUrl: widget.imageUrl,
       fit: widget.fit,
+      fadeInDuration: const Duration(milliseconds: 150),
       // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
-      // ลดจาก 800 เป็น 400 เพื่อลด memory usage (รูปใน grid มีขนาดเล็ก)
-      cacheWidth: 400,
-      loadingBuilder: (context, child, loadingProgress) {
-        if (loadingProgress == null) {
-          // โหลดเสร็จแล้ว - cancel timer
-          _timeoutTimer?.cancel();
-          return child;
-        }
-        final progress = loadingProgress.expectedTotalBytes != null
-            ? loadingProgress.cumulativeBytesLoaded /
-                loadingProgress.expectedTotalBytes!
-            : null;
-        return Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircularProgressIndicator(
-                value: progress,
-                color: AppColors.primary,
-                strokeWidth: 2,
-              ),
-              if (progress != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  '${(progress * 100).toInt()}%',
-                  style: AppTypography.caption.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        );
-      },
-      errorBuilder: (context, error, stackTrace) {
+      memCacheWidth: 400,
+      // placeholder แสดงระหว่างโหลด
+      placeholder: (context, url) => Center(
+        child: CircularProgressIndicator(
+          color: AppColors.primary,
+          strokeWidth: 2,
+        ),
+      ),
+      // errorWidget เรียกเมื่อโหลดไม่สำเร็จ
+      errorWidget: (context, url, error) {
         // เรียก setState หลัง build เสร็จ
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted && !_hasError) {
@@ -1483,6 +1488,11 @@ class _LogPhotoNetworkImageState extends State<_LogPhotoNetworkImage> {
           }
         });
         return _buildErrorWidget();
+      },
+      // imageBuilder เรียกเมื่อโหลดสำเร็จ - cancel timer
+      imageBuilder: (context, imageProvider) {
+        _timeoutTimer?.cancel();
+        return Image(image: imageProvider, fit: widget.fit);
       },
     );
   }

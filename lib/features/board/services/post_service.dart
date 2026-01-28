@@ -54,11 +54,41 @@ class PostService {
   }
 
   /// ดึง posts ตาม filter
+  /// limit: จำนวน posts ต่อหน้า (default 10 สำหรับ infinite scroll)
+  /// offset: ตำแหน่งเริ่มต้น
+  /// Returns: (posts, hasMoreOnServer) - hasMore คำนวณจากจำนวนที่ server ส่งมา
+  ///          ไม่ใช่หลัง client-side filter
+  Future<(List<Post>, bool)> getPostsWithPagination({
+    required int nursinghomeId,
+    required PostFilter filter,
+    String? currentUserId,
+    int limit = 10,
+    int offset = 0,
+    bool forceRefresh = false,
+  }) async {
+    final posts = await getPosts(
+      nursinghomeId: nursinghomeId,
+      filter: filter,
+      currentUserId: currentUserId,
+      limit: limit,
+      offset: offset,
+      forceRefresh: forceRefresh,
+    );
+    // hasMore คำนวณจาก _lastServerPostCount ที่เก็บไว้ใน getPosts
+    return (posts, _lastServerPostCount >= limit);
+  }
+
+  // เก็บจำนวน posts จาก server ก่อน client-side filter
+  int _lastServerPostCount = 0;
+
+  /// ดึง posts ตาม filter
+  /// limit: จำนวน posts ต่อหน้า (default 10 สำหรับ infinite scroll)
+  /// offset: ตำแหน่งเริ่มต้น
   Future<List<Post>> getPosts({
     required int nursinghomeId,
     required PostFilter filter,
     String? currentUserId,
-    int limit = 20,
+    int limit = 10,
     int offset = 0,
     bool forceRefresh = false,
   }) async {
@@ -108,6 +138,10 @@ class PostService {
 
       var posts = (response as List).map((json) => Post.fromJson(json)).toList();
 
+      // เก็บจำนวน posts จาก server ก่อน filter
+      // ใช้สำหรับเช็ค hasMore ใน pagination (ผ่าน getPostsWithPagination)
+      _lastServerPostCount = posts.length;
+
       // Apply filter type (client-side filtering for complex conditions)
       if (currentUserId != null) {
         switch (filter.filterType) {
@@ -131,7 +165,7 @@ class PostService {
       }
 
       debugPrint(
-          'getPosts: fetched ${posts.length} posts in ${stopwatch.elapsedMilliseconds}ms');
+          'getPosts: fetched ${posts.length} posts (server: $_lastServerPostCount) in ${stopwatch.elapsedMilliseconds}ms');
 
       return posts;
     } catch (e) {

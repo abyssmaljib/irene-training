@@ -47,6 +47,11 @@ class BoardScreen extends ConsumerStatefulWidget {
 class _BoardScreenState extends ConsumerState<BoardScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final FocusNode _searchFocusNode = FocusNode();
+
+  /// ScrollController สำหรับ infinite loading
+  /// ตรวจจับเมื่อ scroll ใกล้ท้าย list แล้วโหลดเพิ่ม
+  final ScrollController _scrollController = ScrollController();
+
   bool _isSearching = false;
   List<ResidentOption> _residents = [];
 
@@ -54,12 +59,28 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
   void initState() {
     super.initState();
     _loadResidents();
+
+    // เพิ่ม listener สำหรับ infinite loading
+    // เมื่อ scroll ใกล้ท้าย list (200px) จะโหลดข้อมูลเพิ่ม
+    _scrollController.addListener(_onScroll);
   }
 
   @override
   void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
+  }
+
+  /// ตรวจจับ scroll position สำหรับ infinite loading
+  void _onScroll() {
+    // ถ้า scroll ใกล้ท้าย (200px จากท้าย) ให้โหลดเพิ่ม
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      // เรียก loadMore ผ่าน notifier
+      ref.read(postsNotifierProvider.notifier).loadMore();
+    }
   }
 
   Future<void> _loadResidents() async {
@@ -131,6 +152,8 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
           refreshPosts(ref);
         },
         child: CustomScrollView(
+          // ใช้ ScrollController สำหรับ infinite loading
+          controller: _scrollController,
           // เพิ่ม AlwaysScrollableScrollPhysics เพื่อให้ pull to refresh ทำงานได้
           // แม้ content จะไม่เต็มหน้าจอ
           physics: const AlwaysScrollableScrollPhysics(),
@@ -413,7 +436,8 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
             child: _buildEmptyState('ไม่พบผลลัพธ์'),
           );
         }
-        return _buildPostsListView(posts);
+        // Search results ไม่มี infinite loading
+        return _buildSimplePostsListView(posts);
       },
       loading: () => SliverFillRemaining(
         child: Center(child: CircularProgressIndicator()),
@@ -424,33 +448,12 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
     );
   }
 
-  Widget _buildPostsList() {
-    final postsAsync = ref.watch(postsProvider);
-
-    return postsAsync.when(
-      data: (posts) {
-        if (posts.isEmpty) {
-          return SliverFillRemaining(
-            child: _buildEmptyState('ไม่มีโพส'),
-          );
-        }
-        return _buildPostsListView(posts);
-      },
-      loading: () => SliverFillRemaining(
-        child: Center(child: CircularProgressIndicator()),
-      ),
-      error: (e, _) => SliverFillRemaining(
-        child: _buildErrorState(e.toString()),
-      ),
-    );
-  }
-
-  Widget _buildPostsListView(List<Post> posts) {
+  /// สร้าง posts list view แบบง่าย (ไม่มี infinite loading)
+  /// ใช้สำหรับ search results
+  Widget _buildSimplePostsListView(List<Post> posts) {
     final currentUserId = ref.watch(currentUserIdProvider);
     final mainTab = ref.watch(postMainTabProvider);
-    // TODO: Get userRole from provider when available
     const userRole = 'user';
-    // ถ้าอยู่ใน tab ศูนย์ (announcement) = isCenterTab
     final isCenterTab = mainTab == PostMainTab.announcement;
 
     return SliverPadding(
@@ -458,6 +461,85 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
       sliver: SliverList(
         delegate: SliverChildBuilderDelegate(
           (context, index) {
+            final post = posts[index];
+            final isLiked = post.hasUserLiked(currentUserId);
+            final isRequiredUnread = !isLiked;
+
+            return Padding(
+              padding: EdgeInsets.only(bottom: AppSpacing.md),
+              child: PostCard(
+                post: post,
+                isLiked: isLiked,
+                currentUserId: currentUserId,
+                userRole: userRole,
+                isCenterTab: isCenterTab,
+                isRequiredUnread: isRequiredUnread,
+                onTap: () => _navigateToDetail(post),
+                onLikeTap: () => _handleLike(post.id),
+                onCancelPrn: (queueId) => _handleCancelPrn(queueId),
+                onCancelLogLine: (queueId) => _handleCancelLogLine(queueId),
+              ),
+            );
+          },
+          childCount: posts.length,
+        ),
+      ),
+    );
+  }
+
+  /// สร้าง posts list พร้อม infinite loading
+  /// ใช้ postsNotifierProvider แทน postsProvider เดิม
+  Widget _buildPostsList() {
+    final postsState = ref.watch(postsNotifierProvider);
+
+    // กำลังโหลดครั้งแรก
+    if (postsState.isLoading) {
+      return SliverFillRemaining(
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    // เกิด error
+    if (postsState.error != null && postsState.posts.isEmpty) {
+      return SliverFillRemaining(
+        child: _buildErrorState(postsState.error!),
+      );
+    }
+
+    // ไม่มีข้อมูล
+    if (postsState.posts.isEmpty) {
+      return SliverFillRemaining(
+        child: _buildEmptyState('ไม่มีโพส'),
+      );
+    }
+
+    // แสดง posts list พร้อม infinite loading
+    return _buildPostsListView(postsState);
+  }
+
+  /// สร้าง posts list view พร้อม loading indicator ที่ท้าย
+  Widget _buildPostsListView(PostsState postsState) {
+    final posts = postsState.posts;
+    final currentUserId = ref.watch(currentUserIdProvider);
+    final mainTab = ref.watch(postMainTabProvider);
+    // TODO: Get userRole from provider when available
+    const userRole = 'user';
+    // ถ้าอยู่ใน tab ศูนย์ (announcement) = isCenterTab
+    final isCenterTab = mainTab == PostMainTab.announcement;
+
+    // จำนวน items = posts + 1 (สำหรับ loading indicator หรือ end message)
+    final itemCount = posts.length + 1;
+
+    return SliverPadding(
+      padding: EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, 0),
+      sliver: SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
+            // ถ้าเป็น item สุดท้าย = แสดง loading หรือ end message
+            if (index == posts.length) {
+              return _buildLoadMoreIndicator(postsState);
+            }
+
             final post = posts[index];
             final isLiked = post.hasUserLiked(currentUserId);
 
@@ -482,10 +564,45 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
               ),
             );
           },
-          childCount: posts.length,
+          childCount: itemCount,
         ),
       ),
     );
+  }
+
+  /// สร้าง loading indicator หรือ end message ที่ท้าย list
+  Widget _buildLoadMoreIndicator(PostsState postsState) {
+    // กำลังโหลดเพิ่ม
+    if (postsState.isLoadingMore) {
+      return Padding(
+        padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
+        child: Center(
+          child: SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+
+    // ไม่มีข้อมูลเพิ่มแล้ว
+    if (!postsState.hasMore) {
+      return Padding(
+        padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
+        child: Center(
+          child: Text(
+            'ไม่มีข้อมูลเพิ่มเติม',
+            style: AppTypography.caption.copyWith(
+              color: AppColors.secondaryText,
+            ),
+          ),
+        ),
+      );
+    }
+
+    // ยังมีข้อมูลเพิ่ม แต่ยังไม่โหลด (spacer)
+    return SizedBox(height: AppSpacing.lg);
   }
 
   Widget _buildEmptyState(String message) {

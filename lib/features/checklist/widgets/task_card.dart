@@ -64,17 +64,39 @@ class TaskCard extends StatelessWidget {
                         // Row 1: resident name + taskType
                         Row(
                           children: [
+                            // ชื่อผู้พักอาศัย - badge สีเขียวให้โดดเด่นมาก
                             if (showResident && task.residentName != null) ...[
-                              HugeIcon(icon: HugeIcons.strokeRoundedUser,
-                                  size: 12, color: AppColors.secondaryText),
-                              const SizedBox(width: 4),
                               Flexible(
-                                child: Text(
-                                  task.residentName!,
-                                  style: AppTypography.caption.copyWith(
-                                    color: AppColors.secondaryText,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 3,
                                   ),
-                                  overflow: TextOverflow.ellipsis,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      HugeIcon(
+                                        icon: HugeIcons.strokeRoundedUser,
+                                        size: 16,
+                                        color: AppColors.primary,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Flexible(
+                                        child: Text(
+                                          task.residentName!,
+                                          style: AppTypography.body.copyWith(
+                                            color: AppColors.primary,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ],

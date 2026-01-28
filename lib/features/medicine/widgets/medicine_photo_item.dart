@@ -1,3 +1,36 @@
+// =============================================================================
+// CRASH FIX LOG - MedicinePhotoItem (แสดงรูปตัวอย่างยาแต่ละตัว)
+// =============================================================================
+//
+// ปัญหา: User report ว่าแอป crash ตอน scroll หน้ารูปตัวอย่างยา บน iOS
+//
+// สาเหตุและการแก้ไข:
+//
+// 1. Memory optimization สำหรับรูปตัวอย่างยา:
+//    - ใช้ CachedNetworkImage + memCacheWidth: 200 (ลดจาก 400)
+//    - รูปใน grid มีขนาดเล็ก ไม่ต้องใช้ resolution สูง
+//
+// 2. Full-screen image viewer:
+//    - ใช้ cacheWidth: 1200 สำหรับรูปขยาย
+//    - ใช้ errorBuilder เพื่อจัดการกรณีโหลดไม่สำเร็จ
+//
+// 3. Timeout + Retry mechanism:
+//    - _MedicineNetworkImage มี timeout 15 วินาที
+//    - ถ้าโหลดช้าหรือ error จะแสดงปุ่ม "ลองใหม่"
+//
+// 4. Tap behavior fix (28 Jan 2026):
+//    - ปัญหา: เมื่อรูปโหลดไม่สำเร็จ user กดที่รูป → เปิด full image viewer (ผิด)
+//    - แก้ไข: ย้าย tap handling เข้าไปใน _MedicineNetworkImage
+//      * ถ้ารูปโหลดสำเร็จ → เปิด full image viewer
+//      * ถ้ารูปโหลดไม่สำเร็จ (error/timeout) → retry
+//      * กดที่ไหนก็ได้ในพื้นที่รูป ไม่ต้องกดปุ่ม "ลองใหม่" โดยเฉพาะ
+//    - GestureDetector ข้างนอกใช้สำหรับกรณีไม่มีรูป (placeholder) เท่านั้น
+//
+// หมายเหตุ: ไฟล์นี้ใช้ร่วมกับ MealSectionCard ที่ต้องดูแล memory ด้วย
+// ดู CRASH FIX LOG ใน meal_section_card.dart ประกอบ
+//
+// =============================================================================
+
 import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -33,8 +66,14 @@ class MedicinePhotoItem extends StatelessWidget {
     // ใช้ borderRadius ที่ส่งมา หรือ default เป็น smallRadius
     final effectiveRadius = borderRadius ?? AppRadius.smallRadius;
 
+    // FIX: ย้าย tap handling เข้าไปใน _MedicineNetworkImage
+    // - ถ้ารูปโหลดสำเร็จ → เปิด full image
+    // - ถ้ารูปโหลดไม่สำเร็จ → retry แทนที่จะเปิด full image
+    // GestureDetector ข้างนอกนี้ใช้สำหรับกรณีไม่มีรูป (placeholder) เท่านั้น
     return GestureDetector(
-      onTap: onTap ?? (hasPhoto ? () => _showFullImage(context, photoUrl) : null),
+      // ถ้ามีรูป → ให้ _MedicineNetworkImage จัดการ tap เอง
+      // ถ้าไม่มีรูป → ใช้ onTap ที่ส่งมา
+      onTap: hasPhoto ? null : onTap,
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.background,
@@ -47,6 +86,9 @@ class MedicinePhotoItem extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             // รูปยา - เต็มพื้นที่
+            // _MedicineNetworkImage จัดการ tap behavior เอง:
+            // - โหลดสำเร็จ → เปิด full image
+            // - โหลดไม่สำเร็จ → retry
             hasPhoto
                 ? _MedicineNetworkImage(
                     imageUrl: photoUrl,
@@ -61,51 +103,60 @@ class MedicinePhotoItem extends StatelessWidget {
                       ),
                     ),
                     errorWidget: _buildPlaceholder(),
+                    // Callback เมื่อกดและรูปโหลดสำเร็จ → เปิด full image viewer
+                    onShowFullImage: onTap ?? () => _showFullImage(context, photoUrl),
                   )
                 : _buildPlaceholder(),
 
             // Overlay จำนวนเม็ดยา
+            // ใช้ IgnorePointer เพื่อให้ tap ผ่านไปถึงรูปด้านล่างได้
+            // (ไม่งั้น overlay จะดักจับ tap ก่อน)
             if (showOverlay && medicine.takeTab != null && medicine.takeTab! > 0)
               Positioned.fill(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    return OverlayMedWidget(
-                      width: constraints.maxWidth,
-                      height: constraints.maxHeight,
-                      takeTab: medicine.takeTab,
-                    );
-                  },
+                child: IgnorePointer(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      return OverlayMedWidget(
+                        width: constraints.maxWidth,
+                        height: constraints.maxHeight,
+                        takeTab: medicine.takeTab,
+                      );
+                    },
+                  ),
                 ),
               ),
 
             // ชื่อยา - ซ้อนด้านล่างแบบ gradient ใส
+            // ใช้ IgnorePointer เพื่อให้ tap ผ่านไปถึงรูปด้านล่างได้
             Positioned(
               left: 0,
               right: 0,
               bottom: 0,
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    colors: [
-                      Colors.black.withValues(alpha: 0.7),
-                      Colors.transparent,
-                    ],
+              child: IgnorePointer(
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                      colors: [
+                        Colors.black.withValues(alpha: 0.7),
+                        Colors.transparent,
+                      ],
+                    ),
                   ),
-                ),
-                child: Text(
-                  medicine.str != null && medicine.str!.isNotEmpty
-                      ? '${medicine.displayName} ${medicine.str}'
-                      : medicine.displayName,
-                  style: AppTypography.caption.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 10,
+                  child: Text(
+                    medicine.str != null && medicine.str!.isNotEmpty
+                        ? '${medicine.displayName} ${medicine.str}'
+                        : medicine.displayName,
+                    style: AppTypography.caption.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 10,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ),
@@ -470,17 +521,20 @@ class MedicinePhotoItem extends StatelessWidget {
 /// - มี timeout 15 วินาที ถ้าโหลดไม่เสร็จจะแสดงข้อความ "โหลดช้า" พร้อมปุ่มลองใหม่
 /// - ถ้า error จะแสดงข้อความ "โหลดไม่ได้" พร้อมปุ่มลองใหม่
 /// - ใช้ _retryCount เป็น key เพื่อบังคับ rebuild เมื่อกดลองใหม่
+/// - Tap behavior: ถ้าโหลดสำเร็จ → เรียก onShowFullImage, ถ้า error → retry
 class _MedicineNetworkImage extends StatefulWidget {
   final String imageUrl;
   final BoxFit fit;
   final Widget placeholder; // Widget สำหรับแสดงระหว่างโหลด
   final Widget errorWidget; // Widget สำหรับแสดงเมื่อ error (fallback)
+  final VoidCallback? onShowFullImage; // Callback เมื่อกดและรูปโหลดสำเร็จ
 
   const _MedicineNetworkImage({
     required this.imageUrl,
     required this.fit,
     required this.placeholder,
     required this.errorWidget,
+    this.onShowFullImage,
   });
 
   @override
@@ -558,8 +612,39 @@ class _MedicineNetworkImageState extends State<_MedicineNetworkImage> {
     }
   }
 
+  /// Getter ตรวจสอบว่ารูปโหลดสำเร็จหรือยัง (ใช้ใน _handleTap)
+  bool get _isImageLoaded => !_isLoading && !_hasError && !_timedOut;
+
+  /// Handler สำหรับ tap บนรูป
+  /// - ถ้ารูปโหลดสำเร็จ → เรียก onShowFullImage
+  /// - ถ้า error/timeout → เรียก retry
+  void _handleTap() {
+    if (_isImageLoaded) {
+      // รูปโหลดสำเร็จแล้ว → เปิด full image viewer
+      widget.onShowFullImage?.call();
+    } else if (_hasError || _timedOut) {
+      // รูปโหลดไม่สำเร็จ → ลองโหลดใหม่
+      _retry();
+    }
+    // ถ้ากำลังโหลดอยู่ (_isLoading) → ไม่ทำอะไร
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Wrap ทุก state ด้วย GestureDetector เพื่อจัดการ tap behavior
+    // - โหลดสำเร็จ → เปิด full image
+    // - error/timeout → retry (กดที่ไหนก็ได้ ไม่ต้องกดปุ่มลองใหม่)
+    return GestureDetector(
+      onTap: _handleTap,
+      // HitTestBehavior.opaque ทำให้ GestureDetector รับ tap ได้แม้ child จะโปร่งใส
+      // หรือไม่ครอบคลุมพื้นที่ทั้งหมด
+      behavior: HitTestBehavior.opaque,
+      child: _buildContent(),
+    );
+  }
+
+  /// สร้าง content ตาม state ปัจจุบัน
+  Widget _buildContent() {
     // ถ้า timeout แสดง UI สำหรับ timeout
     if (_timedOut) return _buildTimeoutWidget();
     // ถ้า error แสดง UI สำหรับ error
