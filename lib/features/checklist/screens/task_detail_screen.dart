@@ -23,6 +23,7 @@ import '../widgets/problem_input_sheet.dart';
 import '../widgets/difficulty_rating_dialog.dart';
 import '../../../core/widgets/nps_scale.dart';
 import '../../board/screens/advanced_create_post_screen.dart';
+import '../../board/services/post_action_service.dart';
 import '../../board/widgets/video_player_widget.dart';
 
 /// หน้ารายละเอียด Task แบบ Full Page
@@ -2306,6 +2307,18 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
             meal: meal,
             expectedDate: originalTask.expectedDateTime!,
           );
+        }
+      }
+
+      // === ลบ Post ที่เชื่อมกับ task นี้ (ถ้ามี) ===
+      // เมื่อยกเลิกการรับทราบ task ที่ complete ผ่าน Post ควรลบ Post ด้วย
+      // เพราะ Post นั้นถูกสร้างขึ้นเพื่อ complete task โดยเฉพาะ
+      if (originalTask.postId != null) {
+        final deleted = await PostActionService.instance.deletePost(originalTask.postId!);
+        if (deleted) {
+          debugPrint('TaskDetailScreen: deleted post ${originalTask.postId} for task ${originalTask.logId}');
+        } else {
+          debugPrint('TaskDetailScreen: failed to delete post ${originalTask.postId}');
         }
       }
 

@@ -287,6 +287,7 @@ class TaskService {
         'problem_type': null,
         'difficulty_score': null,
         'difficulty_rated_by': null,
+        'post_id': null, // Clear post_id เพื่อให้ลบ Post ได้ (FK constraint)
       }).eq('id', logId);
 
       invalidateCache();

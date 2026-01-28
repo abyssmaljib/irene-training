@@ -81,6 +81,10 @@ class TaskLog {
   // Task start date (วันที่เริ่มต้น task)
   final DateTime? startDate;
 
+  // Post ID - ถ้า task นี้ถูก complete ผ่าน Post จะมี post_id ที่เชื่อมอยู่
+  // ใช้สำหรับลบ Post เมื่อยกเลิกการรับทราบ
+  final int? postId;
+
   // Difficulty score fields - คะแนนความยากของงาน (1-10)
   // 1 = ง่ายที่สุด, 8 = ยากที่สุดแต่ทำคนเดียวได้, 9-10 = ต้องมีคนช่วย
   // null = ยังไม่ประเมิน หรือ user กดข้าม
@@ -144,6 +148,7 @@ class TaskLog {
     this.creatorPhotoUrl,
     this.creatorGroupName,
     this.startDate,
+    this.postId,
     this.difficultyScore, // null = ยังไม่ประเมิน/ข้าม
     this.difficultyRatedBy,
     this.difficultyRaterNickname,
@@ -209,6 +214,7 @@ class TaskLog {
       creatorPhotoUrl: json['creator_photo_url'] as String?,
       creatorGroupName: json['creator_group_name'] as String?,
       startDate: _parseDateTime(json['start_Date']),
+      postId: json['post_id'] as int?,
       // Difficulty score fields (null = ยังไม่ประเมิน/ข้าม)
       difficultyScore: json['difficulty_score'] as int?,
       difficultyRatedBy: json['difficulty_rated_by'] as String?,
@@ -417,6 +423,7 @@ class TaskLog {
     String? creatorPhotoUrl,
     String? creatorGroupName,
     DateTime? startDate,
+    int? postId,
     int? difficultyScore,
     String? difficultyRatedBy,
     String? difficultyRaterNickname,
@@ -487,6 +494,7 @@ class TaskLog {
       creatorPhotoUrl: creatorPhotoUrl ?? this.creatorPhotoUrl,
       creatorGroupName: creatorGroupName ?? this.creatorGroupName,
       startDate: startDate ?? this.startDate,
+      postId: postId ?? this.postId,
       difficultyScore: clearDifficultyScore ? null : (difficultyScore ?? this.difficultyScore),
       difficultyRatedBy: clearDifficultyRatedBy ? null : (difficultyRatedBy ?? this.difficultyRatedBy),
       difficultyRaterNickname: clearDifficultyRatedBy ? null : (difficultyRaterNickname ?? this.difficultyRaterNickname),
