@@ -56,12 +56,14 @@ class QuizSuggestion {
   }
 }
 
-/// Service for AI helper features using n8n webhooks
+/// Service for AI helper features
+/// ใช้ Supabase Edge Functions ทั้งหมด (เสถียรกว่า n8n)
 class AiHelperService {
-  static const _baseUrl = 'https://n8nocr.ireneplus.app';
-  static const _summarizeEndpoint =
-      '/webhook/e6295ee1-aba2-447f-9ff7-472ba349facf';
-  static const _quizEndpoint = '/webhook/0bd9b238-507a-4819-9b4c-88a8819e7737';
+  // Supabase Edge Functions
+  static const _supabaseBaseUrl =
+      'https://amthgthvrxhlxpttioxu.supabase.co/functions/v1';
+  static const _summarizeEndpoint = '/summarize-text';
+  static const _quizEndpoint = '/generate-quiz';
 
   final http.Client _client;
 
@@ -73,27 +75,26 @@ class AiHelperService {
     if (text.trim().isEmpty) return null;
 
     try {
+      // เรียก Supabase Edge Function (เสถียรกว่า n8n)
       final response = await _client.post(
-        Uri.parse('$_baseUrl$_summarizeEndpoint'),
+        Uri.parse('$_supabaseBaseUrl$_summarizeEndpoint'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'text': text}),
       );
 
       if (response.statusCode == 200) {
         final jsonResponse = jsonDecode(response.body);
-        // Response format: $[:].message.content
-        if (jsonResponse is List && jsonResponse.isNotEmpty) {
-          final firstItem = jsonResponse[0];
-          if (firstItem is Map && firstItem['message'] != null) {
-            return firstItem['message']['content'] as String?;
+
+        // Edge Function return JSON object โดยตรง: { content: "..." }
+        if (jsonResponse is Map<String, dynamic>) {
+          // ตรวจสอบว่ามี error หรือไม่
+          if (jsonResponse['error'] != null &&
+              jsonResponse['content']?.isEmpty == true) {
+            debugPrint('Summarize API error: ${jsonResponse['error']}');
+            return null;
           }
-        }
-        // Try direct content field
-        if (jsonResponse is Map && jsonResponse['content'] != null) {
           return jsonResponse['content'] as String?;
         }
-        // Return raw body if parsing fails but request succeeded
-        return response.body;
       }
       return null;
     } catch (e) {
@@ -113,9 +114,10 @@ class AiHelperService {
         'timestamp': DateTime.now().millisecondsSinceEpoch,
       });
 
+      // เรียก Supabase Edge Function (เสถียรกว่า n8n)
       final response = await _client
           .post(
-            Uri.parse('$_baseUrl$_quizEndpoint'),
+            Uri.parse('$_supabaseBaseUrl$_quizEndpoint'),
             headers: {'Content-Type': 'application/json'},
             body: requestBody,
           )
@@ -124,31 +126,15 @@ class AiHelperService {
       if (response.statusCode == 200) {
         final jsonResponse = jsonDecode(response.body);
 
-        // Handle array response format (like summarize endpoint)
-        if (jsonResponse is List && jsonResponse.isNotEmpty) {
-          final firstItem = jsonResponse[0];
-          if (firstItem is Map<String, dynamic>) {
-            // Check if it has message.content (like summarize)
-            if (firstItem['message'] != null &&
-                firstItem['message']['content'] != null) {
-              // Try to parse content as JSON
-              final content = firstItem['message']['content'] as String;
-              try {
-                final parsed = jsonDecode(content);
-                if (parsed is Map<String, dynamic>) {
-                  return QuizSuggestion.fromJson(parsed);
-                }
-              } catch (_) {
-                // Content is not JSON, try to parse quiz fields directly
-              }
-            }
-            // Try direct quiz fields
-            return QuizSuggestion.fromJson(firstItem);
-          }
-        }
-
-        // Handle direct object response
+        // Edge Function return JSON object โดยตรง (ไม่มี array wrapper เหมือน n8n)
+        // Format: { question, options: { A, B, C }, correct_answer }
         if (jsonResponse is Map<String, dynamic>) {
+          // ตรวจสอบว่ามี error หรือไม่
+          if (jsonResponse['error'] != null &&
+              jsonResponse['question']?.isEmpty == true) {
+            debugPrint('Quiz API error: ${jsonResponse['error']}');
+            return null;
+          }
           return QuizSuggestion.fromJson(jsonResponse);
         }
       }

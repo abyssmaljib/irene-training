@@ -68,6 +68,35 @@ class _EditAiSummaryWidgetState extends ConsumerState<EditAiSummaryWidget> {
     }
   }
 
+  /// เพิ่มสรุปต่อท้ายข้อความเดิม ในรูปแบบ:
+  /// [ข้อความเดิม]
+  ///
+  /// สรุป
+  /// [ข้อความ AI]
+  void _appendSummary() {
+    final summary = ref.read(editPostProvider(widget.postId)).aiSummary;
+    if (summary != null) {
+      final currentText = widget.textController.text.trim();
+      // สร้างข้อความใหม่ โดยเพิ่มสรุปต่อท้าย
+      final newText = '$currentText\n\nสรุป\n$summary';
+      widget.textController.text = newText;
+      widget.textController.selection = TextSelection.collapsed(
+        offset: newText.length,
+      );
+      ref.read(editPostProvider(widget.postId).notifier).setText(newText);
+      // Clear AI summary หลังจากเพิ่มแล้ว เพื่อซ่อน preview box
+      ref.read(editPostProvider(widget.postId).notifier).clearAiSummary();
+      widget.onReplaceText?.call();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('เพิ่มสรุปในข้อความแล้ว'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
   void _copyText() {
     final summary = ref.read(editPostProvider(widget.postId)).aiSummary;
     if (summary != null) {
@@ -161,31 +190,48 @@ class _EditAiSummaryWidgetState extends ConsumerState<EditAiSummaryWidget> {
 
                 AppSpacing.verticalGapMd,
 
-                // Action buttons
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+                // Action buttons - ใช้ Wrap เพื่อรองรับหน้าจอเล็ก
+                Wrap(
+                  alignment: WrapAlignment.end,
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
+                    // ปุ่มเพิ่มสรุปต่อท้าย (ไม่ลบข้อความเดิม)
                     OutlinedButton.icon(
-                      onPressed: _replaceText,
-                      icon: HugeIcon(icon: HugeIcons.strokeRoundedArrowUp02, size: AppIconSize.sm),
-                      label: Text('แทนที่ข้อความ'),
+                      onPressed: _appendSummary,
+                      icon: HugeIcon(icon: HugeIcons.strokeRoundedAdd01, size: AppIconSize.sm),
+                      label: const Text('เพิ่มสรุปในข้อความ'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFF3A0EB6),
-                        side: BorderSide(color: const Color(0xFFBEABF2)),
+                        side: const BorderSide(color: Color(0xFFBEABF2)),
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 6),
                         textStyle: AppTypography.caption,
                         minimumSize: const Size(0, 32),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    // ปุ่มแทนที่ข้อความ (ลบข้อความเดิม)
+                    OutlinedButton.icon(
+                      onPressed: _replaceText,
+                      icon: HugeIcon(icon: HugeIcons.strokeRoundedArrowUp02, size: AppIconSize.sm),
+                      label: const Text('แทนที่ข้อความ'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF3A0EB6),
+                        side: const BorderSide(color: Color(0xFFBEABF2)),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        textStyle: AppTypography.caption,
+                        minimumSize: const Size(0, 32),
+                      ),
+                    ),
+                    // ปุ่มคัดลอก
                     OutlinedButton.icon(
                       onPressed: _copyText,
                       icon: HugeIcon(icon: HugeIcons.strokeRoundedCopy01, size: AppIconSize.sm),
-                      label: Text('คัดลอกข้อความ'),
+                      label: const Text('คัดลอก'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFF3A0EB6),
-                        side: BorderSide(color: const Color(0xFFBEABF2)),
+                        side: const BorderSide(color: Color(0xFFBEABF2)),
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 6),
                         textStyle: AppTypography.caption,
