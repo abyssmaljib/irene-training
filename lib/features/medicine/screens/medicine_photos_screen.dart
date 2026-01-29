@@ -18,21 +18,27 @@
 //    - ทำให้ network request พุ่งขึ้นพร้อมกัน
 //    - memory spike จากการ decode รูปพร้อมกัน
 //
-// การแก้ไข (28 ม.ค. 2026):
+// การแก้ไข (28-29 ม.ค. 2026):
 // 1. ลบ addRepaintBoundaries: false ออกจาก GridView.builder
 // 2. เปลี่ยน Image.network เป็น CachedNetworkImage ใน _LogPhotoNetworkImage
-// 3. เพิ่ม preload system แบบ per-meal (โหลดทีละมื้อ):
-//    - เข้าหน้า → โหลดเฉพาะมื้อแรกที่ expand
-//    - กดมื้ออื่น → แสดง progress bar โหลดมื้อนั้นก่อน แล้วค่อยแสดง
+// 3. เพิ่ม preload system (โหลดทุกรูปทีเดียวตอนเข้าหน้า):
+//    - เข้าหน้า → โหลดรูปทุกมื้อพร้อมกัน แสดง Nyan Cat + progress bar
 //    - โหลดทีละ batch (3 รูป) เพื่อป้องกัน memory spike
-//    - ใช้ Set<int> _precachedMeals เก็บมื้อที่โหลดแล้ว (ไม่โหลดซ้ำ)
+//    - โหลดเสร็จแล้วค่อยให้ทำงาน → ไม่มีสะดุดระหว่างทำงาน
 // 4. จำกัด memCacheWidth ที่ 200-400px เพื่อลด memory usage
-// 5. เพิ่ม retry mechanism ใน _precacheSingleImage:
-//    - ถ้าโหลดรูป fail จะลองใหม่สูงสุด 5 ครั้ง
-//    - ใช้ exponential backoff (500ms, 1000ms, 1500ms, 2000ms, 2500ms) ระหว่าง retry
-//    - ช่วยให้รูปโหลดสำเร็จมากขึ้นเมื่อเน็ตไม่เสถียร
+// 5. Round-based retry mechanism (ดีกว่า per-image retry):
+//    - รอบ 1: โหลดทุกรูป → บางรูปอาจ fail
+//    - รอบ 2-5: retry เฉพาะรูปที่ fail ในรอบก่อน
+//    - ไม่ต้องรอรูปที่โหลดช้า/fail นาน → progress เร็วขึ้น
+//    - ใช้ exponential backoff ระหว่างรอบ (500ms, 1000ms, ...)
+// 6. เพิ่ม loading animation ที่น่ารัก:
+//    - ข้อความตลกๆ 25 ข้อความ สลับทุก 3 วินาที
+//    - Typewriter effect พิมพ์ทีละตัวอักษร (50ms/ตัว)
+//    - ทำให้รอโหลดไม่น่าเบื่อ
 //
 // =============================================================================
+
+import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -84,18 +90,109 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
   SystemRole? _systemRole; // system role ของ user ปัจจุบัน (สำหรับตรวจสิทธิ์ QC)
   bool _hasDataChanged = false; // track ว่ามีการเปลี่ยนแปลงข้อมูลยาหรือไม่
 
-  // State สำหรับ preload รูปภาพ (per-meal)
-  // เปลี่ยนจากโหลดทั้งหมดพร้อมกัน → โหลดทีละมื้อเมื่อ user expand
-  bool _isPrecaching = false; // กำลัง preload รูปมื้อที่เลือกอยู่หรือไม่
-  int _precacheProgress = 0; // จำนวนรูปที่โหลดเสร็จแล้วในมื้อปัจจุบัน
-  int _precacheTotal = 0; // จำนวนรูปทั้งหมดในมื้อปัจจุบัน
-  final Set<int> _precachedMeals = {}; // เก็บ index มื้อที่โหลดเสร็จแล้ว (ไม่ต้องโหลดซ้ำ)
+  // State สำหรับ preload รูปภาพ (โหลดทั้งหมดทีเดียวตอนเข้าหน้า)
+  // เพื่อให้ทำงานได้ลื่นไหล ไม่มีสะดุดระหว่างทำงาน
+  bool _isPrecaching = false; // กำลัง preload รูปอยู่หรือไม่
+  int _precacheProgress = 0; // จำนวนรูปที่โหลดเสร็จแล้ว
+  int _precacheTotal = 0; // จำนวนรูปทั้งหมด
+  bool _allImagesPrecached = false; // โหลดรูปทั้งหมดเสร็จแล้วหรือยัง
+
+  // ข้อความน่ารักๆ สลับไปมาระหว่างโหลด (แสดงคู่กับ Nyan Cat)
+  static const _loadingMessages = [
+    'กำลังเตรียมรูปยา รอแป๊บนะ...',
+    'แมวกำลังวิ่งเก็บรูปอยู่...',
+    'อดทนอีกนิด ใกล้เสร็จแล้ว...',
+    'นับเม็ดยา นับๆๆ...',
+    'รูปเยอะจัง รอหน่อยนะ...',
+    'เหมียววิ่งเร็วที่สุดแล้วนะ...',
+    'กำลังจัดยาใส่ถาด...',
+    'เดี๋ยวเสร็จแล้วจะบอก...',
+    'ยังอยู่นะ อย่าไปไหน...',
+    'โหลดไปได้ครึ่งทางแล้ว...',
+    'แมวขยันมากเลยวันนี้...',
+    'รูปสวยๆ กำลังมา...',
+    'เตรียมตัวทำงานได้เลย...',
+    'แป๊บเดียวเอง รอได้รอได้...',
+    'ถ้าช้าไป โทษเน็ตนะ...',
+    'เหมียวไม่หนีไปไหนแน่นอน...',
+    'โหลดเสร็จแล้วลุยกันเลย...',
+    'ยาครบถ้วน พร้อมเสิร์ฟ...',
+    'แมวส่งยาถึงที่แล้ว...',
+    'เกือบเสร็จแล้ว สู้ๆ...',
+    'แมวแวะดื่มกาแฟระหว่างทาง...',
+    'รอก่อนนะ เดี๋ยวไปเอารูปมาให้...',
+    'กำลังเรียงรูปให้อย่างสวยงาม...',
+    'ไปต้มมาม่ารอ ได้นะ...',
+    'อย่าเพิ่งหลับ แมวกำลังโหลดให้...',
+  ];
+  int _loadingMessageIndex = 0; // index ข้อความปัจจุบัน
+  Timer? _messageTimer; // Timer สำหรับสลับข้อความทุก 3 วินาที
+
+  // Typewriter effect - พิมพ์ทีละตัวอักษร
+  String _displayedText = ''; // ข้อความที่แสดงอยู่ (พิมพ์ไปทีละตัว)
+  Timer? _typewriterTimer; // Timer สำหรับพิมพ์ทีละตัวอักษร
 
   @override
   void initState() {
     super.initState();
     _loadMealGroups();
     _loadUserRole();
+  }
+
+  @override
+  void dispose() {
+    _messageTimer?.cancel();
+    _typewriterTimer?.cancel();
+    super.dispose();
+  }
+
+  /// เริ่ม typewriter effect - พิมพ์ข้อความทีละตัวอักษร
+  void _startTypewriter() {
+    _typewriterTimer?.cancel();
+    _displayedText = '';
+    final targetText = _loadingMessages[_loadingMessageIndex];
+    int charIndex = 0;
+
+    // พิมพ์ทีละตัวอักษรทุก 50ms
+    _typewriterTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+
+      if (charIndex < targetText.length) {
+        setState(() {
+          _displayedText = targetText.substring(0, charIndex + 1);
+        });
+        charIndex++;
+      } else {
+        timer.cancel(); // พิมพ์เสร็จแล้ว หยุด timer
+      }
+    });
+  }
+
+  /// เริ่ม Timer สลับข้อความโหลดทุก 3 วินาที (เพิ่มเวลาให้พิมพ์เสร็จ)
+  void _startMessageTimer() {
+    _messageTimer?.cancel();
+    _loadingMessageIndex = 0;
+    _startTypewriter(); // เริ่มพิมพ์ข้อความแรก
+
+    _messageTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
+      if (mounted) {
+        setState(() {
+          _loadingMessageIndex = (_loadingMessageIndex + 1) % _loadingMessages.length;
+        });
+        _startTypewriter(); // เริ่มพิมพ์ข้อความใหม่
+      }
+    });
+  }
+
+  /// หยุด Timer สลับข้อความ
+  void _stopMessageTimer() {
+    _messageTimer?.cancel();
+    _typewriterTimer?.cancel();
+    _messageTimer = null;
+    _typewriterTimer = null;
   }
 
   /// โหลด system role ของ user ปัจจุบัน (สำหรับตรวจสิทธิ์ QC)
@@ -140,10 +237,9 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
         }
       }
 
-      // Clear precached meals เมื่อเปลี่ยนวันหรือ forceRefresh
-      // เพราะรูปอาจเปลี่ยนไป
+      // Reset precache state เมื่อเปลี่ยนวันหรือ forceRefresh
       if (forceRefresh || !preserveExpanded) {
-        _precachedMeals.clear();
+        _allImagesPrecached = false;
       }
 
       setState(() {
@@ -152,10 +248,9 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
         _expandedIndex = newExpandedIndex;
       });
 
-      // Preload รูปเฉพาะมื้อแรกที่ expand (ถ้ามี)
-      // มื้ออื่นๆ จะโหลดเมื่อ user กด expand
-      if (newExpandedIndex != null) {
-        await _precacheMealImages(newExpandedIndex);
+      // Preload รูปทั้งหมดทีเดียว เพื่อให้ทำงานได้ลื่นไหล
+      if (!_allImagesPrecached) {
+        await _precacheAllImages();
       }
     } catch (e) {
       debugPrint('Error loading meal groups: $e');
@@ -172,122 +267,160 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
     setState(() => _showFoiled = index == 0);
   }
 
-  /// Preload รูปยาเฉพาะมื้อที่ระบุเข้า cache
+  /// Preload รูปยาทั้งหมดจากทุกมื้อเข้า cache ทีเดียว
   /// โหลดทีละ batch เพื่อป้องกัน memory spike บน iOS
-  /// [mealIndex] = index ของมื้อที่ต้องการ preload
-  Future<void> _precacheMealImages(int mealIndex) async {
-    // ถ้ามื้อนี้โหลดไปแล้ว ไม่ต้องโหลดซ้ำ
-    if (_precachedMeals.contains(mealIndex)) return;
+  /// เรียกตอนเข้าหน้าครั้งแรก เพื่อให้ทำงานได้ลื่นไหลไม่สะดุด
+  Future<void> _precacheAllImages() async {
+    // ถ้าโหลดไปแล้ว ไม่ต้องโหลดซ้ำ
+    if (_allImagesPrecached) return;
 
-    // ตรวจสอบว่า index ถูกต้อง
-    if (mealIndex < 0 || mealIndex >= _mealGroups.length) return;
-
-    final group = _mealGroups[mealIndex];
-
-    // รวบรวม URL รูปทั้งหมดในมื้อนี้
+    // รวบรวม URL รูปทั้งหมดจากทุกมื้อ
     final List<String> imageUrls = [];
 
-    // รูปตัวอย่างยา (2C และ 3C) จาก medicine_summary
-    for (final medicine in group.medicines) {
-      if (medicine.photo2C != null && medicine.photo2C!.isNotEmpty) {
-        imageUrls.add(medicine.photo2C!);
+    for (final group in _mealGroups) {
+      // รูปตัวอย่างยา (2C และ 3C) จาก medicine_summary
+      for (final medicine in group.medicines) {
+        if (medicine.photo2C != null && medicine.photo2C!.isNotEmpty) {
+          imageUrls.add(medicine.photo2C!);
+        }
+        if (medicine.photo3C != null && medicine.photo3C!.isNotEmpty) {
+          imageUrls.add(medicine.photo3C!);
+        }
       }
-      if (medicine.photo3C != null && medicine.photo3C!.isNotEmpty) {
-        imageUrls.add(medicine.photo3C!);
-      }
-    }
 
-    // รูปถ่ายจัดยา/เสิร์ฟยาจาก med_logs
-    final log = group.medLog;
-    if (log != null) {
-      if (log.picture2CUrl != null && log.picture2CUrl!.isNotEmpty) {
-        imageUrls.add(log.picture2CUrl!);
-      }
-      if (log.picture3CUrl != null && log.picture3CUrl!.isNotEmpty) {
-        imageUrls.add(log.picture3CUrl!);
+      // รูปถ่ายจัดยา/เสิร์ฟยาจาก med_logs
+      final log = group.medLog;
+      if (log != null) {
+        if (log.picture2CUrl != null && log.picture2CUrl!.isNotEmpty) {
+          imageUrls.add(log.picture2CUrl!);
+        }
+        if (log.picture3CUrl != null && log.picture3CUrl!.isNotEmpty) {
+          imageUrls.add(log.picture3CUrl!);
+        }
       }
     }
 
     // ไม่มีรูปให้ preload - mark as done แล้ว return
     if (imageUrls.isEmpty) {
-      _precachedMeals.add(mealIndex);
+      _allImagesPrecached = true;
       return;
     }
 
     // ลบ duplicates
     final uniqueUrls = imageUrls.toSet().toList();
+    final totalImages = uniqueUrls.length;
 
     setState(() {
       _isPrecaching = true;
       _precacheProgress = 0;
-      _precacheTotal = uniqueUrls.length;
+      _precacheTotal = totalImages;
     });
 
-    // โหลดทีละ batch (3 รูปพร้อมกัน) เพื่อป้องกัน memory spike
-    const batchSize = 3;
-    for (var i = 0; i < uniqueUrls.length; i += batchSize) {
+    // เริ่ม Timer สลับข้อความน่ารักๆ ระหว่างโหลด
+    _startMessageTimer();
+
+    // ========== Round-based retry ==========
+    // แทนที่จะ retry แต่ละรูปหลายครั้งก่อนไปรูปถัดไป
+    // เราจะโหลดทุกรูปก่อน แล้วค่อย retry รูปที่ fail
+    // ทำให้ไม่ต้องรอรูปที่โหลดช้า/fail นาน
+    //
+    // รอบ 1: โหลดทุกรูป → สำเร็จ 7/10
+    // รอบ 2: retry รูปที่ fail → สำเร็จเพิ่ม 2/3
+    // รอบ 3: retry รูปที่ยัง fail → สำเร็จเพิ่ม 1/1
+    // =========================================
+
+    const maxRounds = 5; // จำนวนรอบ retry สูงสุด
+    const batchSize = 3; // โหลดพร้อมกันทีละ 3 รูป
+
+    List<String> pendingUrls = List.from(uniqueUrls);
+    final Set<String> successUrls = {};
+
+    for (int round = 1; round <= maxRounds && pendingUrls.isNotEmpty; round++) {
       if (!mounted) return;
 
-      final end = (i + batchSize < uniqueUrls.length) ? i + batchSize : uniqueUrls.length;
-      final batch = uniqueUrls.sublist(i, end);
+      debugPrint('Precache round $round: ${pendingUrls.length} images pending');
 
-      // โหลด batch นี้พร้อมกัน
-      await Future.wait(
-        batch.map((url) => _precacheSingleImage(url)),
-        eagerError: false, // ไม่ให้ error รูปเดียวหยุดทั้งหมด
-      );
+      final List<String> failedInThisRound = [];
 
-      if (!mounted) return;
+      // โหลดทีละ batch
+      for (var i = 0; i < pendingUrls.length; i += batchSize) {
+        if (!mounted) return;
 
-      // อัพเดต progress
-      setState(() {
-        _precacheProgress = end;
-      });
+        final end = (i + batchSize < pendingUrls.length)
+            ? i + batchSize
+            : pendingUrls.length;
+        final batch = pendingUrls.sublist(i, end);
+
+        // โหลด batch นี้พร้อมกัน และเก็บผลลัพธ์
+        final results = await Future.wait(
+          batch.map((url) => _precacheSingleImage(url)),
+          eagerError: false,
+        );
+
+        // ตรวจสอบผลลัพธ์แต่ละรูป
+        for (int j = 0; j < batch.length; j++) {
+          if (results[j]) {
+            successUrls.add(batch[j]);
+          } else {
+            failedInThisRound.add(batch[j]);
+          }
+        }
+
+        if (!mounted) return;
+
+        // อัพเดต progress (นับเฉพาะรูปที่สำเร็จ)
+        setState(() {
+          _precacheProgress = successUrls.length;
+        });
+      }
+
+      // เตรียม pending list สำหรับรอบถัดไป
+      pendingUrls = failedInThisRound;
+
+      // ถ้าโหลดหมดแล้ว หยุดเลย
+      if (pendingUrls.isEmpty) {
+        debugPrint('Precache completed in round $round: all $totalImages images loaded');
+        break;
+      }
+
+      // รอสักครู่ก่อน retry รอบถัดไป (exponential backoff)
+      if (round < maxRounds && pendingUrls.isNotEmpty) {
+        await Future.delayed(Duration(milliseconds: 500 * round));
+      }
     }
 
-    // เสร็จสิ้นการ preload มื้อนี้
+    // Log ผลลัพธ์สุดท้าย
+    if (pendingUrls.isNotEmpty) {
+      debugPrint('Precache finished: ${successUrls.length}/$totalImages images loaded, ${pendingUrls.length} failed');
+    }
+
+    // เสร็จสิ้นการ preload ทั้งหมด
     if (mounted) {
-      _precachedMeals.add(mealIndex);
+      _stopMessageTimer(); // หยุด Timer สลับข้อความ
+      _allImagesPrecached = true;
       setState(() => _isPrecaching = false);
     }
   }
 
-  /// Preload รูปเดียวเข้า cache พร้อม retry mechanism
-  /// ใช้ CachedNetworkImageProvider เพื่อ cache รูปไว้ใน disk
-  /// [maxRetries] = จำนวนครั้งที่ลองใหม่ถ้า fail (default = 5)
-  Future<void> _precacheSingleImage(String url, {int maxRetries = 5}) async {
-    int attempt = 0;
+  /// Preload รูปเดียวเข้า cache (ไม่มี retry - retry อยู่ใน _precacheAllImages)
+  /// Return true ถ้าโหลดสำเร็จ, false ถ้า fail
+  Future<bool> _precacheSingleImage(String url) async {
+    // ตรวจสอบ mounted ก่อนใช้ context
+    if (!mounted) return false;
 
-    while (attempt < maxRetries) {
-      // ตรวจสอบ mounted ก่อนใช้ context (แก้ warning: BuildContext across async gaps)
-      if (!mounted) return;
-
-      attempt++;
-      try {
-        // ใช้ precacheImage กับ CachedNetworkImageProvider
-        // เพื่อโหลดรูปเข้า disk cache และ memory cache
-        await precacheImage(
-          CachedNetworkImageProvider(
-            url,
-            maxWidth: 200, // จำกัดขนาดใน memory (ตรงกับ memCacheWidth ใน widget)
-          ),
-          context,
-        );
-        // โหลดสำเร็จ - ออกจาก loop
-        return;
-      } catch (e) {
-        debugPrint('Precache attempt $attempt/$maxRetries failed: $url - $e');
-
-        // ถ้ายังไม่ครบ maxRetries ให้รอสักครู่แล้วลองใหม่
-        if (attempt < maxRetries) {
-          // รอ 500ms ก่อน retry (exponential backoff: 500ms, 1000ms, 1500ms)
-          await Future.delayed(Duration(milliseconds: 500 * attempt));
-        }
-      }
+    try {
+      await precacheImage(
+        CachedNetworkImageProvider(
+          url,
+          maxWidth: 200, // จำกัดขนาดใน memory (ตรงกับ memCacheWidth ใน widget)
+        ),
+        context,
+      );
+      return true; // โหลดสำเร็จ
+    } catch (e) {
+      debugPrint('Precache failed: $url - $e');
+      return false; // โหลดไม่สำเร็จ
     }
-
-    // ถ้าลองครบแล้วยังไม่ได้ - log แล้วข้ามไป
-    debugPrint('Precache failed after $maxRetries attempts: $url');
   }
 
   /// Toggle button สำหรับสลับไปหน้ารายการยา (styled like checklist view toggle)
@@ -459,14 +592,18 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
                       ),
                     ),
                     AppSpacing.verticalGapSm,
+                    // ข้อความน่ารักๆ พิมพ์ทีละตัวอักษร (typewriter effect)
                     Text(
-                      'กำลังโหลดรูปยา... ${(progress * 100).toInt()}%',
+                      _displayedText,
                       style: AppTypography.body.copyWith(
                         color: AppColors.textSecondary,
                       ),
+                      textAlign: TextAlign.center,
                     ),
+                    AppSpacing.verticalGapXs,
+                    // แสดง progress
                     Text(
-                      '$_precacheProgress / $_precacheTotal รูป',
+                      '$_precacheProgress / $_precacheTotal รูป (${(progress * 100).toInt()}%)',
                       style: AppTypography.caption.copyWith(
                         color: AppColors.textSecondary,
                       ),
@@ -537,21 +674,17 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
 
   /// เมื่อกดขยายมื้อใด มื้ออื่นจะปิดลง (accordion behavior)
   /// ถ้ามื้อนั้นยังไม่ได้ preload จะโหลดรูปก่อนแล้วค่อยแสดง
-  Future<void> _onMealExpanded(int index) async {
-    // ถ้ากดมื้อเดิมที่ expand อยู่ = ปิด (ไม่ต้อง preload)
+  /// เมื่อกดขยายมื้อใด มื้ออื่นจะปิดลง (accordion behavior)
+  /// ไม่ต้อง preload เพราะโหลดรูปทั้งหมดตั้งแต่เข้าหน้าแล้ว
+  void _onMealExpanded(int index) {
+    // ถ้ากดมื้อเดิมที่ expand อยู่ = ปิด
     if (_expandedIndex == index) {
       setState(() => _expandedIndex = null);
       return;
     }
 
-    // ถ้ากดมื้อใหม่ = preload รูปก่อนแล้วค่อยเปิด
-    // (ถ้ามื้อนี้โหลดไปแล้ว _precacheMealImages จะ return เลย)
-    await _precacheMealImages(index);
-
     // เปิดมื้อใหม่ (มื้อเดิมจะปิดอัตโนมัติ)
-    if (mounted) {
-      setState(() => _expandedIndex = index);
-    }
+    setState(() => _expandedIndex = index);
   }
 
   /// ถ่ายรูปยา พร้อมหน้า preview ให้หมุนรูปได้
