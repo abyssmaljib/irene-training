@@ -39,6 +39,7 @@
 // =============================================================================
 
 import 'dart:async';
+import 'dart:math';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -174,13 +175,20 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
   /// เริ่ม Timer สลับข้อความโหลดทุก 3 วินาที (เพิ่มเวลาให้พิมพ์เสร็จ)
   void _startMessageTimer() {
     _messageTimer?.cancel();
-    _loadingMessageIndex = 0;
-    _startTypewriter(); // เริ่มพิมพ์ข้อความแรก
 
+    // สุ่มข้อความแรกด้วย
+    final random = Random();
+    _loadingMessageIndex = random.nextInt(_loadingMessages.length);
+    _startTypewriter(); // เริ่มพิมพ์ข้อความแรก
     _messageTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
       if (mounted) {
         setState(() {
-          _loadingMessageIndex = (_loadingMessageIndex + 1) % _loadingMessages.length;
+          // สุ่มข้อความใหม่ที่ไม่ซ้ำกับอันเดิม
+          int newIndex;
+          do {
+            newIndex = random.nextInt(_loadingMessages.length);
+          } while (newIndex == _loadingMessageIndex && _loadingMessages.length > 1);
+          _loadingMessageIndex = newIndex;
         });
         _startTypewriter(); // เริ่มพิมพ์ข้อความใหม่
       }
