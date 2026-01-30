@@ -100,7 +100,10 @@ class CameraService {
     required String photoType,
   }) async {
     try {
-      final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+      // แปลง date เป็น local time ก่อน format
+      // เพราะ date อาจเป็น UTC (เช่น 2026-01-29 23:45:00Z = 06:45 เวลาไทยวันที่ 30)
+      final localDate = date.toLocal();
+      final dateStr = '${localDate.year}-${localDate.month.toString().padLeft(2, '0')}-${localDate.day.toString().padLeft(2, '0')}';
 
       // ค้นหา med_log ที่มีอยู่แล้ว
       final existingLogs = await _supabase
@@ -216,7 +219,9 @@ class CameraService {
     required String photoType,
   }) async {
     try {
-      final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+      // แปลง date เป็น local time ก่อน format
+      final localDate = date.toLocal();
+      final dateStr = '${localDate.year}-${localDate.month.toString().padLeft(2, '0')}-${localDate.day.toString().padLeft(2, '0')}';
 
       // ค้นหา med_log พร้อมดึง task_id มาด้วย (สำหรับ 3C)
       final existingLogs = await _supabase

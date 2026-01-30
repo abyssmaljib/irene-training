@@ -2065,7 +2065,6 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           _task.expectedDateTime != null) {
         // ดึง meal จาก title (เช่น 'ก่อนอาหารเช้า', 'หลังอาหารกลางวัน')
         final meal = _extractMealFromTitle(_task.title ?? '');
-
         if (meal != null) {
           // บันทึกลง A_Med_logs (3C)
           await MedicineService.instance.upsertMedLog3C(
