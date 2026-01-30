@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hugeicons/hugeicons.dart';
-// NOTE: Tutorial feature ถูกซ่อนไว้ชั่วคราว
-// import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -14,12 +12,9 @@ import '../../residents/screens/residents_screen.dart';
 import '../../settings/screens/settings_screen.dart';
 import '../../shift_summary/providers/shift_summary_provider.dart';
 import '../../notifications/providers/notification_provider.dart';
-// NOTE: Tutorial/Onboarding feature ถูกซ่อนไว้ชั่วคราว
-// import '../../onboarding/providers/onboarding_provider.dart';
 import '../../board/providers/post_provider.dart';
 import '../../incident_reflection/providers/incident_provider.dart';
 import '../../onboarding/models/tutorial_target.dart';
-// import '../../onboarding/widgets/whats_new_dialog.dart';
 import '../../onboarding/widgets/new_feature_badge.dart';
 
 class MainNavigationScreen extends ConsumerStatefulWidget {

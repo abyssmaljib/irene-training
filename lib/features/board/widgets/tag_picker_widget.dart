@@ -349,7 +349,8 @@ class TagPickerSheet extends ConsumerStatefulWidget {
 
 class _TagPickerSheetState extends ConsumerState<TagPickerSheet> {
   final _searchController = TextEditingController();
-  String _searchQuery = '';
+  // ลบ _searchQuery ออก - ใช้ _searchController.text แทน
+  // ใช้ ValueListenableBuilder wrap ส่วน tags grid เพื่อ rebuild เฉพาะส่วนนั้น
 
   @override
   void dispose() {
@@ -389,69 +390,82 @@ class _TagPickerSheetState extends ConsumerState<TagPickerSheet> {
             ),
           ),
 
-          // Search field
+          // Search field - ลบ onChanged/onClear ออก เพราะใช้ ValueListenableBuilder แทน
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: SearchField(
               controller: _searchController,
               hintText: 'ค้นหาหัวข้อ...',
               isDense: true,
-              onChanged: (value) => setState(() => _searchQuery = value),
-              onClear: () => setState(() => _searchQuery = ''),
+              // ไม่ต้องใช้ onChanged เพราะ ValueListenableBuilder จะ listen โดยตรง
+              onClear: () => _searchController.clear(),
             ),
           ),
 
           AppSpacing.verticalGapMd,
 
-          // Tags grid
+          // Tags grid - ใช้ ValueListenableBuilder เพื่อ rebuild เฉพาะ grid
+          // เมื่อ search text เปลี่ยน แทนที่จะ rebuild ทั้ง sheet
           Expanded(
-            child: tagsAsync.when(
-              data: (tags) {
-                final filtered = _filterTags(tags);
+            child: ValueListenableBuilder<TextEditingValue>(
+              valueListenable: _searchController,
+              builder: (context, textValue, child) {
+                final searchQuery = textValue.text;
 
-                if (filtered.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        HugeIcon(icon: HugeIcons.strokeRoundedTag01, size: AppIconSize.xxxl, color: AppColors.alternate),
-                        AppSpacing.verticalGapMd,
-                        Text(
-                          _searchQuery.isNotEmpty
-                              ? 'ไม่พบหัวข้อ "$_searchQuery"'
-                              : 'ไม่มีหัวข้อ',
-                          style: AppTypography.body.copyWith(
-                            color: AppColors.secondaryText,
-                          ),
+                return tagsAsync.when(
+                  data: (tags) {
+                    final filtered = _filterTags(tags, searchQuery);
+
+                    if (filtered.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            HugeIcon(
+                              icon: HugeIcons.strokeRoundedTag01,
+                              size: AppIconSize.xxxl,
+                              color: AppColors.alternate,
+                            ),
+                            AppSpacing.verticalGapMd,
+                            Text(
+                              searchQuery.isNotEmpty
+                                  ? 'ไม่พบหัวข้อ "$searchQuery"'
+                                  : 'ไม่มีหัวข้อ',
+                              style: AppTypography.body.copyWith(
+                                color: AppColors.secondaryText,
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  );
-                }
-
-                return SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: filtered.map((tag) {
-                      final isSelected = widget.selectedTag?.id == tag.id;
-                      return _TagChip(
-                        tag: tag,
-                        isSelected: isSelected,
-                        onTap: () => widget.onSelect(tag),
                       );
-                    }).toList(),
+                    }
+
+                    return SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: filtered.map((tag) {
+                          final isSelected = widget.selectedTag?.id == tag.id;
+                          return _TagChip(
+                            tag: tag,
+                            isSelected: isSelected,
+                            onTap: () => widget.onSelect(tag),
+                          );
+                        }).toList(),
+                      ),
+                    );
+                  },
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => Center(
+                    child: Text(
+                      'เกิดข้อผิดพลาด',
+                      style: AppTypography.body.copyWith(color: AppColors.error),
+                    ),
                   ),
                 );
               },
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(
-                child: Text(
-                  'เกิดข้อผิดพลาด',
-                  style: AppTypography.body.copyWith(color: AppColors.error),
-                ),
-              ),
             ),
           ),
         ],
@@ -459,10 +473,12 @@ class _TagPickerSheetState extends ConsumerState<TagPickerSheet> {
     );
   }
 
-  List<NewTag> _filterTags(List<NewTag> tags) {
-    if (_searchQuery.isEmpty) return tags;
+  /// Filter tags โดยรับ searchQuery เป็น parameter
+  /// เพื่อให้ใช้กับ ValueListenableBuilder ได้
+  List<NewTag> _filterTags(List<NewTag> tags, String searchQuery) {
+    if (searchQuery.isEmpty) return tags;
 
-    final query = _searchQuery.toLowerCase();
+    final query = searchQuery.toLowerCase();
     return tags.where((t) {
       return t.name.toLowerCase().contains(query) ||
           (t.emoji?.contains(query) ?? false);

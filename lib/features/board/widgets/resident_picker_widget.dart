@@ -182,7 +182,8 @@ class ResidentPickerSheet extends ConsumerStatefulWidget {
 
 class _ResidentPickerSheetState extends ConsumerState<ResidentPickerSheet> {
   final _searchController = TextEditingController();
-  String _searchQuery = '';
+  // ลบ _searchQuery ออก - ใช้ _searchController.text แทน
+  // ใช้ ValueListenableBuilder wrap ส่วน list เพื่อ rebuild เฉพาะส่วนนั้นเมื่อพิมพ์
 
   @override
   void dispose() {
@@ -222,62 +223,75 @@ class _ResidentPickerSheetState extends ConsumerState<ResidentPickerSheet> {
             ),
           ),
 
-          // Search field
+          // Search field - ลบ onChanged/onClear ออก เพราะใช้ ValueListenableBuilder แทน
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: SearchField(
               controller: _searchController,
               hintText: 'ค้นหาชื่อ...',
               isDense: true,
-              onChanged: (value) => setState(() => _searchQuery = value),
-              onClear: () => setState(() => _searchQuery = ''),
+              // ไม่ต้องใช้ onChanged/onClear เพราะ ValueListenableBuilder
+              // จะ listen _searchController โดยตรง
+              onClear: () => _searchController.clear(),
             ),
           ),
 
           AppSpacing.verticalGapMd,
 
-          // Residents list
+          // Residents list - ใช้ ValueListenableBuilder เพื่อ rebuild เฉพาะ list
+          // เมื่อ search text เปลี่ยน แทนที่จะ rebuild ทั้ง sheet
           Expanded(
-            child: residentsAsync.when(
-              data: (residents) {
-                final filtered = _filterResidents(residents);
+            child: ValueListenableBuilder<TextEditingValue>(
+              valueListenable: _searchController,
+              builder: (context, textValue, child) {
+                final searchQuery = textValue.text;
 
-                if (filtered.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        HugeIcon(icon: HugeIcons.strokeRoundedUserSearch01,
-                            size: AppIconSize.xxxl, color: AppColors.alternate),
-                        AppSpacing.verticalGapMd,
-                        Text(
-                          _searchQuery.isNotEmpty
-                              ? 'ไม่พบผู้พักอาศัย'
-                              : 'ไม่มีข้อมูลผู้พักอาศัย',
-                          style: AppTypography.body
-                              .copyWith(color: AppColors.secondaryText),
+                return residentsAsync.when(
+                  data: (residents) {
+                    final filtered = _filterResidents(residents, searchQuery);
+
+                    if (filtered.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            HugeIcon(
+                              icon: HugeIcons.strokeRoundedUserSearch01,
+                              size: AppIconSize.xxxl,
+                              color: AppColors.alternate,
+                            ),
+                            AppSpacing.verticalGapMd,
+                            Text(
+                              searchQuery.isNotEmpty
+                                  ? 'ไม่พบผู้พักอาศัย'
+                                  : 'ไม่มีข้อมูลผู้พักอาศัย',
+                              style: AppTypography.body
+                                  .copyWith(color: AppColors.secondaryText),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  );
-                }
+                      );
+                    }
 
-                return ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: filtered.length,
-                  itemBuilder: (context, index) {
-                    final resident = filtered[index];
-                    return _buildResidentTile(resident);
+                    return ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: filtered.length,
+                      itemBuilder: (context, index) {
+                        final resident = filtered[index];
+                        return _buildResidentTile(resident);
+                      },
+                    );
                   },
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => Center(
+                    child: Text(
+                      'เกิดข้อผิดพลาด',
+                      style: AppTypography.body.copyWith(color: AppColors.error),
+                    ),
+                  ),
                 );
               },
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(
-                child: Text(
-                  'เกิดข้อผิดพลาด',
-                  style: AppTypography.body.copyWith(color: AppColors.error),
-                ),
-              ),
             ),
           ),
         ],
@@ -285,10 +299,15 @@ class _ResidentPickerSheetState extends ConsumerState<ResidentPickerSheet> {
     );
   }
 
-  List<ResidentOption> _filterResidents(List<ResidentOption> residents) {
-    if (_searchQuery.isEmpty) return residents;
+  /// Filter residents โดยรับ searchQuery เป็น parameter
+  /// เพื่อให้ใช้กับ ValueListenableBuilder ได้
+  List<ResidentOption> _filterResidents(
+    List<ResidentOption> residents,
+    String searchQuery,
+  ) {
+    if (searchQuery.isEmpty) return residents;
 
-    final query = _searchQuery.toLowerCase();
+    final query = searchQuery.toLowerCase();
     return residents.where((r) {
       return r.name.toLowerCase().contains(query) ||
           (r.zone?.toLowerCase().contains(query) ?? false);

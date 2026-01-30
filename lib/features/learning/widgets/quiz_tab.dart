@@ -8,7 +8,6 @@ import '../models/quiz_history_item.dart';
 import '../models/topic_detail.dart';
 import '../models/thinking_skill_data.dart';
 import 'quiz_history_card.dart';
-// TODO: Temporarily hidden - import 'skill_visualization_section.dart';
 
 class QuizTab extends StatelessWidget {
   final TopicDetail topicDetail;

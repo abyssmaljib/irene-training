@@ -41,8 +41,6 @@ import '../../incident_reflection/providers/incident_provider.dart';
 import '../../dd_handover/providers/dd_provider.dart';
 import '../services/clock_realtime_service.dart';
 import '../../../main.dart' show globalRefreshNotifier;
-// NOTE: Tutorial feature ถูกซ่อนไว้ชั่วคราว
-// import '../../onboarding/widgets/replay_tutorial_button.dart';
 
 /// หน้าหลัก - Dashboard with Clock-in/Clock-out
 /// ใช้ ConsumerStatefulWidget เพื่อให้ pull to refresh สามารถ invalidate

@@ -207,49 +207,61 @@ class _ProblemInputSheetState extends State<ProblemInputSheet> {
                     maxLines: 3,
                     textInputAction: TextInputAction.done,
                     onSubmitted: (_) => _handleSubmit(),
-                    onChanged: (_) => setState(() {}),
+                    // ลบ onChanged: setState ออก - ใช้ ValueListenableBuilder แทน
                   ),
                   AppSpacing.verticalGapLg,
                 ],
 
-                // Submit button
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton.icon(
-                    // ปิด button ถ้ายังไม่เลือกประเภท หรือ "อื่นๆ" แต่ไม่กรอก
-                    onPressed: (_isSubmitting || !_canSubmit)
-                        ? null
-                        : _handleSubmit,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.error,
-                      foregroundColor: Colors.white,
-                      disabledBackgroundColor:
-                          AppColors.error.withValues(alpha: 0.5),
-                      disabledForegroundColor:
-                          Colors.white.withValues(alpha: 0.7),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    icon: _isSubmitting
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation(Colors.white),
-                            ),
-                          )
-                        : HugeIcon(
-                            icon: HugeIcons.strokeRoundedAlert02,
-                            color: Colors.white, // ต้องระบุสีให้ icon
+                // Submit button - ใช้ ValueListenableBuilder เพื่อ rebuild เฉพาะ button
+                // เมื่อ text เปลี่ยน แทนที่จะ rebuild ทั้ง widget
+                ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: _controller,
+                  builder: (context, textValue, child) {
+                    // คำนวณ canSubmit ใน builder เพื่อใช้ค่าล่าสุดจาก controller
+                    final canSubmit = _selectedType != null &&
+                        (!_selectedType!.requiresDescription ||
+                            textValue.text.trim().isNotEmpty);
+
+                    return SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton.icon(
+                        // ปิด button ถ้ายังไม่เลือกประเภท หรือ "อื่นๆ" แต่ไม่กรอก
+                        onPressed: (_isSubmitting || !canSubmit)
+                            ? null
+                            : _handleSubmit,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.error,
+                          foregroundColor: Colors.white,
+                          disabledBackgroundColor:
+                              AppColors.error.withValues(alpha: 0.5),
+                          disabledForegroundColor:
+                              Colors.white.withValues(alpha: 0.7),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                    label: Text(
-                      'แจ้งปัญหา',
-                      style: AppTypography.button,
-                    ),
-                  ),
+                        ),
+                        icon: _isSubmitting
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor:
+                                      AlwaysStoppedAnimation(Colors.white),
+                                ),
+                              )
+                            : HugeIcon(
+                                icon: HugeIcons.strokeRoundedAlert02,
+                                color: Colors.white,
+                              ),
+                        label: Text(
+                          'แจ้งปัญหา',
+                          style: AppTypography.button,
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ],
             ),

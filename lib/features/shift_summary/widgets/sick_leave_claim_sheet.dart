@@ -7,8 +7,6 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
-// Hidden for now - leaders can't access this screen for other users
-// import '../../checklist/providers/task_provider.dart' show currentUserSystemRoleProvider;
 import '../services/shift_summary_service.dart';
 
 /// Bottom sheet สำหรับแนบหลักฐานการลาป่วย
@@ -47,9 +45,6 @@ class _SickLeaveClaimSheetState extends ConsumerState<SickLeaveClaimSheet> {
     ];
     // แสดงปี ค.ศ. (Christian Era)
     final dateStr = '${widget.date.day} ${thaiMonths[widget.date.month]} ${widget.date.year}';
-    // Hidden for now - leaders can't access this screen for other users
-    // final systemRole = ref.watch(currentUserSystemRoleProvider).valueOrNull;
-    // final canApprove = systemRole?.canQC ?? false;
 
     return Container(
       padding: EdgeInsets.only(

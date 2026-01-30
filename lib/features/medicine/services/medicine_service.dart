@@ -110,8 +110,9 @@ class MedicineService {
   /// เร็วกว่า view เพราะไม่มี WHERE filter 1 month และ 3 LEFT JOINs
   Future<List<MedLog>> getMedLogsForDate(int residentId, DateTime date) async {
     try {
-      // Format date เป็น YYYY-MM-DD
-      final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+      // แปลง date เป็น local time ก่อน format
+      final localDate = date.toLocal();
+      final dateStr = '${localDate.year}-${localDate.month.toString().padLeft(2, '0')}-${localDate.day.toString().padLeft(2, '0')}';
 
       final stopwatch = Stopwatch()..start();
 
@@ -905,9 +906,12 @@ extension MedicineServiceMedLogs on MedicineService {
     required int taskLogId,
   }) async {
     try {
-      // Format date เป็น YYYY-MM-DD
+      // แปลง expectedDate เป็น local time ก่อน format
+      // เพราะ expectedDate อาจเป็น UTC (เช่น 2026-01-29 23:45:00Z = 06:45 เวลาไทยวันที่ 30)
+      // ถ้าไม่แปลง จะได้วันที่ผิด (29 แทน 30)
+      final localDate = expectedDate.toLocal();
       final dateStr =
-          '${expectedDate.year}-${expectedDate.month.toString().padLeft(2, '0')}-${expectedDate.day.toString().padLeft(2, '0')}';
+          '${localDate.year}-${localDate.month.toString().padLeft(2, '0')}-${localDate.day.toString().padLeft(2, '0')}';
 
       debugPrint('[MedicineService] upsertMedLog3C: residentId=$residentId, meal=$meal, date=$dateStr');
 
@@ -973,9 +977,11 @@ extension MedicineServiceMedLogs on MedicineService {
     required DateTime expectedDate,
   }) async {
     try {
-      // Format date เป็น YYYY-MM-DD
+      // แปลง expectedDate เป็น local time ก่อน format
+      // เพราะ expectedDate อาจเป็น UTC (เช่น 2026-01-29 23:45:00Z = 06:45 เวลาไทยวันที่ 30)
+      final localDate = expectedDate.toLocal();
       final dateStr =
-          '${expectedDate.year}-${expectedDate.month.toString().padLeft(2, '0')}-${expectedDate.day.toString().padLeft(2, '0')}';
+          '${localDate.year}-${localDate.month.toString().padLeft(2, '0')}-${localDate.day.toString().padLeft(2, '0')}';
 
       debugPrint('[MedicineService] clearMedLog3C: residentId=$residentId, meal=$meal, date=$dateStr');
 

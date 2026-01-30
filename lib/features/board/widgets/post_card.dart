@@ -3,6 +3,7 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/network_image.dart';
 import '../models/post.dart';
 
 /// Card แสดง Post
@@ -313,33 +314,15 @@ class PostCard extends StatelessWidget {
   Widget _buildFooter() {
     return Row(
       children: [
-        // Author avatar - ใช้ Image.network กับ cacheWidth
-        // เพื่อไม่ให้โหลดรูป full-size เข้า memory (ป้องกัน OOM บนมือถือสเปคต่ำ)
-        CircleAvatar(
+        // Author avatar - ใช้ IreneNetworkAvatar ที่มี timeout และ retry mechanism
+        IreneNetworkAvatar(
+          imageUrl: post.photoUrl,
           radius: 12,
-          backgroundColor: AppColors.accent1,
-          child: post.photoUrl != null
-              ? ClipOval(
-                  child: Image.network(
-                    post.photoUrl!,
-                    width: 24,
-                    height: 24,
-                    fit: BoxFit.cover,
-                    // cache ที่ 48px (2x สำหรับ high DPI screens)
-                    cacheWidth: 48,
-                    // ถ้าโหลดรูปไม่ได้ แสดง icon แทน
-                    errorBuilder: (context, error, stackTrace) => HugeIcon(
-                      icon: HugeIcons.strokeRoundedUser,
-                      size: AppIconSize.xs,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                )
-              : HugeIcon(
-                  icon: HugeIcons.strokeRoundedUser,
-                  size: AppIconSize.xs,
-                  color: AppColors.primary,
-                ),
+          fallbackIcon: HugeIcon(
+            icon: HugeIcons.strokeRoundedUser,
+            size: AppIconSize.xs,
+            color: AppColors.primary,
+          ),
         ),
         AppSpacing.horizontalGapSm,
         Expanded(

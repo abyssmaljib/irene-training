@@ -863,7 +863,15 @@ class _DevModeUserSelector extends ConsumerStatefulWidget {
 }
 
 class _DevModeUserSelectorState extends ConsumerState<_DevModeUserSelector> {
-  String _searchQuery = '';
+  // ใช้ TextEditingController แทน String _searchQuery
+  // เพื่อใช้กับ ValueListenableBuilder และลด rebuild
+  final _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -902,9 +910,9 @@ class _DevModeUserSelectorState extends ConsumerState<_DevModeUserSelector> {
             ],
           ),
           AppSpacing.verticalGapMd,
-          // Search field
+          // Search field - ใช้ controller แทน onChanged + setState
           TextField(
-            onChanged: (value) => setState(() => _searchQuery = value),
+            controller: _searchController,
             decoration: InputDecoration(
               hintText: 'ค้นหาชื่อ...',
               hintStyle: AppTypography.bodySmall.copyWith(
@@ -943,72 +951,83 @@ class _DevModeUserSelectorState extends ConsumerState<_DevModeUserSelector> {
             ),
           ),
           AppSpacing.verticalGapMd,
-          allUsersAsync.when(
-            data: (allUsers) {
-              // Filter users by search query
-              final filteredUsers = _searchQuery.isEmpty
-                  ? allUsers
-                  : allUsers.where((user) {
-                      final query = _searchQuery.toLowerCase();
-                      final nickname = user.nickname?.toLowerCase() ?? '';
-                      final fullName = user.fullName?.toLowerCase() ?? '';
-                      return nickname.contains(query) || fullName.contains(query);
-                    }).toList();
+          // ใช้ ValueListenableBuilder เพื่อ rebuild เฉพาะ list เมื่อ search text เปลี่ยน
+          ValueListenableBuilder<TextEditingValue>(
+            valueListenable: _searchController,
+            builder: (context, textValue, child) {
+              final searchQuery = textValue.text;
 
-              if (filteredUsers.isEmpty) {
-                return Center(
-                  child: Text(
-                    allUsers.isEmpty ? 'ไม่พบรายชื่อพนักงาน' : 'ไม่พบผู้ใช้ที่ค้นหา',
-                    style: AppTypography.bodySmall.copyWith(
-                      color: Colors.cyan.shade600,
+              return allUsersAsync.when(
+                data: (allUsers) {
+                  // Filter users by search query
+                  final filteredUsers = searchQuery.isEmpty
+                      ? allUsers
+                      : allUsers.where((user) {
+                          final query = searchQuery.toLowerCase();
+                          final nickname = user.nickname?.toLowerCase() ?? '';
+                          final fullName = user.fullName?.toLowerCase() ?? '';
+                          return nickname.contains(query) ||
+                              fullName.contains(query);
+                        }).toList();
+
+                  if (filteredUsers.isEmpty) {
+                    return Center(
+                      child: Text(
+                        allUsers.isEmpty
+                            ? 'ไม่พบรายชื่อพนักงาน'
+                            : 'ไม่พบผู้ใช้ที่ค้นหา',
+                        style: AppTypography.bodySmall.copyWith(
+                          color: Colors.cyan.shade600,
+                        ),
+                      ),
+                    );
+                  }
+
+                  return Container(
+                    constraints: BoxConstraints(maxHeight: 200),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: AppRadius.smallRadius,
+                      border: Border.all(color: Colors.cyan.shade200),
+                    ),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: filteredUsers.length,
+                      separatorBuilder: (context, index) => Divider(
+                        height: 1,
+                        color: Colors.cyan.shade100,
+                      ),
+                      itemBuilder: (context, index) {
+                        final user = filteredUsers[index];
+                        final isSelected = user.id == effectiveUserId;
+
+                        return _UserListTile(
+                          user: user,
+                          isSelected: isSelected,
+                          onTap: () => _impersonateUser(user),
+                        );
+                      },
+                    ),
+                  );
+                },
+                loading: () => Center(
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.cyan,
                     ),
                   ),
-                );
-              }
-
-              return Container(
-                constraints: BoxConstraints(maxHeight: 200),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: AppRadius.smallRadius,
-                  border: Border.all(color: Colors.cyan.shade200),
                 ),
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  itemCount: filteredUsers.length,
-                  separatorBuilder: (context, index) => Divider(
-                    height: 1,
-                    color: Colors.cyan.shade100,
+                error: (e, _) => Text(
+                  'ไม่สามารถโหลดรายชื่อได้',
+                  style: AppTypography.bodySmall.copyWith(
+                    color: Colors.red,
                   ),
-                  itemBuilder: (context, index) {
-                    final user = filteredUsers[index];
-                    final isSelected = user.id == effectiveUserId;
-
-                    return _UserListTile(
-                      user: user,
-                      isSelected: isSelected,
-                      onTap: () => _impersonateUser(user),
-                    );
-                  },
                 ),
               );
             },
-            loading: () => Center(
-              child: SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.cyan,
-                ),
-              ),
-            ),
-            error: (_, _) => Text(
-              'ไม่สามารถโหลดรายชื่อได้',
-              style: AppTypography.bodySmall.copyWith(
-                color: Colors.red,
-              ),
-            ),
           ),
         ],
       ),

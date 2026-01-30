@@ -37,13 +37,23 @@ class PostFilterDrawer extends StatefulWidget {
 }
 
 class _PostFilterDrawerState extends State<PostFilterDrawer> {
-  String _searchQuery = '';
+  // ใช้ TextEditingController แทน String _searchQuery
+  // เพื่อใช้กับ ValueListenableBuilder และลด rebuild
+  final _searchController = TextEditingController();
 
-  List<ResidentOption> get _filteredResidents {
-    if (_searchQuery.isEmpty) return widget.residents;
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  /// Filter residents โดยรับ searchQuery เป็น parameter
+  /// เพื่อให้ใช้กับ ValueListenableBuilder ได้
+  List<ResidentOption> _filterResidents(String searchQuery) {
+    if (searchQuery.isEmpty) return widget.residents;
     return widget.residents
         .where((r) =>
-            r.name.toLowerCase().contains(_searchQuery.toLowerCase()))
+            r.name.toLowerCase().contains(searchQuery.toLowerCase()))
         .toList();
   }
 
@@ -243,9 +253,11 @@ class _PostFilterDrawerState extends State<PostFilterDrawer> {
           // Search field (show if many residents)
           if (widget.residents.length > 5) ...[
             SearchField(
+              controller: _searchController,
               hintText: 'ค้นหาชื่อ...',
               isDense: true,
-              onChanged: (value) => setState(() => _searchQuery = value),
+              // ไม่ต้องใช้ onChanged เพราะ ValueListenableBuilder จะ listen โดยตรง
+              onClear: () => _searchController.clear(),
             ),
             AppSpacing.verticalGapMd,
           ],
@@ -298,34 +310,43 @@ class _PostFilterDrawerState extends State<PostFilterDrawer> {
             AppSpacing.verticalGapMd,
           ],
 
-          // Resident list
-          if (_filteredResidents.isEmpty)
-            Padding(
-              padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
-              child: Center(
-                child: Column(
-                  children: [
-                    Image.asset(
-                      'assets/images/not_found.webp',
-                      width: 120,
-                      height: 120,
+          // Resident list - ใช้ ValueListenableBuilder เพื่อ rebuild เฉพาะ list
+          // เมื่อ search text เปลี่ยน แทนที่จะ rebuild ทั้ง drawer
+          ValueListenableBuilder<TextEditingValue>(
+            valueListenable: _searchController,
+            builder: (context, textValue, child) {
+              final searchQuery = textValue.text;
+              final filteredResidents = _filterResidents(searchQuery);
+
+              if (filteredResidents.isEmpty) {
+                return Padding(
+                  padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
+                  child: Center(
+                    child: Column(
+                      children: [
+                        Image.asset(
+                          'assets/images/not_found.webp',
+                          width: 120,
+                          height: 120,
+                        ),
+                        AppSpacing.verticalGapSm,
+                        Text(
+                          searchQuery.isEmpty
+                              ? 'ไม่มีรายชื่อผู้พักอาศัย'
+                              : 'ไม่พบผลการค้นหา',
+                          style: AppTypography.body.copyWith(
+                            color: AppColors.secondaryText,
+                          ),
+                        ),
+                      ],
                     ),
-                    AppSpacing.verticalGapSm,
-                    Text(
-                      _searchQuery.isEmpty
-                          ? 'ไม่มีรายชื่อผู้พักอาศัย'
-                          : 'ไม่พบผลการค้นหา',
-                      style: AppTypography.body.copyWith(
-                        color: AppColors.secondaryText,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          else
-            // แสดงเป็น list tiles แบบเดิมเพราะมี avatar
-            ...(_filteredResidents.map((resident) {
+                  ),
+                );
+              }
+
+              // แสดงเป็น list tiles แบบเดิมเพราะมี avatar
+              return Column(
+                children: filteredResidents.map((resident) {
               final isSelected = resident.id == widget.selectedResidentId;
               return InkWell(
                 onTap: () {
@@ -396,7 +417,10 @@ class _PostFilterDrawerState extends State<PostFilterDrawer> {
                   ),
                 ),
               );
-            }).toList()),
+                }).toList(),
+              );
+            },
+          ),
         ],
       ),
     );

@@ -6,16 +6,15 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/confirm_dialog.dart';
+import '../../../core/widgets/network_image.dart';
 import '../../../core/services/user_service.dart';
 import '../../checklist/models/system_role.dart';
 import '../../checklist/providers/task_provider.dart';
 import '../../auth/screens/login_screen.dart';
 import '../../learning/screens/directory_screen.dart';
 import '../../learning/models/badge.dart';
-import '../../learning/models/thinking_skill_data.dart';
 import '../../learning/services/badge_service.dart';
 import '../../learning/screens/badge_collection_screen.dart';
-// TODO: Temporarily hidden - import '../../learning/widgets/skill_visualization_section.dart';
 import '../models/user_profile.dart';
 import '../../../core/widgets/irene_app_bar.dart';
 import '../../shift_summary/screens/shift_summary_screen.dart';
@@ -30,8 +29,6 @@ import '../../notifications/screens/notification_center_screen.dart';
 import '../../notifications/providers/notification_provider.dart';
 import '../../incident_reflection/screens/incident_list_screen.dart';
 import '../../incident_reflection/providers/incident_provider.dart';
-// NOTE: Tutorial feature ถูกซ่อนไว้ชั่วคราว
-// import '../../navigation/screens/main_navigation_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -47,10 +44,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   List<SystemRole> _allSystemRoles = [];
   List<DevUserInfo> _allUsers = [];
   String? _userEmail;
-  String _userSearchQuery = '';
-  // NOTE: _skillsData temporarily unused - skill visualization hidden for review
-  // ignore: unused_field
-  ThinkingSkillsData? _skillsData;
+  // ใช้ TextEditingController แทน String _userSearchQuery
+  // เพื่อใช้กับ ValueListenableBuilder และลด rebuild
+  final _userSearchController = TextEditingController();
   List<Badge> _earnedBadges = [];
   bool _isLoading = true;
   String? _error;
@@ -67,12 +63,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _loadData();
   }
 
+  @override
+  void dispose() {
+    _userSearchController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadData() async {
     await Future.wait([
       _loadUserProfile(),
       _loadUserRole(),
       _loadSystemRole(),
-      _loadThinkingSkills(),
       _loadBadges(),
       _loadAllUsers(),
     ]);
@@ -140,33 +141,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
-  Future<void> _loadThinkingSkills() async {
-    try {
-      final userId = UserService().effectiveUserId;
-      if (userId == null) return;
-
-      final response = await Supabase.instance.client
-          .from('training_v_thinking_analysis')
-          .select('*');
-
-      if (mounted && response.isNotEmpty) {
-        final Map<String, dynamic> breakdown = {};
-        for (final row in response) {
-          breakdown[row['thinking_type'] as String] = {
-            'total': row['total_questions'],
-            'correct': row['correct_count'],
-            'percent': row['percent_correct'],
-          };
-        }
-
-        setState(() {
-          _skillsData = ThinkingSkillsData.fromThinkingBreakdown(breakdown);
-        });
-      }
-    } catch (e) {
-      debugPrint('Thinking skills error: $e');
-    }
-  }
 
   Future<void> _loadUserProfile() async {
     try {
@@ -296,23 +270,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   width: 2,
                 ),
               ),
-              child: ClipRRect(
-                borderRadius: AppRadius.fullRadius,
-                child: _userProfile?.photoUrl != null &&
-                        _userProfile!.photoUrl!.isNotEmpty
-                    ? Image.network(
-                        _userProfile!.photoUrl!,
-                        width: 80,
-                        height: 80,
-                        fit: BoxFit.cover,
-                        // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
-                        cacheWidth: 200,
-                        errorBuilder: (context, error, stackTrace) {
-                          return _buildDefaultAvatar();
-                        },
-                      )
-                    : _buildDefaultAvatar(),
-              ),
+              child: _userProfile?.photoUrl != null &&
+                      _userProfile!.photoUrl!.isNotEmpty
+                  ? IreneNetworkImage(
+                      imageUrl: _userProfile!.photoUrl!,
+                      width: 80,
+                      height: 80,
+                      fit: BoxFit.cover,
+                      memCacheWidth: 200,
+                      borderRadius: AppRadius.fullRadius,
+                      errorPlaceholder: _buildDefaultAvatar(),
+                    )
+                  : _buildDefaultAvatar(),
             ),
             AppSpacing.verticalGapSm,
             // Nickname
@@ -383,12 +352,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ],
             // Badges Section - แสดงเสมอ
             _buildBadgesSection(),
-            AppSpacing.verticalGapMd,
-            // TODO: Thinking Skills Section temporarily hidden for review
-            // if (_skillsData != null && _skillsData!.hasData)
-            //   SkillVisualizationSection(
-            //     skillsData: _skillsData,
-            //   ),
             AppSpacing.verticalGapXl,
             // Log Out Button
             SizedBox(
@@ -741,16 +704,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final userService = UserService();
     final currentEffectiveUserId = userService.effectiveUserId;
 
-    // Filter users by search query
-    final filteredUsers = _userSearchQuery.isEmpty
-        ? _allUsers
-        : _allUsers.where((user) {
-            final query = _userSearchQuery.toLowerCase();
-            final nickname = user.nickname?.toLowerCase() ?? '';
-            final fullName = user.fullName?.toLowerCase() ?? '';
-            return nickname.contains(query) || fullName.contains(query);
-          }).toList();
-
     return Container(
       width: double.infinity,
       padding: AppSpacing.paddingMd,
@@ -764,7 +717,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         children: [
           Row(
             children: [
-              HugeIcon(icon: HugeIcons.strokeRoundedUserEdit01, size: AppIconSize.sm, color: Colors.cyan.shade700),
+              HugeIcon(
+                icon: HugeIcons.strokeRoundedUserEdit01,
+                size: AppIconSize.sm,
+                color: Colors.cyan.shade700,
+              ),
               AppSpacing.horizontalGapSm,
               Text(
                 'Dev Mode - สวมรอยเป็น User อื่น',
@@ -783,9 +740,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ),
           AppSpacing.verticalGapMd,
-          // Search field
+          // Search field - ใช้ controller แทน onChanged + setState
           TextField(
-            onChanged: (value) => setState(() => _userSearchQuery = value),
+            controller: _userSearchController,
             decoration: InputDecoration(
               hintText: 'ค้นหาชื่อ...',
               hintStyle: AppTypography.bodySmall.copyWith(
@@ -824,50 +781,75 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ),
           AppSpacing.verticalGapMd,
-          if (_isLoading)
-            Text(
-              'กำลังโหลดรายชื่อ...',
-              style: AppTypography.bodySmall.copyWith(
-                color: Colors.purple.shade600,
-              ),
-            )
-          else if (_allUsers.isEmpty)
-             Text(
-              'ไม่พบรายชื่อพนักงาน',
-              style: AppTypography.bodySmall.copyWith(
-                color: Colors.purple.shade600,
-              ),
-            )
-          else if (filteredUsers.isEmpty)
-            Text(
-              'ไม่พบผู้ใช้ที่ค้นหา',
-              style: AppTypography.bodySmall.copyWith(
-                color: Colors.purple.shade600,
-              ),
-            )
-          else
-            Container(
-              constraints: BoxConstraints(maxHeight: 250),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: AppRadius.smallRadius,
-                border: Border.all(color: Colors.purple.shade200),
-              ),
-              child: ListView.separated(
-                shrinkWrap: true,
-                itemCount: filteredUsers.length,
-                separatorBuilder: (context, index) => Divider(
-                  height: 1,
-                  color: Colors.purple.shade100,
-                ),
-                itemBuilder: (context, index) {
-                  final user = filteredUsers[index];
-                  final isSelected = user.id == currentEffectiveUserId;
+          // ใช้ ValueListenableBuilder เพื่อ rebuild เฉพาะ list เมื่อ search text เปลี่ยน
+          ValueListenableBuilder<TextEditingValue>(
+            valueListenable: _userSearchController,
+            builder: (context, textValue, child) {
+              final searchQuery = textValue.text;
 
-                  return _buildUserListTile(user: user, isSelected: isSelected);
-                },
-              ),
-            ),
+              // Filter users by search query
+              final filteredUsers = searchQuery.isEmpty
+                  ? _allUsers
+                  : _allUsers.where((user) {
+                      final query = searchQuery.toLowerCase();
+                      final nickname = user.nickname?.toLowerCase() ?? '';
+                      final fullName = user.fullName?.toLowerCase() ?? '';
+                      return nickname.contains(query) ||
+                          fullName.contains(query);
+                    }).toList();
+
+              if (_isLoading) {
+                return Text(
+                  'กำลังโหลดรายชื่อ...',
+                  style: AppTypography.bodySmall.copyWith(
+                    color: Colors.purple.shade600,
+                  ),
+                );
+              }
+
+              if (_allUsers.isEmpty) {
+                return Text(
+                  'ไม่พบรายชื่อพนักงาน',
+                  style: AppTypography.bodySmall.copyWith(
+                    color: Colors.purple.shade600,
+                  ),
+                );
+              }
+
+              if (filteredUsers.isEmpty) {
+                return Text(
+                  'ไม่พบผู้ใช้ที่ค้นหา',
+                  style: AppTypography.bodySmall.copyWith(
+                    color: Colors.purple.shade600,
+                  ),
+                );
+              }
+
+              return Container(
+                constraints: BoxConstraints(maxHeight: 250),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: AppRadius.smallRadius,
+                  border: Border.all(color: Colors.purple.shade200),
+                ),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: filteredUsers.length,
+                  separatorBuilder: (context, index) => Divider(
+                    height: 1,
+                    color: Colors.purple.shade100,
+                  ),
+                  itemBuilder: (context, index) {
+                    final user = filteredUsers[index];
+                    final isSelected = user.id == currentEffectiveUserId;
+
+                    return _buildUserListTile(
+                        user: user, isSelected: isSelected);
+                  },
+                ),
+              );
+            },
+          ),
         ],
       ),
     );
@@ -904,31 +886,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ? Border.all(color: Colors.purple, width: 2)
                         : null,
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
-                    child: user.photoUrl != null && user.photoUrl!.isNotEmpty
-                        ? Image.network(
-                            user.photoUrl!,
-                            width: 40,
-                            height: 40,
-                            fit: BoxFit.cover,
-                            // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
-                            cacheWidth: 100,
-                            errorBuilder: (context, error, stackTrace) => Center(
-                              child: HugeIcon(
-                                icon: HugeIcons.strokeRoundedUser,
-                                size: AppIconSize.lg,
-                                color: Colors.purple.shade700,
-                              ),
-                            ),
-                          )
-                        : Center(
-                            child: HugeIcon(
-                              icon: HugeIcons.strokeRoundedUser,
-                              size: AppIconSize.lg,
-                              color: Colors.purple.shade700,
-                            ),
-                          ),
+                  // ใช้ IreneNetworkAvatar แทน Image.network
+                  // เพื่อให้มี timeout, retry และ error handling ที่ดีกว่า
+                  child: IreneNetworkAvatar(
+                    imageUrl: user.photoUrl,
+                    radius: 20,
+                    fallbackIcon: HugeIcon(
+                      icon: HugeIcons.strokeRoundedUser,
+                      size: AppIconSize.lg,
+                      color: Colors.purple.shade700,
+                    ),
                   ),
                 ),
                 // Clocked-in indicator (green dot)
