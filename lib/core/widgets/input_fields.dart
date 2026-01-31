@@ -31,6 +31,10 @@ class AppTextField extends StatefulWidget {
   final bool isDense;
   /// Auto focus when widget is mounted
   final bool autofocus;
+  /// Custom fill color for the input field
+  /// Default is AppColors.background (gray)
+  /// Use AppColors.surface (white) for gray backgrounds
+  final Color? fillColor;
 
   const AppTextField({
     super.key,
@@ -52,6 +56,7 @@ class AppTextField extends StatefulWidget {
     this.onSubmitted,
     this.isDense = false,
     this.autofocus = false,
+    this.fillColor,
   });
 
   @override
@@ -150,9 +155,10 @@ class _AppTextFieldState extends State<AppTextField> {
                 : null,
             isDense: widget.isDense,
             filled: true,
+            // ใช้ fillColor ที่กำหนด หรือ default เป็น AppColors.background
             fillColor: widget.enabled
-                ? AppColors.background
-                : AppColors.background.withValues(alpha: 0.5),
+                ? (widget.fillColor ?? AppColors.background)
+                : (widget.fillColor ?? AppColors.background).withValues(alpha: 0.5),
             contentPadding: widget.isDense
                 ? EdgeInsets.symmetric(horizontal: 12, vertical: 12)
                 : AppSpacing.inputPadding,

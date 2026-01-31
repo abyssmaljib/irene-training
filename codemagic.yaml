@@ -135,8 +135,48 @@ workflows:
             --build-name=$VERSION_NAME \
             --export-options-plist=/Users/builder/export_options.plist
 
+      # Upload dSYM files ไป Firebase Crashlytics
+      # เพื่อให้ crash reports แสดง function names และ line numbers ที่อ่านได้
+      - name: Upload dSYM to Firebase Crashlytics
+        script: |
+          echo "=== Uploading dSYM to Firebase Crashlytics ==="
+
+          # Path ของ dSYM files จาก Flutter build
+          DSYM_PATH="$CM_BUILD_DIR/build/ios/archive/Runner.xcarchive/dSYMs"
+
+          if [ ! -d "$DSYM_PATH" ]; then
+            echo "Primary dSYM path not found, searching..."
+            DSYM_PATH=$(find "$CM_BUILD_DIR/build/ios" -name "*.dSYM" -type d | head -1 | xargs dirname 2>/dev/null)
+          fi
+
+          if [ -d "$DSYM_PATH" ]; then
+            echo "Found dSYM files at: $DSYM_PATH"
+            ls -la "$DSYM_PATH"
+
+            # หา upload-symbols script จาก FirebaseCrashlytics pod
+            UPLOAD_SCRIPT="$CM_BUILD_DIR/ios/Pods/FirebaseCrashlytics/upload-symbols"
+
+            if [ -f "$UPLOAD_SCRIPT" ]; then
+              echo "Uploading dSYMs..."
+              "$UPLOAD_SCRIPT" \
+                -gsp "$CM_BUILD_DIR/ios/Runner/GoogleService-Info.plist" \
+                -p ios \
+                "$DSYM_PATH"
+              echo "dSYM upload completed!"
+            else
+              echo "upload-symbols script not found at: $UPLOAD_SCRIPT"
+              echo "Listing Pods/FirebaseCrashlytics contents:"
+              ls -la "$CM_BUILD_DIR/ios/Pods/FirebaseCrashlytics/" 2>/dev/null || echo "Directory not found"
+            fi
+          else
+            echo "No dSYM files found"
+            echo "Searching in build/ios:"
+            find "$CM_BUILD_DIR/build/ios" -name "*.dSYM" -type d 2>/dev/null || echo "None found"
+          fi
+
     artifacts:
       - build/ios/ipa/*.ipa
+      - build/ios/archive/Runner.xcarchive/dSYMs/**
       - /tmp/xcodebuild_logs/*.log
       - flutter_drive.log
 

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui';
 import 'package:clarity_flutter/clarity_flutter.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -19,8 +20,10 @@ import 'core/services/app_version_service.dart';
 import 'core/services/force_update_service.dart';
 import 'core/services/onesignal_service.dart';
 import 'core/widgets/force_update_dialog.dart';
-import 'features/auth/screens/login_screen.dart';
+import 'features/auth/screens/welcome_screen.dart';
 import 'features/navigation/screens/main_navigation_screen.dart';
+import 'features/profile_setup/screens/unified_profile_setup_screen.dart';
+import 'features/profile_setup/services/profile_setup_service.dart';
 
 // Global navigator key สำหรับ navigation จาก service (เช่น push notification)
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -127,6 +130,18 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       // ใช้ navigatorKey เพื่อให้ services สามารถ navigate ได้
       navigatorKey: navigatorKey,
+      // ========== Thai Localization ==========
+      // จำเป็นสำหรับ DatePicker และ UI components อื่นๆ ที่ใช้ locale
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('th', 'TH'), // Thai (หลัก)
+        Locale('en', 'US'), // English (สำรอง)
+      ],
+      locale: const Locale('th', 'TH'), // ใช้ภาษาไทยเป็น default
       theme: ThemeData(
         fontFamily: 'MiSansThai',
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0D9488)),
@@ -238,9 +253,102 @@ class _AuthWrapperState extends State<AuthWrapper> {
   @override
   Widget build(BuildContext context) {
     if (_session != null) {
-      return MainNavigationScreen(key: ValueKey(_session!.user.id));
+      // ใช้ ProfileCheckWrapper เพื่อตรวจสอบว่า user กรอก profile แล้วหรือยัง
+      // ถ้ายังไม่กรอก จะแสดงหน้า ProfileSetupScreen ก่อน
+      return ProfileCheckWrapper(
+        key: ValueKey(_session!.user.id),
+        child: MainNavigationScreen(key: const ValueKey('main')),
+      );
     } else {
-      return const LoginScreen(key: ValueKey('login'));
+      // แสดง WelcomeScreen ก่อน ให้ผู้ใช้เลือกสมัครสมาชิกหรือเข้าสู่ระบบ
+      return const WelcomeScreen(key: ValueKey('welcome'));
+    }
+  }
+}
+
+/// Wrapper ที่ตรวจสอบว่า user กรอก profile แล้วหรือยัง
+/// ถ้ายังไม่กรอก จะแสดง UnifiedProfileSetupScreen (รวมทุกส่วนไว้ในหน้าเดียว)
+/// ถ้ากรอกแล้ว จะแสดง child (MainNavigationScreen)
+///
+/// Flow (Simplified):
+/// 1. UnifiedProfileSetupScreen (รวมทุกส่วน - section 1 บังคับ, 2-3 ไม่บังคับ)
+/// 2. MainNavigationScreen (เข้าแอป)
+class ProfileCheckWrapper extends StatefulWidget {
+  final Widget child;
+
+  const ProfileCheckWrapper({
+    super.key,
+    required this.child,
+  });
+
+  @override
+  State<ProfileCheckWrapper> createState() => _ProfileCheckWrapperState();
+}
+
+/// Step ของการกรอก profile (Simplified)
+enum ProfileSetupStep {
+  loading,     // กำลังโหลด
+  setup,       // UnifiedProfileSetupScreen (รวมทุกส่วน)
+  completed,   // เสร็จแล้ว - แสดง MainNavigationScreen
+}
+
+class _ProfileCheckWrapperState extends State<ProfileCheckWrapper> {
+  ProfileSetupStep _currentStep = ProfileSetupStep.loading;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkProfileStatus();
+  }
+
+  /// ตรวจสอบว่า user ต้องกรอก profile หรือไม่
+  Future<void> _checkProfileStatus() async {
+    try {
+      final needsSetup = await ProfileSetupService().needsProfileSetup();
+      if (mounted) {
+        setState(() {
+          // ถ้าต้องกรอก แสดง UnifiedProfileSetupScreen, ถ้าไม่ต้อง เข้าแอปเลย
+          _currentStep = needsSetup
+              ? ProfileSetupStep.setup
+              : ProfileSetupStep.completed;
+        });
+      }
+    } catch (e) {
+      debugPrint('ProfileCheckWrapper: Error checking profile: $e');
+      // ถ้าเกิด error ไม่บังคับให้กรอก (fail-safe)
+      if (mounted) {
+        setState(() => _currentStep = ProfileSetupStep.completed);
+      }
+    }
+  }
+
+  /// เรียกเมื่อ user กรอก profile เสร็จ - เข้าแอป
+  void _onSetupComplete() {
+    setState(() => _currentStep = ProfileSetupStep.completed);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    switch (_currentStep) {
+      case ProfileSetupStep.loading:
+        // กำลังโหลด - แสดง loading indicator
+        return const Scaffold(
+          body: Center(
+            child: CircularProgressIndicator(),
+          ),
+        );
+
+      case ProfileSetupStep.setup:
+        // UnifiedProfileSetupScreen - รวมทุกส่วนไว้ในหน้าเดียว
+        // Section 1 บังคับ, Section 2-3 ไม่บังคับ (แสดงเป็น ExpansionTile)
+        return UnifiedProfileSetupScreen(
+          onComplete: _onSetupComplete,
+          showAsOnboarding: true,
+        );
+
+      case ProfileSetupStep.completed:
+        // เสร็จแล้ว - แสดง MainNavigationScreen
+        return widget.child;
     }
   }
 }

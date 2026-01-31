@@ -131,7 +131,11 @@ class VitalSignService {
             'Insulin': int.tryParse(formState.insulin ?? ''),
             'Input': int.tryParse(formState.input ?? ''),
             'output': formState.output,
-            'Defecation': formState.isFullReport ? formState.defecation : null,
+            // รายงานย่อ: defecation = false (ไม่บันทึกข้อมูลอุจจาระ แต่ไม่ใช่ null)
+            // รายงานเต็ม: ใช้ค่าที่ user เลือก
+            'Defecation': formState.isFullReport ? formState.defecation : false,
+            // รายงานย่อ: ใช้ค่า constipation เดิมจาก record ล่าสุด
+            // รายงานเต็ม: ใช้ค่าที่ user กรอก/ระบบคำนวณ
             'constipation': formState.isFullReport
                 ? double.tryParse(formState.constipation ?? '')
                 : lastConstipation,
@@ -232,7 +236,9 @@ class VitalSignService {
         'Insulin': int.tryParse(formState.insulin ?? ''),
         'Input': int.tryParse(formState.input ?? ''),
         'output': formState.output,
-        'Defecation': formState.isFullReport ? formState.defecation : null,
+        // รายงานย่อ: defecation = false, รายงานเต็ม: ใช้ค่าที่ user เลือก
+        'Defecation': formState.isFullReport ? formState.defecation : false,
+        // รายงานย่อ: ใช้ค่า constipation เดิม, รายงานเต็ม: ใช้ค่าที่ user กรอก
         'constipation': formState.isFullReport
             ? double.tryParse(formState.constipation ?? '')
             : lastConstipation,

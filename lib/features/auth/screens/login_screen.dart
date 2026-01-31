@@ -6,6 +6,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/input_fields.dart';
+import 'invitation_screen.dart';
+import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -517,135 +519,6 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  void _showForgotPasswordDialog() {
-    final forgotEmailController = TextEditingController(text: _emailController.text);
-    bool isLoading = false;
-    String? errorMessage;
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          return AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: AppRadius.mediumRadius,
-            ),
-            title: Text(
-              'ลืมรหัสผ่าน',
-              style: AppTypography.title.copyWith(
-                color: AppColors.textPrimary,
-              ),
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'กรอกอีเมลของคุณ เราจะส่งลิงก์สำหรับตั้งรหัสผ่านใหม่ให้',
-                  style: AppTypography.bodySmall.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                AppSpacing.verticalGapMd,
-                AppTextField(
-                  controller: forgotEmailController,
-                  hintText: 'example@ireneplus.com',
-                  prefixIcon: HugeIcons.strokeRoundedMail01,
-                  keyboardType: TextInputType.emailAddress,
-                  errorText: errorMessage,
-                ),
-              ],
-            ),
-            actions: [
-              SizedBox(
-                height: AppSpacing.buttonHeight,
-                child: TextButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  style: TextButton.styleFrom(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: AppRadius.smallRadius,
-                    ),
-                  ),
-                  child: Text(
-                    'ยกเลิก',
-                    style: AppTypography.body.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ),
-              ),
-              SizedBox(
-                height: AppSpacing.buttonHeight,
-                child: ElevatedButton(
-                  onPressed: isLoading
-                      ? null
-                      : () async {
-                          final email = forgotEmailController.text.trim();
-
-                          if (email.isEmpty) {
-                            setDialogState(() => errorMessage = 'กรุณากรอกอีเมล');
-                            return;
-                          }
-
-                          setDialogState(() {
-                            isLoading = true;
-                            errorMessage = null;
-                          });
-
-                          try {
-                            debugPrint('Sending reset email to: $email');
-                            await Supabase.instance.client.auth.resetPasswordForEmail(
-                              email,
-                            );
-                            debugPrint('Reset email sent successfully');
-
-                            if (context.mounted) {
-                              Navigator.pop(dialogContext);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('ส่งลิงก์รีเซ็ตรหัสผ่านไปที่ $email แล้ว'),
-                                  backgroundColor: AppColors.primary,
-                                ),
-                              );
-                            }
-                          } catch (e) {
-                            debugPrint('Reset password error: $e');
-                            setDialogState(() {
-                              errorMessage = 'ไม่สามารถส่งอีเมลได้ กรุณาลองใหม่';
-                              isLoading = false;
-                            });
-                          }
-                        },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: AppRadius.smallRadius,
-                    ),
-                  ),
-                  child: isLoading
-                      ? SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.surface),
-                          ),
-                        )
-                      : Text(
-                          'ส่งลิงก์รีเซ็ต',
-                          style: AppTypography.body.copyWith(
-                            color: AppColors.surface,
-                          ),
-                        ),
-                ),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
   Widget _buildFooter() {
     return Padding(
       padding: EdgeInsets.only(bottom: AppSpacing.xl),
@@ -655,7 +528,17 @@ class _LoginScreenState extends State<LoginScreen> {
           SizedBox(
             height: AppSpacing.buttonHeight,
             child: TextButton(
-              onPressed: _showForgotPasswordDialog,
+              onPressed: () {
+                // Navigate ไปหน้า forgot password พร้อมส่ง email ไปด้วย (ถ้ามี)
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ForgotPasswordScreen(
+                      initialEmail: _emailController.text.trim(),
+                    ),
+                  ),
+                );
+              },
               child: Text(
                 'ลืมรหัสผ่าน?',
                 style: AppTypography.bodySmall.copyWith(
@@ -665,7 +548,75 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
           ),
+
+          AppSpacing.verticalGapLg,
+
+          // Divider with text - "หรือลงทะเบียนด้วยคำเชิญ"
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+            child: Row(
+              children: [
+                Expanded(child: Divider(color: AppColors.inputBorder)),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                  child: Text(
+                    'หรือลงทะเบียนด้วยคำเชิญ',
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.textSecondary,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+                Expanded(child: Divider(color: AppColors.inputBorder)),
+              ],
+            ),
+          ),
+
           AppSpacing.verticalGapMd,
+
+          // Search invitation button
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+            child: SizedBox(
+              width: double.infinity,
+              height: AppSpacing.buttonHeight,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  // Navigate ไปหน้า InvitationScreen พร้อมส่ง email ไปด้วย
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => InvitationScreen(
+                        initialEmail: _emailController.text.trim(),
+                      ),
+                    ),
+                  );
+                },
+                icon: HugeIcon(
+                  icon: HugeIcons.strokeRoundedSearch01,
+                  color: AppColors.textPrimary,
+                  size: 16,
+                ),
+                label: Text(
+                  'ค้นหาคำเชิญ',
+                  style: AppTypography.bodySmall.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: AppColors.inputBorder),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: AppRadius.smallRadius,
+                  ),
+                  backgroundColor: AppColors.background,
+                ),
+              ),
+            ),
+          ),
+
+          AppSpacing.verticalGapLg,
+
           // Copyright
           Text(
             '© 2025 Irene Plus',

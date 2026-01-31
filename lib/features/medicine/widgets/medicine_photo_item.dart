@@ -145,17 +145,35 @@ class MedicinePhotoItem extends StatelessWidget {
                       ],
                     ),
                   ),
-                  child: Text(
-                    medicine.str != null && medicine.str!.isNotEmpty
-                        ? '${medicine.displayName} ${medicine.str}'
-                        : medicine.displayName,
-                    style: AppTypography.caption.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 10,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  // แสดง 2 บรรทัด: ชื่อยาบน, จำนวนล่าง
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // บรรทัดบน: ชื่อยา + strength
+                      Text(
+                        medicine.str != null && medicine.str!.isNotEmpty
+                            ? '${medicine.displayName} ${medicine.str}'
+                            : medicine.displayName,
+                        style: AppTypography.caption.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 10,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      // บรรทัดล่าง: จำนวน (ถ้ามี)
+                      if (medicine.takeTab != null && medicine.takeTab! > 0)
+                        Text(
+                          medicine.displayDosage,
+                          style: AppTypography.caption.copyWith(
+                            color: Colors.white.withValues(alpha: 0.9),
+                            fontWeight: FontWeight.w500,
+                            fontSize: 9,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ),

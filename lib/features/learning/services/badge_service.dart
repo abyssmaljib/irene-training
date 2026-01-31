@@ -439,4 +439,57 @@ class BadgeService {
       return [];
     }
   }
+
+  /// มอบ badge "The Perfect Starter" สำหรับ user ที่กรอกข้อมูลครบตั้งแต่ onboarding
+  /// คืนค่า Badge ที่ได้รับ หรือ null ถ้าไม่ได้รับ (เช่น มีอยู่แล้ว)
+  Future<Badge?> awardPerfectStarterBadge() async {
+    try {
+      final userId = UserService().effectiveUserId;
+      if (userId == null) {
+        debugPrint('BadgeService.awardPerfectStarterBadge: No user logged in');
+        return null;
+      }
+
+      // ค้นหา badge "The Perfect Starter" จาก requirement_type
+      final badgeData = await _client
+          .from('training_badges')
+          .select()
+          .eq('requirement_type', 'profile_complete_onboarding')
+          .eq('is_active', true)
+          .maybeSingle();
+
+      if (badgeData == null) {
+        debugPrint('BadgeService: Perfect Starter badge not found');
+        return null;
+      }
+
+      final badgeId = badgeData['id'] as String;
+
+      // ตรวจสอบว่ามี badge นี้อยู่แล้วหรือยัง
+      final existing = await _client
+          .from('training_user_badges')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('badge_id', badgeId)
+          .maybeSingle();
+
+      if (existing != null) {
+        debugPrint('BadgeService: User already has Perfect Starter badge');
+        return null;
+      }
+
+      // มอบ badge (ไม่ต้องใส่ season_id เพราะไม่เกี่ยวกับ training season)
+      await _client.from('training_user_badges').insert({
+        'user_id': userId,
+        'badge_id': badgeId,
+        'season_id': null,
+      });
+
+      debugPrint('BadgeService: Awarded Perfect Starter badge to $userId');
+      return Badge.fromBadgeTable(badgeData);
+    } catch (e) {
+      debugPrint('BadgeService: Error awarding Perfect Starter badge: $e');
+      return null;
+    }
+  }
 }

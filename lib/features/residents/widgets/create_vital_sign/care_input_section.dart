@@ -72,14 +72,17 @@ class CareInputSection extends ConsumerWidget {
         ),
         const SizedBox(height: AppSpacing.md),
 
-        // Defecation Section - Card ใหญ่เด่นชัด เตะตา
-        _DefecationCard(
-          defecation: formState.defecation,
-          constipation: formState.constipation,
-          onDefecationChanged: setDefecation,
-          onConstipationChanged: setConstipation,
-        ),
-        const SizedBox(height: AppSpacing.md),
+        // Defecation Section - แสดงเฉพาะรายงานฉบับเต็ม
+        // รายงานย่อจะ auto set defecation=false และ constipation=ค่าเดิม
+        if (formState.isFullReport) ...[
+          _DefecationCard(
+            defecation: formState.defecation,
+            constipation: formState.constipation,
+            onDefecationChanged: setDefecation,
+            onConstipationChanged: setConstipation,
+          ),
+          const SizedBox(height: AppSpacing.md),
+        ],
 
         // Napkin Count
         _CareInputField(

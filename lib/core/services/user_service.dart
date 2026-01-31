@@ -173,7 +173,9 @@ class UserService {
     }
   }
 
-  /// Get current user's name from users table
+  /// Get current user's name from user_info table
+  ///
+  /// Returns nickname if available, otherwise full_name
   Future<String?> getUserName({bool forceRefresh = false}) async {
     final userId = effectiveUserId;
     if (userId == null) return null;
@@ -184,16 +186,21 @@ class UserService {
     }
 
     try {
+      // Query user_info table (ไม่ใช่ users)
+      // ดึงทั้ง nickname และ full_name เพื่อใช้แสดงชื่อ
       final response = await Supabase.instance.client
-          .from('users')
-          .select('name')
+          .from('user_info')
+          .select('nickname, full_name')
           .eq('id', userId)
           .maybeSingle();
 
       _cachedUserId = userId;
-      _cachedUserName = response?['name'] as String?;
+      // Prefer nickname over full_name (เหมือน DevUserInfo.displayName)
+      _cachedUserName =
+          response?['nickname'] as String? ?? response?['full_name'] as String?;
       return _cachedUserName;
     } catch (e) {
+      debugPrint('UserService: Error getting user name: $e');
       return null;
     }
   }

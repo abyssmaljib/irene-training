@@ -29,6 +29,8 @@ import '../../notifications/screens/notification_center_screen.dart';
 import '../../notifications/providers/notification_provider.dart';
 import '../../incident_reflection/screens/incident_list_screen.dart';
 import '../../incident_reflection/providers/incident_provider.dart';
+import '../../profile_setup/screens/unified_profile_setup_screen.dart';
+import '../../profile_setup/providers/profile_setup_provider.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -407,6 +409,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         children: [
           _buildNotificationMenuItem(),
           Divider(height: 1, color: AppColors.alternate),
+          _buildProfileMenuItem(),
+          Divider(height: 1, color: AppColors.alternate),
           _buildMenuItem(
             icon: HugeIcons.strokeRoundedBook02,
             label: 'เรียนรู้',
@@ -530,6 +534,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const NotificationCenterScreen()),
+        );
+      },
+    );
+  }
+
+  /// Build profile menu item with badge showing incomplete profile pages
+  /// แสดง badge ถ้ายังกรอกข้อมูลไม่ครบทั้ง 3 หน้า
+  Widget _buildProfileMenuItem() {
+    final completionAsync = ref.watch(profileCompletionStatusProvider);
+    final incompleteCount = completionAsync.maybeWhen(
+      data: (status) => status.isComplete ? 0 : status.incompleteCount,
+      orElse: () => 0,
+    );
+
+    return _buildMenuItem(
+      icon: HugeIcons.strokeRoundedUserEdit01,
+      label: 'แก้ไขโปรไฟล์',
+      badgeCount: incompleteCount,
+      onTap: () {
+        Navigator.push(
+          context,
+          // showAsOnboarding: false → ไม่มี header gradient, มีปุ่มกลับ
+          MaterialPageRoute(builder: (_) => const UnifiedProfileSetupScreen()),
         );
       },
     );

@@ -997,6 +997,8 @@ class _QCButtonState extends State<_QCButton>
       return GestureDetector(
         onTap: widget.onTap,
         child: Container(
+          // จำกัดความกว้างสูงสุด เพื่อให้ text wrap ได้
+          constraints: const BoxConstraints(maxWidth: 160),
           padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
             color: style.bgColor,
@@ -1015,6 +1017,7 @@ class _QCButtonState extends State<_QCButton>
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               HugeIcon(
                 icon: style.icon,
@@ -1022,12 +1025,18 @@ class _QCButtonState extends State<_QCButton>
                 color: style.color,
               ),
               SizedBox(width: 4),
-              Text(
-                displayLabel,
-                style: AppTypography.caption.copyWith(
-                  color: style.color,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 11,
+              // ใช้ Flexible เพื่อให้ text wrap ได้
+              Flexible(
+                child: Text(
+                  displayLabel,
+                  style: AppTypography.caption.copyWith(
+                    color: style.color,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 11,
+                  ),
+                  // แสดง 2 บรรทัด ถ้ายาวเกิน
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],

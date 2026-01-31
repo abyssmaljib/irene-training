@@ -16,6 +16,7 @@ import '../../board/providers/post_provider.dart';
 import '../../incident_reflection/providers/incident_provider.dart';
 import '../../onboarding/models/tutorial_target.dart';
 import '../../onboarding/widgets/new_feature_badge.dart';
+import '../../profile_setup/providers/profile_setup_provider.dart';
 
 class MainNavigationScreen extends ConsumerStatefulWidget {
   final int initialIndex;
@@ -341,7 +342,7 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
     );
   }
 
-  /// Build profile nav item with notification badge for pending absences, notifications, and incidents
+  /// Build profile nav item with notification badge for pending absences, notifications, incidents, and incomplete profile
   Widget _buildProfileNavItem() {
     final pendingAbsenceAsync = ref.watch(pendingAbsenceCountProvider);
     final hasPendingAbsence = pendingAbsenceAsync.maybeWhen(
@@ -358,6 +359,16 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
     // เพิ่ม: ตรวจสอบ pending incidents (รวม pending + in_progress)
     final pendingIncidentCount = ref.watch(pendingIncidentCountProvider);
     final hasPendingIncidents = pendingIncidentCount > 0;
+
+    // เพิ่ม: ตรวจสอบ profile ที่ยังกรอกไม่ครบ (5 sections required)
+    final profileCompletionAsync = ref.watch(profileCompletionStatusProvider);
+    final hasIncompleteProfile = profileCompletionAsync.maybeWhen(
+      data: (status) {
+        // ใช้ incompleteCount จาก ProfileCompletionStatus โดยตรง
+        return status.incompleteCount > 0;
+      },
+      orElse: () => false,
+    );
 
     final isSelected = _currentIndex == 4;
 
@@ -383,8 +394,8 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
                   color: isSelected ? AppColors.primary : AppColors.secondaryText,
                   size: AppIconSize.xl,
                 ),
-                // Red dot for unread notifications, pending absences, or pending incidents
-                if (hasUnreadNotifications || hasPendingAbsence || hasPendingIncidents)
+                // Red dot for unread notifications, pending absences, pending incidents, or incomplete profile
+                if (hasUnreadNotifications || hasPendingAbsence || hasPendingIncidents || hasIncompleteProfile)
                   Positioned(
                     right: -4,
                     top: -4,

@@ -30,6 +30,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # Thai Localization - สำหรับ DatePicker และ UI ภาษาไทย
+  flutter_localizations:
+    sdk: flutter
   # Supabase
   supabase_flutter: ^2.8.0
   # State Management
@@ -128,8 +131,10 @@ flutter:
   uses-material-design: true
   assets:
     - .env
+    - assets/app_icon.png
     - assets/animations/
     - assets/images/
+    - assets/images/login/
     - assets/images/tarot/
     - assets/sound/
 

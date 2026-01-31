@@ -31,6 +31,7 @@ import 'tarot_card_screen.dart';
 import '../models/tarot_card.dart';
 import '../widgets/tarot_core_value_card.dart';
 import '../../dd_handover/widgets/dd_summary_card.dart';
+import '../widgets/profile_completion_card.dart';
 import '../../dd_handover/screens/dd_list_screen.dart';
 import '../../dd_handover/services/dd_service.dart';
 import '../../incident_reflection/widgets/incident_summary_card.dart';
@@ -683,6 +684,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             },
           ),
         if (_currentMonthSummary != null) AppSpacing.verticalGapMd,
+
+        // Profile Completion Card - ชวน user กรอกข้อมูลโปรไฟล์ให้ครบ
+        // จะแสดงเฉพาะเมื่อยังกรอกไม่ครบทั้ง 3 หน้า
+        const ProfileCompletionCard(),
 
         // DD Summary Card (อยู่ระหว่าง Monthly Summary และ Clock In)
         DDSummaryCard(
