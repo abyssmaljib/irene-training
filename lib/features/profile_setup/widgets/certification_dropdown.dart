@@ -207,3 +207,36 @@ String? getCertificationLabel(String? value) {
   );
   return cert['label']!.isNotEmpty ? cert['label'] : null;
 }
+
+/// Helper function เพื่อ normalize certification value
+/// รองรับกรณีที่ database เก็บเป็น label แทน value code
+/// เช่น "ผู้ช่วยเหลือดูแลผู้สูงอายุ (CG)" → "CG"
+String? normalizeCertificationValue(String? rawValue) {
+  if (rawValue == null || rawValue.isEmpty) return null;
+
+  // ถ้าเป็น value code อยู่แล้ว ส่งกลับเลย
+  final isValidCode = careCertifications.any((c) => c['value'] == rawValue);
+  if (isValidCode) return rawValue;
+
+  // ถ้าเป็น label ให้หา value code
+  final matchByLabel = careCertifications.firstWhere(
+    (c) => c['label'] == rawValue,
+    orElse: () => {'value': '', 'label': ''},
+  );
+  if (matchByLabel['value']!.isNotEmpty) return matchByLabel['value'];
+
+  // ถ้าเป็น label บางส่วน (เช่น มีแค่ชื่อย่อในวงเล็บ)
+  // ลองหาจาก pattern (XX) ใน string
+  final codeMatch = RegExp(r'\(([A-Z]{2,3})\)').firstMatch(rawValue);
+  if (codeMatch != null) {
+    final extractedCode = codeMatch.group(1);
+    final matchByCode = careCertifications.firstWhere(
+      (c) => c['value'] == extractedCode,
+      orElse: () => {'value': '', 'label': ''},
+    );
+    if (matchByCode['value']!.isNotEmpty) return matchByCode['value'];
+  }
+
+  // ไม่เจอ - return null เพื่อให้ user เลือกใหม่
+  return null;
+}

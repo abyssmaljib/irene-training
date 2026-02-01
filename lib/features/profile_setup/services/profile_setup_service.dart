@@ -2,6 +2,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'google_sheet_sync_service.dart';
+
 /// Service สำหรับจัดการ Profile Setup flow
 /// - ตรวจสอบว่า user ต้องกรอก profile หรือยัง
 /// - บันทึกข้อมูล profile (หน้า 1 บังคับ, หน้า 2-3 ไม่บังคับ)
@@ -303,9 +305,118 @@ class ProfileSetupService {
       await _supabase.from('user_info').update(updateData).eq('id', userId);
 
       debugPrint('ProfileSetupService: Saved full profile for $userId');
+
+      // ========== Sync ไป Google Sheet ==========
+      // sync แบบ fire-and-forget (ไม่ block user)
+      // ถ้า sync ไม่สำเร็จก็ไม่เป็นไร ข้อมูลยังอยู่ใน Supabase
+      _syncToGoogleSheet(
+        fullName: fullName,
+        nickname: nickname,
+        prefix: prefix,
+        photoUrl: photoUrl,
+        englishName: englishName,
+        gender: gender,
+        dob: dobStaff,
+        weight: weight,
+        height: height,
+        nationalId: nationalIdStaff,
+        address: address,
+        phone: phoneNumber,
+        education: educationDegree,
+        certification: careCertification,
+        institution: institution,
+        skills: skills,
+        workExperience: workExperience,
+        specialAbilities: specialAbilities,
+        bank: bank,
+        bankAccount: bankAccount,
+        bankBookUrl: bankBookPhotoUrl,
+        idCardUrl: idCardPhotoUrl,
+        certificateUrl: certificatePhotoUrl,
+        resumeUrl: resumeUrl,
+        maritalStatus: maritalStatus,
+        childrenCount: childrenCount,
+        disease: underlyingDiseaseStaff,
+      );
     } catch (e) {
       debugPrint('ProfileSetupService: Error saving full profile: $e');
       rethrow;
+    }
+  }
+
+  /// Sync ข้อมูล profile ไป Google Sheet (fire-and-forget)
+  /// ไม่ throw error ถ้า sync ไม่สำเร็จ เพราะไม่ต้องการให้ block user
+  Future<void> _syncToGoogleSheet({
+    String? fullName,
+    String? nickname,
+    String? prefix,
+    String? photoUrl,
+    String? englishName,
+    String? gender,
+    DateTime? dob,
+    double? weight,
+    double? height,
+    String? nationalId,
+    String? address,
+    String? phone,
+    String? education,
+    String? certification,
+    String? institution,
+    List<String>? skills,
+    String? workExperience,
+    String? specialAbilities,
+    String? bank,
+    String? bankAccount,
+    String? bankBookUrl,
+    String? idCardUrl,
+    String? certificateUrl,
+    String? resumeUrl,
+    String? maritalStatus,
+    int? childrenCount,
+    String? disease,
+  }) async {
+    try {
+      final syncService = GoogleSheetSyncService();
+
+      // แปลงข้อมูลเป็น format สำหรับ Google Sheet
+      final sheetData = syncService.convertProfileToSheetFormat(
+        fullName: fullName,
+        nickname: nickname,
+        prefix: prefix,
+        photoUrl: photoUrl,
+        englishName: englishName,
+        gender: gender,
+        dob: dob,
+        weight: weight,
+        height: height,
+        nationalId: nationalId,
+        address: address,
+        phone: phone,
+        education: education,
+        certification: certification,
+        institution: institution,
+        skills: skills,
+        workExperience: workExperience,
+        specialAbilities: specialAbilities,
+        bank: bank,
+        bankAccount: bankAccount,
+        bankBookUrl: bankBookUrl,
+        idCardUrl: idCardUrl,
+        certificateUrl: certificateUrl,
+        resumeUrl: resumeUrl,
+        maritalStatus: maritalStatus,
+        childrenCount: childrenCount,
+        disease: disease,
+        // email จาก auth (ถ้ามี)
+        email: _supabase.auth.currentUser?.email,
+      );
+
+      // Sync ไป Google Sheet
+      final result = await syncService.syncProfile(sheetData);
+      debugPrint('ProfileSetupService: Google Sheet sync result: $result');
+    } catch (e) {
+      // ไม่ throw error - แค่ log ไว้
+      debugPrint('ProfileSetupService: Google Sheet sync failed (non-blocking): $e');
     }
   }
 

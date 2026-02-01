@@ -199,7 +199,10 @@ class _UnifiedProfileSetupScreenState
 
           // Section 3
           _selectedEducation = profile['education_degree'];
-          _selectedCertification = profile['care_certification'];
+          // Normalize certification เพราะ DB อาจเก็บเป็น label แทน value code
+          _selectedCertification = normalizeCertificationValue(
+            profile['care_certification'],
+          );
           _institutionController.text = profile['institution'] ?? '';
           _selectedSkills = skillsFromJson(profile['skills']);
           _workExperienceController.text = profile['work_experience'] ?? '';
@@ -1364,34 +1367,6 @@ class _UnifiedProfileSetupScreenState
               SizedBox(height: AppSpacing.sm),
             ],
 
-            // ========== DEV BUTTON: กรอกข้อมูลทั้งหมดใน 1 click ==========
-            // ปุ่มสีม่วงสำหรับ developer ใช้ทดสอบ
-            // TODO: ลบออกก่อน production
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _devFillAllFields,
-                icon: HugeIcon(
-                  icon: HugeIcons.strokeRoundedMagicWand01,
-                  color: Colors.white,
-                  size: 20,
-                ),
-                label: const Text(
-                  '🧪 DEV: กรอกข้อมูลทั้งหมด',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.purple,
-                  padding: EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-            SizedBox(height: AppSpacing.sm),
-            // ========== END DEV BUTTON ==========
-
             // ปุ่มบันทึก - enabled เมื่อกรอกชื่อจริง+ชื่อเล่น (ขั้นต่ำ)
             // ถ้ากรอกครบทุก section แสดง "บันทึกข้อมูล" แทน "เริ่มใช้งาน!!"
             PrimaryButton(
@@ -1406,73 +1381,6 @@ class _UnifiedProfileSetupScreenState
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  /// [DEV ONLY] กรอกข้อมูลทั้งหมดอัตโนมัติสำหรับทดสอบ
-  /// ใส่ข้อมูลปลอมในทุก field ยกเว้นรูปภาพ
-  void _devFillAllFields() {
-    setState(() {
-      // ========== Section 1: ข้อมูลพื้นฐาน ==========
-      _selectedPrefix = 'นาย';
-      _fullNameController.text = 'สมชาย ใจดี';
-      _nicknameController.text = 'ชาย';
-      _englishNameController.text = 'Somchai Jaidee';
-      _selectedGender = 'ชาย';
-      _selectedDob = DateTime(1990, 5, 15);
-      _weightController.text = '65';
-      _heightController.text = '175';
-
-      // ========== Section 2: ข้อมูลติดต่อ ==========
-      _nationalIdController.text = '1234567890123';
-      _addressController.text = '123 หมู่ 4 ต.ในเมือง อ.เมือง จ.ขอนแก่น 40000';
-      _phoneController.text = '0812345678';
-      _lineIdController.text = 'somchai.dev';
-
-      // ========== Section 3: วุฒิการศึกษาและทักษะ ==========
-      _selectedEducation = 'ปริญญาตรี';
-      _selectedCertification = 'ผู้ช่วยเหลือดูแลผู้สูงอายุ (CG)';
-      _institutionController.text = 'สถาบันฝึกอบรมการดูแลผู้สูงอายุ';
-      _selectedSkills = {
-        'ดูแลสุขอนามัยส่วนบุคคล (อาบน้ำ สระผม แต่งตัว)',
-        'ดูแลการรับประทานอาหาร',
-        'ดูแลการเคลื่อนไหว (พลิกตัว ย้ายจากเตียง)',
-        'ทำความสะอาดห้องและอุปกรณ์',
-      };
-      _workExperienceController.text = 'เคยทำงานดูแลผู้สูงอายุ 3 ปี ที่บ้านพักคนชรา ABC';
-      _specialAbilitiesController.text = 'ทำอาหาร, ขับรถยนต์';
-
-      // ========== Section 4: การเงิน ==========
-      _selectedBank = 'กสิกรไทย';
-      _bankAccountController.text = '1234567890';
-      // Dummy bank book photo URL
-      _bankBookPhotoUrl = 'https://picsum.photos/seed/bankbook/400/300';
-
-      // ========== Section 5: เอกสาร ==========
-      // Dummy document photo URLs
-      _idCardPhotoUrl = 'https://picsum.photos/seed/idcard/400/250';
-      _certificatePhotoUrl = 'https://picsum.photos/seed/certificate/400/300';
-      // Profile photo
-      _photoUrl = 'https://picsum.photos/seed/profile/200/200';
-
-      // ========== Section 6: ข้อมูลเพิ่มเติม ==========
-      _selectedMaritalStatus = 'โสด';
-      _childrenCountController.text = '0';
-      _diseaseController.text = 'ไม่มี';
-      _aboutMeController.text =
-          'เป็นคนรักการดูแลผู้สูงอายุ มีความอดทน ใจเย็น และเอาใจใส่ในการทำงาน';
-    });
-
-    // แสดง snackbar แจ้งผล
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '🧪 DEV: กรอกข้อมูลและรูปภาพทั้งหมดแล้ว!',
-          style: AppTypography.body.copyWith(color: Colors.white),
-        ),
-        backgroundColor: Colors.purple,
-        duration: const Duration(seconds: 2),
       ),
     );
   }
