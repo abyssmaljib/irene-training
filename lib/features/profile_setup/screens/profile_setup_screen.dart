@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hugeicons/hugeicons.dart';
@@ -169,7 +170,8 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
 
             // Welcome text บน gradient (กด 5 ครั้งเพื่อ logout - สำหรับ dev)
             GestureDetector(
-              onTap: _handleSecretTap,
+              // Secret tap สำหรับ dev logout - เปิดเฉพาะ debug mode
+              onTap: kDebugMode ? _handleSecretTap : null,
               child: Text(
                 'ยินดีต้อนรับ',
                 style: AppTypography.heading2.copyWith(
