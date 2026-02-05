@@ -5,11 +5,12 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/widgets/buttons.dart';
+import '../../../../core/widgets/network_image.dart';
 import '../../models/vital_sign.dart';
 import '../../models/vital_sign_form_state.dart';
 
 /// Bottom Sheet สำหรับ Preview ข้อมูล Vital Sign ก่อน Submit
-/// แสดง 2 sections: สรุปข้อมูล + ตัวอย่างรายงานที่จะส่งให้ญาติ
+/// แสดง 3 sections: ข้อมูลผู้สูงอายุ + สรุปข้อมูล + ตัวอย่างรายงานที่จะส่งให้ญาติ
 class PreviewVitalSignDialog extends StatelessWidget {
   const PreviewVitalSignDialog({
     super.key,
@@ -17,12 +18,21 @@ class PreviewVitalSignDialog extends StatelessWidget {
     required this.residentName,
     this.userFullName,
     this.userNickname,
+    // Resident info สำหรับ preview card
+    this.residentImageUrl,
+    this.zoneName,
+    this.underlyingDiseases = const [],
   });
 
   final VitalSignFormState formState;
   final String residentName;
   final String? userFullName;
   final String? userNickname;
+
+  // Resident info สำหรับ preview card
+  final String? residentImageUrl;
+  final String? zoneName;
+  final List<String> underlyingDiseases;
 
   /// แสดง Preview Bottom Sheet
   /// Return: true = ยืนยัน, false = แก้ไข, null = ปิด
@@ -32,6 +42,10 @@ class PreviewVitalSignDialog extends StatelessWidget {
     required String residentName,
     String? userFullName,
     String? userNickname,
+    // Resident info สำหรับ preview card
+    String? residentImageUrl,
+    String? zoneName,
+    List<String> underlyingDiseases = const [],
   }) async {
     return showModalBottomSheet<bool>(
       context: context,
@@ -42,6 +56,9 @@ class PreviewVitalSignDialog extends StatelessWidget {
         residentName: residentName,
         userFullName: userFullName,
         userNickname: userNickname,
+        residentImageUrl: residentImageUrl,
+        zoneName: zoneName,
+        underlyingDiseases: underlyingDiseases,
       ),
     );
   }
@@ -87,6 +104,10 @@ class PreviewVitalSignDialog extends StatelessWidget {
                   // Space หลัง header
                   const SizedBox(height: AppSpacing.md),
 
+                  // Section 0: ข้อมูลผู้สูงอายุ - ให้ user ตรวจสอบว่าถูกคนหรือไม่
+                  _buildResidentCard(),
+                  const SizedBox(height: AppSpacing.md),
+
                   // Section 1: สรุปข้อมูล
                   _buildSummarySection(),
                   const SizedBox(height: AppSpacing.md),
@@ -115,6 +136,87 @@ class PreviewVitalSignDialog extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.alternate,
         borderRadius: BorderRadius.circular(2),
+      ),
+    );
+  }
+
+  /// สร้าง Resident Card - ให้ user ตรวจสอบว่าบันทึกให้ถูกคนหรือไม่
+  Widget _buildResidentCard() {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(AppRadius.medium),
+        border: Border.all(
+          color: AppColors.primary.withValues(alpha: 0.2),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // รูป resident
+          IreneNetworkAvatar(
+            imageUrl: residentImageUrl,
+            radius: 28,
+            fallbackIcon: HugeIcon(
+              icon: HugeIcons.strokeRoundedUser,
+              color: AppColors.secondaryText,
+              size: AppIconSize.lg,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          // ข้อมูล resident
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ชื่อ
+                Text(
+                  residentName,
+                  style: AppTypography.heading3.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                // Zone
+                if (zoneName != null && zoneName!.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    'zone - $zoneName',
+                    style: AppTypography.bodySmall.copyWith(
+                      color: AppColors.secondaryText,
+                    ),
+                  ),
+                ],
+                // โรคประจำตัว
+                if (underlyingDiseases.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.xs),
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: 'โรคประจำตัว: ',
+                          style: AppTypography.bodySmall.copyWith(
+                            color: AppColors.error,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        TextSpan(
+                          text: underlyingDiseases.join(', '),
+                          style: AppTypography.bodySmall.copyWith(
+                            color: AppColors.error,
+                          ),
+                        ),
+                      ],
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -626,6 +728,27 @@ class PreviewVitalSignDialog extends StatelessWidget {
   // Formatting Functions
   // ==========================================
 
+  /// Format ชื่อผู้ดูแลแบบ "ชื่อจริง (ชื่อเล่น)"
+  /// จัดการ edge cases: ถ้ามีแค่ค่าเดียว ก็แสดงแค่ค่านั้น
+  String _formatDisplayName(String? fullName, String? nickname) {
+    final hasFullName = fullName != null && fullName.isNotEmpty;
+    final hasNickname = nickname != null && nickname.isNotEmpty;
+
+    if (hasFullName && hasNickname) {
+      // มีทั้ง 2 ค่า: "ชื่อจริง (ชื่อเล่น)"
+      return '$fullName ($nickname)';
+    } else if (hasFullName) {
+      // มีแค่ชื่อจริง
+      return fullName;
+    } else if (hasNickname) {
+      // มีแค่ชื่อเล่น
+      return nickname;
+    } else {
+      // ไม่มีทั้งคู่
+      return '-';
+    }
+  }
+
   /// Format DateTime สำหรับแสดงผล
   String _formatDateTime(DateTime dt) {
     return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} '
@@ -749,9 +872,10 @@ class PreviewVitalSignDialog extends StatelessWidget {
 
     // Footer
     buffer.writeln();
-    final fullName = userFullName ?? '';
-    final nickname = userNickname ?? '';
-    buffer.writeln('👧ผู้ดูแล $fullName ($nickname)');
+    // สร้าง display name แบบ "ชื่อจริง (ชื่อเล่น)"
+    // จัดการ edge cases: ถ้ามีแค่ค่าเดียว ก็แสดงแค่ค่านั้น
+    final displayName = _formatDisplayName(userFullName, userNickname);
+    buffer.writeln('👧ผู้ดูแล $displayName');
     buffer.writeln(_formatDateTime(formState.selectedDateTime));
     buffer.writeln('❤️THANK YOU🙏');
 

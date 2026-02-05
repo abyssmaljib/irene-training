@@ -7,6 +7,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/irene_app_bar.dart';
 import '../../../core/widgets/success_popup.dart';
+import '../providers/resident_detail_provider.dart';
 import '../providers/vital_sign_form_provider.dart';
 import '../widgets/create_vital_sign/vital_input_section.dart';
 import '../widgets/create_vital_sign/care_input_section.dart';
@@ -193,10 +194,16 @@ class CreateVitalSignScreen extends ConsumerWidget {
                       }
 
                       // 2. ดึงข้อมูล user สำหรับแสดงใน preview (รองรับ impersonation)
-                      final userNickname = await UserService().getUserName();
-                      final userFullName = userNickname; // ใช้ชื่อเดียวกัน
+                      // ใช้ getUserNames() เพื่อดึงทั้ง fullName และ nickname แยกกัน
+                      final userNames = await UserService().getUserNames();
+                      final userFullName = userNames.fullName;
+                      final userNickname = userNames.nickname;
 
-                      // 3. แสดง Preview Dialog
+                      // 3. ดึงข้อมูล resident สำหรับแสดงใน preview card
+                      final residentDetail =
+                          await ref.read(residentDetailProvider(residentId).future);
+
+                      // 4. แสดง Preview Dialog
                       if (!context.mounted) return;
                       final confirmed = await PreviewVitalSignDialog.show(
                         context,
@@ -204,6 +211,11 @@ class CreateVitalSignScreen extends ConsumerWidget {
                         residentName: residentName ?? '',
                         userFullName: userFullName,
                         userNickname: userNickname,
+                        // ส่งข้อมูล resident สำหรับ preview card
+                        residentImageUrl: residentDetail?.imageUrl,
+                        zoneName: residentDetail?.zoneName,
+                        underlyingDiseases:
+                            residentDetail?.underlyingDiseases ?? [],
                       );
 
                       // 4. ถ้ายืนยัน → submit

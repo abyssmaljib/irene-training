@@ -201,6 +201,10 @@ class UserService {
     }
   }
 
+  // Cache สำหรับ full_name แยกจาก nickname
+  String? _cachedFullName;
+  String? _cachedNickname;
+
   /// Get current user's name from user_info table
   ///
   /// Returns nickname if available, otherwise full_name
@@ -223,13 +227,48 @@ class UserService {
           .maybeSingle();
 
       _cachedUserId = userId;
+      _cachedNickname = response?['nickname'] as String?;
+      _cachedFullName = response?['full_name'] as String?;
       // Prefer nickname over full_name (เหมือน DevUserInfo.displayName)
-      _cachedUserName =
-          response?['nickname'] as String? ?? response?['full_name'] as String?;
+      _cachedUserName = _cachedNickname ?? _cachedFullName;
       return _cachedUserName;
     } catch (e) {
       debugPrint('UserService: Error getting user name: $e');
       return null;
+    }
+  }
+
+  /// Get current user's full name and nickname separately
+  /// Returns (fullName, nickname) - useful for displaying "ชื่อจริง (ชื่อเล่น)"
+  Future<({String? fullName, String? nickname})> getUserNames({
+    bool forceRefresh = false,
+  }) async {
+    final userId = effectiveUserId;
+    if (userId == null) return (fullName: null, nickname: null);
+
+    // Return cached values if same user and not forcing refresh
+    if (!forceRefresh &&
+        _cachedUserId == userId &&
+        (_cachedFullName != null || _cachedNickname != null)) {
+      return (fullName: _cachedFullName, nickname: _cachedNickname);
+    }
+
+    try {
+      final response = await Supabase.instance.client
+          .from('user_info')
+          .select('nickname, full_name')
+          .eq('id', userId)
+          .maybeSingle();
+
+      _cachedUserId = userId;
+      _cachedNickname = response?['nickname'] as String?;
+      _cachedFullName = response?['full_name'] as String?;
+      _cachedUserName = _cachedNickname ?? _cachedFullName;
+
+      return (fullName: _cachedFullName, nickname: _cachedNickname);
+    } catch (e) {
+      debugPrint('UserService: Error getting user names: $e');
+      return (fullName: null, nickname: null);
     }
   }
 
@@ -296,6 +335,9 @@ class UserService {
   void clearCache() {
     _cachedNursinghomeId = null;
     _cachedUserId = null;
+    _cachedUserName = null;
+    _cachedFullName = null;
+    _cachedNickname = null;
     _cachedRole = null;
     _cachedSystemRole = null;
     _cachedEmploymentType = null;
