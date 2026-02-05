@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hugeicons/hugeicons.dart';
@@ -20,6 +21,7 @@ import '../services/clock_service.dart';
 import '../widgets/clock_in_section.dart';
 import '../widgets/on_shift_card.dart';
 import '../widgets/clock_out_dialog.dart';
+import '../widgets/clock_out_survey_form.dart';
 import '../widgets/shift_activity_card.dart';
 import '../widgets/monthly_summary_card.dart';
 import '../../board/screens/required_posts_screen.dart';
@@ -42,6 +44,11 @@ import '../../incident_reflection/providers/incident_provider.dart';
 import '../../dd_handover/providers/dd_provider.dart';
 import '../services/clock_realtime_service.dart';
 import '../../../main.dart' show globalRefreshNotifier;
+import '../../points/widgets/points_summary_card.dart';
+import '../../points/models/models.dart'; // สำหรับ Tier, UserTierInfo
+import '../../learning/models/badge.dart' as learning; // สำหรับ mock badges (ป้องกัน conflict กับ material Badge)
+import '../services/shift_summary_service.dart' as clock_out_summary; // สำหรับ ShiftSummary (clock out)
+import '../widgets/clock_out_summary_modal.dart'; // สำหรับ dev test
 
 /// หน้าหลัก - Dashboard with Clock-in/Clock-out
 /// ใช้ ConsumerStatefulWidget เพื่อให้ pull to refresh สามารถ invalidate
@@ -431,10 +438,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     setState(() => _isClockingIn = true);
     try {
+      // ดึง system role ของ user เพื่อเช็คว่าเป็นหัวหน้าเวรหรือไม่
+      // ถ้าเป็น shift_leader จะ auto-set Incharge = true
+      final systemRole = await _userService.getSystemRole();
+      final isIncharge = systemRole?.isShiftLeader ?? false;
+
       final result = await _clockService.clockIn(
         zoneIds: _selectedZoneIds.toList(),
         residentIds: _selectedResidentIds.toList(),
         breakTimeIds: _selectedBreakTimeIds.toList(),
+        isIncharge: isIncharge,
       );
 
       if (result != null && mounted) {
@@ -669,6 +682,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildClockInContent() {
     return Column(
       children: [
+        // ปุ่ม Dev สำหรับทดสอบฟอร์มหลังลงเวร (แสดงเฉพาะใน debug mode)
+        if (kDebugMode) ...[
+          _buildDevSurveyFormButton(),
+          AppSpacing.verticalGapSm,
+          _buildDevSummaryModalButton(),
+          AppSpacing.verticalGapMd,
+        ],
+
         // Monthly Summary Card
         if (_currentMonthSummary != null)
           MonthlySummaryCard(
@@ -685,11 +706,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         if (_currentMonthSummary != null) AppSpacing.verticalGapMd,
 
+        // Points Summary Card - แสดงคะแนนสะสมและ Tier
+        // กดเพื่อไปหน้า Leaderboard
+        const PointsSummaryCard(),
+
         // Profile Completion Card - ชวน user กรอกข้อมูลโปรไฟล์ให้ครบ
         // จะแสดงเฉพาะเมื่อยังกรอกไม่ครบทั้ง 3 หน้า
         const ProfileCompletionCard(),
 
         // DD Summary Card (อยู่ระหว่าง Monthly Summary และ Clock In)
+        // Card มี margin bottom ของตัวเอง ไม่ต้องเพิ่ม gap
         DDSummaryCard(
           onTap: () {
             Navigator.push(
@@ -698,7 +724,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             );
           },
         ),
-        AppSpacing.verticalGapMd,
 
         // Incident Reflection Summary Card (Shortcut ไปหน้าถอดบทเรียน)
         IncidentSummaryCard(
@@ -737,6 +762,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildOnShiftContent() {
     return Column(
       children: [
+        // ปุ่ม Dev สำหรับทดสอบฟอร์มหลังลงเวร (แสดงเฉพาะใน debug mode)
+        if (kDebugMode) ...[
+          _buildDevSummaryModalButton(),
+          AppSpacing.verticalGapMd,
+        ],
+
         // Tarot Core Value Card - แสดงไพ่ที่ได้รับตอนขึ้นเวร
         if (_selectedTarotCard != null) ...[
           TarotCoreValueCard(card: _selectedTarotCard!),
@@ -778,6 +809,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               clockInTime: _currentShift!.clockInTimestamp ?? DateTime.now(),
               selectedBreakTimes: filteredBreakTimes,
               recentItemsLimit: 3,
+              // ส่ง deadAirMinutes จาก backend (database trigger calculation)
+              deadAirMinutes: _currentShift!.deadAirMinutes,
               onViewAllTap: () {
                 // Navigate to Checklist tab (index 1)
                 MainNavigationScreen.navigateToTab(context, 1);
@@ -980,6 +1013,237 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  /// ปุ่ม Dev สำหรับทดสอบฟอร์มหลังลงเวร (ClockOutSurveyForm)
+  /// แสดงเฉพาะใน debug mode เพื่อให้ dev ทดสอบ UI ได้โดยไม่ต้องขึ้นเวรจริง
+  Widget _buildDevSurveyFormButton() {
+    return Container(
+      padding: EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: Colors.orange.shade50,
+        borderRadius: AppRadius.mediumRadius,
+        border: Border.all(color: Colors.orange.shade200),
+      ),
+      child: Row(
+        children: [
+          HugeIcon(
+            icon: HugeIcons.strokeRoundedTestTube,
+            color: Colors.orange.shade700,
+            size: AppIconSize.lg,
+          ),
+          AppSpacing.horizontalGapSm,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'DEV: ทดสอบฟอร์มหลังลงเวร',
+                  style: AppTypography.subtitle.copyWith(
+                    color: Colors.orange.shade700,
+                  ),
+                ),
+                Text(
+                  'เปิดดู ClockOutSurveyForm โดยไม่ต้องขึ้นเวร',
+                  style: AppTypography.caption.copyWith(
+                    color: Colors.orange.shade600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          AppSpacing.horizontalGapSm,
+          ElevatedButton(
+            onPressed: _showDevSurveyFormDialog,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange.shade600,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('เปิด'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// แสดง Dialog สำหรับทดสอบ ClockOutSurveyForm
+  void _showDevSurveyFormDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: AppColors.surface, // พื้นหลังขาว
+        insetPadding: EdgeInsets.all(AppSpacing.md),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 500),
+          padding: EdgeInsets.all(AppSpacing.lg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header พร้อมปุ่มปิด
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'DEV: ทดสอบฟอร์ม',
+                    style: AppTypography.subtitle.copyWith(
+                      color: Colors.orange.shade700,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: HugeIcon(
+                      icon: HugeIcons.strokeRoundedCancel01,
+                      color: AppColors.secondaryText,
+                      size: AppIconSize.md,
+                    ),
+                  ),
+                ],
+              ),
+              const Divider(),
+              // ClockOutSurveyForm
+              Flexible(
+                child: ClockOutSurveyForm(
+                  onSubmit: ({
+                    required int shiftScore,
+                    required int selfScore,
+                    required String shiftSurvey,
+                    String? bugSurvey,
+                    int? leaderScore,
+                  }) {
+                    // แสดงผลลัพธ์ใน SnackBar แทนการบันทึกจริง
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(this.context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'DEV: shiftScore=$shiftScore, selfScore=$selfScore, '
+                          'leaderScore=$leaderScore, '
+                          'survey="${shiftSurvey.substring(0, shiftSurvey.length.clamp(0, 30))}..."',
+                        ),
+                        backgroundColor: Colors.orange.shade600,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// ปุ่ม Dev สำหรับทดสอบ ClockOutSummaryModal
+  /// แสดงเฉพาะใน debug mode เพื่อให้ dev ทดสอบ UI ได้โดยไม่ต้องลงเวรจริง
+  Widget _buildDevSummaryModalButton() {
+    return Container(
+      padding: EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: Colors.purple.shade50,
+        borderRadius: AppRadius.mediumRadius,
+        border: Border.all(color: Colors.purple.shade200),
+      ),
+      child: Row(
+        children: [
+          HugeIcon(
+            icon: HugeIcons.strokeRoundedGift,
+            color: Colors.purple.shade700,
+            size: AppIconSize.lg,
+          ),
+          AppSpacing.horizontalGapSm,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'DEV: ทดสอบ Summary Modal',
+                  style: AppTypography.subtitle.copyWith(
+                    color: Colors.purple.shade700,
+                  ),
+                ),
+                Text(
+                  'เปิดดู ClockOutSummaryModal พร้อม Confetti',
+                  style: AppTypography.caption.copyWith(
+                    color: Colors.purple.shade600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          AppSpacing.horizontalGapSm,
+          ElevatedButton(
+            onPressed: _showDevSummaryModal,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.purple.shade600,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('เปิด'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// แสดง ClockOutSummaryModal พร้อม mock data
+  void _showDevSummaryModal() {
+    // สร้าง mock ShiftSummary สำหรับทดสอบ
+    final mockSummary = clock_out_summary.ShiftSummary(
+      points: const clock_out_summary.ShiftPointsSummary(
+        totalPoints: 85,
+        taskPoints: 60,
+        quizPoints: 15,
+        contentPoints: 10,
+        badgePoints: 0,
+        deadAirPenalty: 5,
+        transactionCount: 12,
+      ),
+      newBadges: [
+        // Mock badges สำหรับทดสอบ
+        // ใช้ learning.Badge เพื่อหลีกเลี่ยง conflict กับ material Badge
+        learning.Badge(
+          id: 'badge_1',
+          name: 'ตรงเวลา 7 วัน',
+          description: 'มาทำงานตรงเวลา 7 วันติดต่อกัน',
+          imageUrl: null,
+          rarity: 'common',
+          category: 'punctuality',
+          points: 10,
+          requirementType: 'streak',
+          isEarned: true,
+        ),
+        learning.Badge(
+          id: 'badge_2',
+          name: 'Quiz Master',
+          description: 'ทำ Quiz ได้คะแนนเต็ม 5 ครั้ง',
+          imageUrl: null,
+          rarity: 'rare',
+          category: 'learning',
+          points: 20,
+          requirementType: 'quiz_perfect',
+          isEarned: true,
+        ),
+      ],
+      tierInfo: UserTierInfo(
+        currentTier: Tier.defaultTier,
+        nextTier: const Tier(
+          id: 'silver',
+          name: 'Silver',
+          nameTh: 'ซิลเวอร์',
+          minPoints: 500,
+          icon: '🥈',
+        ),
+        totalPoints: 350,
+      ),
+      leaderboardRank: 5,
+      totalUsers: 25,
+      workStreak: 7,
+      deadAirMinutes: 45,
+    );
+
+    // แสดง Modal
+    ClockOutSummaryModal.show(
+      context,
+      summary: mockSummary,
     );
   }
 }

@@ -5,6 +5,7 @@ class UserProfile {
   final String? fullName;
   final String? prefix;
   final int? nursinghomeId;
+  final String? employmentType; // full_time, part_time, trainee, resigned
 
   const UserProfile({
     required this.id,
@@ -13,6 +14,7 @@ class UserProfile {
     this.fullName,
     this.prefix,
     this.nursinghomeId,
+    this.employmentType,
   });
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
@@ -23,8 +25,28 @@ class UserProfile {
       fullName: json['full_name'] as String?,
       prefix: json['prefix'] as String?,
       nursinghomeId: json['nursinghome_id'] as int?,
+      employmentType: json['employment_type'] as String?,
     );
   }
+
+  /// แปลง employment_type เป็นข้อความภาษาไทย
+  String? get employmentTypeDisplay {
+    switch (employmentType) {
+      case 'full_time':
+        return 'ประจำ';
+      case 'part_time':
+        return 'พาร์ทไทม์';
+      case 'trainee':
+        return 'ฝึกงาน';
+      case 'resigned':
+        return 'ลาออกแล้ว';
+      default:
+        return null;
+    }
+  }
+
+  /// ตรวจสอบว่าลาออกแล้วหรือไม่
+  bool get isResigned => employmentType == 'resigned';
 
   String get displayName {
     if (nickname != null && nickname!.isNotEmpty) {

@@ -60,13 +60,13 @@ class ClockInSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Header
+        // Header - ใช้ shadow แทน border เพื่อความสม่ำเสมอกับ cards อื่น
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(AppSpacing.md),
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: AppRadius.mediumRadius,
-            border: Border.all(color: AppColors.inputBorder),
+            boxShadow: [AppShadows.subtle],
           ),
           child: Row(
             children: [

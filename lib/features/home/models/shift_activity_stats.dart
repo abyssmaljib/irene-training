@@ -28,10 +28,11 @@ class ShiftActivityStats {
   final int veryLateCount;
   final int kindnessCount; // งาน "น้ำใจ" ช่วยคนอื่น
   final int totalTasks; // รวมทั้ง completed และ pending
-  final int deadAirMinutes; // เวลาอู้งานรวม (นาที)
+  final int deadAirMinutes; // เวลาอู้งานรวม (นาที) = totalGapMinutes - allowance - breakOverlapMinutes
   final int totalWorkMinutes; // เวลาทำงานทั้งหมดตั้งแต่ clock-in (นาที)
   final List<DeadAirGap> deadAirGaps; // รายละเอียดช่วงว่างแต่ละช่วง
-  final int totalBreakMinutes; // เวลาพักรวม
+  final int totalBreakMinutes; // เวลาพักรวมที่ทับกับ gaps (สำหรับ UI)
+  final int totalGapMinutes; // รวมช่วงห่างทั้งหมด (ก่อนหัก allowance และ break)
 
   const ShiftActivityStats({
     required this.totalCompleted,
@@ -45,6 +46,7 @@ class ShiftActivityStats {
     required this.totalWorkMinutes,
     this.deadAirGaps = const [],
     this.totalBreakMinutes = 0,
+    this.totalGapMinutes = 0,
   });
 
   /// สร้าง empty stats
@@ -59,6 +61,64 @@ class ShiftActivityStats {
       totalTasks: 0,
       deadAirMinutes: 0,
       totalWorkMinutes: 0,
+      totalGapMinutes: 0,
+    );
+  }
+
+  /// สร้างจาก backend dead air value
+  /// ใช้เมื่อ deadAirMinutes มาจาก database (คำนวณโดย trigger)
+  /// สูตร: Dead Air = Total Gaps - Task Time - 75 นาที (allowance) - Break Overlap
+  /// Task Time: Score 1-3 = 5 นาที, Score 4-6 = 10 นาที, Score 7-10 = 15 นาที
+  factory ShiftActivityStats.fromBackend({
+    required List<ShiftActivityItem> activities,
+    required int totalTasks,
+    required int teamTotalCompleted,
+    required DateTime clockInTime,
+    required int deadAirMinutes, // จาก backend (ClockInOut.deadAirMinutes)
+    List<int> myResidentIds = const [],
+  }) {
+    int onTime = 0;
+    int slightlyLate = 0;
+    int veryLate = 0;
+    int kindness = 0;
+
+    for (final activity in activities) {
+      // Check if kindness task (helped someone else's resident)
+      if (activity.isKindnessTask(myResidentIds)) {
+        kindness++;
+        continue;
+      }
+
+      switch (activity.timelinessStatus) {
+        case 'onTime':
+          onTime++;
+          break;
+        case 'slightlyLate':
+          slightlyLate++;
+          break;
+        case 'veryLate':
+          veryLate++;
+          break;
+      }
+    }
+
+    // คำนวณเวลาทำงานทั้งหมด
+    final now = DateTime.now();
+    final totalWorkMinutes = now.difference(clockInTime).inMinutes;
+
+    return ShiftActivityStats(
+      totalCompleted: activities.length,
+      teamTotalCompleted: teamTotalCompleted,
+      onTimeCount: onTime,
+      slightlyLateCount: slightlyLate,
+      veryLateCount: veryLate,
+      kindnessCount: kindness,
+      totalTasks: totalTasks,
+      deadAirMinutes: deadAirMinutes, // ใช้ค่าจาก backend โดยตรง
+      totalWorkMinutes: totalWorkMinutes,
+      deadAirGaps: const [], // ไม่มี breakdown จาก backend
+      totalBreakMinutes: 0, // ไม่มีจาก backend
+      totalGapMinutes: 0, // ไม่มีจาก backend
     );
   }
 
@@ -119,6 +179,7 @@ class ShiftActivityStats {
       totalWorkMinutes: totalWorkMinutes,
       deadAirGaps: deadAirResult.gaps,
       totalBreakMinutes: deadAirResult.totalBreakMinutes,
+      totalGapMinutes: deadAirResult.totalGapMinutes,
     );
   }
 
@@ -141,83 +202,105 @@ class ShiftActivityStats {
   /// มี activity หรือไม่
   bool get hasActivities => totalCompleted > 0;
 
+  /// Allowance สำหรับ dead air - 75 นาที (1 ชม. 15 นาที) ให้ฟรี
+  static const int deadAirAllowanceMinutes = 75;
+
   /// คำนวณ Dead Air จาก list ของ completed tasks พร้อมรายละเอียด
-  /// - เรียง tasks ตาม completedAt
-  /// - หา gap ระหว่าง tasks ที่ > 1 ชั่วโมง
-  /// - ลบเวลาพักออก (ถ้า gap ทับกับช่วงพัก)
-  static ({int totalDeadAir, List<DeadAirGap> gaps, int totalBreakMinutes}) _calculateDeadAirWithDetails({
+  /// สูตรใหม่:
+  /// 1. รวมทุก gap (ไม่มี threshold ต่อ gap)
+  /// 2. Break Overlap = ส่วนที่ gaps ทับกับเวลาพักที่ user เลือก
+  /// 3. Dead Air = Total Gaps - 75 (allowance) - Break Overlap
+  ///
+  /// หมายเหตุ: Break จะหักได้เฉพาะส่วนที่ gap ทับกับเวลาพัก
+  /// เพื่อให้ user ไปพักตรงเวลาที่เลือก
+  static ({int totalDeadAir, List<DeadAirGap> gaps, int totalBreakMinutes, int totalGapMinutes})
+      _calculateDeadAirWithDetails({
     required List<ShiftActivityItem> activities,
     required DateTime clockInTime,
     required List<BreakTimeOption> selectedBreakTimes,
   }) {
     if (activities.isEmpty) {
-      return (totalDeadAir: 0, gaps: [], totalBreakMinutes: 0);
+      return (totalDeadAir: 0, gaps: [], totalBreakMinutes: 0, totalGapMinutes: 0);
     }
 
     // เรียงตาม completedAt
     final sorted = List<ShiftActivityItem>.from(activities)
       ..sort((a, b) => a.completedAt.compareTo(b.completedAt));
 
-    int totalDeadAir = 0;
-    int totalBreakMinutes = 0;
+    int totalGapMinutes = 0;
+    int totalBreakOverlap = 0;
     final List<DeadAirGap> gaps = [];
     DateTime lastActivityTime = clockInTime;
 
+    // รวบรวมทุก gap
     for (final activity in sorted) {
       final gapMinutes =
           activity.completedAt.difference(lastActivityTime).inMinutes;
 
-      if (gapMinutes > 60) {
-        // ลบเวลาพักที่อยู่ใน gap ออก
+      if (gapMinutes > 0) {
+        // คำนวณ break overlap สำหรับ gap นี้
         final breakMinutesInGap = _calculateBreakMinutesInRange(
           lastActivityTime,
           activity.completedAt,
           selectedBreakTimes,
         );
-        totalBreakMinutes += breakMinutesInGap;
 
-        // Dead air = gap - 60 นาที allowance - เวลาพัก
-        final actualDeadAir = gapMinutes - 60 - breakMinutesInGap;
-        if (actualDeadAir > 0) {
-          totalDeadAir += actualDeadAir;
-          gaps.add(DeadAirGap(
-            gapStart: lastActivityTime,
-            gapEnd: activity.completedAt,
-            gapMinutes: gapMinutes,
-            breakMinutes: breakMinutesInGap,
-            deadAirMinutes: actualDeadAir,
-          ));
-        }
+        totalGapMinutes += gapMinutes;
+        totalBreakOverlap += breakMinutesInGap;
+
+        // บันทึก gap detail
+        gaps.add(DeadAirGap(
+          gapStart: lastActivityTime,
+          gapEnd: activity.completedAt,
+          gapMinutes: gapMinutes,
+          breakMinutes: breakMinutesInGap,
+          deadAirMinutes: 0, // จะคำนวณทีหลังจาก total
+        ));
       }
 
       lastActivityTime = activity.completedAt;
     }
 
-    // Check gap จาก activity สุดท้ายถึงปัจจุบัน
+    // Gap สุดท้าย: จาก activity ล่าสุดถึงปัจจุบัน
     final now = DateTime.now();
     final lastGapMinutes = now.difference(lastActivityTime).inMinutes;
-    if (lastGapMinutes > 60) {
+    if (lastGapMinutes > 0) {
       final breakMinutesInGap = _calculateBreakMinutesInRange(
         lastActivityTime,
         now,
         selectedBreakTimes,
       );
-      totalBreakMinutes += breakMinutesInGap;
 
-      final actualDeadAir = lastGapMinutes - 60 - breakMinutesInGap;
-      if (actualDeadAir > 0) {
-        totalDeadAir += actualDeadAir;
-        gaps.add(DeadAirGap(
-          gapStart: lastActivityTime,
-          gapEnd: now,
-          gapMinutes: lastGapMinutes,
-          breakMinutes: breakMinutesInGap,
-          deadAirMinutes: actualDeadAir,
-        ));
-      }
+      totalGapMinutes += lastGapMinutes;
+      totalBreakOverlap += breakMinutesInGap;
+
+      gaps.add(DeadAirGap(
+        gapStart: lastActivityTime,
+        gapEnd: now,
+        gapMinutes: lastGapMinutes,
+        breakMinutes: breakMinutesInGap,
+        deadAirMinutes: 0,
+      ));
     }
 
-    return (totalDeadAir: totalDeadAir, gaps: gaps, totalBreakMinutes: totalBreakMinutes);
+    // คำนวณ Dead Air ตามสูตรใหม่:
+    // Dead Air = Total Gaps - 75 (allowance) - Break Overlap
+    final totalDeadAir =
+        totalGapMinutes - deadAirAllowanceMinutes - totalBreakOverlap;
+
+    debugPrint('=== Dead Air Calculation (New Formula) ===');
+    debugPrint('Total Gaps: $totalGapMinutes นาที');
+    debugPrint('Allowance: $deadAirAllowanceMinutes นาที');
+    debugPrint('Break Overlap: $totalBreakOverlap นาที');
+    debugPrint(
+        'Dead Air: $totalGapMinutes - $deadAirAllowanceMinutes - $totalBreakOverlap = ${totalDeadAir > 0 ? totalDeadAir : 0} นาที');
+
+    return (
+      totalDeadAir: totalDeadAir > 0 ? totalDeadAir : 0,
+      gaps: gaps,
+      totalBreakMinutes: totalBreakOverlap,
+      totalGapMinutes: totalGapMinutes,
+    );
   }
 
   /// คำนวณจำนวนนาทีพักที่อยู่ในช่วงเวลา

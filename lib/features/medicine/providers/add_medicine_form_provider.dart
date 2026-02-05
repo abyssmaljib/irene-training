@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../core/services/user_service.dart';
 import '../models/add_medicine_form_state.dart';
 import '../models/med_db.dart';
 import '../services/medicine_service.dart';
@@ -39,18 +39,9 @@ class AddMedicineFormNotifier
   /// Initialize form ด้วย default values
   Future<void> _initialize() async {
     try {
-      // ดึง nursinghomeId จาก user profile
-      final userId = Supabase.instance.client.auth.currentUser?.id;
-      debugPrint('[AddMedicineForm] userId: $userId');
-      if (userId != null) {
-        final userInfo = await Supabase.instance.client
-            .from('user_info')
-            .select('nursinghome_id')
-            .eq('id', userId)
-            .maybeSingle();
-        _nursinghomeId = userInfo?['nursinghome_id'] as int?;
-        debugPrint('[AddMedicineForm] nursinghomeId: $_nursinghomeId');
-      }
+      // ดึง nursinghomeId จาก UserService (รองรับ impersonation)
+      _nursinghomeId = await UserService().getNursinghomeId();
+      debugPrint('[AddMedicineForm] nursinghomeId: $_nursinghomeId');
 
       // Pre-load medicines cache (ถ้ามี nursinghomeId)
       if (_nursinghomeId != null) {
@@ -353,7 +344,8 @@ class AddMedicineFormNotifier
       final reconcile = currentState.reconcile.isNotEmpty
           ? double.tryParse(currentState.reconcile)
           : null;
-      final userId = Supabase.instance.client.auth.currentUser?.id;
+      // ใช้ effectiveUserId เพื่อรองรับ impersonation
+      final userId = UserService().effectiveUserId;
 
       // Insert medicine
       final result = await _service.addMedicineToResident(

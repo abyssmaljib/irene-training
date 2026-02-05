@@ -66,7 +66,7 @@ class _RequiredPostsScreenState extends ConsumerState<RequiredPostsScreen> {
   @override
   Widget build(BuildContext context) {
     final postAsync = ref.watch(postDetailProvider(_currentPostId));
-    final currentUserId = ref.watch(currentUserIdProvider);
+    final currentUserId = ref.watch(postCurrentUserIdProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -635,7 +635,7 @@ class _RequiredPostsScreenState extends ConsumerState<RequiredPostsScreen> {
                     // ถ้ายังไม่ได้ like ให้ like ก่อน
                     if (!isLiked) {
                       final actionService = ref.read(postActionServiceProvider);
-                      final userId = ref.read(currentUserIdProvider);
+                      final userId = ref.read(postCurrentUserIdProvider);
                       if (userId == null) return;
 
                       await actionService.toggleLike(_currentPostId, userId);

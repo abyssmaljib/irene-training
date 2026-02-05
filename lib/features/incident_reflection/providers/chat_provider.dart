@@ -4,6 +4,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../core/services/user_service.dart';
 import '../models/chat_message.dart';
 import '../models/incident.dart';
 import '../models/reflection_pillars.dart';
@@ -165,10 +166,13 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
   /// ดึงชื่อเล่น/ชื่อจริงของ user จาก user_info table
   /// ใช้ nickname เป็นหลัก ถ้าไม่มีให้ใช้ full_name
+  /// ใช้ effectiveUserId เพื่อรองรับ impersonation
   Future<void> _loadUserName() async {
     try {
       final supabase = Supabase.instance.client;
-      final userId = supabase.auth.currentUser?.id;
+      // ใช้ effectiveUserId เพื่อรองรับ impersonation
+      // ถ้า impersonate อยู่ จะดึงชื่อของ user ที่ impersonate
+      final userId = UserService().effectiveUserId;
 
       if (userId == null) {
         debugPrint('ChatNotifier._loadUserName: no current user');

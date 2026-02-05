@@ -9,8 +9,13 @@ import '../../../core/widgets/blocking_check_dialog.dart';
 import '../../../core/widgets/buttons.dart';
 import '../../incident_reflection/models/incident.dart';
 import '../../incident_reflection/services/incident_service.dart';
+import '../../learning/services/badge_service.dart';
+import '../../points/services/points_service.dart';
+import '../models/shift_leader.dart';
 import '../services/clock_service.dart';
 import '../services/home_service.dart';
+import '../services/shift_summary_service.dart';
+import 'clock_out_summary_modal.dart';
 import 'clock_out_survey_form.dart';
 
 /// Step ในการลงเวร
@@ -94,7 +99,10 @@ class ClockOutDialog extends StatefulWidget {
 class _ClockOutDialogState extends State<ClockOutDialog> {
   final _clockService = ClockService.instance;
   final _homeService = HomeService.instance;
+  final _badgeService = BadgeService();
   final _incidentService = IncidentService.instance;
+  final _pointsService = PointsService();
+  final _shiftSummaryService = ShiftSummaryService.instance;
   late ConfettiController _confettiController;
 
   ClockOutStep _step = ClockOutStep.checking;
@@ -105,6 +113,7 @@ class _ClockOutDialogState extends State<ClockOutDialog> {
   int _unreadPostsCount = 0;
   bool _hasHandover = false;
   bool _isSubmitting = false;
+  ShiftLeader? _shiftLeader; // หัวหน้าเวรของเวรปัจจุบัน (ถ้ามี)
 
   @override
   void initState() {
@@ -171,6 +180,9 @@ class _ClockOutDialogState extends State<ClockOutDialog> {
       return;
     }
 
+    // 5. Load shift leader info (ถ้ามี)
+    _shiftLeader = await _clockService.getShiftLeader();
+
     // All checks passed - show survey
     setState(() => _step = ClockOutStep.survey);
   }
@@ -180,26 +192,86 @@ class _ClockOutDialogState extends State<ClockOutDialog> {
     required int selfScore,
     required String shiftSurvey,
     String? bugSurvey,
+    int? leaderScore,
   }) async {
     setState(() => _isSubmitting = true);
 
+    // 1. คำนวณ Dead Air และบันทึก penalty (ถ้ามี)
+    int deadAirMinutes = 0;
+    if (widget.clockInTime != null) {
+      // ดึง break times ที่เลือก
+      final currentShift = await _clockService.getCurrentShift();
+      final breakTimeIds = currentShift?.selectedBreakTime ?? [];
+      final breakTimes = await _clockService.getBreakTimeOptions();
+      final selectedBreakTimes =
+          breakTimes.where((b) => breakTimeIds.contains(b.id)).toList();
+
+      // ดึง shift activity stats
+      // ใช้ deadAirMinutes จาก backend (database trigger calculation) ถ้ามี
+      final stats = await _homeService.getShiftActivityStats(
+        residentIds: widget.residentIds,
+        clockInTime: widget.clockInTime!,
+        selectedBreakTimes: selectedBreakTimes,
+        deadAirMinutes: currentShift?.deadAirMinutes,
+      );
+
+      deadAirMinutes = stats.deadAirMinutes;
+
+      // บันทึก dead air penalty (ถ้ามี)
+      if (deadAirMinutes > 0) {
+        await _pointsService.recordDeadAirPenalty(
+          userId: widget.userId,
+          clockRecordId: widget.clockRecordId,
+          deadAirMinutes: deadAirMinutes,
+          nursinghomeId: widget.nursinghomeId,
+        );
+      }
+    }
+
+    // 2. Clock out
     final success = await _clockService.clockOutWithSurvey(
       clockRecordId: widget.clockRecordId,
       shiftScore: shiftScore,
       selfScore: selfScore,
       shiftSurvey: shiftSurvey,
       bugSurvey: bugSurvey,
+      leaderScore: leaderScore,
+      leaderId: _shiftLeader?.id,
     );
 
     if (mounted && success) {
-      // แสดง success step พร้อม confetti
-      setState(() => _step = ClockOutStep.success);
-      _confettiController.play();
+      // 3. ตรวจสอบและ award shift badges
+      if (widget.clockInTime != null) {
+        await _badgeService.checkAndAwardShiftBadges(
+          clockRecordId: widget.clockRecordId,
+          nursinghomeId: widget.nursinghomeId,
+          clockIn: widget.clockInTime!,
+          clockOut: DateTime.now(),
+          assignedResidentIds: widget.residentIds,
+        );
+      }
 
-      // รอ 3 วินาทีแล้ว pop
-      await Future.delayed(const Duration(seconds: 3));
+      // 4. Query shift summary
+      final summary = await _shiftSummaryService.getShiftSummary(
+        userId: widget.userId,
+        nursinghomeId: widget.nursinghomeId,
+        clockInTime: widget.clockInTime ?? DateTime.now(),
+        clockOutTime: DateTime.now(),
+        deadAirMinutes: deadAirMinutes,
+      );
+
+      // 5. ปิด dialog นี้ก่อน
       if (mounted) {
         Navigator.of(context).pop(true);
+      }
+
+      // 6. แสดง ClockOutSummaryModal (ใน parent context)
+      // ignore: use_build_context_synchronously
+      if (mounted) {
+        await ClockOutSummaryModal.show(
+          context,
+          summary: summary,
+        );
       }
     } else if (mounted) {
       Navigator.of(context).pop(false);
@@ -666,6 +738,7 @@ class _ClockOutDialogState extends State<ClockOutDialog> {
     return ClockOutSurveyForm(
       onSubmit: _handleSurveySubmit,
       isLoading: _isSubmitting,
+      shiftLeader: _shiftLeader,
     );
   }
 

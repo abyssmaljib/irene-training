@@ -51,6 +51,7 @@ import '../models/meal_photo_group.dart';
 import '../services/camera_service.dart';
 import '../services/medicine_service.dart';
 import '../services/med_error_log_service.dart';
+import '../../points/services/points_service.dart';
 import '../widgets/day_picker.dart';
 import '../widgets/meal_section_card.dart';
 import 'medicine_list_screen.dart';
@@ -467,6 +468,18 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
         photoUrl: url,
         photoType: photoType,
       );
+
+      // 5. บันทึก points สำหรับถ่ายรูปยา (ได้เฉพาะครั้งแรกต่อรูป)
+      final userId = UserService().effectiveUserId;
+      if (userId != null) {
+        await PointsService().recordMedicinePhotoTaken(
+          userId: userId,
+          residentId: widget.residentId,
+          date: _selectedDate,
+          mealKey: mealKey,
+          photoType: photoType,
+        );
+      }
 
       // ปิด loading dialog
       if (mounted) Navigator.pop(context);

@@ -4,6 +4,7 @@ import '../../../core/services/user_service.dart';
 import '../models/clock_in_out.dart';
 import '../models/break_time_option.dart';
 import '../models/friend_break_time.dart';
+import '../models/shift_leader.dart';
 
 /// Service สำหรับจัดการ Clock In/Out
 class ClockService {
@@ -317,27 +318,58 @@ class ClockService {
   }
 
   /// ลงเวร (Clock Out) พร้อม survey data
+  /// - leaderScore: คะแนนประเมินหัวหน้าเวร (1-10) - จะ insert ไปที่ leader_evaluations table
+  /// - leaderId: user_id ของหัวหน้าเวรที่ถูกประเมิน
   Future<bool> clockOutWithSurvey({
     required int clockRecordId,
     required int shiftScore,
     required int selfScore,
     required String shiftSurvey,
     String? bugSurvey,
+    int? leaderScore,
+    String? leaderId,
   }) async {
+    final userId = _userService.effectiveUserId;
+    final nursinghomeId = await _userService.getNursinghomeId();
+    if (userId == null || nursinghomeId == null) return false;
+
     try {
+      final now = DateTime.now();
+
+      // 1. Update clock_in_out_ver2 (ไม่เก็บ leader_score ที่นี่แล้ว)
       await _supabase.from('clock_in_out_ver2').update({
-        'clock_out_timestamp': DateTime.now().toIso8601String(),
+        'clock_out_timestamp': now.toIso8601String(),
         'shift_score': shiftScore,
         'self_score': selfScore,
         'shift_survey': shiftSurvey,
         'bug_survey': bugSurvey,
       }).eq('id', clockRecordId);
 
+      // 2. Insert leader evaluation ไปที่ table แยก (ถ้ามี)
+      // เก็บ evaluator_id ไว้เพื่อป้องกันซ้ำ แต่ไม่แสดงที่ frontend
+      if (leaderScore != null && leaderId != null) {
+        final shiftType = getCurrentShiftType();
+        // shift_date = วันที่ของเวร (ถ้าเวรดึกก่อน 07:00 ให้ใช้วันก่อนหน้า)
+        final shiftDate = now.hour < 7
+            ? now.subtract(const Duration(days: 1))
+            : now;
+
+        await _supabase.from('leader_evaluations').upsert({
+          'leader_id': leaderId,
+          'evaluator_id': userId,
+          'nursinghome_id': nursinghomeId,
+          'shift': shiftType,
+          'shift_date': '${shiftDate.year}-${shiftDate.month.toString().padLeft(2, '0')}-${shiftDate.day.toString().padLeft(2, '0')}',
+          'score': leaderScore,
+        }, onConflict: 'leader_id,evaluator_id,shift_date,shift');
+      }
+
       // Clear cache
       invalidateCache();
 
       return true;
     } catch (e) {
+      debugPrint('clockOutWithSurvey error: $e');
       return false;
     }
   }
@@ -374,6 +406,44 @@ class ClockService {
       return unreadPosts.length;
     } catch (e) {
       return 0;
+    }
+  }
+
+  /// ดึงข้อมูลหัวหน้าเวรของเวรปัจจุบัน (คนที่ Incharge = true)
+  /// - ต้องอยู่ในเวรเดียวกัน (shift เดียวกัน)
+  /// - ต้องยังไม่ลงเวร (clock_out_timestamp IS NULL)
+  /// - ต้องไม่ใช่ตัวเอง
+  /// Returns null ถ้าไม่มีหัวหน้าเวร หรือตัวเองเป็นหัวหน้าเวร
+  Future<ShiftLeader?> getShiftLeader() async {
+    final userId = _userService.effectiveUserId;
+    final nursinghomeId = await _userService.getNursinghomeId();
+    if (userId == null || nursinghomeId == null) return null;
+
+    try {
+      // กำหนด shift ปัจจุบัน
+      final currentShift = getCurrentShiftType();
+
+      // ค้นหาคนที่ Incharge = true ในเวรเดียวกัน (ไม่ใช่ตัวเอง)
+      final response = await _supabase
+          .from('clock_in_out_ver2')
+          .select('''
+            user_id,
+            user_info:user_id(nickname, full_name, photo_url)
+          ''')
+          .eq('nursinghome_id', nursinghomeId)
+          .eq('shift', currentShift)
+          .eq('Incharge', true)
+          .neq('user_id', userId)
+          .isFilter('clock_out_timestamp', null)
+          .limit(1)
+          .maybeSingle();
+
+      if (response == null) return null;
+
+      return ShiftLeader.fromJson(response);
+    } catch (e) {
+      debugPrint('getShiftLeader error: $e');
+      return null;
     }
   }
 

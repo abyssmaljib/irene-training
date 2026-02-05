@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../core/services/user_service.dart';
 import '../models/edit_medicine_db_form_state.dart';
 import '../models/med_db.dart';
 import '../services/medicine_service.dart';
@@ -36,16 +36,8 @@ class EditMedicineDBFormNotifier
     try {
       debugPrint('[EditMedicineDBForm] Initializing for medDbId: $medDbId');
 
-      // ดึง nursinghomeId จาก user profile
-      final userId = Supabase.instance.client.auth.currentUser?.id;
-      if (userId != null) {
-        final userInfo = await Supabase.instance.client
-            .from('user_info')
-            .select('nursinghome_id')
-            .eq('id', userId)
-            .maybeSingle();
-        _nursinghomeId = userInfo?['nursinghome_id'] as int?;
-      }
+      // ดึง nursinghomeId จาก UserService (รองรับ impersonation)
+      _nursinghomeId = await UserService().getNursinghomeId();
 
       // Fetch ข้อมูลยาจาก medDbId
       final medicine = await _service.getMedicineById(medDbId);

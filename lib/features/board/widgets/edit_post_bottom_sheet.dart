@@ -1117,7 +1117,7 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
 
     try {
       final actionService = ref.read(postActionServiceProvider);
-      final userId = ref.read(currentUserIdProvider);
+      final userId = ref.read(postCurrentUserIdProvider);
 
       if (userId == null) {
         throw Exception('ไม่พบข้อมูลผู้ใช้');

@@ -82,12 +82,127 @@ Supabase is initialized in `main.dart` with config from `core/config/supabase_co
 
 ### Network Images (สำคัญมาก!)
 
-**ทุกรูปที่โหลดจาก network ต้องมี timeout และ retry mechanism เสมอ** เพื่อ UX ที่ดี:
+**ทุกรูปที่โหลดจาก network ต้องใช้ `IreneNetworkImage` หรือ `IreneNetworkAvatar`** เพื่อ UX ที่ดี:
 
-1. **Timeout 15 วินาที** - ถ้าโหลดไม่เสร็จภายในเวลา แสดง "โหลดช้า" + ปุ่มลองใหม่
-2. **Error handling** - ถ้าโหลดไม่ได้ แสดง "โหลดรูปไม่สำเร็จ" + ปุ่มลองใหม่
-3. **Progress indicator** - แสดง % ระหว่างโหลด (ถ้าทราบขนาดไฟล์)
+```dart
+// สำหรับรูปทั่วไป
+IreneNetworkImage(
+  imageUrl: 'https://example.com/image.jpg',
+  width: 200,
+  height: 150,
+  fit: BoxFit.cover,
+  memCacheWidth: 400, // จำกัด memory usage
+  compact: true,      // UI แบบ compact สำหรับรูปเล็ก
+)
 
-ตัวอย่าง widget: ดู `_MedicineNetworkImage` ใน `lib/features/medicine/widgets/medicine_photo_item.dart`
+// สำหรับ avatar (วงกลม)
+IreneNetworkAvatar(
+  imageUrl: user.photoUrl,
+  radius: 20,
+  fallbackIcon: HugeIcon(icon: HugeIcons.strokeRoundedUser, ...),
+)
+```
 
-**ห้ามใช้ `Image.network` หรือ `CachedNetworkImage` โดยตรง** โดยไม่มี timeout/retry!
+**Features ของ IreneNetworkImage:**
+1. **Timeout 15 วินาที** - ถ้าโหลดไม่เสร็จ แสดง "โหลดช้า" + ปุ่มลองใหม่
+2. **Error handling** - ถ้าโหลดไม่ได้ แสดง "โหลดไม่สำเร็จ" + ปุ่มลองใหม่
+3. **Memory optimization** - ใช้ `memCacheWidth` เพื่อไม่โหลดรูปใหญ่เกินไปเข้า memory
+4. **Retry mechanism** - กดลองใหม่ได้เมื่อ timeout หรือ error
+5. **Compact mode** - สำหรับรูปเล็กๆ แสดงแค่ icon ไม่มีข้อความ
+
+**ไฟล์:** `lib/core/widgets/network_image.dart`
+
+**❌ ห้ามใช้โดยตรง:**
+- `Image.network()` - ไม่มี timeout/retry
+- `CachedNetworkImage()` - ต้อง wrap ด้วย timeout logic เอง
+- `NetworkImage()` ใน `backgroundImage` - ไม่มี error handling
+
+---
+
+## Performance Guidelines (สำคัญมาก!)
+
+### 1. หลีกเลี่ยง setState ที่ไม่จำเป็น
+
+**ปัญหา:** `setState(() {})` ใน TextField `onChanged` จะ rebuild ทั้งหน้าทุกครั้งที่พิมพ์
+
+```dart
+// ❌ BAD - rebuild ทั้งหน้าทุกตัวอักษร
+TextField(
+  controller: _controller,
+  onChanged: (v) => setState(() {}),
+)
+
+// ✅ GOOD - ใช้ ValueListenableBuilder rebuild เฉพาะส่วนที่ต้องการ
+ValueListenableBuilder<TextEditingValue>(
+  valueListenable: _controller,
+  builder: (context, value, child) {
+    final isDisabled = value.text.trim().isEmpty;
+    return PrimaryButton(
+      onPressed: isDisabled ? null : _handleSubmit,
+    );
+  },
+)
+```
+
+### 2. ColorFiltered ใช้เฉพาะรูปจาก Network
+
+**ปัญหา:** `ColorFiltered` เป็น GPU-intensive widget ห้ามใช้ใน list ที่ scroll ได้
+
+```dart
+// ❌ BAD - ใช้ ColorFiltered กับ emoji ใน GridView
+ColorFiltered(
+  colorFilter: ColorFilter.mode(Colors.grey, BlendMode.saturation),
+  child: Text('🏆', style: TextStyle(fontSize: 24)),
+)
+
+// ✅ GOOD - ใช้ color property สำหรับ Text
+Text('🏆', style: TextStyle(fontSize: 24, color: Colors.grey))
+
+// ✅ GOOD - ใช้ ColorFiltered เฉพาะรูปจาก network (จำเป็นจริงๆ)
+if (imageUrl != null) {
+  return ColorFiltered(
+    colorFilter: ColorFilter.mode(Colors.grey, BlendMode.saturation),
+    child: IreneNetworkImage(imageUrl: imageUrl, ...),
+  );
+}
+```
+
+### 3. ใช้ cacheWidth สำหรับรูปใน List
+
+**ปัญหา:** รูปใหญ่โหลดเข้า memory ทำให้แอปช้าและ crash ได้
+
+```dart
+// ❌ BAD - โหลดรูป full-size เข้า memory
+CircleAvatar(
+  backgroundImage: NetworkImage(user.photoUrl!),
+)
+
+// ✅ GOOD - จำกัดขนาดรูปที่โหลดเข้า memory
+CircleAvatar(
+  child: ClipOval(
+    child: Image.network(
+      user.photoUrl!,
+      width: 24,
+      height: 24,
+      cacheWidth: 48, // 2x สำหรับ high DPI
+      fit: BoxFit.cover,
+    ),
+  ),
+)
+
+// ✅ BETTER - ใช้ IreneNetworkAvatar
+IreneNetworkAvatar(
+  imageUrl: user.photoUrl,
+  radius: 12,
+)
+```
+
+### 4. สรุป Performance Checklist
+
+| สิ่งที่ต้องตรวจ | วิธีแก้ |
+|---------------|--------|
+| `setState(() {})` ใน onChanged | ใช้ `ValueListenableBuilder` |
+| `ColorFiltered` ใน list | ใช้ `color` property สำหรับ Text/Icon |
+| `Image.network` ไม่มี cacheWidth | เพิ่ม `cacheWidth: size * 2` |
+| `NetworkImage` ใน backgroundImage | ใช้ `IreneNetworkAvatar` แทน |
+| Widget ใหญ่ rebuild บ่อย | แยกเป็น StatefulWidget ย่อย |

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hugeicons/hugeicons.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../core/services/user_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -192,25 +192,9 @@ class CreateVitalSignScreen extends ConsumerWidget {
                         return;
                       }
 
-                      // 2. ดึงข้อมูล user สำหรับแสดงใน preview
-                      String? userFullName;
-                      String? userNickname;
-                      try {
-                        final userId = Supabase.instance.client.auth.currentUser?.id;
-                        if (userId != null) {
-                          final userInfo = await Supabase.instance.client
-                              .from('user_info')
-                              .select('full_name, nickname')
-                              .eq('id', userId)
-                              .maybeSingle();
-                          if (userInfo != null) {
-                            userFullName = userInfo['full_name'] as String?;
-                            userNickname = userInfo['nickname'] as String?;
-                          }
-                        }
-                      } catch (_) {
-                        // ถ้าดึงไม่ได้ก็ไม่เป็นไร ใช้ค่าว่างแทน
-                      }
+                      // 2. ดึงข้อมูล user สำหรับแสดงใน preview (รองรับ impersonation)
+                      final userNickname = await UserService().getUserName();
+                      final userFullName = userNickname; // ใช้ชื่อเดียวกัน
 
                       // 3. แสดง Preview Dialog
                       if (!context.mounted) return;

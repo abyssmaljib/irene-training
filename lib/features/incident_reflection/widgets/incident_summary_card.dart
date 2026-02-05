@@ -25,15 +25,16 @@ class IncidentSummaryCard extends ConsumerWidget {
 
     return incidentsAsync.when(
       data: (incidents) {
-        // ไม่แสดง card ถ้าไม่มี incidents
-        if (incidents.isEmpty) return const SizedBox.shrink();
-
         // รวม pending + in_progress เป็น "รอดำเนินการ"
         final pendingCount = incidents
             .where((i) =>
                 i.reflectionStatus.value == 'pending' ||
                 i.reflectionStatus.value == 'in_progress')
             .length;
+
+        // ซ่อน card ถ้าไม่มี pending (ไม่ต้องรบกวน user)
+        if (pendingCount == 0) return const SizedBox.shrink();
+
         final completedCount = incidents
             .where((i) => i.reflectionStatus.value == 'completed')
             .length;
@@ -47,13 +48,8 @@ class IncidentSummaryCard extends ConsumerWidget {
             decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: AppRadius.mediumRadius,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+              // ใช้ shadow จาก theme เพื่อความสม่ำเสมอ
+              boxShadow: [AppShadows.subtle],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/services/user_service.dart';
+import '../../points/services/points_service.dart';
 import '../models/topic_detail.dart';
 
 class ContentTab extends StatefulWidget {
@@ -108,6 +109,15 @@ class _ContentTabState extends State<ContentTab> {
           'content_read_count': widget.topicDetail.readCount + 1,
           'content_version_read': widget.topicDetail.contentVersion,
         }, onConflict: 'user_id,topic_id,season_id');
+
+        // บันทึก points สำหรับการอ่าน (ให้เฉพาะครั้งแรกต่อ topic)
+        // PointsService มี duplicate check อยู่แล้ว - ถ้าเคยได้ points แล้วจะไม่ให้ซ้ำ
+        await PointsService().recordContentRead(
+          userId: userId,
+          topicId: widget.topicDetail.topicId,
+          topicName: widget.topicDetail.topicName,
+          seasonId: seasonId as String?,
+        );
       } else {
         // Unmark as read - set content_read_at to null
         await Supabase.instance.client.from('training_user_progress').upsert({

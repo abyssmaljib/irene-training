@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' hide Badge;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hugeicons/hugeicons.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -12,8 +13,6 @@ import '../../checklist/models/system_role.dart';
 import '../../checklist/providers/task_provider.dart';
 import '../../auth/screens/login_screen.dart';
 import '../../learning/screens/directory_screen.dart';
-import '../../learning/models/badge.dart';
-import '../../learning/services/badge_service.dart';
 import '../../learning/screens/badge_collection_screen.dart';
 import '../models/user_profile.dart';
 import '../../../core/widgets/irene_app_bar.dart';
@@ -31,6 +30,8 @@ import '../../incident_reflection/screens/incident_list_screen.dart';
 import '../../incident_reflection/providers/incident_provider.dart';
 import '../../profile_setup/screens/unified_profile_setup_screen.dart';
 import '../../profile_setup/providers/profile_setup_provider.dart';
+import '../../points/points.dart';
+import '../../home/screens/bug_report_list_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -49,9 +50,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   // ใช้ TextEditingController แทน String _userSearchQuery
   // เพื่อใช้กับ ValueListenableBuilder และลด rebuild
   final _userSearchController = TextEditingController();
-  List<Badge> _earnedBadges = [];
   bool _isLoading = true;
   String? _error;
+  String _appVersion = '';
 
   // Dev emails that can change role
   static const _devEmails = ['beautyheechul@gmail.com'];
@@ -72,13 +73,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _loadData() async {
+    // โหลด version แยกต่างหาก (ไม่ต้องรอ)
+    _loadAppVersion();
+
     await Future.wait([
       _loadUserProfile(),
       _loadUserRole(),
       _loadSystemRole(),
-      _loadBadges(),
       _loadAllUsers(),
     ]);
+  }
+
+  /// โหลด version ของแอปจาก package_info_plus
+  Future<void> _loadAppVersion() async {
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      if (mounted) {
+        setState(() {
+          _appVersion = 'v${packageInfo.version}';
+        });
+      }
+    } catch (e) {
+      debugPrint('Load app version error: $e');
+    }
   }
 
   Future<void> _loadAllUsers() async {
@@ -129,21 +146,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
-  Future<void> _loadBadges() async {
-    try {
-      final badgeService = BadgeService();
-      final badges = await badgeService.getUserBadges();
-      if (mounted) {
-        setState(() {
-          _earnedBadges = badges;
-        });
-      }
-    } catch (e) {
-      debugPrint('Load badges error: $e');
-    }
-  }
-
-
   Future<void> _loadUserProfile() async {
     try {
       // Use effectiveUserId to support dev mode impersonation
@@ -156,9 +158,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         return;
       }
 
+      // เพิ่ม employment_type เพื่อแสดงสถานะการทำงานใน profile
       final response = await Supabase.instance.client
           .from('user_info')
-          .select('id, photo_url, nickname, full_name, prefix, nursinghome_id')
+          .select('id, photo_url, nickname, full_name, prefix, nursinghome_id, employment_type')
           .eq('id', userId)
           .maybeSingle();
 
@@ -299,39 +302,90 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 color: AppColors.primary,
               ),
             ),
-            // System Role Badge (ตำแหน่ง)
-            if (_systemRole != null) ...[
+            // System Role Badge (ตำแหน่ง) และ Employment Type Badge
+            if (_systemRole != null || _userProfile?.employmentTypeDisplay != null) ...[
               AppSpacing.verticalGapSm,
-              Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: AppSpacing.sm,
-                  vertical: AppSpacing.xs,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: AppRadius.smallRadius,
-                  border: Border.all(
-                    color: AppColors.primary.withValues(alpha: 0.3),
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    HugeIcon(
-                      icon: HugeIcons.strokeRoundedUserAccount,
-                      size: AppIconSize.sm,
-                      color: AppColors.primary,
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // System Role Badge
+                  if (_systemRole != null)
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: AppSpacing.sm,
+                        vertical: AppSpacing.xs,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: AppRadius.smallRadius,
+                        border: Border.all(
+                          color: AppColors.primary.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          HugeIcon(
+                            icon: HugeIcons.strokeRoundedUserAccount,
+                            size: AppIconSize.sm,
+                            color: AppColors.primary,
+                          ),
+                          SizedBox(width: 4),
+                          Text(
+                            _systemRole!.name,
+                            style: AppTypography.caption.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    SizedBox(width: 4),
-                    Text(
-                      _systemRole!.name,
-                      style: AppTypography.caption.copyWith(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w600,
+                  // Employment Type Badge (ข้างๆ system role)
+                  if (_userProfile?.employmentTypeDisplay != null) ...[
+                    if (_systemRole != null) SizedBox(width: 8),
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: AppSpacing.sm,
+                        vertical: AppSpacing.xs,
+                      ),
+                      decoration: BoxDecoration(
+                        // สีแดงถ้าลาออก สีเทาถ้าเป็นสถานะอื่น
+                        color: _userProfile!.isResigned
+                            ? Colors.red.withValues(alpha: 0.1)
+                            : Colors.grey.withValues(alpha: 0.1),
+                        borderRadius: AppRadius.smallRadius,
+                        border: Border.all(
+                          color: _userProfile!.isResigned
+                              ? Colors.red.withValues(alpha: 0.3)
+                              : Colors.grey.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          HugeIcon(
+                            icon: HugeIcons.strokeRoundedBriefcase01,
+                            size: AppIconSize.sm,
+                            color: _userProfile!.isResigned
+                                ? Colors.red
+                                : Colors.grey.shade600,
+                          ),
+                          SizedBox(width: 4),
+                          Text(
+                            _userProfile!.employmentTypeDisplay!,
+                            style: AppTypography.caption.copyWith(
+                              color: _userProfile!.isResigned
+                                  ? Colors.red
+                                  : Colors.grey.shade700,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
-                ),
+                ],
               ),
             ],
             AppSpacing.verticalGapMd,
@@ -352,9 +406,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               _buildDevSystemRoleSelector(),
               AppSpacing.verticalGapMd,
             ],
-            // Badges Section - แสดงเสมอ
-            _buildBadgesSection(),
-            AppSpacing.verticalGapXl,
+            AppSpacing.verticalGapMd,
             // Log Out Button
             SizedBox(
               width: double.infinity,
@@ -384,78 +436,84 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Widget _buildDefaultAvatar() {
-    return Container(
-      width: 80,
-      height: 80,
-      color: AppColors.accent1,
-      child: Center(
-        child: HugeIcon(
-          icon: HugeIcons.strokeRoundedUser,
-          size: 40,
-          color: AppColors.primary,
-        ),
+    // ไม่ต้องมี Container กับ color เพราะ parent Container มี decoration circle
+    // กับ color อยู่แล้ว - ถ้าใส่ color ตรงนี้จะเป็นสี่เหลี่ยมเกินออกมานอกวงกลม
+    return Center(
+      child: HugeIcon(
+        icon: HugeIcons.strokeRoundedUser,
+        size: 40,
+        color: AppColors.primary,
       ),
     );
   }
 
+  /// สร้างเมนูทั้งหมดโดยจัดกลุ่มเป็น 4 sections
   Widget _buildMenuSection() {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.secondaryBackground,
-        borderRadius: AppRadius.mediumRadius,
-        border: Border.all(color: AppColors.alternate),
-      ),
-      child: Column(
-        children: [
-          _buildNotificationMenuItem(),
-          Divider(height: 1, color: AppColors.alternate),
-          _buildProfileMenuItem(),
-          Divider(height: 1, color: AppColors.alternate),
-          _buildMenuItem(
-            icon: HugeIcons.strokeRoundedBook02,
-            label: 'เรียนรู้',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const DirectoryScreen()),
-              );
-            },
-          ),
-          Divider(height: 1, color: AppColors.alternate),
-          _buildShiftMenuItem(),
-          Divider(height: 1, color: AppColors.alternate),
-          _buildDDMenuItem(),
-          Divider(height: 1, color: AppColors.alternate),
-          _buildIncidentReflectionMenuItem(),
-          Divider(height: 1, color: AppColors.alternate),
-          _buildMenuItem(
-            icon: HugeIcons.strokeRoundedAlert02,
-            label: 'ใบเตือน',
-            onTap: () {
-              // TODO: Navigate to warnings screen
-            },
-          ),
-          Divider(height: 1, color: AppColors.alternate),
-          _buildMenuItem(
-            icon: HugeIcons.strokeRoundedSettings02,
-            label: 'ตั้งค่า',
-            onTap: () {
-              // TODO: Navigate to app settings
-            },
-          ),
-          // NOTE: Tutorial feature ถูกซ่อนไว้ชั่วคราว
-          // Divider(height: 1, color: AppColors.alternate),
-          // _buildMenuItem(
-          //   icon: HugeIcons.strokeRoundedHelpCircle,
-          //   label: 'ดู Tutorial อีกครั้ง',
-          //   onTap: () {
-          //     Navigator.pop(context);
-          //     MainNavigationScreen.navigateToTab(context, 0);
-          //     MainNavigationScreen.replayTutorial(context);
-          //   },
-          // ),
-        ],
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ===== Section 1: งานของฉัน =====
+        // เมนูที่ใช้บ่อยที่สุด - เกี่ยวกับการทำงานประจำวัน
+        _buildSettingsSection(
+          title: 'งานของฉัน',
+          children: [
+            _buildShiftMenuItem(),
+            _buildDDMenuItem(),
+            _buildIncidentReflectionMenuItem(),
+          ],
+        ),
+
+        // ===== Section 2: พัฒนาตัวเอง =====
+        // เมนูเกี่ยวกับการเรียนรู้และ gamification
+        _buildSettingsSection(
+          title: 'พัฒนาตัวเอง',
+          children: [
+            _buildMenuItem(
+              icon: HugeIcons.strokeRoundedBook02,
+              label: 'เรียนรู้',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const DirectoryScreen()),
+                );
+              },
+            ),
+            _buildPointsMenuItem(),
+            _buildBadgesMenuItem(),
+          ],
+        ),
+
+        // ===== Section 3: บัญชีของฉัน =====
+        // เมนูเกี่ยวกับ account และ profile
+        _buildSettingsSection(
+          title: 'บัญชีของฉัน',
+          children: [
+            _buildProfileMenuItem(),
+            _buildNotificationMenuItem(),
+          ],
+        ),
+
+        // ===== Section 4: แอปและความช่วยเหลือ =====
+        // เมนูเกี่ยวกับ app settings และ support
+        _buildSettingsSection(
+          title: 'แอปและความช่วยเหลือ',
+          children: [
+            _buildMenuItem(
+              icon: HugeIcons.strokeRoundedBug01,
+              label: 'รายงานปัญหา/Bug',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const BugReportListScreen(),
+                  ),
+                );
+              },
+            ),
+            _buildAboutMenuItem(),
+          ],
+        ),
+      ],
     );
   }
 
@@ -518,6 +576,128 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  /// Build points menu item - แสดงคะแนนสะสมและ tier ปัจจุบัน
+  /// กดเพื่อไปหน้า Leaderboard
+  Widget _buildPointsMenuItem() {
+    // ดึงข้อมูล points summary จาก provider
+    final summaryAsync = ref.watch(userPointsSummaryProvider);
+
+    return summaryAsync.when(
+      data: (summary) {
+        // แสดงคะแนนใน subtitle ถ้ามีข้อมูล
+        final pointsText = summary != null
+            ? '${summary.totalPoints} คะแนน'
+            : null;
+
+        return _buildMenuItemWithSubtitle(
+          icon: HugeIcons.strokeRoundedRanking,
+          label: 'คะแนนของฉัน',
+          subtitle: pointsText,
+          tierIcon: summary?.tierIcon,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const LeaderboardScreen()),
+            );
+          },
+        );
+      },
+      loading: () => _buildMenuItem(
+        icon: HugeIcons.strokeRoundedRanking,
+        label: 'คะแนนของฉัน',
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const LeaderboardScreen()),
+          );
+        },
+      ),
+      error: (error, stack) => _buildMenuItem(
+        icon: HugeIcons.strokeRoundedRanking,
+        label: 'คะแนนของฉัน',
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const LeaderboardScreen()),
+          );
+        },
+      ),
+    );
+  }
+
+  /// Menu item พร้อม subtitle และ tier icon (สำหรับ Points menu)
+  Widget _buildMenuItemWithSubtitle({
+    required dynamic icon,
+    required String label,
+    required VoidCallback onTap,
+    String? subtitle,
+    String? tierIcon,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppRadius.mediumRadius,
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.md,
+          ),
+          child: Row(
+            children: [
+              // Icon container
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.accent1,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Center(
+                  child: HugeIcon(icon: icon, color: AppColors.primary, size: AppIconSize.lg),
+                ),
+              ),
+              AppSpacing.horizontalGapMd,
+              // Label และ subtitle
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label, style: AppTypography.body),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          if (tierIcon != null) ...[
+                            Text(tierIcon, style: const TextStyle(fontSize: 14)),
+                            const SizedBox(width: 4),
+                          ],
+                          Text(
+                            subtitle,
+                            style: AppTypography.caption.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              // Arrow icon
+              HugeIcon(
+                icon: HugeIcons.strokeRoundedArrowRight01,
+                size: AppIconSize.md,
+                color: AppColors.secondaryText,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   /// Build notification menu item with badge count for unread notifications
   Widget _buildNotificationMenuItem() {
     final unreadCountAsync = ref.watch(unreadNotificationCountProvider);
@@ -534,6 +714,73 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const NotificationCenterScreen()),
+        );
+      },
+    );
+  }
+
+  /// Build badges menu item - กดเพื่อไปหน้า BadgeCollectionScreen
+  Widget _buildBadgesMenuItem() {
+    return _buildMenuItem(
+      icon: HugeIcons.strokeRoundedMedal01,
+      label: 'Badges ที่ได้รับ',
+      // ไม่แสดง badge count เพราะเป็น total count ไม่ใช่ new/unread
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const BadgeCollectionScreen()),
+        );
+      },
+    );
+  }
+
+  /// Build about app menu item - แสดง version ของแอป
+  Widget _buildAboutMenuItem() {
+    return _buildMenuItemWithSubtitle(
+      icon: HugeIcons.strokeRoundedInformationCircle,
+      label: 'เกี่ยวกับแอป',
+      subtitle: _appVersion.isNotEmpty ? _appVersion : null,
+      onTap: () {
+        // แสดง dialog ข้อมูลแอป
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            backgroundColor: Colors.white,
+            title: Row(
+              children: [
+                Image.asset(
+                  'assets/app_icon.png',
+                  width: 40,
+                  height: 40,
+                ),
+                AppSpacing.horizontalGapMd,
+                const Text('Irene Training'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Version: $_appVersion',
+                  style: AppTypography.body,
+                ),
+                AppSpacing.verticalGapSm,
+                Text(
+                  'แอปสำหรับฝึกอบรมและพัฒนาทักษะ\nผู้ดูแลผู้สูงอายุ',
+                  style: AppTypography.bodySmall.copyWith(
+                    color: AppColors.secondaryText,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('ปิด'),
+              ),
+            ],
+          ),
         );
       },
     );
@@ -640,6 +887,54 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  /// Section container สำหรับจัดกลุ่มเมนู
+  /// มี header text สีเทา และ container สีขาวสำหรับ menu items
+  Widget _buildSettingsSection({
+    required String title,
+    required List<Widget> children,
+  }) {
+    // สร้าง list ของ children พร้อม dividers
+    final List<Widget> itemsWithDividers = [];
+    for (int i = 0; i < children.length; i++) {
+      itemsWithDividers.add(children[i]);
+      // เพิ่ม divider ระหว่าง items (ไม่เพิ่มหลังตัวสุดท้าย)
+      if (i < children.length - 1) {
+        itemsWithDividers.add(Divider(height: 1, color: AppColors.alternate));
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Section Header (label style, สีเทา)
+        Padding(
+          padding: EdgeInsets.fromLTRB(
+            AppSpacing.xs, // left - เยื้องเล็กน้อย
+            AppSpacing.lg, // top - เว้นระยะจาก section ก่อนหน้า
+            AppSpacing.xs, // right
+            AppSpacing.sm, // bottom
+          ),
+          child: Text(
+            title,
+            style: AppTypography.label.copyWith(
+              color: AppColors.secondaryText,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        // Menu Items Container
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.secondaryBackground,
+            borderRadius: AppRadius.mediumRadius,
+            border: Border.all(color: AppColors.alternate),
+          ),
+          child: Column(children: itemsWithDividers),
+        ),
+      ],
+    );
+  }
+
   Widget _buildImpersonationBanner() {
     final userService = UserService();
     final impersonatedUser = _allUsers.where(
@@ -662,12 +957,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               HugeIcon(icon: HugeIcons.strokeRoundedAlert02, size: AppIconSize.lg, color: Colors.red.shade700),
               AppSpacing.horizontalGapSm,
               Expanded(
-                child: Text(
-                  'กำลังใช้งานในนามของ: ${impersonatedUser?.displayName ?? "Unknown"}',
-                  style: AppTypography.label.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: Colors.red.shade700,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'กำลังใช้งานในนามของ: ${impersonatedUser?.displayName ?? "Unknown"}',
+                      style: AppTypography.label.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.red.shade700,
+                      ),
+                    ),
+                    // แสดง employment_type ของ user ที่กำลัง impersonate
+                    if (impersonatedUser?.employmentTypeDisplay != null)
+                      Text(
+                        'สถานะ: ${impersonatedUser!.employmentTypeDisplay}',
+                        style: AppTypography.caption.copyWith(
+                          color: impersonatedUser.isResigned
+                              ? Colors.red.shade900
+                              : Colors.red.shade600,
+                          fontWeight: impersonatedUser.isResigned
+                              ? FontWeight.w600
+                              : FontWeight.w400,
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ],
@@ -960,6 +1273,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      // แสดง badge สถานะการทำงาน
+                      if (user.employmentTypeDisplay != null) ...[
+                        SizedBox(width: 6),
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            // สีแดงถ้าลาออก สีเทาถ้าเป็นสถานะอื่น
+                            color: user.isResigned
+                                ? Colors.red.shade100
+                                : Colors.grey.shade200,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            user.employmentTypeDisplay!,
+                            style: AppTypography.caption.copyWith(
+                              fontSize: 9,
+                              color: user.isResigned
+                                  ? Colors.red.shade700
+                                  : Colors.grey.shade700,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
                       if (user.isClockedIn) ...[
                         SizedBox(width: 6),
                         Container(
@@ -1329,160 +1666,4 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
-  /// สร้าง section แสดง badges ที่ได้รับ
-  /// เมื่อกดจะ navigate ไปหน้า BadgeCollectionScreen
-  Widget _buildBadgesSection() {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        // เมื่อกดจะไปหน้า Badge Collection
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const BadgeCollectionScreen(),
-            ),
-          );
-        },
-        borderRadius: AppRadius.mediumRadius,
-        child: Container(
-          width: double.infinity,
-          padding: AppSpacing.paddingMd,
-          decoration: BoxDecoration(
-            color: AppColors.secondaryBackground,
-            borderRadius: AppRadius.mediumRadius,
-            border: Border.all(color: AppColors.alternate),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  HugeIcon(
-                    icon: HugeIcons.strokeRoundedMedal01,
-                    color: AppColors.primary,
-                    size: AppIconSize.lg,
-                  ),
-                  AppSpacing.horizontalGapSm,
-                  Text(
-                    'Badges ที่ได้รับ',
-                    style: AppTypography.label.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.1),
-                      borderRadius: AppRadius.smallRadius,
-                    ),
-                    child: Text(
-                      '${_earnedBadges.length}',
-                      style: AppTypography.caption.copyWith(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  // Arrow icon แสดงว่ากดได้
-                  const SizedBox(width: 8),
-                  HugeIcon(
-                    icon: HugeIcons.strokeRoundedArrowRight01,
-                    color: AppColors.secondaryText,
-                    size: AppIconSize.md,
-                  ),
-                ],
-              ),
-              AppSpacing.verticalGapMd,
-              if (_earnedBadges.isEmpty)
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Text(
-                      'ยังไม่มี badge - ทำแบบทดสอบเพื่อรับ badge!',
-                      style: AppTypography.bodySmall.copyWith(
-                        color: AppColors.secondaryText,
-                      ),
-                    ),
-                  ),
-                )
-              else
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: _earnedBadges.map((badge) => _buildBadgeItem(badge)).toList(),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBadgeItem(Badge badge) {
-    final rarityColor = _getRarityColor(badge.rarity);
-
-    return SizedBox(
-      width: 72,
-      child: Column(
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: rarityColor.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-              border: Border.all(color: rarityColor, width: 2),
-            ),
-            child: Center(
-              child: badge.imageUrl != null
-                  ? ClipOval(
-                      child: Image.network(
-                        badge.imageUrl!,
-                        width: 40,
-                        height: 40,
-                        fit: BoxFit.cover,
-                        // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
-                        cacheWidth: 100,
-                        errorBuilder: (context, error, stackTrace) => Text(
-                          badge.icon ?? badge.rarityEmoji,
-                          style: const TextStyle(fontSize: 24),
-                        ),
-                      ),
-                    )
-                  : Text(
-                      badge.icon ?? badge.rarityEmoji,
-                      style: const TextStyle(fontSize: 24),
-                    ),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            badge.name,
-            style: AppTypography.caption.copyWith(
-              fontSize: 10,
-              color: AppColors.primaryText,
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Color _getRarityColor(String rarity) {
-    switch (rarity) {
-      case 'legendary':
-        return const Color(0xFFFFD700);
-      case 'epic':
-        return const Color(0xFF9B59B6);
-      case 'rare':
-        return const Color(0xFF3498DB);
-      default:
-        return AppColors.primary;
-    }
-  }
 }

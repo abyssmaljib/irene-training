@@ -24,6 +24,8 @@ import 'features/auth/screens/welcome_screen.dart';
 import 'features/navigation/screens/main_navigation_screen.dart';
 import 'features/profile_setup/screens/unified_profile_setup_screen.dart';
 import 'features/profile_setup/services/profile_setup_service.dart';
+import 'core/services/user_service.dart';
+import 'core/theme/app_colors.dart';
 
 // Global navigator key สำหรับ navigation จาก service (เช่น push notification)
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -253,15 +255,232 @@ class _AuthWrapperState extends State<AuthWrapper> {
   @override
   Widget build(BuildContext context) {
     if (_session != null) {
-      // ใช้ ProfileCheckWrapper เพื่อตรวจสอบว่า user กรอก profile แล้วหรือยัง
-      // ถ้ายังไม่กรอก จะแสดงหน้า ProfileSetupScreen ก่อน
-      return ProfileCheckWrapper(
+      // Flow: EmploymentCheckWrapper → ProfileCheckWrapper → MainNavigationScreen
+      // 1. ตรวจสอบว่าลาออกหรือยัง และมี nursinghome_id หรือไม่
+      // 2. ตรวจสอบว่ากรอก profile แล้วหรือยัง
+      // 3. เข้าแอป
+      return EmploymentCheckWrapper(
         key: ValueKey(_session!.user.id),
-        child: MainNavigationScreen(key: const ValueKey('main')),
+        child: ProfileCheckWrapper(
+          key: ValueKey('profile_${_session!.user.id}'),
+          child: MainNavigationScreen(key: const ValueKey('main')),
+        ),
       );
     } else {
       // แสดง WelcomeScreen ก่อน ให้ผู้ใช้เลือกสมัครสมาชิกหรือเข้าสู่ระบบ
       return const WelcomeScreen(key: ValueKey('welcome'));
+    }
+  }
+}
+
+/// Wrapper ที่ตรวจสอบสถานะการทำงานของ user
+/// - ถ้าลาออกแล้ว (resigned) → แสดงหน้า error และ logout
+/// - ถ้าไม่มี nursinghome_id → แสดงหน้า error
+/// - ถ้าผ่าน → แสดง child (ProfileCheckWrapper)
+class EmploymentCheckWrapper extends StatefulWidget {
+  final Widget child;
+
+  const EmploymentCheckWrapper({
+    super.key,
+    required this.child,
+  });
+
+  @override
+  State<EmploymentCheckWrapper> createState() => _EmploymentCheckWrapperState();
+}
+
+enum EmploymentStatus {
+  loading,
+  valid,
+  resigned,
+  noNursinghome,
+}
+
+class _EmploymentCheckWrapperState extends State<EmploymentCheckWrapper> {
+  EmploymentStatus _status = EmploymentStatus.loading;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkEmploymentStatus();
+  }
+
+  Future<void> _checkEmploymentStatus() async {
+    try {
+      final (isValid, errorType) = await UserService().validateUserAccess();
+
+      if (!mounted) return;
+
+      if (isValid) {
+        setState(() => _status = EmploymentStatus.valid);
+      } else if (errorType == 'resigned') {
+        setState(() => _status = EmploymentStatus.resigned);
+      } else if (errorType == 'no_nursinghome') {
+        setState(() => _status = EmploymentStatus.noNursinghome);
+      }
+    } catch (e) {
+      debugPrint('EmploymentCheckWrapper: Error: $e');
+      // ถ้าเกิด error ให้ผ่านไปก่อน (fail-safe)
+      if (mounted) {
+        setState(() => _status = EmploymentStatus.valid);
+      }
+    }
+  }
+
+  Future<void> _logout() async {
+    UserService().clearCache();
+    await Supabase.instance.client.auth.signOut();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    switch (_status) {
+      case EmploymentStatus.loading:
+        return const Scaffold(
+          body: Center(child: CircularProgressIndicator()),
+        );
+
+      case EmploymentStatus.valid:
+        return widget.child;
+
+      case EmploymentStatus.resigned:
+        // หน้า error สำหรับ user ที่ลาออกแล้ว
+        return Scaffold(
+          body: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Icon
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: AppColors.error.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.work_off_outlined,
+                      size: 64,
+                      color: AppColors.error,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+
+                  // Title
+                  Text(
+                    'บัญชีถูกระงับ',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Description
+                  Text(
+                    'บัญชีของคุณถูกระงับการใช้งานเนื่องจากพ้นสภาพการเป็นพนักงาน\n\nหากมีข้อสงสัย กรุณาติดต่อหัวหน้างานหรือฝ่ายบุคคล',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: AppColors.textSecondary,
+                          height: 1.5,
+                        ),
+                  ),
+                  const SizedBox(height: 48),
+
+                  // Logout button
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: _logout,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.error,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: const Text('ออกจากระบบ'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+
+      case EmploymentStatus.noNursinghome:
+        // หน้า error สำหรับ user ที่ไม่มี nursinghome_id
+        return Scaffold(
+          body: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Icon
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: AppColors.warning.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.business_outlined,
+                      size: 64,
+                      color: AppColors.warning,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+
+                  // Title
+                  Text(
+                    'ยังไม่ได้รับการกำหนดสถานที่',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Description
+                  Text(
+                    'บัญชีของคุณยังไม่ได้ถูกกำหนดให้อยู่ในสถานดูแลใดๆ\n\nกรุณาติดต่อหัวหน้างานหรือฝ่ายบุคคลเพื่อดำเนินการ',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: AppColors.textSecondary,
+                          height: 1.5,
+                        ),
+                  ),
+                  const SizedBox(height: 48),
+
+                  // Retry button
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () {
+                        setState(() => _status = EmploymentStatus.loading);
+                        _checkEmploymentStatus();
+                      },
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: const Text('ลองใหม่'),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Logout button
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: _logout,
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: const Text('ออกจากระบบ'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
     }
   }
 }

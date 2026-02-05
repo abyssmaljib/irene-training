@@ -17,6 +17,9 @@ class ShiftActivityCard extends StatefulWidget {
   final int recentItemsLimit;
   final VoidCallback? onViewAllTap;
   final VoidCallback? onCardTap; // กดที่ card เพื่อดูรายละเอียด time block
+  /// Dead Air minutes จาก backend (ClockInOut.deadAirMinutes)
+  /// ถ้ามีค่าจะใช้ค่าจาก backend แทนการคำนวณใน frontend
+  final int? deadAirMinutes;
 
   const ShiftActivityCard({
     super.key,
@@ -26,6 +29,7 @@ class ShiftActivityCard extends StatefulWidget {
     this.recentItemsLimit = 3,
     this.onViewAllTap,
     this.onCardTap,
+    this.deadAirMinutes,
   });
 
   @override
@@ -48,10 +52,11 @@ class _ShiftActivityCardState extends State<ShiftActivityCard> {
   @override
   void didUpdateWidget(ShiftActivityCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Reload data when residentIds or selectedBreakTimes change
+    // Reload data when residentIds, selectedBreakTimes, or deadAirMinutes change
     // This fixes the race condition where break times load after initial build
     if (oldWidget.residentIds != widget.residentIds ||
-        oldWidget.selectedBreakTimes.length != widget.selectedBreakTimes.length) {
+        oldWidget.selectedBreakTimes.length != widget.selectedBreakTimes.length ||
+        oldWidget.deadAirMinutes != widget.deadAirMinutes) {
       _loadData();
     }
   }
@@ -59,10 +64,12 @@ class _ShiftActivityCardState extends State<ShiftActivityCard> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
 
+    // ถ้ามี deadAirMinutes จาก backend ให้ใช้ค่านั้น
     final stats = await _homeService.getShiftActivityStats(
       residentIds: widget.residentIds,
       clockInTime: widget.clockInTime,
       selectedBreakTimes: widget.selectedBreakTimes,
+      deadAirMinutes: widget.deadAirMinutes, // ค่าจาก backend
     );
 
     final recentActivities = await _homeService.getRecentShiftActivities(
@@ -441,6 +448,17 @@ class _ShiftActivityCardState extends State<ShiftActivityCard> {
     final stats = _stats;
     if (stats == null) return;
 
+    // Format dead air time
+    final minutes = stats.deadAirMinutes;
+    final hours = minutes ~/ 60;
+    final remainingMinutes = minutes % 60;
+    String timeText;
+    if (hours > 0) {
+      timeText = remainingMinutes > 0 ? '$hours ชม. $remainingMinutes นาที' : '$hours ชม.';
+    } else {
+      timeText = '$minutes นาที';
+    }
+
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.surface,
@@ -448,327 +466,214 @@ class _ShiftActivityCardState extends State<ShiftActivityCard> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.85,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        expand: false,
-        builder: (context, scrollController) => SingleChildScrollView(
-          controller: scrollController,
-          padding: AppSpacing.paddingMd,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Handle bar
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: AppColors.alternate,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
+      builder: (context) => Padding(
+        padding: AppSpacing.paddingMd,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Handle bar
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: AppColors.alternate,
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
+            ),
 
-              // Title
-              Row(
-                children: [
-                  HugeIcon(
-                    icon: HugeIcons.strokeRoundedPauseCircle,
-                    color: AppColors.secondaryText,
-                    size: AppIconSize.lg,
-                  ),
-                  AppSpacing.horizontalGapSm,
-                  Text(
+            // Title with peeping cat
+            Row(
+              children: [
+                HugeIcon(
+                  icon: HugeIcons.strokeRoundedPauseCircle,
+                  color: AppColors.secondaryText,
+                  size: AppIconSize.lg,
+                ),
+                AppSpacing.horizontalGapSm,
+                Expanded(
+                  child: Text(
                     'ทำไรอยู่อ่ะ?',
                     style: AppTypography.title,
                   ),
+                ),
+                // Peeping cat
+                Image.asset(
+                  'assets/images/peep2.webp',
+                  height: 60,
+                  fit: BoxFit.contain,
+                ),
+              ],
+            ),
+
+            AppSpacing.verticalGapMd,
+
+            // Total Dead Air - แสดงแค่ค่ารวม (คำนวณจาก backend)
+            Container(
+              padding: AppSpacing.paddingMd,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.08),
+                borderRadius: AppRadius.mediumRadius,
+                border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.2),
+                ),
+              ),
+              child: Row(
+                children: [
+                  HugeIcon(
+                    icon: HugeIcons.strokeRoundedTime04,
+                    color: AppColors.primary,
+                    size: AppIconSize.xl,
+                  ),
+                  AppSpacing.horizontalGapMd,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'เวลาที่ห่างหาย',
+                          style: AppTypography.bodySmall.copyWith(
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        Text(
+                          timeText,
+                          style: AppTypography.heading2.copyWith(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
+            ),
 
+            AppSpacing.verticalGapMd,
+
+            // Formula explanation - สูตรใหม่ (Backend)
+            Container(
+              padding: AppSpacing.paddingMd,
+              decoration: BoxDecoration(
+                color: AppColors.alternate.withValues(alpha: 0.2),
+                borderRadius: AppRadius.mediumRadius,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'วิธีคำนวณ',
+                    style: AppTypography.bodySmall.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  AppSpacing.verticalGapSm,
+                  Text(
+                    'Dead Air = ช่วงห่างระหว่าง tasks - เวลาทำ task - 75 นาที (allowance) - เวลาพักที่ทับ',
+                    style: AppTypography.bodySmall.copyWith(
+                      color: AppColors.secondaryText,
+                    ),
+                  ),
+                  AppSpacing.verticalGapMd,
+                  Text(
+                    'เวลาทำ task โดยประมาณ:',
+                    style: AppTypography.caption.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  AppSpacing.verticalGapXs,
+                  _buildTaskTimeRow('งานง่าย (score 1-3)', '5 นาที'),
+                  _buildTaskTimeRow('งานปานกลาง (score 4-6)', '10 นาที'),
+                  _buildTaskTimeRow('งานยาก (score 7-10)', '15 นาที'),
+                ],
+              ),
+            ),
+
+            // Guide box
+            if (stats.deadAirMinutes > 0) ...[
               AppSpacing.verticalGapMd,
-
-              // User's actual calculation
               Container(
                 padding: AppSpacing.paddingMd,
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.08),
+                  color: AppColors.warning.withValues(alpha: 0.1),
                   borderRadius: AppRadius.mediumRadius,
                   border: Border.all(
-                    color: AppColors.primary.withValues(alpha: 0.2),
+                    color: AppColors.warning.withValues(alpha: 0.3),
                   ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Row(
+                      children: [
+                        HugeIcon(
+                          icon: HugeIcons.strokeRoundedInformationCircle,
+                          size: AppIconSize.sm,
+                          color: AppColors.warning,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'ไม่ได้อู้งาน?',
+                          style: AppTypography.bodySmall.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.warning,
+                          ),
+                        ),
+                      ],
+                    ),
+                    AppSpacing.verticalGapSm,
                     Text(
-                      'การคำนวณของคุณ',
+                      '• ไม่ได้ไปพักตามเวลาที่เลือกไว้ตอนขึ้นเวร',
                       style: AppTypography.bodySmall.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primary,
+                        color: AppColors.secondaryText,
+                      ),
+                    ),
+                    Text(
+                      '• ค้างงานไว้แล้วมากดติดๆ กัน ทำให้มีช่องว่าง',
+                      style: AppTypography.bodySmall.copyWith(
+                        color: AppColors.secondaryText,
                       ),
                     ),
                     AppSpacing.verticalGapSm,
-                    _buildCalcRow('เวลาทำงานรวม', '${stats.totalWorkMinutes} นาที'),
-                    if (stats.totalBreakMinutes > 0)
-                      _buildCalcRow('เวลาพักที่เลือก', '${stats.totalBreakMinutes} นาที'),
-                    _buildCalcRow('ทำไรอยู่อ่ะ?', '${stats.deadAirMinutes} นาที', highlight: true),
-                  ],
-                ),
-              ),
-
-              // Gap breakdown with peeping cat
-              if (stats.deadAirGaps.isNotEmpty) ...[
-                AppSpacing.verticalGapMd,
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'รายละเอียดช่วงว่าง:',
-                            style: AppTypography.bodySmall.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          AppSpacing.verticalGapSm,
-                          ...stats.deadAirGaps.map((gap) => _buildGapItem(gap)),
-                        ],
-                      ),
-                    ),
-                    // Peeping cat image
-                    Padding(
-                      padding: const EdgeInsets.only(left: 16),
-                      child: Image.asset(
-                        'assets/images/peep2.webp',
-                        height: 120,
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-
-              AppSpacing.verticalGapMd,
-              Divider(color: AppColors.alternate),
-              AppSpacing.verticalGapMd,
-
-              // Explanation
-              Text(
-                'หลักการคำนวณ:',
-                style: AppTypography.bodySmall.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              AppSpacing.verticalGapSm,
-              _buildExplanationItem(
-                '1.',
-                'นับช่วงเวลาที่ห่างระหว่างงานแต่ละตัว',
-              ),
-              _buildExplanationItem(
-                '2.',
-                'ถ้าช่วงห่าง > 1 ชั่วโมง จะเริ่มนับเป็น "ทำไรอยู่อ่ะ?"',
-              ),
-              _buildExplanationItem(
-                '3.',
-                'ไม่นับช่วงเวลาพักที่เลือกไว้ตอนขึ้นเวร',
-              ),
-
-              AppSpacing.verticalGapMd,
-
-              // Formula
-              Container(
-                padding: AppSpacing.paddingSm,
-                decoration: BoxDecoration(
-                  color: AppColors.alternate.withValues(alpha: 0.3),
-                  borderRadius: AppRadius.smallRadius,
-                ),
-                child: Row(
-                  children: [
-                    HugeIcon(
-                      icon: HugeIcons.strokeRoundedCalculator01,
-                      size: AppIconSize.sm,
-                      color: AppColors.secondaryText,
-                    ),
-                    AppSpacing.horizontalGapSm,
-                    Expanded(
-                      child: Text(
-                        'ทำไรอยู่อ่ะ? = (ช่วงห่าง - 1 ชม.) - เวลาพัก',
-                        style: AppTypography.bodySmall.copyWith(
-                          fontFamily: 'monospace',
-                          color: AppColors.secondaryText,
-                        ),
+                    Text(
+                      'พยายามกดงานตามจริงนะ',
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.secondaryText,
+                        fontStyle: FontStyle.italic,
                       ),
                     ),
                   ],
                 ),
               ),
-
-              // Guide box
-              if (stats.deadAirMinutes > 0) ...[
-                AppSpacing.verticalGapMd,
-                Container(
-                  padding: AppSpacing.paddingMd,
-                  decoration: BoxDecoration(
-                    color: AppColors.warning.withValues(alpha: 0.1),
-                    borderRadius: AppRadius.mediumRadius,
-                    border: Border.all(
-                      color: AppColors.warning.withValues(alpha: 0.3),
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          HugeIcon(
-                            icon: HugeIcons.strokeRoundedInformationCircle,
-                            size: AppIconSize.sm,
-                            color: AppColors.warning,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'ไม่ได้อู้งาน?',
-                            style: AppTypography.bodySmall.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.warning,
-                            ),
-                          ),
-                        ],
-                      ),
-                      AppSpacing.verticalGapSm,
-                      Text(
-                        'อาจเกิดจากสาเหตุเหล่านี้:',
-                        style: AppTypography.bodySmall.copyWith(
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      AppSpacing.verticalGapXs,
-                      Text(
-                        '• ไม่ได้ไปพักตามเวลาที่เลือกไว้ตอนขึ้นเวร',
-                        style: AppTypography.bodySmall.copyWith(
-                          color: AppColors.secondaryText,
-                        ),
-                      ),
-                      Text(
-                        '• ค้างงานไว้แล้วมากดติดๆ กัน ทำให้มีช่องว่าง',
-                        style: AppTypography.bodySmall.copyWith(
-                          color: AppColors.secondaryText,
-                        ),
-                      ),
-                      AppSpacing.verticalGapSm,
-                      Text(
-                        'พยายามกดงานตามจริง เพื่อให้หัวหน้าเข้าใจการทำงานของเราได้ถูกต้องนะ',
-                        style: AppTypography.caption.copyWith(
-                          color: AppColors.secondaryText,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-
-              AppSpacing.verticalGapLg,
             ],
-          ),
+
+            AppSpacing.verticalGapLg,
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildCalcRow(String label, String value, {bool highlight = false}) {
+  Widget _buildTaskTimeRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
-            label,
-            style: AppTypography.bodySmall.copyWith(
-              color: highlight ? AppColors.primary : AppColors.secondaryText,
-              fontWeight: highlight ? FontWeight.w600 : FontWeight.normal,
-            ),
-          ),
-          Text(
-            value,
-            style: AppTypography.bodySmall.copyWith(
-              color: highlight ? AppColors.primary : AppColors.primaryText,
-              fontWeight: highlight ? FontWeight.w600 : FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildGapItem(DeadAirGap gap) {
-    final localStart = gap.gapStart.toLocal();
-    final localEnd = gap.gapEnd.toLocal();
-    final startTime = '${localStart.hour.toString().padLeft(2, '0')}:${localStart.minute.toString().padLeft(2, '0')}';
-    final endTime = '${localEnd.hour.toString().padLeft(2, '0')}:${localEnd.minute.toString().padLeft(2, '0')}';
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: AppSpacing.paddingSm,
-      decoration: BoxDecoration(
-        color: AppColors.alternate.withValues(alpha: 0.2),
-        borderRadius: AppRadius.smallRadius,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              HugeIcon(icon: HugeIcons.strokeRoundedClock01, size: AppIconSize.sm, color: AppColors.secondaryText),
-              const SizedBox(width: 4),
-              Text(
-                '$startTime → $endTime',
-                style: AppTypography.bodySmall.copyWith(
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'ช่วงห่าง ${gap.gapMinutes} นาที'
-            '${gap.breakMinutes > 0 ? ' - พัก ${gap.breakMinutes} นาที' : ''}'
-            ' - 60 นาที = ${gap.deadAirMinutes} นาที',
+            '• $label',
             style: AppTypography.caption.copyWith(
               color: AppColors.secondaryText,
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildExplanationItem(String number, String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 20,
-            child: Text(
-              number,
-              style: AppTypography.bodySmall.copyWith(
-                fontWeight: FontWeight.w600,
-                color: AppColors.primary,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              text,
-              style: AppTypography.bodySmall,
+          const Spacer(),
+          Text(
+            value,
+            style: AppTypography.caption.copyWith(
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],

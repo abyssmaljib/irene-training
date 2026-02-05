@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../core/services/user_service.dart';
 import '../models/add_medicine_form_state.dart';
 import '../models/med_db.dart';
 import '../models/med_atc_level.dart';
@@ -38,16 +38,8 @@ class CreateMedicineDBFormNotifier
   /// Initialize form
   Future<void> _initialize() async {
     try {
-      // ดึง nursinghomeId จาก user profile
-      final userId = Supabase.instance.client.auth.currentUser?.id;
-      if (userId != null) {
-        final userInfo = await Supabase.instance.client
-            .from('user_info')
-            .select('nursinghome_id')
-            .eq('id', userId)
-            .maybeSingle();
-        _nursinghomeId = userInfo?['nursinghome_id'] as int?;
-      }
+      // ดึง nursinghomeId จาก UserService (รองรับ impersonation)
+      _nursinghomeId = await UserService().getNursinghomeId();
 
       // Set initial state with defaults
       state = const AsyncValue.data(CreateMedicineDBFormState(

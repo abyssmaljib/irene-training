@@ -1,19 +1,26 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../checklist/providers/task_provider.dart'; // for userChangeCounterProvider
 import '../models/app_notification.dart';
 import '../services/notification_service.dart';
 
 /// Provider for unread notification count
 final unreadNotificationCountProvider = FutureProvider.autoDispose<int>((ref) async {
+  // Watch user change counter เพื่อ refresh เมื่อ impersonate
+  ref.watch(userChangeCounterProvider);
   return NotificationService.instance.getUnreadCount();
 });
 
 /// Provider for all notifications
 final notificationsProvider = FutureProvider.autoDispose<List<AppNotification>>((ref) async {
+  // Watch user change counter เพื่อ refresh เมื่อ impersonate
+  ref.watch(userChangeCounterProvider);
   return NotificationService.instance.fetchNotifications();
 });
 
 /// Provider for unread notifications only
 final unreadNotificationsProvider = FutureProvider.autoDispose<List<AppNotification>>((ref) async {
+  // Watch user change counter เพื่อ refresh เมื่อ impersonate
+  ref.watch(userChangeCounterProvider);
   final notifications = await NotificationService.instance.fetchNotifications();
   return notifications.where((n) => !n.isRead).toList();
 });

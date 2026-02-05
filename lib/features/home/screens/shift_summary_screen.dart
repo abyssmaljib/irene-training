@@ -81,6 +81,8 @@ class _ShiftSummaryScreenState extends State<ShiftSummaryScreen> {
         residentIds: widget.currentShift.selectedResidentIdList,
         clockInTime: widget.currentShift.clockInTimestamp ?? DateTime.now(),
         selectedBreakTimes: selectedBreakTimes,
+        // ใช้ deadAirMinutes จาก backend (database trigger calculation)
+        deadAirMinutes: widget.currentShift.deadAirMinutes,
       );
 
       if (mounted) {

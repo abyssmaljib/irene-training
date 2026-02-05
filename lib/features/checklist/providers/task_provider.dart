@@ -95,6 +95,8 @@ final currentUserNicknameProvider = FutureProvider<String?>((ref) async {
 
 /// Provider สำหรับ nursinghome ID
 final nursinghomeIdProvider = FutureProvider<int?>((ref) async {
+  // Watch user change counter เพื่อ refresh เมื่อ impersonate
+  ref.watch(userChangeCounterProvider);
   final userService = ref.watch(userServiceProvider);
   return userService.getNursinghomeId();
 });
@@ -351,6 +353,8 @@ final selectedZonesFilterProvider = StateProvider<Set<int>>((ref) {
 
 /// Provider สำหรับ current user's system role
 final currentUserSystemRoleProvider = FutureProvider<SystemRole?>((ref) async {
+  // Watch user change counter เพื่อ refresh เมื่อ impersonate
+  ref.watch(userChangeCounterProvider);
   final userService = ref.watch(userServiceProvider);
   return userService.getSystemRole();
 });

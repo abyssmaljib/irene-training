@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hugeicons/hugeicons.dart';
 
+import '../../../core/services/user_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -14,9 +15,68 @@ import '../../shift_summary/providers/shift_summary_provider.dart';
 import '../../notifications/providers/notification_provider.dart';
 import '../../board/providers/post_provider.dart';
 import '../../incident_reflection/providers/incident_provider.dart';
+import '../../checklist/providers/task_provider.dart'; // for userChangeCounterProvider
 import '../../onboarding/models/tutorial_target.dart';
 import '../../onboarding/widgets/new_feature_badge.dart';
 import '../../profile_setup/providers/profile_setup_provider.dart';
+
+// =============================================================================
+// Provider สำหรับตรวจสอบสถานะ employment และสิทธิ์การเข้าถึง
+// =============================================================================
+
+/// Provider ตรวจสอบว่า user ปัจจุบันลาออกแล้วหรือยัง
+/// ใช้สำหรับซ่อน/แสดง tabs ตามสถานะ
+final isUserResignedProvider = FutureProvider<bool>((ref) async {
+  // Watch user change counter เพื่อ refresh เมื่อ impersonate
+  ref.watch(userChangeCounterProvider);
+  return await UserService().isResigned();
+});
+
+/// Provider ดึง employment type ของ user ปัจจุบัน
+/// Returns: 'full_time', 'part_time', 'trainee', 'resigned', หรือ null
+final userEmploymentTypeProvider = FutureProvider<String?>((ref) async {
+  // Watch user change counter เพื่อ refresh เมื่อ impersonate
+  ref.watch(userChangeCounterProvider);
+  return await UserService().getEmploymentType();
+});
+
+/// Provider ตรวจสอบว่า user ควรเห็น tabs เฉพาะ (limited view) หรือไม่
+///
+/// **กฎการแสดง tabs:**
+/// - **ลาออก (resigned)**: แสดงแค่ Home + Settings เสมอ
+/// - **Part-time ที่ยังไม่ขึ้นเวร**: แสดงแค่ Home + Settings
+/// - **Part-time ที่ขึ้นเวรแล้ว**: แสดงทุก tab
+/// - **Full-time/Trainee**: แสดงทุก tab เสมอ
+final shouldShowLimitedTabsProvider = FutureProvider<bool>((ref) async {
+  // Watch user change counter เพื่อ refresh เมื่อ impersonate
+  ref.watch(userChangeCounterProvider);
+
+  final userService = UserService();
+
+  // 1. เช็คว่าลาออกหรือยัง - ถ้าลาออกแล้ว ต้องแสดง limited tabs เสมอ
+  final isResigned = await userService.isResigned();
+  if (isResigned) return true;
+
+  // 2. เช็ค employment type
+  final employmentType = await userService.getEmploymentType();
+
+  // 3. ถ้าเป็น part-time ต้องเช็คว่าขึ้นเวรหรือยัง
+  if (employmentType == 'part_time') {
+    // ดึงสถานะ clock-in จาก currentShiftProvider
+    final currentShiftAsync = ref.watch(currentShiftProvider);
+    final currentShift = currentShiftAsync.value;
+
+    // ถ้ายังไม่ขึ้นเวร (shift == null หรือ isClockedIn == false)
+    // ให้แสดง limited tabs
+    if (currentShift == null || !currentShift.isClockedIn) {
+      return true;
+    }
+  }
+
+  // 4. กรณีอื่นๆ (full_time, trainee, หรือ part-time ที่ขึ้นเวรแล้ว)
+  // ให้แสดงทุก tab
+  return false;
+});
 
 class MainNavigationScreen extends ConsumerStatefulWidget {
   final int initialIndex;
@@ -125,18 +185,74 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
     });
   }
 
-  final List<Widget> _screens = [
-    const HomeScreen(),
-    const ChecklistScreen(),
-    const ResidentsScreen(),
-    const BoardScreen(),
-    const SettingsScreen(),
-  ];
+  /// สร้าง screens list แบบ dynamic ตามสถานะ employment และ clock-in
+  ///
+  /// **Limited View (แสดงแค่ Home + Settings):**
+  /// - พนักงานที่ลาออกแล้ว
+  /// - Part-time ที่ยังไม่ขึ้นเวร
+  ///
+  /// **Full View (แสดงทุก tab):**
+  /// - Full-time, Trainee
+  /// - Part-time ที่ขึ้นเวรแล้ว
+  List<Widget> _buildScreensList(bool showLimited) {
+    if (showLimited) {
+      // Limited view: แสดงแค่ Home, Settings (ไม่มี Checklist, Residents, Board)
+      return const [
+        HomeScreen(),
+        SettingsScreen(),
+      ];
+    } else {
+      // Full view: แสดงทุก tab
+      return const [
+        HomeScreen(),
+        ChecklistScreen(),
+        ResidentsScreen(),
+        BoardScreen(),
+        SettingsScreen(),
+      ];
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    // ตรวจสอบว่ากำลัง impersonate อยู่หรือไม่
+    // ใช้ watch เพื่อให้ rebuild เมื่อ user change
+    ref.watch(userChangeCounterProvider);
+    final userService = UserService();
+    final isImpersonating = userService.isImpersonating;
+
+    // ตรวจสอบว่าควรแสดง limited tabs หรือไม่
+    // (ลาออก หรือ part-time ที่ยังไม่ขึ้นเวร)
+    final shouldShowLimitedAsync = ref.watch(shouldShowLimitedTabsProvider);
+    final shouldShowLimited = shouldShowLimitedAsync.value ?? false;
+
+    // สร้าง screens list ตามสถานะ
+    final screens = _buildScreensList(shouldShowLimited);
+
+    // ถ้า index เกินจำนวน screens (เกิดขึ้นเมื่อเปลี่ยนจากปกติเป็นลาออก)
+    // ให้กลับไป Home
+    if (_currentIndex >= screens.length) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() => _currentIndex = 0);
+        }
+      });
+    }
+
+    // คำนวณ index ที่ถูกต้องสำหรับ IndexedStack
+    final safeIndex = _currentIndex.clamp(0, screens.length - 1);
+
     return Scaffold(
-      body: IndexedStack(index: _currentIndex, children: _screens),
+      body: Column(
+        children: [
+          // แสดง Impersonation Banner ถ้ากำลัง impersonate
+          if (isImpersonating) _buildGlobalImpersonationBanner(userService),
+          // แสดง screens
+          Expanded(
+            child: IndexedStack(index: safeIndex, children: screens),
+          ),
+        ],
+      ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: AppColors.secondaryBackground,
@@ -150,39 +266,63 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildNavItem(
-                  index: 0,
-                  icon: HugeIcons.strokeRoundedHome01,
-                  activeIcon: HugeIcons.strokeRoundedHome01,
-                  label: 'หน้าหลัก',
-                  tutorialKey: _tutorialKeys.homeTabKey,
-                  tabId: 'home',
-                ),
-                _buildNavItem(
-                  index: 1,
-                  icon: HugeIcons.strokeRoundedTask01,
-                  activeIcon: HugeIcons.strokeRoundedTask01,
-                  label: 'เช็คลิสต์',
-                  tutorialKey: _tutorialKeys.checklistTabKey,
-                  tabId: 'checklist',
-                ),
-                _buildNavItem(
-                  index: 2,
-                  icon: HugeIcons.strokeRoundedUserGroup,
-                  activeIcon: HugeIcons.strokeRoundedUserGroup,
-                  label: 'คนไข้',
-                  tutorialKey: _tutorialKeys.residentsTabKey,
-                  tabId: 'residents',
-                ),
-                _buildBoardNavItem(),
-                _buildProfileNavItem(),
-              ],
+              children: _buildNavItems(shouldShowLimited),
             ),
           ),
         ),
       ),
     );
+  }
+
+  /// สร้าง navigation items แบบ dynamic ตามสถานะ employment และ clock-in
+  ///
+  /// **Limited View:** Home(0), Settings(1)
+  /// **Full View:** Home(0), Checklist(1), Residents(2), Board(3), Settings(4)
+  List<Widget> _buildNavItems(bool showLimited) {
+    if (showLimited) {
+      // Limited view: Home(0), Settings(1) - ไม่มี Checklist, Residents, Board
+      return [
+        _buildNavItem(
+          index: 0,
+          icon: HugeIcons.strokeRoundedHome01,
+          activeIcon: HugeIcons.strokeRoundedHome01,
+          label: 'หน้าหลัก',
+          tutorialKey: _tutorialKeys.homeTabKey,
+          tabId: 'home',
+        ),
+        _buildProfileNavItem(navIndex: 1),
+      ];
+    } else {
+      // พนักงานปกติ: ทุก tab
+      return [
+        _buildNavItem(
+          index: 0,
+          icon: HugeIcons.strokeRoundedHome01,
+          activeIcon: HugeIcons.strokeRoundedHome01,
+          label: 'หน้าหลัก',
+          tutorialKey: _tutorialKeys.homeTabKey,
+          tabId: 'home',
+        ),
+        _buildNavItem(
+          index: 1,
+          icon: HugeIcons.strokeRoundedTask01,
+          activeIcon: HugeIcons.strokeRoundedTask01,
+          label: 'เช็คลิสต์',
+          tutorialKey: _tutorialKeys.checklistTabKey,
+          tabId: 'checklist',
+        ),
+        _buildNavItem(
+          index: 2,
+          icon: HugeIcons.strokeRoundedUserGroup,
+          activeIcon: HugeIcons.strokeRoundedUserGroup,
+          label: 'คนไข้',
+          tutorialKey: _tutorialKeys.residentsTabKey,
+          tabId: 'residents',
+        ),
+        _buildBoardNavItem(navIndex: 3),
+        _buildProfileNavItem(navIndex: 4),
+      ];
+    }
   }
 
   Widget _buildNavItem({
@@ -253,14 +393,15 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
   }
 
   /// Build board nav item with red dot for unread posts
-  Widget _buildBoardNavItem() {
+  /// [navIndex] คือ index ใน navigation bar (เปลี่ยนได้ตามจำนวน tabs ที่แสดง)
+  Widget _buildBoardNavItem({int navIndex = 3}) {
     final unreadCountAsync = ref.watch(totalUnreadPostCountProvider);
     final hasUnreadPosts = unreadCountAsync.maybeWhen(
       data: (count) => count > 0,
       orElse: () => false,
     );
 
-    final isSelected = _currentIndex == 3;
+    final isSelected = _currentIndex == navIndex;
 
     // NOTE: NEW badge feature ถูกซ่อนไว้ชั่วคราว
     // final userId = Supabase.instance.client.auth.currentUser?.id ?? '';
@@ -275,7 +416,7 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
       key: _tutorialKeys.boardTabKey,
       onTap: () {
         setState(() {
-          _currentIndex = 3;
+          _currentIndex = navIndex;
         });
 
         // NOTE: NEW badge dismiss ถูกซ่อนไว้ชั่วคราว
@@ -343,7 +484,8 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
   }
 
   /// Build profile nav item with notification badge for pending absences, notifications, incidents, and incomplete profile
-  Widget _buildProfileNavItem() {
+  /// [navIndex] คือ index ใน navigation bar (เปลี่ยนได้ตามจำนวน tabs ที่แสดง)
+  Widget _buildProfileNavItem({int navIndex = 4}) {
     final pendingAbsenceAsync = ref.watch(pendingAbsenceCountProvider);
     final hasPendingAbsence = pendingAbsenceAsync.maybeWhen(
       data: (count) => count > 0,
@@ -370,13 +512,13 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
       orElse: () => false,
     );
 
-    final isSelected = _currentIndex == 4;
+    final isSelected = _currentIndex == navIndex;
 
     return GestureDetector(
       key: _tutorialKeys.settingsTabKey, // ใช้ key สำหรับ tutorial highlight
       onTap: () {
         setState(() {
-          _currentIndex = 4;
+          _currentIndex = navIndex;
         });
       },
       behavior: HitTestBehavior.opaque,
@@ -428,5 +570,105 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
         ),
       ),
     );
+  }
+
+  /// สร้าง Global Impersonation Banner
+  /// แสดงด้านบนสุดของแอปตลอดเวลาเมื่อกำลัง impersonate user อื่น
+  Widget _buildGlobalImpersonationBanner(UserService userService) {
+    return Container(
+      width: double.infinity,
+      color: Colors.red.shade600,
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.sm,
+          ),
+          child: Row(
+            children: [
+              // Icon แจ้งเตือน
+              HugeIcon(
+                icon: HugeIcons.strokeRoundedUserSwitch,
+                size: AppIconSize.md,
+                color: Colors.white,
+              ),
+              AppSpacing.horizontalGapSm,
+              // ข้อความแสดงชื่อ user ที่กำลัง impersonate
+              Expanded(
+                child: FutureBuilder<String?>(
+                  future: _getImpersonatedUserName(userService),
+                  builder: (context, snapshot) {
+                    final name = snapshot.data ?? 'Unknown User';
+                    return Text(
+                      'กำลังใช้งานในนาม: $name',
+                      style: AppTypography.bodySmall.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    );
+                  },
+                ),
+              ),
+              // ปุ่มหยุด impersonate
+              GestureDetector(
+                onTap: _stopImpersonating,
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: AppSpacing.sm,
+                    vertical: AppSpacing.xs,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: AppRadius.smallRadius,
+                  ),
+                  child: Text(
+                    'หยุด',
+                    style: AppTypography.caption.copyWith(
+                      color: Colors.red.shade600,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// ดึงชื่อของ user ที่กำลัง impersonate
+  Future<String?> _getImpersonatedUserName(UserService userService) async {
+    final effectiveUserId = userService.effectiveUserId;
+    if (effectiveUserId == null) return null;
+
+    try {
+      // ใช้ getUserName() ซึ่งจะดึงชื่อของ effectiveUserId
+      return await userService.getUserName();
+    } catch (e) {
+      return 'Unknown';
+    }
+  }
+
+  /// หยุด impersonate และกลับมาเป็น user จริง
+  void _stopImpersonating() {
+    UserService().stopImpersonating();
+
+    // Increment user change counter เพื่อ refresh Riverpod providers
+    ref.read(userChangeCounterProvider.notifier).state++;
+
+    // แสดง snackbar แจ้งเตือน
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('กลับมาเป็นตัวคุณเองแล้ว'),
+          backgroundColor: AppColors.success,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
   }
 }

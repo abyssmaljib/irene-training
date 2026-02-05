@@ -24,10 +24,6 @@ class DDSummaryCard extends ConsumerStatefulWidget {
 class _DDSummaryCardState extends ConsumerState<DDSummaryCard> {
   final _userService = UserService();
 
-  // สีพิเศษสำหรับ DD Card
-  static const _backgroundColor = Color(0xFFFFFFD9);
-  static const _borderColor = Color(0xFFF1EF99);
-
   @override
   void initState() {
     super.initState();
@@ -61,12 +57,12 @@ class _DDSummaryCardState extends ConsumerState<DDSummaryCard> {
 
   Widget _buildLoadingCard() {
     return Container(
-      margin: EdgeInsets.only(bottom: AppSpacing.sm),
+      margin: EdgeInsets.only(bottom: AppSpacing.md),
       padding: EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: _backgroundColor,
-        borderRadius: BorderRadius.circular(8.0),
-        border: Border.all(color: _borderColor),
+        color: AppColors.surface,
+        borderRadius: AppRadius.mediumRadius,
+        boxShadow: [AppShadows.subtle],
       ),
       child: Row(
         children: [
@@ -92,63 +88,61 @@ class _DDSummaryCardState extends ConsumerState<DDSummaryCard> {
     return GestureDetector(
       onTap: widget.onTap,
       child: Container(
-        margin: EdgeInsets.only(bottom: AppSpacing.sm),
+        margin: EdgeInsets.only(bottom: AppSpacing.md),
+        padding: EdgeInsets.all(AppSpacing.md),
         decoration: BoxDecoration(
-          color: _backgroundColor,
-          boxShadow: const [
-            BoxShadow(
-              blurRadius: 4.0,
-              color: _borderColor,
-              offset: Offset(0.0, 2.0),
-            ),
-          ],
-          borderRadius: BorderRadius.circular(8.0),
-          border: Border.all(color: _borderColor),
+          // ใช้ style เดียวกับ cards อื่น (พื้นขาว + shadow)
+          color: AppColors.surface,
+          boxShadow: [AppShadows.subtle],
+          borderRadius: AppRadius.mediumRadius,
         ),
-        child: Padding(
-          padding: EdgeInsets.all(AppSpacing.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              Row(
-                children: [
-                  HugeIcon(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header - style เหมือน IncidentSummaryCard
+            Row(
+              children: [
+                // Icon container
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withValues(alpha: 0.1),
+                    borderRadius: AppRadius.smallRadius,
+                  ),
+                  child: HugeIcon(
                     icon: HugeIcons.strokeRoundedCalendarCheckIn01,
                     color: AppColors.warning,
-                    size: AppIconSize.xl,
-                  ),
-                  SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: Text(
-                      'คุณมี $count งาน DD รอทำ',
-                      style: AppTypography.title.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  HugeIcon(
-                    icon: HugeIcons.strokeRoundedArrowRight01,
-                    color: AppColors.secondaryText,
                     size: AppIconSize.lg,
                   ),
-                ],
-              ),
-              // แสดงรายละเอียด record แรก
-              SizedBox(height: AppSpacing.sm),
-              _buildRecordPreview(firstRecord),
-              // ถ้ามีมากกว่า 1 รายการ
-              if (count > 1) ...[
-                SizedBox(height: AppSpacing.xs),
-                Text(
-                  '+ อีก ${count - 1} รายการ',
-                  style: AppTypography.bodySmall.copyWith(
-                    color: AppColors.secondaryText,
+                ),
+                SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Text(
+                    'คุณมี $count งาน DD รอทำ',
+                    style: AppTypography.title.copyWith(fontSize: 16),
                   ),
                 ),
+                HugeIcon(
+                  icon: HugeIcons.strokeRoundedArrowRight01,
+                  color: AppColors.secondaryText,
+                  size: AppIconSize.md,
+                ),
               ],
+            ),
+            // แสดงรายละเอียด record แรก
+            SizedBox(height: AppSpacing.sm),
+            _buildRecordPreview(firstRecord),
+            // ถ้ามีมากกว่า 1 รายการ
+            if (count > 1) ...[
+              SizedBox(height: AppSpacing.xs),
+              Text(
+                '+ อีก ${count - 1} รายการ',
+                style: AppTypography.bodySmall.copyWith(
+                  color: AppColors.secondaryText,
+                ),
+              ),
             ],
-          ),
+          ],
         ),
       ),
     );

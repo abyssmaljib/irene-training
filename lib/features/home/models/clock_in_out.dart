@@ -12,6 +12,9 @@ class ClockInOut {
   final List<int> selectedResidentIdList;
   final List<int> selectedBreakTime;
   final DateTime? createdAt;
+  // Dead Air - คำนวณจาก backend (database trigger)
+  // สูตร: Dead Air = Total Gaps - Task Time - 75 นาที (allowance) - Break Overlap
+  final int deadAirMinutes;
 
   const ClockInOut({
     this.id,
@@ -26,6 +29,7 @@ class ClockInOut {
     this.selectedResidentIdList = const [],
     this.selectedBreakTime = const [],
     this.createdAt,
+    this.deadAirMinutes = 0,
   });
 
   /// Parse จาก Supabase response
@@ -43,6 +47,8 @@ class ClockInOut {
       selectedResidentIdList: _parseIntList(json['selected_resident_id_list']),
       selectedBreakTime: _parseIntList(json['selected_break_time']),
       createdAt: _parseDateTime(json['created_at']),
+      // Dead Air จาก backend calculation
+      deadAirMinutes: json['dead_air_minutes'] as int? ?? 0,
     );
   }
 

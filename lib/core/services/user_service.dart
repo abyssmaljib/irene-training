@@ -50,6 +50,7 @@ class DevUserInfo {
   final String? photoUrl;
   final bool isClockedIn;
   final List<String> clockedInZones; // โซนที่ขึ้นเวรอยู่
+  final String? employmentType; // full_time, part_time, trainee, resigned
 
   const DevUserInfo({
     required this.id,
@@ -58,9 +59,34 @@ class DevUserInfo {
     this.photoUrl,
     this.isClockedIn = false,
     this.clockedInZones = const [],
+    this.employmentType,
   });
 
   String get displayName => nickname ?? fullName ?? id;
+
+  /// แปลง employment_type เป็นข้อความภาษาไทย
+  String? get employmentTypeDisplay {
+    switch (employmentType) {
+      case 'full_time':
+        return 'พนักงานประจำ';
+      case 'part_time':
+        return 'พาร์ทไทม์';
+      case 'trainee':
+        return 'ฝึกงาน';
+      case 'resigned':
+        return 'ลาออกแล้ว';
+      default:
+        return null;
+    }
+  }
+
+  /// ตรวจสอบว่าเป็นพนักงานที่ active อยู่หรือไม่
+  bool get isActiveEmployee =>
+      employmentType == null ||
+      ['full_time', 'part_time', 'trainee'].contains(employmentType);
+
+  /// ตรวจสอบว่าลาออกแล้วหรือไม่
+  bool get isResigned => employmentType == 'resigned';
 
   factory DevUserInfo.fromJson(
     Map<String, dynamic> json, {
@@ -74,6 +100,7 @@ class DevUserInfo {
       photoUrl: json['photo_url'] as String?,
       isClockedIn: isClockedIn,
       clockedInZones: clockedInZones,
+      employmentType: json['employment_type'] as String?,
     );
   }
 }
@@ -87,6 +114,7 @@ class UserService {
   String? _cachedUserId;
   String? _cachedUserName;
   UserRole? _cachedRole;
+  String? _cachedEmploymentType;
 
   // Dev mode impersonation
   String? _impersonatedUserId;
@@ -270,6 +298,74 @@ class UserService {
     _cachedUserId = null;
     _cachedRole = null;
     _cachedSystemRole = null;
+    _cachedEmploymentType = null;
+  }
+
+  // ============================================================
+  // Employment Validation (ตรวจสอบสถานะการทำงาน)
+  // ============================================================
+
+  /// Get current user's employment type
+  /// Returns: 'full_time', 'part_time', 'trainee', 'resigned', or null
+  Future<String?> getEmploymentType({bool forceRefresh = false}) async {
+    final userId = effectiveUserId;
+    if (userId == null) return null;
+
+    // Return cached value if same user and not forcing refresh
+    if (!forceRefresh &&
+        _cachedUserId == userId &&
+        _cachedEmploymentType != null) {
+      return _cachedEmploymentType;
+    }
+
+    try {
+      final response = await Supabase.instance.client
+          .from('user_info')
+          .select('employment_type')
+          .eq('id', userId)
+          .maybeSingle();
+
+      _cachedUserId = userId;
+      _cachedEmploymentType = response?['employment_type'] as String?;
+      return _cachedEmploymentType;
+    } catch (e) {
+      debugPrint('UserService: Error getting employment type: $e');
+      return null;
+    }
+  }
+
+  /// ตรวจสอบว่า user ยังทำงานอยู่หรือไม่
+  /// Returns true ถ้า employment_type เป็น full_time, part_time, หรือ trainee
+  Future<bool> isActiveEmployee() async {
+    final employmentType = await getEmploymentType();
+    // ถ้าไม่มีค่า ถือว่ายังไม่ได้ set (อนุญาตให้เข้า)
+    if (employmentType == null) return true;
+    return ['full_time', 'part_time', 'trainee'].contains(employmentType);
+  }
+
+  /// ตรวจสอบว่า user ลาออกแล้วหรือไม่
+  Future<bool> isResigned() async {
+    final employmentType = await getEmploymentType();
+    return employmentType == 'resigned';
+  }
+
+  /// Validate user access - ตรวจสอบทั้ง employment_type และ nursinghome_id
+  /// Returns: (isValid, errorType)
+  /// errorType: null = valid, 'resigned' = ลาออกแล้ว, 'no_nursinghome' = ไม่มี nursinghome
+  Future<(bool isValid, String? errorType)> validateUserAccess() async {
+    // ตรวจสอบว่าลาออกหรือยัง
+    final isResignedUser = await isResigned();
+    if (isResignedUser) {
+      return (false, 'resigned');
+    }
+
+    // ตรวจสอบว่ามี nursinghome_id หรือไม่
+    final nursinghomeId = await getNursinghomeId();
+    if (nursinghomeId == null) {
+      return (false, 'no_nursinghome');
+    }
+
+    return (true, null);
   }
 
   // ============================================================
@@ -360,10 +456,10 @@ class UserService {
         return [];
       }
 
-      // Build query
+      // Build query - เพิ่ม employment_type เพื่อแสดงสถานะการทำงาน
       var query = Supabase.instance.client
           .from('user_info')
-          .select('id, nickname, full_name, photo_url');
+          .select('id, nickname, full_name, photo_url, employment_type');
 
       if (nursinghomeId != null) {
         query = query.eq('nursinghome_id', nursinghomeId);

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/services/user_service.dart';
+import '../../checklist/providers/task_provider.dart'; // for userChangeCounterProvider
 import '../models/post.dart';
 import '../models/post_tab.dart';
 import '../models/post_filter.dart';
@@ -74,14 +75,14 @@ class PostsNotifier extends StateNotifier<PostsState> {
     state = PostsState.loading();
 
     try {
-      final nursinghomeId = await ref.read(nursinghomeIdProvider.future);
+      final nursinghomeId = await ref.read(postNursinghomeIdProvider.future);
       if (nursinghomeId == null) {
         state = const PostsState(posts: [], isLoading: false, hasMore: false);
         return;
       }
 
       final filter = ref.read(postFilterProvider);
-      final currentUserId = ref.read(currentUserIdProvider);
+      final currentUserId = ref.read(postCurrentUserIdProvider);
       final service = ref.read(postServiceProvider);
 
       // เก็บ filter ล่าสุดไว้เช็คตอน loadMore
@@ -121,14 +122,14 @@ class PostsNotifier extends StateNotifier<PostsState> {
     state = state.copyWith(isLoadingMore: true);
 
     try {
-      final nursinghomeId = await ref.read(nursinghomeIdProvider.future);
+      final nursinghomeId = await ref.read(postNursinghomeIdProvider.future);
       if (nursinghomeId == null) {
         state = state.copyWith(isLoadingMore: false, hasMore: false);
         return;
       }
 
       final filter = ref.read(postFilterProvider);
-      final currentUserId = ref.read(currentUserIdProvider);
+      final currentUserId = ref.read(postCurrentUserIdProvider);
       final service = ref.read(postServiceProvider);
 
       // ถ้า filter เปลี่ยน ให้ loadInitial แทน
@@ -190,12 +191,16 @@ final postActionServiceProvider = Provider<PostActionService>((ref) {
 });
 
 /// Provider สำหรับ current user ID (uses effectiveUserId for dev mode)
-final currentUserIdProvider = Provider<String?>((ref) {
+final postCurrentUserIdProvider = Provider<String?>((ref) {
+  // Watch user change counter เพื่อ refresh เมื่อ impersonate
+  ref.watch(userChangeCounterProvider);
   return UserService().effectiveUserId;
 });
 
 /// Provider สำหรับ nursinghome ID
-final nursinghomeIdProvider = FutureProvider<int?>((ref) async {
+final postNursinghomeIdProvider = FutureProvider<int?>((ref) async {
+  // Watch user change counter เพื่อ refresh เมื่อ impersonate
+  ref.watch(userChangeCounterProvider);
   final userService = UserService();
   return userService.getNursinghomeId();
 });
@@ -206,6 +211,8 @@ final nursinghomeIdProvider = FutureProvider<int?>((ref) async {
 /// - 40+ = manager (ผู้จัดการ)
 /// - 50 = owner (เจ้าของ)
 final userRoleLevelProvider = FutureProvider<int>((ref) async {
+  // Watch user change counter เพื่อ refresh เมื่อ impersonate
+  ref.watch(userChangeCounterProvider);
   final userService = UserService();
   final systemRole = await userService.getSystemRole();
   return systemRole?.level ?? 0;
@@ -226,11 +233,11 @@ final postsProvider = FutureProvider<List<Post>>((ref) async {
   // Watch refresh counter to trigger rebuild
   ref.watch(postRefreshCounterProvider);
 
-  final nursinghomeId = await ref.watch(nursinghomeIdProvider.future);
+  final nursinghomeId = await ref.watch(postNursinghomeIdProvider.future);
   if (nursinghomeId == null) return [];
 
   final filter = ref.watch(postFilterProvider);
-  final currentUserId = ref.watch(currentUserIdProvider);
+  final currentUserId = ref.watch(postCurrentUserIdProvider);
   final service = ref.watch(postServiceProvider);
 
   return service.getPosts(
@@ -244,7 +251,7 @@ final postsProvider = FutureProvider<List<Post>>((ref) async {
 final pinnedPostProvider = FutureProvider<Post?>((ref) async {
   ref.watch(postRefreshCounterProvider);
 
-  final nursinghomeId = await ref.watch(nursinghomeIdProvider.future);
+  final nursinghomeId = await ref.watch(postNursinghomeIdProvider.future);
   if (nursinghomeId == null) return null;
 
   final service = ref.watch(postServiceProvider);
@@ -255,8 +262,8 @@ final pinnedPostProvider = FutureProvider<Post?>((ref) async {
 final unreadCountsProvider = FutureProvider<Map<PostMainTab, int>>((ref) async {
   ref.watch(postRefreshCounterProvider);
 
-  final nursinghomeId = await ref.watch(nursinghomeIdProvider.future);
-  final userId = ref.watch(currentUserIdProvider);
+  final nursinghomeId = await ref.watch(postNursinghomeIdProvider.future);
+  final userId = ref.watch(postCurrentUserIdProvider);
 
   if (nursinghomeId == null || userId == null) {
     return {
@@ -287,7 +294,7 @@ final postSearchResultsProvider = FutureProvider<List<Post>>((ref) async {
   final searchQuery = ref.watch(postSearchQueryProvider);
   if (searchQuery.isEmpty) return [];
 
-  final nursinghomeId = await ref.watch(nursinghomeIdProvider.future);
+  final nursinghomeId = await ref.watch(postNursinghomeIdProvider.future);
   if (nursinghomeId == null) return [];
 
   final mainTab = ref.watch(postMainTabProvider);
@@ -327,7 +334,7 @@ void invalidateAndRefreshPosts(WidgetRef ref) {
 /// Provider for toggling like with optimistic update
 final toggleLikeProvider =
     FutureProvider.family<bool, int>((ref, postId) async {
-  final userId = ref.watch(currentUserIdProvider);
+  final userId = ref.watch(postCurrentUserIdProvider);
   if (userId == null) return false;
 
   final actionService = ref.watch(postActionServiceProvider);

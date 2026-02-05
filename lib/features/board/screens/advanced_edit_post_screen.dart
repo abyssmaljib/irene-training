@@ -186,7 +186,7 @@ class _AdvancedEditPostScreenState
     setState(() => _isSubmitting = true);
 
     try {
-      final userId = ref.read(currentUserIdProvider);
+      final userId = ref.read(postCurrentUserIdProvider);
       if (userId == null) throw Exception('Not authenticated');
 
       // Upload new images if any พร้อมแสดง progress

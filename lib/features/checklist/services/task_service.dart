@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../points/services/points_service.dart';
 import '../models/task_log.dart';
 import '../models/user_shift.dart';
 
@@ -193,6 +194,30 @@ class TaskService {
       invalidateCache();
       debugPrint(
           'markTaskComplete: log $logId marked as complete (postId: $postId, difficulty: $difficultyScore)');
+
+      // บันทึก points สำหรับ task completion
+      // ดึงชื่อ task จาก cache หรือ database
+      try {
+        String taskName = 'งาน';
+        final cachedTask = _cachedTasks?.where((t) => t.logId == logId).firstOrNull;
+        if (cachedTask != null) {
+          taskName = cachedTask.title ?? 'งาน';
+        }
+
+        // ใช้ V1 เพราะ context นี้ไม่มี actualMinutes, expectedMinutes, completionType
+        // ignore: deprecated_member_use_from_same_package
+        final points = await PointsService().recordTaskCompleted(
+          userId: userId,
+          taskLogId: logId,
+          taskName: taskName,
+          difficultyScore: difficultyScore,
+        );
+        debugPrint('markTaskComplete: recorded $points points');
+      } catch (e) {
+        // ไม่ให้ error จาก points กระทบ task completion
+        debugPrint('markTaskComplete: failed to record points: $e');
+      }
+
       return true;
     } catch (e) {
       debugPrint('markTaskComplete error: $e');

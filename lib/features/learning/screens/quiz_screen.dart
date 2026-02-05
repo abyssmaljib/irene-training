@@ -2,11 +2,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../core/services/user_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/confirm_dialog.dart';
 import '../../../core/widgets/irene_app_bar.dart';
+import '../../points/services/points_service.dart';
 import '../models/question.dart';
 import '../models/quiz_session.dart';
 import '../models/quiz_answer.dart';
@@ -242,6 +244,39 @@ class _QuizScreenState extends State<QuizScreen> {
           .eq('id', widget.session.progressId);
 
       debugPrint('Quiz submitted successfully');
+
+      // บันทึก points ถ้าเป็น posttest และผ่านครั้งแรก
+      // ตรวจสอบว่า posttest_completed_at เดิมเป็น null หรือไม่
+      final userId = UserService().effectiveUserId;
+      if (userId != null && widget.session.quizType == 'posttest' && isPassed) {
+        // ถ้า posttest_completed_at เดิมเป็น null แสดงว่าเป็นครั้งแรกที่ผ่าน
+        final wasFirstPass = currentProgress['posttest_completed_at'] == null;
+
+        if (wasFirstPass) {
+          final points = await PointsService().recordQuizPassed(
+            userId: userId,
+            sessionId: widget.session.id,
+            topicId: widget.session.topicId,
+            topicName: widget.topicName,
+            score: _score,
+            totalQuestions: _questions.length,
+            isFirstPass: true,
+            seasonId: widget.session.seasonId,
+          );
+          debugPrint('Quiz points recorded: $points');
+        }
+      }
+
+      // บันทึก points สำหรับ review
+      if (userId != null && widget.session.quizType == 'review') {
+        await PointsService().recordReviewCompleted(
+          userId: userId,
+          sessionId: widget.session.id,
+          topicName: widget.topicName,
+          seasonId: widget.session.seasonId,
+        );
+        debugPrint('Review points recorded');
+      }
     } catch (e) {
       debugPrint('Error submitting quiz: $e');
     }

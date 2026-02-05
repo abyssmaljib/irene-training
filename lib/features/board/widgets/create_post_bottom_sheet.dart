@@ -216,7 +216,7 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
     if (_draftService == null) return;
     if (widget.isFromTask) return;
 
-    final userId = ref.read(currentUserIdProvider);
+    final userId = ref.read(postCurrentUserIdProvider);
     if (userId == null) return;
 
     final state = ref.read(createPostProvider);
@@ -243,7 +243,7 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
   Future<void> _checkAndRestoreDraft() async {
     if (_draftService == null) return;
 
-    final userId = ref.read(currentUserIdProvider);
+    final userId = ref.read(postCurrentUserIdProvider);
     if (userId == null) {
       ref.read(createPostProvider.notifier).reset();
       return;
@@ -345,7 +345,7 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
         return true;
       case ExitCreateResult.discard:
         // ยกเลิก - ลบ draft แล้วปิด
-        final userId = ref.read(currentUserIdProvider);
+        final userId = ref.read(postCurrentUserIdProvider);
         if (userId != null && _draftService != null) {
           await _draftService!.clearDraft(userId.toString());
         }
@@ -357,7 +357,7 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
 
   /// ลบ draft หลังจาก submit สำเร็จ
   Future<void> _clearDraftAfterSubmit() async {
-    final userId = ref.read(currentUserIdProvider);
+    final userId = ref.read(postCurrentUserIdProvider);
     if (userId != null && _draftService != null) {
       await _draftService!.clearDraft(userId.toString());
     }
@@ -1193,7 +1193,7 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
   /// เริ่ม background upload video พร้อม progress tracking
   Future<void> _startBackgroundVideoUpload(File videoFile) async {
     final notifier = ref.read(createPostProvider.notifier);
-    final userId = ref.read(currentUserIdProvider);
+    final userId = ref.read(postCurrentUserIdProvider);
 
     // ล้าง video เดิม และเริ่ม upload state
     notifier.clearVideos();
@@ -1545,8 +1545,8 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
 
     try {
       final actionService = ref.read(postActionServiceProvider);
-      final userId = ref.read(currentUserIdProvider);
-      final nursinghomeId = await ref.read(nursinghomeIdProvider.future);
+      final userId = ref.read(postCurrentUserIdProvider);
+      final nursinghomeId = await ref.read(postNursinghomeIdProvider.future);
 
       if (userId == null || nursinghomeId == null) {
         throw Exception('ไม่พบข้อมูลผู้ใช้');

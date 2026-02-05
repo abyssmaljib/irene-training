@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../core/services/user_service.dart';
 import '../models/vital_sign_form_state.dart';
 import '../services/vital_sign_service.dart';
 
@@ -395,10 +395,9 @@ class VitalSignFormNotifier
     state = AsyncValue.data(currentState.copyWith(isLoading: true, errorMessage: null));
 
     try {
-      // Get current user info
-      final userId = Supabase.instance.client.auth.currentUser?.id ?? '';
-      // TODO: Get nursinghomeId from user profile or context
-      const nursinghomeId = 1; // Placeholder
+      // Get current user info (รองรับ impersonation)
+      final userId = UserService().effectiveUserId ?? '';
+      final nursinghomeId = await UserService().getNursinghomeId() ?? 1;
 
       await _service.createVitalSign(
         residentId: residentId,
@@ -781,8 +780,9 @@ class EditVitalSignFormNotifier
     state = AsyncValue.data(currentState.copyWith(isLoading: true, errorMessage: null));
 
     try {
-      final userId = Supabase.instance.client.auth.currentUser?.id ?? '';
-      const nursinghomeId = 1; // TODO: Get from user profile
+      // Get current user info (รองรับ impersonation)
+      final userId = UserService().effectiveUserId ?? '';
+      final nursinghomeId = await UserService().getNursinghomeId() ?? 1;
 
       await _service.updateVitalSign(
         id: vitalSignId,

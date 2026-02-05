@@ -7,6 +7,7 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../board/models/post.dart';
 import '../../../board/providers/post_provider.dart';
 import '../../../board/screens/board_screen.dart';
+import '../../../checklist/providers/task_provider.dart'; // for nursinghomeIdProvider
 import '../../screens/activity_log_screen.dart';
 
 /// Provider สำหรับ activity posts ของ resident

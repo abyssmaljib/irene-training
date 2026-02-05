@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../core/services/user_service.dart';
 import '../models/edit_medicine_form_state.dart';
 import '../models/medicine_summary.dart';
 import '../services/medicine_service.dart';
@@ -242,7 +242,8 @@ class EditMedicineFormNotifier
       final reconcile = currentState.reconcile.isNotEmpty
           ? double.tryParse(currentState.reconcile)
           : null;
-      final userId = Supabase.instance.client.auth.currentUser?.id;
+      // ใช้ effectiveUserId เพื่อรองรับ impersonation
+      final userId = UserService().effectiveUserId;
 
       if (userId == null) {
         state = AsyncValue.data(currentState.copyWith(

@@ -3,6 +3,7 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/services/user_service.dart';
+import '../../checklist/providers/task_provider.dart'; // for userChangeCounterProvider
 import '../models/incident.dart';
 import '../services/incident_service.dart';
 
@@ -12,19 +13,23 @@ final incidentServiceProvider = Provider<IncidentService>((ref) {
 });
 
 /// Provider สำหรับ UserService (Singleton)
-final userServiceProvider = Provider<UserService>((ref) {
+final incidentUserServiceProvider = Provider<UserService>((ref) {
   return UserService();
 });
 
 /// Provider สำหรับ current user ID
 /// ใช้ effectiveUserId เพื่อรองรับ dev mode impersonation
-final currentUserIdProvider = Provider<String?>((ref) {
+final incidentCurrentUserIdProvider = Provider<String?>((ref) {
+  // Watch user change counter เพื่อ refresh เมื่อ impersonate
+  ref.watch(userChangeCounterProvider);
   return UserService().effectiveUserId;
 });
 
 /// Provider สำหรับ nursinghome ID ของ user ปัจจุบัน
-final nursinghomeIdProvider = FutureProvider<int?>((ref) async {
-  final userService = ref.watch(userServiceProvider);
+final incidentNursinghomeIdProvider = FutureProvider<int?>((ref) async {
+  // Watch user change counter เพื่อ refresh เมื่อ impersonate
+  ref.watch(userChangeCounterProvider);
+  final userService = ref.watch(incidentUserServiceProvider);
   return userService.getNursinghomeId();
 });
 
@@ -32,8 +37,8 @@ final nursinghomeIdProvider = FutureProvider<int?>((ref) async {
 ///
 /// ดึงจาก v_incidents_with_details view โดย filter ที่ staff_id contains userId
 final myIncidentsProvider = FutureProvider<List<Incident>>((ref) async {
-  final userId = ref.watch(currentUserIdProvider);
-  final nursinghomeIdAsync = ref.watch(nursinghomeIdProvider);
+  final userId = ref.watch(incidentCurrentUserIdProvider);
+  final nursinghomeIdAsync = ref.watch(incidentNursinghomeIdProvider);
 
   // รอ nursinghomeId ก่อน
   final nursinghomeId = nursinghomeIdAsync.value;
@@ -51,8 +56,8 @@ final myIncidentsProvider = FutureProvider<List<Incident>>((ref) async {
 /// เรียกเมื่อต้องการ force refresh data
 final refreshIncidentsProvider = Provider<Future<void> Function()>((ref) {
   return () async {
-    final userId = ref.read(currentUserIdProvider);
-    final nursinghomeIdAsync = ref.read(nursinghomeIdProvider);
+    final userId = ref.read(incidentCurrentUserIdProvider);
+    final nursinghomeIdAsync = ref.read(incidentNursinghomeIdProvider);
     final nursinghomeId = nursinghomeIdAsync.value;
 
     if (userId == null || nursinghomeId == null) return;

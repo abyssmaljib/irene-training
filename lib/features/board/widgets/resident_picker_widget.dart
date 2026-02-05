@@ -26,7 +26,7 @@ class ResidentOption {
 
 /// Provider สำหรับดึงรายชื่อ residents
 final residentsProvider = FutureProvider<List<ResidentOption>>((ref) async {
-  final nursinghomeId = await ref.watch(nursinghomeIdProvider.future);
+  final nursinghomeId = await ref.watch(postNursinghomeIdProvider.future);
   if (nursinghomeId == null) return [];
 
   final service = PostService.instance;

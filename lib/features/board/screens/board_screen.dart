@@ -85,7 +85,7 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
 
   Future<void> _loadResidents() async {
     final service = ref.read(postServiceProvider);
-    final nursinghomeId = await ref.read(nursinghomeIdProvider.future);
+    final nursinghomeId = await ref.read(postNursinghomeIdProvider.future);
     if (nursinghomeId != null) {
       final residents = await service.getResidents(nursinghomeId);
       if (mounted) {
@@ -341,8 +341,8 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
     PostService.instance.invalidateCache();
 
     // ดึง nursinghome และ user ID
-    final nursinghomeId = await ref.read(nursinghomeIdProvider.future);
-    final userId = ref.read(currentUserIdProvider);
+    final nursinghomeId = await ref.read(postNursinghomeIdProvider.future);
+    final userId = ref.read(postCurrentUserIdProvider);
 
     if (nursinghomeId == null || userId == null) {
       if (mounted) {
@@ -451,7 +451,7 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
   /// สร้าง posts list view แบบง่าย (ไม่มี infinite loading)
   /// ใช้สำหรับ search results
   Widget _buildSimplePostsListView(List<Post> posts) {
-    final currentUserId = ref.watch(currentUserIdProvider);
+    final currentUserId = ref.watch(postCurrentUserIdProvider);
     final mainTab = ref.watch(postMainTabProvider);
     const userRole = 'user';
     final isCenterTab = mainTab == PostMainTab.announcement;
@@ -520,7 +520,7 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
   /// สร้าง posts list view พร้อม loading indicator ที่ท้าย
   Widget _buildPostsListView(PostsState postsState) {
     final posts = postsState.posts;
-    final currentUserId = ref.watch(currentUserIdProvider);
+    final currentUserId = ref.watch(postCurrentUserIdProvider);
     final mainTab = ref.watch(postMainTabProvider);
     // TODO: Get userRole from provider when available
     const userRole = 'user';
@@ -684,7 +684,7 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
   Future<void> _handleLike(int postId) async {
     try {
       final actionService = ref.read(postActionServiceProvider);
-      final userId = ref.read(currentUserIdProvider);
+      final userId = ref.read(postCurrentUserIdProvider);
       if (userId == null) return;
 
       await actionService.toggleLike(postId, userId);
@@ -782,7 +782,7 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final postAsync = ref.watch(postDetailProvider(widget.postId));
-    final currentUserId = ref.watch(currentUserIdProvider);
+    final currentUserId = ref.watch(postCurrentUserIdProvider);
     final systemRoleAsync = ref.watch(currentUserSystemRoleProvider);
 
     return Scaffold(
@@ -1384,7 +1384,7 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
             onPressed: canAcknowledge
                 ? () async {
                     final actionService = ref.read(postActionServiceProvider);
-                    final userId = ref.read(currentUserIdProvider);
+                    final userId = ref.read(postCurrentUserIdProvider);
                     if (userId == null) return;
 
                     await actionService.toggleLike(widget.postId, userId);

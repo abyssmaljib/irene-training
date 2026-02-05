@@ -3,22 +3,32 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/network_image.dart';
 import '../../../core/widgets/nps_scale.dart';
+import '../models/shift_leader.dart';
+import 'bug_report_form.dart';
 
 /// Form สำหรับกรอก survey ก่อนลงเวร
 class ClockOutSurveyForm extends StatefulWidget {
+  /// Callback เมื่อ submit form
+  /// - leaderScore จะเป็น null ถ้าไม่มีหัวหน้าเวร
   final void Function({
     required int shiftScore,
     required int selfScore,
     required String shiftSurvey,
     String? bugSurvey,
+    int? leaderScore,
   }) onSubmit;
   final bool isLoading;
+
+  /// ข้อมูลหัวหน้าเวร (ถ้ามี) - ใช้แสดง card ประเมินหัวหน้าเวร
+  final ShiftLeader? shiftLeader;
 
   const ClockOutSurveyForm({
     super.key,
     required this.onSubmit,
     this.isLoading = false,
+    this.shiftLeader,
   });
 
   @override
@@ -28,18 +38,26 @@ class ClockOutSurveyForm extends StatefulWidget {
 class _ClockOutSurveyFormState extends State<ClockOutSurveyForm> {
   int _shiftScore = 0;
   int _selfScore = 0;
+  int _leaderScore = 0; // คะแนนประเมินหัวหน้าเวร
   final _shiftSurveyController = TextEditingController();
-  final _bugSurveyController = TextEditingController();
 
-  bool get _isValid =>
-      _shiftScore > 0 &&
-      _selfScore > 0 &&
-      _shiftSurveyController.text.trim().isNotEmpty;
+  /// ตรวจสอบว่า form valid หรือไม่
+  /// - ถ้ามีหัวหน้าเวร ต้องให้คะแนนหัวหน้าเวรด้วย
+  bool get _isValid {
+    final baseValid = _shiftScore > 0 &&
+        _selfScore > 0 &&
+        _shiftSurveyController.text.trim().isNotEmpty;
+
+    // ถ้ามีหัวหน้าเวร ต้องให้คะแนนด้วย
+    if (widget.shiftLeader != null) {
+      return baseValid && _leaderScore > 0;
+    }
+    return baseValid;
+  }
 
   @override
   void dispose() {
     _shiftSurveyController.dispose();
-    _bugSurveyController.dispose();
     super.dispose();
   }
 
@@ -50,9 +68,8 @@ class _ClockOutSurveyFormState extends State<ClockOutSurveyForm> {
       shiftScore: _shiftScore,
       selfScore: _selfScore,
       shiftSurvey: _shiftSurveyController.text.trim(),
-      bugSurvey: _bugSurveyController.text.trim().isNotEmpty
-          ? _bugSurveyController.text.trim()
-          : null,
+      bugSurvey: null, // Bug report ย้ายไปใช้ BugReportForm แยกแล้ว
+      leaderScore: widget.shiftLeader != null ? _leaderScore : null,
     );
   }
 
@@ -91,10 +108,8 @@ class _ClockOutSurveyFormState extends State<ClockOutSurveyForm> {
 
           AppSpacing.verticalGapLg,
 
-          // Shift Score Rating
-          _buildRatingSection(
-            label: 'ให้คะแนนเวรนี้',
-            hint: 'เวรนี้เป็นอย่างไรบ้าง?',
+          // NPS Score Rating (1-10)
+          _buildNpsSection(
             value: _shiftScore,
             onChanged: (v) => setState(() => _shiftScore = v),
           ),
@@ -111,6 +126,12 @@ class _ClockOutSurveyFormState extends State<ClockOutSurveyForm> {
 
           AppSpacing.verticalGapMd,
 
+          // Leader Score Rating (ถ้ามีหัวหน้าเวร)
+          if (widget.shiftLeader != null) ...[
+            _buildLeaderRatingCard(),
+            AppSpacing.verticalGapMd,
+          ],
+
           // Shift Survey TextField
           Text('สิ่งที่เกิดขึ้นในเวรนี้ *', style: AppTypography.subtitle),
           AppSpacing.verticalGapSm,
@@ -122,7 +143,7 @@ class _ClockOutSurveyFormState extends State<ClockOutSurveyForm> {
                 color: AppColors.secondaryText,
               ),
               filled: true,
-              fillColor: Colors.white,
+              fillColor: AppColors.background,
               border: OutlineInputBorder(
                 borderRadius: AppRadius.smallRadius,
                 borderSide: BorderSide(color: AppColors.inputBorder),
@@ -145,35 +166,8 @@ class _ClockOutSurveyFormState extends State<ClockOutSurveyForm> {
 
           AppSpacing.verticalGapMd,
 
-          // Bug Survey TextField (Optional)
-          Text('รายงานปัญหา/Bug (ถ้ามี)', style: AppTypography.subtitle),
-          AppSpacing.verticalGapSm,
-          TextField(
-            controller: _bugSurveyController,
-            decoration: InputDecoration(
-              hintText: 'พบปัญหาอะไรบ้างในระบบ?',
-              hintStyle: AppTypography.body.copyWith(
-                color: AppColors.secondaryText,
-              ),
-              filled: true,
-              fillColor: Colors.white,
-              border: OutlineInputBorder(
-                borderRadius: AppRadius.smallRadius,
-                borderSide: BorderSide(color: AppColors.inputBorder),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: AppRadius.smallRadius,
-                borderSide: BorderSide(color: AppColors.inputBorder),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: AppRadius.smallRadius,
-                borderSide: BorderSide(color: AppColors.primary, width: 1.5),
-              ),
-              contentPadding: EdgeInsets.all(AppSpacing.md),
-            ),
-            maxLines: 2,
-            textInputAction: TextInputAction.done,
-          ),
+          // Bug Report Button - เปิด BugReportForm dialog
+          _buildBugReportButton(),
 
           AppSpacing.verticalGapLg,
 
@@ -191,18 +185,45 @@ class _ClockOutSurveyFormState extends State<ClockOutSurveyForm> {
     );
   }
 
-  /// Thresholds สำหรับ rating 1-5 (ให้คะแนนเวร/ตัวเอง)
-  /// - 1: แย่มาก (แดง)
-  /// - 2: ไม่ค่อยดี (ส้ม)
-  /// - 3: ปานกลาง (เหลือง)
-  /// - 4: ดี (เขียว)
-  /// - 5: ดีมาก (primary teal)
+  /// Widget สำหรับ NPS (1-10) - แนะนำงานที่นี่ให้เพื่อน
+  Widget _buildNpsSection({
+    required int? value,
+    required ValueChanged<int> onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'อยากแนะนำงานของที่นี่ (ไอรีนน์ เนอร์สซิ่งโฮม) ให้แก่เพื่อนร่วมอาชีพ หรือรุ่นน้องมากน้อยขนาดไหน',
+          style: AppTypography.subtitle,
+        ),
+        AppSpacing.verticalGapSm,
+        // NPS Scale 1-10 (ไม่มี thresholds แค่แสดงเลข)
+        NpsScale(
+          selectedValue: value == 0 ? null : value,
+          onChanged: onChanged,
+          minValue: 1,
+          maxValue: 10,
+          minLabel: 'ไม่แนะนำ',
+          maxLabel: 'แนะนำเป็นอย่างยิ่ง',
+          itemSize: 32,
+        ),
+      ],
+    );
+  }
+
+  /// Thresholds สำหรับ rating 1-10 (ให้คะแนนตัวเอง)
+  /// - 1-2: แย่มาก (แดง)
+  /// - 3-4: ไม่ค่อยดี (ส้ม)
+  /// - 5-6: ปานกลาง (เหลือง)
+  /// - 7-8: ดี (เขียว)
+  /// - 9-10: ดีมาก (primary teal)
   static const _ratingThresholds = [
-    NpsThreshold(from: 1, to: 1, color: Color(0xFFE53935), label: 'แย่มาก'),
-    NpsThreshold(from: 2, to: 2, color: Color(0xFFFF9800), label: 'ไม่ค่อยดี'),
-    NpsThreshold(from: 3, to: 3, color: Color(0xFFFFC107), label: 'ปานกลาง'),
-    NpsThreshold(from: 4, to: 4, color: Color(0xFF4DB6AC), label: 'ดี'),
-    NpsThreshold(from: 5, to: 5, color: Color(0xFF0D9488), label: 'ดีมาก'),
+    NpsThreshold(from: 1, to: 2, color: Color(0xFFE53935), label: 'แย่มาก'),
+    NpsThreshold(from: 3, to: 4, color: Color(0xFFFF9800), label: 'ไม่ค่อยดี'),
+    NpsThreshold(from: 5, to: 6, color: Color(0xFFFFC107), label: 'ปานกลาง'),
+    NpsThreshold(from: 7, to: 8, color: Color(0xFF4DB6AC), label: 'ดี'),
+    NpsThreshold(from: 9, to: 10, color: Color(0xFF0D9488), label: 'ดีมาก'),
   ];
 
   /// คืนค่าสี text ที่เหมาะสมกับ threshold color
@@ -242,16 +263,16 @@ class _ClockOutSurveyFormState extends State<ClockOutSurveyForm> {
           style: AppTypography.caption.copyWith(color: AppColors.secondaryText),
         ),
         AppSpacing.verticalGapSm,
-        // ใช้ NpsScale แทน star rating
+        // ใช้ NpsScale 1-10 สำหรับให้คะแนนตัวเอง
         NpsScale(
           selectedValue: value == 0 ? null : value,
           onChanged: onChanged,
           minValue: 1,
-          maxValue: 5,
+          maxValue: 10,
           minLabel: 'แย่มาก',
           maxLabel: 'ดีมาก',
           thresholds: _ratingThresholds,
-          itemSize: 40,
+          itemSize: 32, // ลดขนาดลงเพราะมี 10 ช่อง
         ),
         // กล่องแสดงข้อความของคะแนนที่เลือก
         if (selectedThreshold != null) ...[
@@ -278,6 +299,213 @@ class _ClockOutSurveyFormState extends State<ClockOutSurveyForm> {
           ),
         ],
       ],
+    );
+  }
+
+  /// Card สำหรับประเมินหัวหน้าเวร
+  /// แสดง profile (รูป, ชื่อจริง, ชื่อเล่น) และ NPS scale 1-10
+  Widget _buildLeaderRatingCard() {
+    final leader = widget.shiftLeader!;
+
+    // หา threshold ที่ตรงกับค่าที่เลือก
+    final selectedThreshold = _leaderScore > 0
+        ? _ratingThresholds
+            .where((t) => _leaderScore >= t.from && _leaderScore <= t.to)
+            .firstOrNull
+        : null;
+
+    return Container(
+      padding: EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        // สีพื้นหลังอ่อนๆ ตาม primary color
+        color: AppColors.primary.withValues(alpha: 0.05),
+        borderRadius: AppRadius.mediumRadius,
+        border: Border.all(
+          color: AppColors.primary.withValues(alpha: 0.2),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header - ประเมินหัวหน้าเวร
+          Text('ประเมินหัวหน้าเวร', style: AppTypography.subtitle),
+          AppSpacing.verticalGapXs,
+          Text(
+            'ให้คะแนนการดูแลของหัวหน้าเวรในเวรนี้',
+            style: AppTypography.caption.copyWith(color: AppColors.secondaryText),
+          ),
+
+          AppSpacing.verticalGapMd,
+
+          // Profile section - รูป + ชื่อ
+          Row(
+            children: [
+              // Avatar
+              if (leader.photoUrl != null && leader.photoUrl!.isNotEmpty)
+                IreneNetworkAvatar(
+                  imageUrl: leader.photoUrl,
+                  radius: 24,
+                  fallbackIcon: HugeIcon(
+                    icon: HugeIcons.strokeRoundedUser,
+                    color: AppColors.secondaryText,
+                    size: 24,
+                  ),
+                )
+              else
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                  child: HugeIcon(
+                    icon: HugeIcons.strokeRoundedUser,
+                    color: AppColors.primary,
+                    size: 24,
+                  ),
+                ),
+              AppSpacing.horizontalGapMd,
+              // ชื่อ
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ชื่อเล่น (ตัวใหญ่)
+                    Text(
+                      leader.nickname ?? leader.displayName,
+                      style: AppTypography.title.copyWith(
+                        color: AppColors.primaryText,
+                      ),
+                    ),
+                    // ชื่อจริง (ถ้ามี และไม่ซ้ำกับชื่อเล่น)
+                    if (leader.fullName != null &&
+                        leader.fullName != leader.nickname)
+                      Text(
+                        leader.fullName!,
+                        style: AppTypography.bodySmall.copyWith(
+                          color: AppColors.secondaryText,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              // Badge หัวหน้าเวร
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    HugeIcon(
+                      icon: HugeIcons.strokeRoundedUserStar01,
+                      color: AppColors.primary,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'หน.เวร',
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          AppSpacing.verticalGapMd,
+
+          // NPS Scale 1-10
+          NpsScale(
+            selectedValue: _leaderScore == 0 ? null : _leaderScore,
+            onChanged: (v) => setState(() => _leaderScore = v),
+            minValue: 1,
+            maxValue: 10,
+            minLabel: 'แย่มาก',
+            maxLabel: 'ดีมาก',
+            thresholds: _ratingThresholds,
+            itemSize: 32,
+          ),
+
+          // กล่องแสดงข้อความของคะแนนที่เลือก
+          if (selectedThreshold != null) ...[
+            AppSpacing.verticalGapSm,
+            Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: selectedThreshold.color.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: selectedThreshold.color.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Text(
+                  selectedThreshold.label ?? '',
+                  style: AppTypography.bodySmall.copyWith(
+                    color: _getTextColorForThreshold(selectedThreshold.color),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// ปุ่มรายงานปัญหา/Bug - กดแล้วเปิด BugReportForm dialog
+  Widget _buildBugReportButton() {
+    return InkWell(
+      onTap: () => showBugReportDialog(context),
+      borderRadius: AppRadius.smallRadius,
+      child: Container(
+        padding: EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: AppColors.error.withValues(alpha: 0.08),
+          borderRadius: AppRadius.smallRadius,
+          border: Border.all(
+            color: AppColors.error.withValues(alpha: 0.2),
+          ),
+        ),
+        child: Row(
+          children: [
+            HugeIcon(
+              icon: HugeIcons.strokeRoundedBug01,
+              color: AppColors.error,
+              size: AppIconSize.lg,
+            ),
+            AppSpacing.horizontalGapMd,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'รายงานปัญหา/Bug',
+                    style: AppTypography.subtitle.copyWith(
+                      color: AppColors.error,
+                    ),
+                  ),
+                  Text(
+                    'กดเพื่อแจ้งปัญหาที่พบในแอป',
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.secondaryText,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            HugeIcon(
+              icon: HugeIcons.strokeRoundedArrowRight01,
+              color: AppColors.error.withValues(alpha: 0.5),
+              size: AppIconSize.md,
+            ),
+          ],
+        ),
+      ),
     );
   }
 

@@ -459,10 +459,13 @@ class HomeService {
   }
 
   /// ดึง stats ความตรงเวลาของ user ในเวรนี้
+  /// [deadAirMinutes] - ค่า dead air จาก backend (ClockInOut.deadAirMinutes)
+  /// ถ้ามีค่าจะใช้ค่าจาก backend แทนการคำนวณใน frontend
   Future<ShiftActivityStats> getShiftActivityStats({
     required List<int> residentIds,
     required DateTime clockInTime,
     required List<BreakTimeOption> selectedBreakTimes,
+    int? deadAirMinutes, // ค่าจาก backend (ถ้ามี)
   }) async {
     try {
       if (residentIds.isEmpty) return ShiftActivityStats.empty();
@@ -473,6 +476,20 @@ class HomeService {
       // ดึง total tasks สำหรับ residents เหล่านี้
       final taskProgress = await getMyShiftTaskProgress(residentIds: residentIds);
 
+      // ถ้ามี deadAirMinutes จาก backend ให้ใช้ค่านั้น
+      // สูตร backend: Dead Air = Total Gaps - Task Time - 75 นาที - Break Overlap
+      if (deadAirMinutes != null) {
+        return ShiftActivityStats.fromBackend(
+          activities: activities,
+          totalTasks: taskProgress.total,
+          teamTotalCompleted: taskProgress.completed,
+          clockInTime: clockInTime,
+          deadAirMinutes: deadAirMinutes,
+          myResidentIds: residentIds,
+        );
+      }
+
+      // Fallback: คำนวณใน frontend (สูตรเดิม)
       return ShiftActivityStats.fromActivities(
         activities: activities,
         totalTasks: taskProgress.total,

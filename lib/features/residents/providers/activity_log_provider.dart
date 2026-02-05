@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../board/models/post.dart';
 import '../../board/providers/post_provider.dart';
+import '../../checklist/providers/task_provider.dart'; // for nursinghomeIdProvider
 
 /// State สำหรับ activity log filters
 class ActivityLogFilter {
