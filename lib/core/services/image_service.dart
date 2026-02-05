@@ -8,11 +8,17 @@ class ImageService {
   /// [url] - URL ของรูปจาก Supabase Storage
   /// [width] - ความกว้างที่ต้องการ (pixel)
   /// [quality] - คุณภาพรูป (1-100), default 75
+  /// [resize] - วิธีการ resize: 'contain' (ไม่ crop), 'cover' (crop ให้เต็ม), 'fill'
   ///
   /// Example:
   /// Original: https://xxx.supabase.co/storage/v1/object/public/bucket/image.jpg
-  /// Transformed: https://xxx.supabase.co/storage/v1/render/image/public/bucket/image.jpg?width=300&quality=75
-  static String getResizedUrl(String url, {int? width, int quality = 75}) {
+  /// Transformed: https://xxx.supabase.co/storage/v1/render/image/public/bucket/image.jpg?width=300&quality=75&resize=contain
+  static String getResizedUrl(
+    String url, {
+    int? width,
+    int quality = 75,
+    String resize = 'contain',
+  }) {
     if (url.isEmpty) return url;
 
     // ตรวจสอบว่าเป็น Supabase Storage URL หรือไม่
@@ -28,11 +34,13 @@ class ImageService {
     );
 
     // เพิ่ม query parameters
+    // resize=contain เพื่อให้ scale รูปทั้งหมดโดยไม่ crop
     final params = <String>[];
     if (width != null) {
       params.add('width=$width');
     }
     params.add('quality=$quality');
+    params.add('resize=$resize');
 
     final queryString = params.join('&');
 

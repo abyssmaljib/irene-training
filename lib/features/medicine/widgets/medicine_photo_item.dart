@@ -38,6 +38,7 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/services/image_service.dart';
 import '../models/medicine_summary.dart';
 import 'overlay_med_widget.dart';
 
@@ -264,16 +265,17 @@ class MedicinePhotoItem extends StatelessWidget {
                 ),
               ),
 
-              // Image
+              // Image - ใช้ Supabase Image Transformation สำหรับรูปขยายด้วย
+              // ใช้ getLargeUrl (800px) แทน original เพื่อลด memory
               Flexible(
                 child: InteractiveViewer(
                   minScale: 0.5,
                   maxScale: 4.0,
                   child: Image.network(
-                    imageUrl,
+                    ImageService.getLargeUrl(imageUrl),
                     fit: BoxFit.contain,
                     // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
-                    cacheWidth: 1200,
+                    cacheWidth: 800,
                     errorBuilder: (context, error, stackTrace) {
                       return Container(
                         height: 200,
@@ -668,17 +670,20 @@ class _MedicineNetworkImageState extends State<_MedicineNetworkImage> {
     // ถ้า error แสดง UI สำหรับ error
     if (_hasError) return _buildErrorWidget();
 
+    // ใช้ Supabase Image Transformation เพื่อโหลดรูปขนาดเล็กจาก server
+    // แทนที่จะโหลดรูปเต็ม 1.5MB แล้ว resize ฝั่ง client
+    // ลดจาก ~1.5MB → ~50KB (ลด 96%) ช่วยแก้ปัญหา crash บน iOS
+    final thumbnailUrl = ImageService.getThumbnailUrl(widget.imageUrl);
+
     // ใช้ CachedNetworkImage พร้อม key ที่เปลี่ยนเมื่อ retry
     // เพื่อบังคับให้โหลดใหม่
     return CachedNetworkImage(
       key: ValueKey('${widget.imageUrl}_$_retryCount'),
-      imageUrl: widget.imageUrl,
+      imageUrl: thumbnailUrl,
       fit: widget.fit,
       fadeInDuration: const Duration(milliseconds: 150),
-      // ใช้แค่ memCacheWidth เพื่อรักษา aspect ratio ของรูปต้นฉบับ
-      // (ถ้าใส่ทั้ง width และ height จะบังคับให้รูปเป็น 1:1 ทำให้บิดเบี้ยว)
-      // ลดจาก 400 เป็น 200 เพื่อลด memory usage บน iOS
-      // (รูปตัวอย่างยาใน grid มีขนาดเล็กอยู่แล้ว ไม่ต้องใช้ resolution สูง)
+      // memCacheWidth ยังคงใช้เพื่อจำกัด memory cache
+      // แต่ตอนนี้รูปที่โหลดมาเล็กอยู่แล้ว (200px จาก server)
       memCacheWidth: 200,
       // placeholder แสดงระหว่างโหลด
       placeholder: (context, url) => widget.placeholder,

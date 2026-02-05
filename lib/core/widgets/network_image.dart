@@ -17,6 +17,7 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
+import '../services/image_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
@@ -59,6 +60,11 @@ class IreneNetworkImage extends StatefulWidget {
   /// Timeout duration (default = 15 วินาที)
   final Duration timeout;
 
+  /// ใช้ Supabase Image Transformation เพื่อโหลดรูปขนาดเล็กจาก server
+  /// ช่วยลดขนาด download จาก ~1.5MB → ~50KB (ลด 96%)
+  /// Default = true
+  final bool useServerResize;
+
   const IreneNetworkImage({
     super.key,
     required this.imageUrl,
@@ -71,6 +77,7 @@ class IreneNetworkImage extends StatefulWidget {
     this.errorPlaceholder,
     this.compact = false,
     this.timeout = const Duration(seconds: 15),
+    this.useServerResize = true,
   });
 
   @override
@@ -146,6 +153,16 @@ class _IreneNetworkImageState extends State<IreneNetworkImage> {
 
   @override
   Widget build(BuildContext context) {
+    // ใช้ Supabase Image Transformation เพื่อโหลดรูปขนาดเล็กจาก server
+    // ลดจาก ~1.5MB → ~50KB ช่วยแก้ปัญหา crash บน iOS
+    final effectiveUrl = widget.useServerResize
+        ? ImageService.getResizedUrl(
+            widget.imageUrl,
+            width: widget.memCacheWidth ?? 400,
+            quality: 75,
+          )
+        : widget.imageUrl;
+
     Widget imageWidget;
 
     if (_timedOut) {
@@ -155,7 +172,7 @@ class _IreneNetworkImageState extends State<IreneNetworkImage> {
     } else {
       imageWidget = CachedNetworkImage(
         key: ValueKey('${widget.imageUrl}_$_retryCount'),
-        imageUrl: widget.imageUrl,
+        imageUrl: effectiveUrl,
         fit: widget.fit,
         width: widget.width,
         height: widget.height,

@@ -39,6 +39,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
+import '../../../core/services/image_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -194,12 +195,15 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
       }
 
       // Preload แบบ background (ไม่ block UI)
-      // ใช้ try-catch เพื่อ ignore errors - CachedNetworkImage จะ handle เอง
+      // ใช้ Supabase Image Transformation เพื่อโหลดรูปขนาดเล็ก (200px)
+      // ลดจาก ~1.5MB → ~50KB ช่วยแก้ปัญหา crash บน iOS
       for (final url in urls.toSet()) {
         if (!mounted) return;
         try {
+          // Transform URL ให้โหลดรูปขนาดเล็กจาก server
+          final thumbnailUrl = ImageService.getThumbnailUrl(url);
           await precacheImage(
-            CachedNetworkImageProvider(url, maxWidth: 200),
+            CachedNetworkImageProvider(thumbnailUrl, maxWidth: 200),
             context,
           );
         } catch (_) {

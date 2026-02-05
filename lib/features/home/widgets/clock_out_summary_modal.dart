@@ -56,6 +56,9 @@ class _ClockOutSummaryModalState extends State<ClockOutSummaryModal>
   // Coin animation state - แสดง animation เหรียญเมื่อกด "รับเลย"
   bool _showCoinAnimation = false;
 
+  // ป้องกันการเรียก onClose หลายครั้ง
+  bool _hasClosed = false;
+
   @override
   void initState() {
     super.initState();
@@ -560,44 +563,70 @@ class _ClockOutSummaryModalState extends State<ClockOutSummaryModal>
     );
   }
 
+  /// ปิด modal อย่างปลอดภัย - เรียกได้ครั้งเดียว
+  void _closeModal() {
+    if (_hasClosed || !mounted) return;
+    _hasClosed = true;
+    widget.onClose?.call();
+  }
+
   /// Handle claim button press - แสดง coin animation แล้วปิด
   void _handleClaim() {
     setState(() => _showCoinAnimation = true);
+
+    // Safety timeout - ถ้า animation ไม่ทำงาน 3 วินาทีให้ปิด modal
+    Future.delayed(const Duration(seconds: 3), _closeModal);
   }
 
   /// Coin animation overlay - แสดงเหรียญตกลงมาตรงกลาง
   Widget _buildCoinAnimationOverlay() {
-    return Container(
-      color: Colors.black.withValues(alpha: 0.7),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Coin Lottie animation
-            Lottie.asset(
-              'assets/animations/coin_reward.json',
-              width: 200,
-              height: 200,
-              repeat: false,
-              onLoaded: (composition) {
-                // เมื่อ animation เล่นจบ ให้ปิด modal
-                Future.delayed(composition.duration, () {
-                  if (mounted) {
-                    widget.onClose?.call();
-                  }
-                });
-              },
-            ),
-            AppSpacing.verticalGapMd,
-            // แสดง points ที่ได้รับ
-            Text(
-              '+${widget.summary.points.netPoints} Points!',
-              style: AppTypography.heading2.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
+    return GestureDetector(
+      // กดที่ไหนก็ได้เพื่อปิด (กรณี animation ค้าง)
+      onTap: _closeModal,
+      child: Container(
+        color: Colors.black.withValues(alpha: 0.7),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Coin Lottie animation พร้อม error handling
+              Lottie.asset(
+                'assets/animations/coin_reward.json',
+                width: 200,
+                height: 200,
+                repeat: false,
+                onLoaded: (composition) {
+                  // เมื่อ animation เล่นจบ ให้ปิด modal
+                  Future.delayed(composition.duration, _closeModal);
+                },
+                errorBuilder: (context, error, stackTrace) {
+                  // ถ้าโหลด Lottie ไม่ได้ แสดง emoji แทน แล้วปิด
+                  Future.delayed(const Duration(milliseconds: 800), _closeModal);
+                  return const Text(
+                    '🪙',
+                    style: TextStyle(fontSize: 100),
+                  );
+                },
               ),
-            ),
-          ],
+              AppSpacing.verticalGapMd,
+              // แสดง points ที่ได้รับ
+              Text(
+                '+${widget.summary.points.netPoints} Points!',
+                style: AppTypography.heading2.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              AppSpacing.verticalGapMd,
+              // Hint ให้ user รู้ว่ากดปิดได้
+              Text(
+                'แตะเพื่อปิด',
+                style: AppTypography.caption.copyWith(
+                  color: Colors.white.withValues(alpha: 0.6),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

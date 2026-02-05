@@ -27,6 +27,7 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
+import '../../../core/services/image_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -1467,13 +1468,17 @@ class _LogPhotoNetworkImageState extends State<_LogPhotoNetworkImage> {
     if (_timedOut) return _buildTimeoutWidget();
     if (_hasError) return _buildErrorWidget();
 
+    // ใช้ Supabase Image Transformation เพื่อโหลดรูปขนาดเล็กจาก server
+    // ลดจาก ~1.5MB → ~100KB ช่วยแก้ปัญหา crash บน iOS
+    final mediumUrl = ImageService.getMediumUrl(widget.imageUrl);
+
     // ใช้ CachedNetworkImage แทน Image.network เพื่อ:
     // 1. Cache รูปไว้ใน disk ไม่ต้องโหลดซ้ำทุกครั้ง
     // 2. จัดการ memory ได้ดีกว่า
     // 3. ลด network request ซ้ำซ้อน
     return CachedNetworkImage(
       key: ValueKey('${widget.imageUrl}_$_retryCount'),
-      imageUrl: widget.imageUrl,
+      imageUrl: mediumUrl,
       fit: widget.fit,
       fadeInDuration: const Duration(milliseconds: 150),
       // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
