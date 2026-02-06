@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show kDebugMode;
+// import 'package:flutter/foundation.dart' show kDebugMode; // ซ่อน dev buttons ไว้
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hugeicons/hugeicons.dart';
@@ -682,13 +682,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildClockInContent() {
     return Column(
       children: [
-        // ปุ่ม Dev สำหรับทดสอบฟอร์มหลังลงเวร (แสดงเฉพาะใน debug mode)
-        if (kDebugMode) ...[
-          _buildDevSurveyFormButton(),
-          AppSpacing.verticalGapSm,
-          _buildDevSummaryModalButton(),
-          AppSpacing.verticalGapMd,
-        ],
+        // ปุ่ม Dev ซ่อนไว้ — เปิดใช้เมื่อต้องการทดสอบ
+        // if (kDebugMode) ...[
+        //   _buildDevClockOutCheckButton(),
+        //   AppSpacing.verticalGapSm,
+        //   _buildDevSurveyFormButton(),
+        //   AppSpacing.verticalGapSm,
+        //   _buildDevSummaryModalButton(),
+        //   AppSpacing.verticalGapMd,
+        // ],
 
         // Monthly Summary Card
         if (_currentMonthSummary != null)
@@ -762,11 +764,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildOnShiftContent() {
     return Column(
       children: [
-        // ปุ่ม Dev สำหรับทดสอบฟอร์มหลังลงเวร (แสดงเฉพาะใน debug mode)
-        if (kDebugMode) ...[
-          _buildDevSummaryModalButton(),
-          AppSpacing.verticalGapMd,
-        ],
+        // ปุ่ม Dev ซ่อนไว้ — เปิดใช้เมื่อต้องการทดสอบ
+        // if (kDebugMode) ...[
+        //   _buildDevClockOutCheckButton(),
+        //   AppSpacing.verticalGapSm,
+        //   _buildDevSummaryModalButton(),
+        //   AppSpacing.verticalGapMd,
+        // ],
 
         // Tarot Core Value Card - แสดงไพ่ที่ได้รับตอนขึ้นเวร
         if (_selectedTarotCard != null) ...[
@@ -1016,8 +1020,96 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
+  /// ปุ่ม Dev สำหรับทดสอบ flow ตรวจสอบก่อนลงเวร (ClockOutDialog)
+  /// แสดงเฉพาะใน debug mode เพื่อให้ dev ทดสอบ check flow ได้
+  // ignore: unused_element
+  Widget _buildDevClockOutCheckButton() {
+    return Container(
+      padding: EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50,
+        borderRadius: AppRadius.mediumRadius,
+        border: Border.all(color: Colors.blue.shade200),
+      ),
+      child: Row(
+        children: [
+          HugeIcon(
+            icon: HugeIcons.strokeRoundedCheckList,
+            color: Colors.blue.shade700,
+            size: AppIconSize.lg,
+          ),
+          AppSpacing.horizontalGapSm,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'DEV: ตรวจสอบก่อนลงเวร',
+                  style: AppTypography.subtitle.copyWith(
+                    color: Colors.blue.shade700,
+                  ),
+                ),
+                Text(
+                  'เปิดดู ClockOutDialog (check flow ทั้งหมด)',
+                  style: AppTypography.caption.copyWith(
+                    color: Colors.blue.shade600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          AppSpacing.horizontalGapSm,
+          ElevatedButton(
+            onPressed: _showDevClockOutCheckDialog,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue.shade600,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('เปิด'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// เปิด ClockOutDialog สำหรับทดสอบ - ใช้ข้อมูลจริงของ user
+  /// ถ้ายังไม่ได้ขึ้นเวร จะใช้ mock clockRecordId
+  // ignore: unused_element
+  Future<void> _showDevClockOutCheckDialog() async {
+    final userId = _userService.effectiveUserId;
+    final nursinghomeId = await _userService.getNursinghomeId();
+
+    if (userId == null || nursinghomeId == null || !mounted) return;
+
+    // ใช้ข้อมูลจริงถ้ามี shift อยู่ หรือ mock ถ้ายังไม่ได้ขึ้นเวร
+    final clockRecordId = _currentShift?.id ?? 0;
+    final shift = _currentShift?.shift ?? 'เวรเช้า';
+    final residentIds = _currentShift?.selectedResidentIdList ?? [];
+    final clockInTime = _currentShift?.clockInTimestamp ?? DateTime.now();
+
+    await ClockOutDialog.show(
+      context,
+      clockRecordId: clockRecordId,
+      shift: shift,
+      residentIds: residentIds,
+      clockInTime: clockInTime,
+      userId: userId,
+      nursinghomeId: nursinghomeId,
+      onCreateHandover: () {
+        MainNavigationScreen.navigateToTab(context, 3);
+      },
+      onViewPosts: () {
+        debugPrint('DEV: onViewPosts called');
+      },
+      onViewIncidents: (incident) {
+        debugPrint('DEV: onViewIncidents called - ${incident.id}');
+      },
+    );
+  }
+
   /// ปุ่ม Dev สำหรับทดสอบฟอร์มหลังลงเวร (ClockOutSurveyForm)
   /// แสดงเฉพาะใน debug mode เพื่อให้ dev ทดสอบ UI ได้โดยไม่ต้องขึ้นเวรจริง
+  // ignore: unused_element
   Widget _buildDevSurveyFormButton() {
     return Container(
       padding: EdgeInsets.all(AppSpacing.md),
@@ -1068,6 +1160,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   /// แสดง Dialog สำหรับทดสอบ ClockOutSurveyForm
+  // ignore: unused_element
   void _showDevSurveyFormDialog() {
     showDialog(
       context: context,
@@ -1135,6 +1228,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   /// ปุ่ม Dev สำหรับทดสอบ ClockOutSummaryModal
   /// แสดงเฉพาะใน debug mode เพื่อให้ dev ทดสอบ UI ได้โดยไม่ต้องลงเวรจริง
+  // ignore: unused_element
   Widget _buildDevSummaryModalButton() {
     return Container(
       padding: EdgeInsets.all(AppSpacing.md),
@@ -1185,6 +1279,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   /// แสดง ClockOutSummaryModal พร้อม mock data
+  // ignore: unused_element
   void _showDevSummaryModal() {
     // สร้าง mock ShiftSummary สำหรับทดสอบ
     final mockSummary = clock_out_summary.ShiftSummary(

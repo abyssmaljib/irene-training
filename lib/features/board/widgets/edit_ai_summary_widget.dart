@@ -35,14 +35,6 @@ class _EditAiSummaryWidgetState extends ConsumerState<EditAiSummaryWidget> {
     super.dispose();
   }
 
-  int _getTextLength() {
-    return widget.textController.text.replaceAll(' ', '').length;
-  }
-
-  bool _canSummarize() {
-    return _getTextLength() > 50;
-  }
-
   Future<void> _summarize() async {
     final text = widget.textController.text;
     if (text.trim().isEmpty) return;
@@ -113,147 +105,156 @@ class _EditAiSummaryWidgetState extends ConsumerState<EditAiSummaryWidget> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(editPostProvider(widget.postId));
-    final textLength = _getTextLength();
-    final canSummarize = _canSummarize();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Summarize button row
-        Row(
+    // ใช้ ValueListenableBuilder เพื่อ rebuild เฉพาะส่วนที่ขึ้นกับ text
+    // แทน setState ทุก keystroke ซึ่งจะ rebuild ทั้ง widget → กระตุกในเครื่องช้า
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: widget.textController,
+      builder: (context, textValue, _) {
+        // นับตัวอักษรโดยไม่นับช่องว่าง
+        final textLength = textValue.text.replaceAll(' ', '').length;
+        final canSummarize = textLength > 50;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // AI Summarize button
-            OutlinedButton.icon(
-              onPressed: canSummarize && !state.isLoadingAI ? _summarize : null,
-              icon: state.isLoadingAI
-                  ? SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: AppColors.primary,
-                      ),
-                    )
-                  : HugeIcon(icon: HugeIcons.strokeRoundedMagicWand01, size: AppIconSize.sm),
-              label: Text('น้องไอรีนน์ ช่วยสรุป'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor:
-                    canSummarize ? AppColors.primary : AppColors.secondaryText,
-                side: BorderSide(
-                  color: canSummarize
-                      ? AppColors.primary
-                      : AppColors.alternate,
-                ),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                textStyle: AppTypography.bodySmall,
-              ),
-            ),
-
-            const SizedBox(width: 12),
-
-            // Character count hint
-            if (!canSummarize)
-              Expanded(
-                child: Text(
-                  'พิมพ์มากกว่า 50 ตัวอักษร เพื่อเปิดใช้งาน ($textLength/50)',
-                  style: AppTypography.caption.copyWith(
-                    color: AppColors.secondaryText,
-                  ),
-                ),
-              ),
-          ],
-        ),
-
-        // AI Summary result
-        if (state.aiSummary != null && canSummarize) ...[
-          AppSpacing.verticalGapMd,
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFEFBFF),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFE5DEF8)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            // Summarize button row
+            Row(
               children: [
-                // Summary text
-                SelectableText(
-                  state.aiSummary!,
-                  style: AppTypography.body.copyWith(
-                    color: AppColors.primaryText,
-                    height: 1.5,
+                // AI Summarize button
+                OutlinedButton.icon(
+                  onPressed: canSummarize && !state.isLoadingAI ? _summarize : null,
+                  icon: state.isLoadingAI
+                      ? SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.primary,
+                          ),
+                        )
+                      : HugeIcon(icon: HugeIcons.strokeRoundedMagicWand01, size: AppIconSize.sm),
+                  label: Text('น้องไอรีนน์ ช่วยสรุป'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor:
+                        canSummarize ? AppColors.primary : AppColors.secondaryText,
+                    side: BorderSide(
+                      color: canSummarize
+                          ? AppColors.primary
+                          : AppColors.alternate,
+                    ),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    textStyle: AppTypography.bodySmall,
                   ),
                 ),
 
-                AppSpacing.verticalGapMd,
+                const SizedBox(width: 12),
 
-                // Action buttons - ใช้ Wrap เพื่อรองรับหน้าจอเล็ก
-                Wrap(
-                  alignment: WrapAlignment.end,
-                  spacing: 8,
-                  runSpacing: 8,
+                // Character count hint - แสดงเมื่อยังไม่ถึง 50 ตัวอักษร
+                if (!canSummarize)
+                  Expanded(
+                    child: Text(
+                      'พิมพ์มากกว่า 50 ตัวอักษร เพื่อเปิดใช้งาน ($textLength/50)',
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.secondaryText,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+
+            // AI Summary result
+            if (state.aiSummary != null && canSummarize) ...[
+              AppSpacing.verticalGapMd,
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEFBFF),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFE5DEF8)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // ปุ่มเพิ่มสรุปต่อท้าย (ไม่ลบข้อความเดิม)
-                    OutlinedButton.icon(
-                      onPressed: _appendSummary,
-                      icon: HugeIcon(icon: HugeIcons.strokeRoundedAdd01, size: AppIconSize.sm),
-                      label: const Text('เพิ่มสรุปในข้อความ'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF3A0EB6),
-                        side: const BorderSide(color: Color(0xFFBEABF2)),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 6),
-                        textStyle: AppTypography.caption,
-                        minimumSize: const Size(0, 32),
+                    // Summary text
+                    SelectableText(
+                      state.aiSummary!,
+                      style: AppTypography.body.copyWith(
+                        color: AppColors.primaryText,
+                        height: 1.5,
                       ),
                     ),
-                    // ปุ่มแทนที่ข้อความ (ลบข้อความเดิม)
-                    OutlinedButton.icon(
-                      onPressed: _replaceText,
-                      icon: HugeIcon(icon: HugeIcons.strokeRoundedArrowUp02, size: AppIconSize.sm),
-                      label: const Text('แทนที่ข้อความ'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF3A0EB6),
-                        side: const BorderSide(color: Color(0xFFBEABF2)),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 6),
-                        textStyle: AppTypography.caption,
-                        minimumSize: const Size(0, 32),
-                      ),
-                    ),
-                    // ปุ่มคัดลอก
-                    OutlinedButton.icon(
-                      onPressed: _copyText,
-                      icon: HugeIcon(icon: HugeIcons.strokeRoundedCopy01, size: AppIconSize.sm),
-                      label: const Text('คัดลอก'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF3A0EB6),
-                        side: const BorderSide(color: Color(0xFFBEABF2)),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 6),
-                        textStyle: AppTypography.caption,
-                        minimumSize: const Size(0, 32),
-                      ),
+
+                    AppSpacing.verticalGapMd,
+
+                    // Action buttons - ใช้ Wrap เพื่อรองรับหน้าจอเล็ก
+                    Wrap(
+                      alignment: WrapAlignment.end,
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        // ปุ่มเพิ่มสรุปต่อท้าย (ไม่ลบข้อความเดิม)
+                        OutlinedButton.icon(
+                          onPressed: _appendSummary,
+                          icon: HugeIcon(icon: HugeIcons.strokeRoundedAdd01, size: AppIconSize.sm),
+                          label: const Text('เพิ่มสรุปในข้อความ'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF3A0EB6),
+                            side: const BorderSide(color: Color(0xFFBEABF2)),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 6),
+                            textStyle: AppTypography.caption,
+                            minimumSize: const Size(0, 32),
+                          ),
+                        ),
+                        // ปุ่มแทนที่ข้อความ (ลบข้อความเดิม)
+                        OutlinedButton.icon(
+                          onPressed: _replaceText,
+                          icon: HugeIcon(icon: HugeIcons.strokeRoundedArrowUp02, size: AppIconSize.sm),
+                          label: const Text('แทนที่ข้อความ'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF3A0EB6),
+                            side: const BorderSide(color: Color(0xFFBEABF2)),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 6),
+                            textStyle: AppTypography.caption,
+                            minimumSize: const Size(0, 32),
+                          ),
+                        ),
+                        // ปุ่มคัดลอก
+                        OutlinedButton.icon(
+                          onPressed: _copyText,
+                          icon: HugeIcon(icon: HugeIcons.strokeRoundedCopy01, size: AppIconSize.sm),
+                          label: const Text('คัดลอก'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF3A0EB6),
+                            side: const BorderSide(color: Color(0xFFBEABF2)),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 6),
+                            textStyle: AppTypography.caption,
+                            minimumSize: const Size(0, 32),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
+              ),
 
-          // Disclaimer
-          AppSpacing.verticalGapSm,
-          Text(
-            'โปรดทราบว่า ผู้โพสต้องตรวจสอบข้อมูลด้วยตนเองทุกครั้งก่อนโพส เนื่องจากน้องไอรีนน์เป็น AI อาจจะสรุปหรือย่อความได้ไม่สมบูรณ์แบบเท่ามนุษย์',
-            style: AppTypography.caption.copyWith(
-              color: AppColors.warning,
-            ),
-          ),
-        ],
-      ],
+              // Disclaimer
+              AppSpacing.verticalGapSm,
+              Text(
+                'โปรดทราบว่า ผู้โพสต้องตรวจสอบข้อมูลด้วยตนเองทุกครั้งก่อนโพส เนื่องจากน้องไอรีนน์เป็น AI อาจจะสรุปหรือย่อความได้ไม่สมบูรณ์แบบเท่ามนุษย์',
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.warning,
+                ),
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 }

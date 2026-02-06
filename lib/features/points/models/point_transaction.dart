@@ -13,6 +13,7 @@ enum PointTransactionType {
   medArrange('MedArrange', 'จัดยา', '💊'),
   manualAdjustment('manual_adjustment', 'ปรับปรุงคะแนน', '🔧'),
   transfer('transfer', 'โอนคะแนน', '🔄'),
+  periodReward('period_reward', 'รางวัลประจำรอบ', '🎁'),
   other('other', 'อื่นๆ', '📌');
 
   final String value;

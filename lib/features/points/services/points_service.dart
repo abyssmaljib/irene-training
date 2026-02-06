@@ -603,6 +603,28 @@ class PointsService {
     }
   }
 
+  // ==================== Period Rewards ====================
+
+  /// ดึงรางวัลที่ user ได้จาก period completions (weekly/monthly/seasonal)
+  /// JOIN กับ leaderboard_periods เพื่อดึง period name + date range มาด้วย
+  Future<List<PeriodRewardEntry>> getUserPeriodRewards(String userId) async {
+    try {
+      final result = await _client
+          .from('period_reward_distributions')
+          .select(
+              '*, leaderboard_periods(name, period_type, start_date, end_date)')
+          .eq('user_id', userId)
+          .order('created_at', ascending: false);
+
+      return (result as List)
+          .map((e) => PeriodRewardEntry.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      debugPrint('❌ Error getting user period rewards: $e');
+      return [];
+    }
+  }
+
   // ==================== Rewards ====================
 
   /// ดึง rewards ทั้งหมด

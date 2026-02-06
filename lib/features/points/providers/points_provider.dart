@@ -211,4 +211,16 @@ final leaderboardDataProvider = FutureProvider.family<LeaderboardData, int?>(
   },
 );
 
+/// Provider สำหรับ user's period rewards (รางวัลจากจบรอบ weekly/monthly/seasonal)
+final userPeriodRewardsProvider =
+    FutureProvider<List<PeriodRewardEntry>>((ref) async {
+  // Watch user change counter เพื่อ refresh เมื่อ impersonate
+  ref.watch(userChangeCounterProvider);
+  final userId = UserService().effectiveUserId;
+  if (userId == null) return [];
+
+  final service = ref.read(pointsServiceProvider);
+  return service.getUserPeriodRewards(userId);
+});
+
 // Note: simpleLeaderboardProvider removed - using history view instead

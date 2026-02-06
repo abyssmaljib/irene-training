@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:confetti/confetti.dart';
+// import 'package:flutter/foundation.dart' show kDebugMode; // ซ่อน dev buttons ไว้
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
@@ -172,16 +173,17 @@ class _ClockOutDialogState extends State<ClockOutDialog> {
       return;
     }
 
-    // 4. Check handover
+    // 4. Load shift leader info (ถ้ามี) - โหลดก่อน handover check
+    // เพื่อให้ leader card แสดงได้เสมอ ไม่ว่าจะ handover หรือไม่
+    _shiftLeader = await _clockService.getShiftLeader();
+
+    // 5. Check handover
     _hasHandover = await _clockService.hasHandoverPost();
 
     if (!_hasHandover) {
       setState(() => _step = ClockOutStep.noHandover);
       return;
     }
-
-    // 5. Load shift leader info (ถ้ามี)
-    _shiftLeader = await _clockService.getShiftLeader();
 
     // All checks passed - show survey
     setState(() => _step = ClockOutStep.survey);
@@ -349,6 +351,33 @@ class _ClockOutDialogState extends State<ClockOutDialog> {
     );
   }
 
+  /// DEV: ข้ามทุก check ไปหน้า survey เลย
+  /// โหลด shift leader ก่อน (ถ้ายังไม่ได้โหลด) แล้วไปหน้า survey
+  // ignore: unused_element
+  Future<void> _devSkipToSurvey() async {
+    _shiftLeader ??= await _clockService.getShiftLeader();
+    if (mounted) {
+      setState(() => _step = ClockOutStep.survey);
+    }
+  }
+
+  /// DEV: ปุ่มข้ามไปหน้า survey — ซ่อนไว้ เปิดใช้ตอน debug
+  Widget _buildDevSkipButton() {
+    // ซ่อน dev button — เปิด kDebugMode check เมื่อต้องการทดสอบ
+    return const SizedBox.shrink();
+    // if (!kDebugMode) return const SizedBox.shrink();
+    // return TextButton(
+    //   onPressed: _devSkipToSurvey,
+    //   child: Text(
+    //     'DEV: ข้ามไป survey',
+    //     style: AppTypography.bodySmall.copyWith(
+    //       color: Colors.orange.shade700,
+    //       fontWeight: FontWeight.w600,
+    //     ),
+    //   ),
+    // );
+  }
+
   Widget _buildContent() {
     switch (_step) {
       case ClockOutStep.checking:
@@ -470,6 +499,9 @@ class _ClockOutDialogState extends State<ClockOutDialog> {
             text: 'ปิด',
             onPressed: () => Navigator.of(context).pop(false),
           ),
+
+          // DEV: ข้ามไป survey
+          _buildDevSkipButton(),
         ],
       ),
     );
@@ -572,25 +604,34 @@ class _ClockOutDialogState extends State<ClockOutDialog> {
       ),
     );
 
-    return BlockingCheckContent(
-      title: 'มี Incident ที่ต้องถอดบทเรียน',
-      imageAsset: 'assets/images/checking_cat.webp',
-      imageSize: 160,
-      richMessage: richMessage,
-      items: items,
-      totalCount: _pendingIncidentsCount,
-      displayLimit: 5,
-      primaryButtonText: 'ไปถอดบทเรียน',
-      primaryButtonIcon: HugeIcons.strokeRoundedArrowRight01,
-      onPrimaryPressed: () {
-        Navigator.of(context).pop(false);
-        // ส่ง incident แรกที่ยังไม่เสร็จไปให้ callback
-        if (_pendingIncidents.isNotEmpty) {
-          widget.onViewIncidents(_pendingIncidents.first);
-        }
-      },
-      cancelButtonText: 'ยกเลิก',
-      onCancelPressed: () => Navigator.of(context).pop(false),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Flexible(
+          child: BlockingCheckContent(
+            title: 'มี Incident ที่ต้องถอดบทเรียน',
+            imageAsset: 'assets/images/checking_cat.webp',
+            imageSize: 160,
+            richMessage: richMessage,
+            items: items,
+            totalCount: _pendingIncidentsCount,
+            displayLimit: 5,
+            primaryButtonText: 'ไปถอดบทเรียน',
+            primaryButtonIcon: HugeIcons.strokeRoundedArrowRight01,
+            onPrimaryPressed: () {
+              Navigator.of(context).pop(false);
+              // ส่ง incident แรกที่ยังไม่เสร็จไปให้ callback
+              if (_pendingIncidents.isNotEmpty) {
+                widget.onViewIncidents(_pendingIncidents.first);
+              }
+            },
+            cancelButtonText: 'ยกเลิก',
+            onCancelPressed: () => Navigator.of(context).pop(false),
+          ),
+        ),
+        // DEV: ข้ามไป survey
+        _buildDevSkipButton(),
+      ],
     );
   }
 
@@ -661,6 +702,9 @@ class _ClockOutDialogState extends State<ClockOutDialog> {
             ),
           ),
         ),
+
+        // DEV: ข้ามไป survey
+        _buildDevSkipButton(),
       ],
     );
   }
@@ -687,9 +731,9 @@ class _ClockOutDialogState extends State<ClockOutDialog> {
 
         AppSpacing.verticalGapMd,
 
-        // Message
+        // Message - แจ้งเตือนแต่ไม่บังคับ
         Text(
-          'กรุณาสร้างโพสต์ Handover ก่อนลงเวร\nเพื่อส่งต่อข้อมูลให้เวรถัดไป',
+          'ยังไม่ได้สร้างโพสต์ Handover\nเพื่อส่งต่อข้อมูลให้เวรถัดไป',
           style: AppTypography.body.copyWith(
             color: AppColors.secondaryText,
           ),
@@ -698,37 +742,13 @@ class _ClockOutDialogState extends State<ClockOutDialog> {
 
         AppSpacing.verticalGapLg,
 
-        // Create Handover Button
+        // ปุ่มไปต่อ - ไปหน้า survey เลย
         PrimaryButton(
-          text: 'สร้างโพสต์ Handover',
-          onPressed: () {
-            Navigator.of(context).pop(false);
-            widget.onCreateHandover();
-          },
-          icon: HugeIcons.strokeRoundedFileEdit,
-        ),
-
-        AppSpacing.verticalGapSm,
-
-        // Skip and continue
-        SecondaryButton(
-          text: 'ลงเวรโดยไม่ Handover',
+          text: 'ไปต่อ',
           onPressed: () {
             setState(() => _step = ClockOutStep.survey);
           },
-        ),
-
-        AppSpacing.verticalGapSm,
-
-        // Cancel Button
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: Text(
-            'ยกเลิก',
-            style: AppTypography.body.copyWith(
-              color: AppColors.secondaryText,
-            ),
-          ),
+          icon: HugeIcons.strokeRoundedArrowRight01,
         ),
       ],
     );
