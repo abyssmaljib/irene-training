@@ -86,6 +86,16 @@ class _MealSectionCardState extends State<MealSectionCard>
       duration: const Duration(milliseconds: 200),
       vsync: this,
     );
+
+    // เมื่อ animation collapse เสร็จ (ปิดสนิท) ให้ setState เพื่อ unmount content
+    // ทำให้ CachedNetworkImage widgets ถูกลบออกจาก widget tree → ปล่อย decoded images
+    // ช่วยลด memory อย่างมาก โดยเฉพาะก่อนเปิดกล้อง ป้องกัน crash บน iOS
+    _controller.addStatusListener((status) {
+      if (status == AnimationStatus.dismissed && mounted) {
+        setState(() {});
+      }
+    });
+
     _iconTurns = Tween<double>(begin: 0.0, end: 0.5).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
     );
@@ -222,7 +232,11 @@ class _MealSectionCardState extends State<MealSectionCard>
           ),
 
           // Expandable content
-          if (hasMedicines)
+          // Build เฉพาะเมื่อ expanded หรือกำลัง animate (reverse/forward)
+          // เมื่อ collapse สนิทแล้ว (isDismissed) จะ unmount content ทั้งหมด
+          // ทำให้ CachedNetworkImage ปล่อย decoded images จาก memory
+          // ลด crash ตอนเปิดกล้องถ่ายรูปยา (iOS memory pressure)
+          if (hasMedicines && !_controller.isDismissed)
             ClipRect(
               child: AnimatedBuilder(
                 animation: _heightFactor,

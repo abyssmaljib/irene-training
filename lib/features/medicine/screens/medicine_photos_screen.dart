@@ -34,6 +34,18 @@
 //    - แก้ไข: ใช้ Lazy Loading - โหลดรูปเฉพาะมื้อที่เปิด + มื้อถัดไป
 //    - ผล: เข้าหน้าได้ทันที ไม่ต้องรอโหลด
 //
+// การแก้ไข (6 ก.พ. 2026):
+// 6. Unmount content เมื่อ collapse สนิท (meal_section_card.dart):
+//    - ปัญหา: Align(heightFactor:0) แค่ซ่อน ไม่ได้ unmount CachedNetworkImage
+//    - decoded images ยังค้างใน memory แม้ section จะปิดแล้ว
+//    - แก้ไข: เพิ่ม condition !_controller.isDismissed + AnimationStatusListener
+//    - ผล: เมื่อ collapse เสร็จ → widgets unmount → decoded images ถูกปล่อยจริง
+//
+// 7. Collapse section + aggressive cache cleanup ก่อนเปิดกล้อง:
+//    - ปัญหา: clear cache อย่างเดียวไม่พอ เพราะ live widgets ยังถือ reference
+//    - แก้ไข: Collapse ก่อน → รอ unmount → clear cache → set cache limit = 0
+//    - ผล: memory ว่างจริงก่อนเปิดกล้อง → ไม่ crash
+//
 // =============================================================================
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -422,20 +434,48 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
   /// ถ่ายรูปยา พร้อมหน้า preview ให้หมุนรูปได้
   Future<void> _onTakePhoto(String mealKey, String photoType) async {
     try {
-      // 0. Clear image cache ก่อนเปิดกล้อง เพื่อป้องกัน memory overflow บน iOS
-      // เมื่อ preload รูปยาเยอะ + เปิดกล้อง → memory spike → crash
-      // การ clear cache จะปล่อย memory ให้กล้องใช้งานได้
+      // === Phase 1: ปล่อย memory ก่อนเปิดกล้อง ===
+      // ปัญหาเดิม: clear image cache อย่างเดียวไม่พอ เพราะ CachedNetworkImage widgets
+      // ยังคง mount อยู่ใน widget tree (แม้ collapse แล้วก็ยังถือ decoded images)
+      //
+      // แก้ไข: Collapse section → AnimationStatusListener trigger setState
+      // → content ถูก unmount → decoded images ถูกปล่อยจริง → memory ว่าง
+      final previousExpandedIndex = _expandedIndex;
+      setState(() => _expandedIndex = null);
+
+      // รอ animation collapse เสร็จ (200ms) + StatusListener setState + rebuild
+      // เพื่อให้ CachedNetworkImage widgets ถูก unmount จริง
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      // Clear image cache หลัง widgets ถูก unmount แล้ว
+      // ตอนนี้ไม่มี live references → decoded images ถูกปล่อยจาก memory จริง
       PaintingBinding.instance.imageCache.clear();
       PaintingBinding.instance.imageCache.clearLiveImages();
-      debugPrint('MedicinePhotosScreen: Cleared image cache before taking photo');
 
-      // 1. ถ่ายรูป
+      // ลด cache limit ชั่วคราวเป็น 0 เพื่อป้องกันไม่ให้ cache รูปใหม่ระหว่างเปิดกล้อง
+      // กล้อง iOS ใช้ memory สูงมาก ต้องให้ memory ว่างมากที่สุด
+      final savedMaxSize = PaintingBinding.instance.imageCache.maximumSize;
+      final savedMaxBytes = PaintingBinding.instance.imageCache.maximumSizeBytes;
+      PaintingBinding.instance.imageCache.maximumSize = 0;
+      PaintingBinding.instance.imageCache.maximumSizeBytes = 0;
+      debugPrint('MedicinePhotosScreen: Collapsed sections + cleared caches before camera');
+
+      // === Phase 2: ถ่ายรูป ===
       final file = await _cameraService.takePhoto();
-      if (file == null) return; // user ยกเลิก
+
+      // คืนค่า cache limits ทันทีหลังกล้องปิด
+      PaintingBinding.instance.imageCache.maximumSize = savedMaxSize;
+      PaintingBinding.instance.imageCache.maximumSizeBytes = savedMaxBytes;
+
+      if (file == null) {
+        // User ยกเลิก → คืน expanded state เดิม
+        if (mounted) setState(() => _expandedIndex = previousExpandedIndex);
+        return;
+      }
 
       if (!mounted) return;
 
-      // 2. แสดงหน้า preview ให้ user ดูและหมุนรูป
+      // === Phase 3: แสดง preview ===
       final mealLabel = _getMealLabel(mealKey);
       final confirmedFile = await PhotoPreviewScreen.show(
         context: context,
@@ -444,11 +484,18 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
         mealLabel: mealLabel,
       );
 
-      if (confirmedFile == null) return; // user ยกเลิก/ถ่ายใหม่
+      if (confirmedFile == null) {
+        // User ยกเลิก/ถ่ายใหม่ → คืน expanded state เดิม
+        if (mounted) setState(() => _expandedIndex = previousExpandedIndex);
+        return;
+      }
 
       if (!mounted) return;
 
-      // 3. แสดง loading และ upload
+      // คืน expandedIndex ก่อน upload เพื่อให้ preserveExpanded ทำงานถูกต้อง
+      _expandedIndex = previousExpandedIndex;
+
+      // === Phase 4: Upload ===
       _showLoadingDialog();
 
       final url = await _cameraService.uploadPhoto(
@@ -464,7 +511,7 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
         throw Exception('Upload failed');
       }
 
-      // 4. อัพเดต med_log
+      // อัพเดต med_log
       await _cameraService.updateMedLog(
         residentId: widget.residentId,
         mealKey: mealKey,
@@ -473,7 +520,7 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
         photoType: photoType,
       );
 
-      // 5. บันทึก points สำหรับถ่ายรูปยา (ได้เฉพาะครั้งแรกต่อรูป)
+      // บันทึก points สำหรับถ่ายรูปยา (ได้เฉพาะครั้งแรกต่อรูป)
       final userId = UserService().effectiveUserId;
       if (userId != null) {
         await PointsService().recordMedicinePhotoTaken(

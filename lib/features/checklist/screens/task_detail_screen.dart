@@ -2025,6 +2025,17 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     // คะแนนความยากที่ user ให้ (null = ข้าม → ใช้ default 5)
     final difficultyScore = difficultyResult.score;
 
+    // === Capture data ก่อน async operations ===
+    // เพราะ Realtime event จาก markTaskComplete อาจ trigger _refreshTaskData()
+    // ซึ่งจะ clear _uploadedImageUrl = null ก่อนที่ upsertMedLog3C จะได้ทำงาน
+    // (race condition: เน็ตยิ่งเร็ว Realtime ยิ่งมาเร็ว ยิ่งเกิดบ่อย)
+    final capturedImageUrl = _uploadedImageUrl;
+    final capturedTaskType = _task.taskType;
+    final capturedResidentId = _task.residentId;
+    final capturedExpectedDate = _task.expectedDateTime;
+    final capturedTitle = _task.title;
+    final capturedLogId = _task.logId;
+
     // === Optimistic Update ===
     // สร้าง task ใหม่ที่มีสถานะ complete ก่อนรอ server
     final optimisticTask = _task.copyWith(
@@ -2032,7 +2043,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       completedByUid: userId,
       completedByNickname: userNickname,
       completedAt: DateTime.now(),
-      confirmImage: _uploadedImageUrl,
+      confirmImage: capturedImageUrl,
       difficultyScore: difficultyScore ?? 5, // default 5 ถ้า skip
       difficultyRatedBy: userId,
       difficultyRaterNickname: userNickname,
@@ -2049,9 +2060,9 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
 
     // === เรียก Server ===
     final success = await service.markTaskComplete(
-      _task.logId,
+      capturedLogId,
       userId,
-      imageUrl: _uploadedImageUrl,
+      imageUrl: capturedImageUrl,
       difficultyScore: difficultyScore, // null = ใช้ default ใน database
       difficultyRatedBy: userId,
     );
@@ -2059,21 +2070,22 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     if (success) {
       // === Special logic สำหรับ taskType = 'จัดยา' ===
       // ถ้าเป็นงานจัดยา และมีรูปยืนยัน ให้บันทึกลง A_Med_logs ด้วย
-      if (_isJudYa &&
-          _uploadedImageUrl != null &&
-          _task.residentId != null &&
-          _task.expectedDateTime != null) {
+      // ใช้ captured values เพราะ _uploadedImageUrl อาจถูก clear โดย Realtime แล้ว
+      if (capturedTaskType == 'จัดยา' &&
+          capturedImageUrl != null &&
+          capturedResidentId != null &&
+          capturedExpectedDate != null) {
         // ดึง meal จาก title (เช่น 'ก่อนอาหารเช้า', 'หลังอาหารกลางวัน')
-        final meal = _extractMealFromTitle(_task.title ?? '');
+        final meal = _extractMealFromTitle(capturedTitle ?? '');
         if (meal != null) {
           // บันทึกลง A_Med_logs (3C)
           await MedicineService.instance.upsertMedLog3C(
-            residentId: _task.residentId!,
+            residentId: capturedResidentId,
             meal: meal,
-            expectedDate: _task.expectedDateTime!,
+            expectedDate: capturedExpectedDate,
             userId: userId,
-            pictureUrl: _uploadedImageUrl!,
-            taskLogId: _task.logId,
+            pictureUrl: capturedImageUrl,
+            taskLogId: capturedLogId,
           );
         }
       }
