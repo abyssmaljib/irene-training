@@ -152,7 +152,9 @@ class PostActionService {
         debugPrint('PostActionService: created QA entry $qaId');
       }
 
-      // Insert post
+      // Insert post พร้อม resident_id ใน row เดียวกัน (atomic)
+      // ไม่ต้องแยก INSERT เข้า junction table อีกต่อไป
+      // ป้องกัน partial failure ที่ Post สำเร็จแต่ resident link พัง
       final response = await _supabase.from('Post').insert({
         'user_id': userId,
         'nursinghome_id': nursinghomeId,
@@ -166,29 +168,12 @@ class PostActionService {
         'visible_to_relative': visibleToRelative,
         'is_handover': isHandover,
         'qa_id': qaId,
+        // resident_id อยู่ใน Post table โดยตรง (ไม่ผ่าน junction table)
+        'resident_id': residentId ?? residentIds?.firstOrNull,
         if (ddId != null) 'DD_id': ddId,
       }).select('id').single();
 
       final postId = response['id'] as int;
-
-      // Link to single resident if provided (new)
-      if (residentId != null) {
-        await _supabase.from('Post_Resident_id').insert({
-          'Post_id': postId,
-          'resident_id': residentId,
-        });
-      }
-      // Link to multiple residents if provided (legacy)
-      else if (residentIds != null && residentIds.isNotEmpty) {
-        final residentLinks = residentIds
-            .map((rid) => {
-                  'Post_id': postId,
-                  'resident_id': rid,
-                })
-            .toList();
-
-        await _supabase.from('Post_Resident_id').insert(residentLinks);
-      }
 
       debugPrint('PostActionService: created post $postId (handover: $isHandover)');
 
@@ -279,25 +264,16 @@ class PostActionService {
         }
       }
 
-      // Update the Post table
+      // Handle resident update (อัพเดต resident_id ใน Post table โดยตรง)
+      // residentId = -1 → ลบ resident, residentId > 0 → เปลี่ยน resident
+      if (residentId != null) {
+        updates['resident_id'] = residentId > 0 ? residentId : null;
+        debugPrint('PostActionService: updating resident_id to ${residentId > 0 ? residentId : "null"} for post $postId');
+      }
+
+      // Update the Post table (รวม resident_id ใน UPDATE เดียวกัน = atomic)
       await _supabase.from('Post').update(updates).eq('id', postId);
       debugPrint('PostActionService: updated post $postId');
-
-      // Handle resident update (uses Post_Resident_id junction table)
-      if (residentId != null) {
-        // ลบ resident เดิมก่อน
-        await _supabase.from('Post_Resident_id').delete().eq('Post_id', postId);
-        debugPrint('PostActionService: deleted existing resident links for post $postId');
-
-        // เพิ่ม resident ใหม่ (ถ้า residentId > 0)
-        if (residentId > 0) {
-          await _supabase.from('Post_Resident_id').insert({
-            'Post_id': postId,
-            'resident_id': residentId,
-          });
-          debugPrint('PostActionService: linked post $postId to resident $residentId');
-        }
-      }
 
       return true;
     } catch (e) {
@@ -309,9 +285,8 @@ class PostActionService {
   /// Delete a post
   Future<bool> deletePost(int postId) async {
     try {
-      // Delete related records first
+      // Delete related records first (resident_id อยู่ใน Post table แล้ว ไม่ต้องลบ junction)
       await _supabase.from('Post_likes').delete().eq('Post_id', postId);
-      await _supabase.from('Post_Resident_id').delete().eq('Post_id', postId);
       await _supabase.from('Post_Tags').delete().eq('Post_id', postId);
 
       // Delete the post
