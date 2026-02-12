@@ -132,6 +132,11 @@ class _ClockOutDialogState extends State<ClockOutDialog> {
   Future<void> _runChecks() async {
     setState(() => _step = ClockOutStep.checking);
 
+    // 0. Load shift leader info ก่อนทุกอย่าง
+    // เพื่อให้มีข้อมูลหัวหน้าเวรพร้อมแสดงในฟอร์ม survey เสมอ
+    // (ไม่ว่าจะมีโพสค้างหรือ handover หรือไม่)
+    _shiftLeader = await _clockService.getShiftLeader();
+
     // 1. Check remaining tasks
     _remainingTasksCount = await _homeService.getRemainingTasksCount(
       shift: widget.shift,
@@ -173,11 +178,7 @@ class _ClockOutDialogState extends State<ClockOutDialog> {
       return;
     }
 
-    // 4. Load shift leader info (ถ้ามี) - โหลดก่อน handover check
-    // เพื่อให้ leader card แสดงได้เสมอ ไม่ว่าจะ handover หรือไม่
-    _shiftLeader = await _clockService.getShiftLeader();
-
-    // 5. Check handover
+    // 4. Check handover
     _hasHandover = await _clockService.hasHandoverPost();
 
     if (!_hasHandover) {

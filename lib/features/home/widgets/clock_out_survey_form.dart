@@ -133,12 +133,12 @@ class _ClockOutSurveyFormState extends State<ClockOutSurveyForm> {
           ],
 
           // Shift Survey TextField
-          Text('สิ่งที่เกิดขึ้นในเวรนี้ *', style: AppTypography.subtitle),
+          Text('อยากเล่าอะไรเพิ่มเติม เกี่ยวกับคะแนนที่ให้หรือเวรในรอบนี้มั้ย? *', style: AppTypography.subtitle),
           AppSpacing.verticalGapSm,
           TextField(
             controller: _shiftSurveyController,
             decoration: InputDecoration(
-              hintText: 'เล่าสิ่งที่เกิดขึ้นในเวรนี้...',
+              hintText: 'เล่าให้ฟังหน่อย...',
               hintStyle: AppTypography.body.copyWith(
                 color: AppColors.secondaryText,
               ),

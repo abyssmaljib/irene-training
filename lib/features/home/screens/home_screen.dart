@@ -1,5 +1,5 @@
-// import 'package:flutter/foundation.dart' show kDebugMode; // ซ่อน dev buttons ไว้
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
@@ -49,6 +49,7 @@ import '../../points/models/models.dart'; // สำหรับ Tier, UserTierIn
 import '../../learning/models/badge.dart' as learning; // สำหรับ mock badges (ป้องกัน conflict กับ material Badge)
 import '../services/shift_summary_service.dart' as clock_out_summary; // สำหรับ ShiftSummary (clock out)
 import '../widgets/clock_out_summary_modal.dart'; // สำหรับ dev test
+import '../models/shift_leader.dart'; // สำหรับ mock ShiftLeader ใน dev button
 
 /// หน้าหลัก - Dashboard with Clock-in/Clock-out
 /// ใช้ ConsumerStatefulWidget เพื่อให้ pull to refresh สามารถ invalidate
@@ -67,6 +68,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   final _userService = UserService();
   final _shiftSummaryService = ShiftSummaryService.instance;
   final _clockRealtimeService = ClockRealtimeService.instance;
+
+  // Dev mode - แสดงปุ่ม dev เฉพาะ user นี้เท่านั้น
+  bool get _isDevUser =>
+      Supabase.instance.client.auth.currentUser?.email == 'beautyheechul@gmail.com';
 
   // Zone data
   List<Zone> _zones = [];
@@ -438,16 +443,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     setState(() => _isClockingIn = true);
     try {
-      // ดึง system role ของ user เพื่อเช็คว่าเป็นหัวหน้าเวรหรือไม่
-      // ถ้าเป็น shift_leader จะ auto-set Incharge = true
-      final systemRole = await _userService.getSystemRole();
-      final isIncharge = systemRole?.isShiftLeader ?? false;
-
+      // ไม่ต้อง set Incharge ตอน clock in แล้ว
+      // scheduled job (pg_cron) จะ assign Incharge ให้ตอน 08:00/20:00
+      // เพื่อให้ทุกคนมีเวลาขึ้นเวรก่อน แล้วค่อยตัดสินใจว่าใครเป็น Incharge
       final result = await _clockService.clockIn(
         zoneIds: _selectedZoneIds.toList(),
         residentIds: _selectedResidentIds.toList(),
         breakTimeIds: _selectedBreakTimeIds.toList(),
-        isIncharge: isIncharge,
       );
 
       if (result != null && mounted) {
@@ -682,15 +684,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildClockInContent() {
     return Column(
       children: [
-        // ปุ่ม Dev ซ่อนไว้ — เปิดใช้เมื่อต้องการทดสอบ
-        // if (kDebugMode) ...[
-        //   _buildDevClockOutCheckButton(),
-        //   AppSpacing.verticalGapSm,
-        //   _buildDevSurveyFormButton(),
-        //   AppSpacing.verticalGapSm,
-        //   _buildDevSummaryModalButton(),
-        //   AppSpacing.verticalGapMd,
-        // ],
+        // ปุ่ม Dev สำหรับทดสอบ clock out flow โดยไม่ต้องขึ้นเวรจริง
+        if (_isDevUser) ...[
+          _buildDevClockOutCheckButton(),
+          AppSpacing.verticalGapSm,
+          _buildDevSurveyFormButton(),
+          AppSpacing.verticalGapSm,
+          _buildDevSummaryModalButton(),
+          AppSpacing.verticalGapMd,
+        ],
 
         // Monthly Summary Card
         if (_currentMonthSummary != null)
@@ -764,13 +766,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildOnShiftContent() {
     return Column(
       children: [
-        // ปุ่ม Dev ซ่อนไว้ — เปิดใช้เมื่อต้องการทดสอบ
-        // if (kDebugMode) ...[
-        //   _buildDevClockOutCheckButton(),
-        //   AppSpacing.verticalGapSm,
-        //   _buildDevSummaryModalButton(),
-        //   AppSpacing.verticalGapMd,
-        // ],
+        // ปุ่ม Dev สำหรับทดสอบ clock out flow ขณะขึ้นเวรอยู่
+        if (_isDevUser) ...[
+          _buildDevClockOutCheckButton(),
+          AppSpacing.verticalGapSm,
+          _buildDevSummaryModalButton(),
+          AppSpacing.verticalGapMd,
+        ],
 
         // Tarot Core Value Card - แสดงไพ่ที่ได้รับตอนขึ้นเวร
         if (_selectedTarotCard != null) ...[
@@ -1160,8 +1162,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   /// แสดง Dialog สำหรับทดสอบ ClockOutSurveyForm
+  /// ใช้ mock ShiftLeader เพื่อให้เห็นส่วนประเมินหัวหน้าเวรด้วย
   // ignore: unused_element
   void _showDevSurveyFormDialog() {
+    // Mock หัวหน้าเวร เพื่อทดสอบ UI ส่วนประเมินหัวหน้าเวร
+    const mockLeader = ShiftLeader(
+      id: 'dev-leader-001',
+      nickname: 'พี่แมว',
+      fullName: 'สมชาย แมวดี',
+      photoUrl: null, // ไม่มีรูป - จะแสดง fallback icon แทน
+    );
+
     showDialog(
       context: context,
       builder: (context) => Dialog(
@@ -1194,9 +1205,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ],
               ),
               const Divider(),
-              // ClockOutSurveyForm
+              // ClockOutSurveyForm พร้อม mock shiftLeader
               Flexible(
                 child: ClockOutSurveyForm(
+                  shiftLeader: mockLeader, // ส่ง mock leader เพื่อแสดงส่วนประเมินหัวหน้าเวร
                   onSubmit: ({
                     required int shiftScore,
                     required int selfScore,

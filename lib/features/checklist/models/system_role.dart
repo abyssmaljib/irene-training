@@ -94,7 +94,14 @@ class SystemRole {
   /// Check if this role is owner
   bool get isOwner => name == 'owner';
 
-  /// Check if this role is shift leader (หัวหน้าเวร)
-  /// ใช้สำหรับ auto-set Incharge = true ตอน clock in
-  bool get isShiftLeader => name == 'shift_leader';
+  /// Check if this role is shift leader (หัวหน้าเวร - role 12)
+  /// ใช้สำหรับ auto-set Incharge = true ตอน clock in เสมอ
+  bool get isShiftLeader => id == 12;
+
+  /// Check if this role is backup shift leader (หัวหน้าเวรสำรอง - role 13)
+  /// จะ auto-set Incharge = true เฉพาะเมื่อไม่มี role 12 ขึ้นเวรอยู่
+  bool get isBackupShiftLeader => id == 13;
+
+  /// Check if this role can be incharge (หัวหน้าเวร หรือ หัวหน้าเวรสำรอง)
+  bool get canBeIncharge => isShiftLeader || isBackupShiftLeader;
 }
