@@ -116,29 +116,38 @@ class ShiftSummaryService {
     required DateTime clockInTime,
     DateTime? clockOutTime,
     int deadAirMinutes = 0,
+    List<Badge>? awardedBadges, // รับ badges ที่ award แล้วจาก BadgeService
   }) async {
     final endTime = clockOutTime ?? DateTime.now();
 
     try {
-      // Query ข้อมูลทั้งหมดพร้อมกัน (parallel)
+      // ถ้ามี awardedBadges ส่งมา ใช้เลย ไม่ต้อง query จาก database
+      // เพราะอาจมีปัญหา timing/race condition
+      final List<Badge> newBadges;
+      if (awardedBadges != null && awardedBadges.isNotEmpty) {
+        newBadges = awardedBadges;
+      } else {
+        // Fallback: query จาก database (กรณีเรียกจากที่อื่น)
+        newBadges = await _getNewBadges(userId, clockInTime, endTime);
+      }
+
+      // Query ข้อมูลที่เหลือพร้อมกัน (parallel)
       final results = await Future.wait([
         _getShiftPoints(userId, clockInTime, endTime),
-        _getNewBadges(userId, clockInTime, endTime),
         _pointsService.getUserTier(userId),
         _getUserRank(userId, nursinghomeId),
         _getWorkStreak(userId, nursinghomeId),
       ]);
 
       final shiftPoints = results[0] as ShiftPointsSummary;
-      final newBadges = results[1] as List<Badge>;
-      final tierInfo = results[2] as UserTierInfo? ??
+      final tierInfo = results[1] as UserTierInfo? ??
           UserTierInfo(
             currentTier: Tier.defaultTier,
             nextTier: null,
             totalPoints: 0,
           );
-      final rankData = results[3] as Map<String, int>;
-      final workStreak = results[4] as int;
+      final rankData = results[2] as Map<String, int>;
+      final workStreak = results[3] as int;
 
       return ShiftSummary(
         points: shiftPoints,

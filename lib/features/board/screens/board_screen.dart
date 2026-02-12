@@ -466,7 +466,7 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
             final isRequiredUnread = !isLiked;
 
             return Padding(
-              padding: EdgeInsets.only(bottom: AppSpacing.md),
+              padding: EdgeInsets.only(bottom: AppSpacing.sm),
               child: PostCard(
                 post: post,
                 isLiked: isLiked,
@@ -549,7 +549,7 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
             final isRequiredUnread = !isLiked;
 
             return Padding(
-              padding: EdgeInsets.only(bottom: AppSpacing.md),
+              padding: EdgeInsets.only(bottom: AppSpacing.sm),
               child: PostCard(
                 post: post,
                 isLiked: isLiked,

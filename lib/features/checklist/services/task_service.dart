@@ -79,30 +79,38 @@ class TaskService {
 
       final stopwatch = Stopwatch()..start();
 
-      final response = await _supabase
-          .from('v2_task_logs_with_details')
-          .select()
-          .eq('nursinghome_id', nursinghomeId)
-          .eq('adjust_date', dateStr)
-          // กรองเฉพาะ tasks ที่มี timeBlock (มาจาก A_Repeated_Task หรือ C_Task)
-          // task ที่ไม่มี timeBlock = ไม่มี Task_Repeat_Id = ไม่สมบูรณ์
-          .not('timeBlock', 'is', null)
-          .order('ExpectedDateTime', ascending: true);
+      // ✨ ใช้ RPC get_tasks_by_date แทน query view โดยตรง
+      // RPC = SECURITY DEFINER → ตรวจสิทธิ์ 1 ครั้ง → เร็วกว่า query view ตรงมาก
+      // filter: nursinghome_id, adjust_date, timeBlock IS NOT NULL, ORDER BY ExpectedDateTime
+      final response = await _supabase.rpc(
+        'get_tasks_by_date',
+        params: {
+          'p_date': dateStr,
+          'p_nursinghome_id': nursinghomeId,
+        },
+      );
 
       stopwatch.stop();
 
       final tasks =
           (response as List).map((json) => TaskLog.fromJson(json)).toList();
 
+      final viewMs = stopwatch.elapsedMilliseconds;
+
+      // ดึง history_seen_users แยกผ่าน RPC (view ส่ง [] เพราะลบ LATERAL join ออกแล้ว)
+      // ทำแบบ batch เรียกครั้งเดียว เร็วกว่า LATERAL join ที่วนทีละ row
+      final enrichedTasks = await _enrichWithSeenUsers(tasks);
+
       // Update cache
       _cachedDate = date;
       _cachedNursinghomeId = nursinghomeId;
-      _cachedTasks = tasks;
+      _cachedTasks = enrichedTasks;
       _cacheTime = DateTime.now();
 
       debugPrint(
-          'getTasksByDate: fetched ${tasks.length} tasks for $dateStr in ${stopwatch.elapsedMilliseconds}ms');
-      return tasks;
+          'getTasksByDate: fetched ${enrichedTasks.length} tasks for $dateStr '
+          'in ${stopwatch.elapsedMilliseconds}ms (view: ${viewMs}ms, seen: ${stopwatch.elapsedMilliseconds - viewMs}ms)');
+      return enrichedTasks;
     } catch (e) {
       debugPrint('getTasksByDate error: $e');
       // Return cached data if available even on error
@@ -114,6 +122,58 @@ class TaskService {
         return _cachedTasks!;
       }
       return [];
+    }
+  }
+
+  /// ดึง history_seen_users แบบ batch ผ่าน RPC function
+  /// แทน LATERAL join ที่ลบออกจาก view (เร็วกว่า + ไม่มีปัญหา RLS)
+  ///
+  /// Flow:
+  /// 1. รวบรวม taskId ทั้งหมดจาก tasks
+  /// 2. เรียก RPC get_task_seen_users ครั้งเดียว (batch)
+  /// 3. Merge seen_users กลับเข้า TaskLog ผ่าน copyWith
+  Future<List<TaskLog>> _enrichWithSeenUsers(List<TaskLog> tasks) async {
+    if (tasks.isEmpty) return tasks;
+
+    // รวบรวม taskId ที่ไม่ซ้ำ (ไม่รวม null)
+    final taskIds = tasks
+        .map((t) => t.taskId)
+        .where((id) => id != null)
+        .cast<int>()
+        .toSet()
+        .toList();
+
+    if (taskIds.isEmpty) return tasks;
+
+    try {
+      // เรียก RPC ครั้งเดียว — ได้ {task_id, seen_users[]} ทุก task
+      final response = await _supabase.rpc(
+        'get_task_seen_users',
+        params: {'p_task_ids': taskIds},
+      );
+
+      // สร้าง Map: taskId → List<String> ของ user ที่เคยเห็น
+      final seenMap = <int, List<String>>{};
+      for (final row in (response as List)) {
+        final taskId = row['task_id'] as int;
+        final users = (row['seen_users'] as List?)
+                ?.map((e) => e.toString())
+                .toList() ??
+            [];
+        seenMap[taskId] = users;
+      }
+
+      // Merge seen_users เข้า TaskLog
+      return tasks.map((task) {
+        if (task.taskId != null && seenMap.containsKey(task.taskId)) {
+          return task.copyWith(historySeenUsers: seenMap[task.taskId!]);
+        }
+        return task;
+      }).toList();
+    } catch (e) {
+      // ถ้า RPC ล้มเหลว → return tasks เดิม (unseen badge จะแสดงทุก task เป็น unseen)
+      debugPrint('_enrichWithSeenUsers error: $e');
+      return tasks;
     }
   }
 

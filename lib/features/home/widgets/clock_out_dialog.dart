@@ -10,6 +10,7 @@ import '../../../core/widgets/blocking_check_dialog.dart';
 import '../../../core/widgets/buttons.dart';
 import '../../incident_reflection/models/incident.dart';
 import '../../incident_reflection/services/incident_service.dart';
+import '../../learning/models/badge.dart' as learning;
 import '../../learning/services/badge_service.dart';
 import '../../points/services/points_service.dart';
 import '../models/shift_leader.dart';
@@ -244,8 +245,9 @@ class _ClockOutDialogState extends State<ClockOutDialog> {
 
     if (mounted && success) {
       // 3. ตรวจสอบและ award shift badges
+      List<learning.Badge> awardedBadges = [];
       if (widget.clockInTime != null) {
-        await _badgeService.checkAndAwardShiftBadges(
+        awardedBadges = await _badgeService.checkAndAwardShiftBadges(
           clockRecordId: widget.clockRecordId,
           nursinghomeId: widget.nursinghomeId,
           clockIn: widget.clockInTime!,
@@ -254,13 +256,14 @@ class _ClockOutDialogState extends State<ClockOutDialog> {
         );
       }
 
-      // 4. Query shift summary
+      // 4. Query shift summary (ส่ง awardedBadges ไปด้วย)
       final summary = await _shiftSummaryService.getShiftSummary(
         userId: widget.userId,
         nursinghomeId: widget.nursinghomeId,
         clockInTime: widget.clockInTime ?? DateTime.now(),
         clockOutTime: DateTime.now(),
         deadAirMinutes: deadAirMinutes,
+        awardedBadges: awardedBadges, // ส่ง badges ที่ได้ไปแสดงโดยตรง
       );
 
       // 5. ปิด dialog นี้ก่อน
