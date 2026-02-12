@@ -142,6 +142,10 @@ class PostService {
       // ใช้สำหรับเช็ค hasMore ใน pagination (ผ่าน getPostsWithPagination)
       _lastServerPostCount = posts.length;
 
+      // ดึง LINE status แยก (ไม่ได้อยู่ใน view แล้ว เพื่อ performance)
+      // ใช้ RPC query เฉพาะ post IDs ที่ได้มา แทนการ scan ทั้งตาราง 112k+ rows
+      posts = await _enrichWithLineStatus(posts);
+
       // Apply filter type (client-side filtering for complex conditions)
       if (currentUserId != null) {
         switch (filter.filterType) {
@@ -175,10 +179,13 @@ class PostService {
   }
 
   /// ดึง post เดี่ยวตาม ID
+  /// ใช้ v_post_list (ตัวเต็ม) เพราะ detail view ต้องการข้อมูลครบ
+  /// เช่น like_user_nicknames, tagged_user_nicknames ฯลฯ
+  /// ดึงแค่ 1 row จึงไม่กระทบ performance
   Future<Post?> getPostById(int postId) async {
     try {
       final response = await _supabase
-          .from('postwithuserinfo')
+          .from('v_post_list')
           .select()
           .eq('id', postId)
           .maybeSingle();
@@ -192,10 +199,11 @@ class PostService {
   }
 
   /// ดึง pinned Critical post ล่าสุด
+  /// ใช้ v_post_list (ตัวเต็ม) เพราะดึงแค่ 1 row
   Future<Post?> getPinnedCriticalPost(int nursinghomeId) async {
     try {
       final response = await _supabase
-          .from('postwithuserinfo')
+          .from('v_post_list')
           .select()
           .eq('nursinghome_id', nursinghomeId)
           .eq('tab', 'Announcements-Critical')
@@ -365,6 +373,44 @@ class PostService {
     } catch (e) {
       debugPrint('getPostsByResident error: $e');
       return [];
+    }
+  }
+
+  /// ดึง LINE notification status แยกจาก view (เพื่อ performance)
+  /// เรียก RPC function ที่ query เฉพาะ post IDs ที่ต้องการ (~2ms)
+  /// แทนการ JOIN ทั้งตาราง 112k+ rows ใน view (~100ms)
+  Future<List<Post>> _enrichWithLineStatus(List<Post> posts) async {
+    if (posts.isEmpty) return posts;
+
+    try {
+      // รวบรวม post IDs ที่ต้องการ
+      final postIds = posts.map((p) => p.id).toList();
+
+      // เรียก RPC function ดึง LINE status เฉพาะ posts เหล่านี้
+      final response = await _supabase.rpc(
+        'get_post_line_status',
+        params: {'post_ids': postIds},
+      );
+
+      // สร้าง map สำหรับ lookup เร็วๆ: post_id → {status, queue_id}
+      final statusMap = <int, Map<String, dynamic>>{};
+      for (final row in response as List) {
+        statusMap[row['post_id'] as int] = row;
+      }
+
+      // merge LINE status กลับเข้า posts ด้วย copyWith
+      return posts.map((post) {
+        final lineData = statusMap[post.id];
+        if (lineData == null) return post;
+        return post.copyWith(
+          logLineStatus: lineData['log_line_status'] as String?,
+          logLineQueueId: lineData['log_line_queue_id'] as int?,
+        );
+      }).toList();
+    } catch (e) {
+      // ถ้าดึง LINE status ไม่ได้ ให้แสดง posts ปกติ (ไม่มีสถานะ LINE)
+      debugPrint('_enrichWithLineStatus error: $e');
+      return posts;
     }
   }
 
