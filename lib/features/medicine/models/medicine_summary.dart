@@ -230,10 +230,14 @@ class MedicineSummary {
       return false;
     }
 
+    // แปลงเป็น local time ก่อนดึงวัน เพราะ DateTime จาก Supabase
+    // อาจเป็น UTC (เช่น 06:45+07 → 23:45Z วันก่อน) ทำให้ .day ผิดวัน
+    // ถ้า selectedDate เป็น local อยู่แล้ว .toLocal() จะไม่มีผลกระทบ
+    final localDate = selectedDate.toLocal();
     final checkDate = DateTime(
-      selectedDate.year,
-      selectedDate.month,
-      selectedDate.day,
+      localDate.year,
+      localDate.month,
+      localDate.day,
     );
 
     // ถ้า firstMedHistoryOnDate เป็น null = ใช้ checkDate เป็น startDate (ยา active ตลอด)
