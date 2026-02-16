@@ -136,7 +136,9 @@ class _ClockOutDialogState extends State<ClockOutDialog> {
     // 0. Load shift leader info ก่อนทุกอย่าง
     // เพื่อให้มีข้อมูลหัวหน้าเวรพร้อมแสดงในฟอร์ม survey เสมอ
     // (ไม่ว่าจะมีโพสค้างหรือ handover หรือไม่)
-    _shiftLeader = await _clockService.getShiftLeader();
+    // ใช้ widget.shift (เวรจริงจาก clock record) ไม่ใช้ getCurrentShiftType()
+    // เพราะ เวรเช้าลงเวรตอน 19:00+ → getCurrentShiftType() จะได้ 'เวรดึก' ผิด
+    _shiftLeader = await _clockService.getShiftLeader(widget.shift);
 
     // 1. Check remaining tasks
     _remainingTasksCount = await _homeService.getRemainingTasksCount(
@@ -359,7 +361,7 @@ class _ClockOutDialogState extends State<ClockOutDialog> {
   /// โหลด shift leader ก่อน (ถ้ายังไม่ได้โหลด) แล้วไปหน้า survey
   // ignore: unused_element
   Future<void> _devSkipToSurvey() async {
-    _shiftLeader ??= await _clockService.getShiftLeader();
+    _shiftLeader ??= await _clockService.getShiftLeader(widget.shift);
     if (mounted) {
       setState(() => _step = ClockOutStep.survey);
     }

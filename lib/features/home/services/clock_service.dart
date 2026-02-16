@@ -409,21 +409,22 @@ class ClockService {
     }
   }
 
-  /// ดึงข้อมูลหัวหน้าเวรของเวรปัจจุบัน (คนที่ Incharge = true)
-  /// - ต้องอยู่ในเวรเดียวกัน (shift เดียวกัน)
+  /// ดึงข้อมูลหัวหน้าเวรของเวรที่ระบุ (คนที่ Incharge = true)
+  /// - [shift] = เวรที่ user กำลังจะลงเวร (เช่น 'เวรเช้า' หรือ 'เวรดึก')
+  ///   ต้องส่งค่าจริงจาก clock record ไม่ใช่คำนวณจากเวลาปัจจุบัน
+  ///   เพราะ เวรเช้าลงเวรตอน 19:00+ (getCurrentShiftType จะได้ 'เวรดึก' ผิด)
   /// - ต้องยังไม่ลงเวร (clock_out_timestamp IS NULL)
   /// - ต้องไม่ใช่ตัวเอง
   /// Returns null ถ้าไม่มีหัวหน้าเวร หรือตัวเองเป็นหัวหน้าเวร
-  Future<ShiftLeader?> getShiftLeader() async {
+  Future<ShiftLeader?> getShiftLeader(String shift) async {
     final userId = _userService.effectiveUserId;
     final nursinghomeId = await _userService.getNursinghomeId();
     if (userId == null || nursinghomeId == null) return null;
 
     try {
-      // กำหนด shift ปัจจุบัน
-      final currentShift = getCurrentShiftType();
-
       // ค้นหาคนที่ Incharge = true ในเวรเดียวกัน (ไม่ใช่ตัวเอง)
+      // ใช้ shift ที่ส่งมาจาก clock record จริง ไม่ใช้ getCurrentShiftType()
+      // เพราะ user เวรเช้าที่ลงเวรตอน 19:00+ จะได้ shift ผิดถ้าดูจากเวลา
       final response = await _supabase
           .from('clock_in_out_ver2')
           .select('''
@@ -431,7 +432,7 @@ class ClockService {
             user_info:user_id(nickname, full_name, photo_url)
           ''')
           .eq('nursinghome_id', nursinghomeId)
-          .eq('shift', currentShift)
+          .eq('shift', shift)
           .eq('Incharge', true)
           .neq('user_id', userId)
           .isFilter('clock_out_timestamp', null)
