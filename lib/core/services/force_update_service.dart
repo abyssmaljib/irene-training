@@ -38,15 +38,19 @@ class ForceUpdateService {
     try {
       // 0. ดึง version ปัจจุบัน และยกเว้น 1.0.0 (dev/debug build)
       final packageInfo = await PackageInfo.fromPlatform();
+      debugPrint('🔍 ForceUpdate: version=${packageInfo.version}, buildNumber=${packageInfo.buildNumber}');
+
       if (packageInfo.version == '1.0.0') {
-        debugPrint('ForceUpdateService: Version 1.0.0 detected, skip update check (dev build)');
+        debugPrint('🔍 ForceUpdate: ❌ SKIP - Version 1.0.0 = dev build');
         return false;
       }
 
       // 1. ดึง nursinghome_id ของ user
       final nursinghomeId = await UserService().getNursinghomeId();
+      debugPrint('🔍 ForceUpdate: nursinghomeId=$nursinghomeId');
+
       if (nursinghomeId == null) {
-        debugPrint('ForceUpdateService: No nursinghome_id found, skip update check');
+        debugPrint('🔍 ForceUpdate: ❌ SKIP - nursinghomeId เป็น null');
         return false;
       }
 
@@ -57,24 +61,29 @@ class ForceUpdateService {
           .eq('id', nursinghomeId)
           .maybeSingle();
 
+      debugPrint('🔍 ForceUpdate: DB response=$response');
+
       final minBuildNumber = response?['app_version'] as int?;
+      debugPrint('🔍 ForceUpdate: app_version จาก DB=$minBuildNumber');
+
       if (minBuildNumber == null || minBuildNumber == 0) {
-        // ไม่มีการกำหนด minimum version หรือเป็น 0 = ไม่บังคับ update
-        debugPrint('ForceUpdateService: No minimum version set, skip update check');
+        debugPrint('🔍 ForceUpdate: ❌ SKIP - app_version เป็น null หรือ 0 (ไม่บังคับ update)');
         return false;
       }
 
-      // 3. ดึง buildNumber ปัจจุบันของ app (ใช้ packageInfo ที่ดึงไว้แล้วด้านบน)
+      // 3. ดึง buildNumber ปัจจุบันของ app
       final currentBuildNumber = int.tryParse(packageInfo.buildNumber) ?? 0;
 
-      debugPrint('ForceUpdateService: Current build=$currentBuildNumber, Required=$minBuildNumber');
+      debugPrint('🔍 ForceUpdate: currentBuild=$currentBuildNumber vs requiredBuild=$minBuildNumber');
 
       // 4. เทียบ version
-      // ถ้า currentBuildNumber < minBuildNumber → ต้อง update
-      return currentBuildNumber < minBuildNumber;
-    } catch (e) {
-      debugPrint('ForceUpdateService: Error checking update: $e');
-      // ถ้า error ให้ผ่านไป ไม่บังคับ update (เพื่อไม่ให้ user ถูก block)
+      final needsUpdate = currentBuildNumber < minBuildNumber;
+      debugPrint('🔍 ForceUpdate: ${needsUpdate ? "✅ ต้อง UPDATE!" : "✅ ไม่ต้อง update (version ใหม่พอ)"}');
+
+      return needsUpdate;
+    } catch (e, stackTrace) {
+      debugPrint('🔍 ForceUpdate: ❌ ERROR: $e');
+      debugPrint('🔍 ForceUpdate: StackTrace: $stackTrace');
       return false;
     }
   }

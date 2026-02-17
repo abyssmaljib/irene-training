@@ -171,16 +171,25 @@ class AuthWrapper extends StatefulWidget {
   State<AuthWrapper> createState() => _AuthWrapperState();
 }
 
-class _AuthWrapperState extends State<AuthWrapper> {
+class _AuthWrapperState extends State<AuthWrapper>
+    with WidgetsBindingObserver {
   Session? _session;
   late final StreamSubscription<AuthState> _authSubscription;
 
-  // Flag เพื่อป้องกันการเช็ค force update ซ้ำ
-  bool _hasCheckedForceUpdate = false;
+  // Cooldown: เช็ค force update ได้ไม่เกินทุก 5 นาที
+  // ป้องกัน query DB ถี่เกินไปเมื่อ user สลับแอปไปมา
+  DateTime? _lastForceUpdateCheck;
+  static const _forceUpdateCooldown = Duration(minutes: 5);
+
+  // Flag กัน dialog ซ้อน — ถ้า dialog แสดงอยู่แล้วไม่ต้องเช็คอีก
+  bool _isForceUpdateDialogShowing = false;
 
   @override
   void initState() {
     super.initState();
+
+    // ลงทะเบียน lifecycle observer เพื่อเช็ค force update ตอนกลับเข้าแอป
+    WidgetsBinding.instance.addObserver(this);
 
     _session = Supabase.instance.client.auth.currentSession;
 
@@ -210,44 +219,73 @@ class _AuthWrapperState extends State<AuthWrapper> {
           AppVersionService.instance.updateVersionInfo();
 
           // เช็ค force update หลัง login
-          // ใช้ addPostFrameCallback เพื่อให้ context พร้อมใช้งาน
           _checkForceUpdate();
         } else {
           // Logout from OneSignal
           OneSignalService.instance.clearToken();
-          // Reset flag เมื่อ logout เพื่อให้เช็คใหม่ตอน login ครั้งหน้า
-          _hasCheckedForceUpdate = false;
+          // Reset เมื่อ logout เพื่อให้เช็คทันทีตอน login ครั้งหน้า
+          _lastForceUpdateCheck = null;
+          _isForceUpdateDialogShowing = false;
         }
       }
     });
   }
 
+  /// เช็ค force update เมื่อ user กลับเข้าแอปจาก background
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+
+    // เช็คเฉพาะตอนกลับเข้าแอป (resumed) และ user ยัง login อยู่
+    if (state == AppLifecycleState.resumed && _session != null) {
+      debugPrint('🔍 Lifecycle: App resumed → เช็ค force update');
+      _checkForceUpdate();
+    }
+  }
+
   /// ตรวจสอบว่าต้อง force update หรือไม่
-  /// ถ้าต้อง update จะแสดง dialog ที่ปิดไม่ได้
+  /// เช็คได้ทุกครั้งที่เรียก แต่มี cooldown 5 นาทีกัน query DB ถี่เกินไป
   Future<void> _checkForceUpdate() async {
-    // ป้องกันการเช็คซ้ำ
-    if (_hasCheckedForceUpdate) return;
-    _hasCheckedForceUpdate = true;
+    // ถ้า dialog แสดงอยู่แล้ว ไม่ต้องเช็คซ้ำ
+    if (_isForceUpdateDialogShowing) {
+      debugPrint('🔍 _checkForceUpdate: SKIP - dialog แสดงอยู่แล้ว');
+      return;
+    }
+
+    // Cooldown: ถ้าเช็คไปไม่ถึง 5 นาที ยังไม่ต้องเช็คใหม่
+    final now = DateTime.now();
+    if (_lastForceUpdateCheck != null &&
+        now.difference(_lastForceUpdateCheck!) < _forceUpdateCooldown) {
+      debugPrint('🔍 _checkForceUpdate: SKIP - cooldown ยังไม่หมด '
+          '(เหลือ ${_forceUpdateCooldown.inMinutes - now.difference(_lastForceUpdateCheck!).inMinutes} นาที)');
+      return;
+    }
+    _lastForceUpdateCheck = now;
 
     try {
       final isUpdateRequired =
           await ForceUpdateService.instance.isUpdateRequired();
 
+      debugPrint('🔍 _checkForceUpdate: isUpdateRequired=$isUpdateRequired, mounted=$mounted');
+
       if (isUpdateRequired && mounted) {
-        // รอให้ frame build เสร็จก่อนแสดง dialog
+        debugPrint('🔍 _checkForceUpdate: ✅ จะแสดง ForceUpdateDialog');
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted && navigatorKey.currentContext != null) {
+            debugPrint('🔍 _checkForceUpdate: 🎉 แสดง ForceUpdateDialog!');
+            _isForceUpdateDialogShowing = true;
             ForceUpdateDialog.show(navigatorKey.currentContext!);
           }
         });
       }
     } catch (e) {
-      debugPrint('AuthWrapper: Error checking force update: $e');
+      debugPrint('🔍 _checkForceUpdate: ❌ ERROR: $e');
     }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _authSubscription.cancel();
     super.dispose();
   }
