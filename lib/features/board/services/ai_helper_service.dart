@@ -64,6 +64,7 @@ class AiHelperService {
       'https://amthgthvrxhlxpttioxu.supabase.co/functions/v1';
   static const _summarizeEndpoint = '/summarize-text';
   static const _quizEndpoint = '/generate-quiz';
+  static const _shiftSummaryEndpoint = '/generate-shift-summary';
 
   final http.Client _client;
 
@@ -141,6 +142,62 @@ class AiHelperService {
       return null;
     } catch (e) {
       debugPrint('Quiz API error: $e');
+      return null;
+    }
+  }
+
+  /// สรุปรายงานเวรสำหรับ resident โดย AI
+  /// Edge function จะ query ข้อมูลจากทุกตารางที่เกี่ยวข้องแล้วส่ง Gemini สรุป
+  /// Return ข้อความสรุปภาษาไทย หรือ null ถ้าล้มเหลว
+  Future<String?> generateShiftSummary({
+    required int residentId,
+    required String residentName,
+    required String date, // 'YYYY-MM-DD' ในเวลาไทย
+    required String shift, // 'เวรเช้า' หรือ 'เวรดึก'
+    required int nursinghomeId,
+    Map<String, dynamic>? currentFormData, // ข้อมูลจากฟอร์มปัจจุบัน (ยังไม่ save)
+  }) async {
+    try {
+      // สร้าง request body
+      final Map<String, dynamic> requestBody = {
+        'resident_id': residentId,
+        'resident_name': residentName,
+        'date': date,
+        'shift': shift,
+        'nursinghome_id': nursinghomeId,
+      };
+
+      // ส่งข้อมูลจากฟอร์มปัจจุบัน (vital signs, ratings ที่ user กรอกแล้วแต่ยังไม่ save)
+      // Edge Function จะรวมข้อมูลนี้ใน DATA section เพื่อให้ AI สรุปด้วย
+      if (currentFormData != null && currentFormData.isNotEmpty) {
+        requestBody['current_form_data'] = currentFormData;
+      }
+
+      // เรียก Edge Function — timeout 90 วินาที
+      // เพราะต้อง query หลายตาราง + รอ AI สรุป
+      final response = await _client
+          .post(
+            Uri.parse('$_supabaseBaseUrl$_shiftSummaryEndpoint'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(requestBody),
+          )
+          .timeout(const Duration(seconds: 90));
+
+      if (response.statusCode == 200) {
+        final jsonResponse = jsonDecode(response.body);
+        if (jsonResponse is Map<String, dynamic>) {
+          // ตรวจสอบว่ามี error หรือไม่
+          if (jsonResponse['error'] != null &&
+              jsonResponse['content']?.isEmpty == true) {
+            debugPrint('Shift summary API error: ${jsonResponse['error']}');
+            return null;
+          }
+          return jsonResponse['content'] as String?;
+        }
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Shift summary error: $e');
       return null;
     }
   }

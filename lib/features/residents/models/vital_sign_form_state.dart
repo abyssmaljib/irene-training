@@ -32,6 +32,7 @@ class VitalSignFormState {
 
   // UI state
   final bool isLoading;
+  final bool isLoadingAI; // true ขณะ AI กำลังสรุปเวร
   final String? errorMessage;
 
   VitalSignFormState({
@@ -56,6 +57,7 @@ class VitalSignFormState {
     this.reportD,
     this.reportN,
     this.isLoading = false,
+    this.isLoadingAI = false,
     this.errorMessage,
   });
 
@@ -81,6 +83,7 @@ class VitalSignFormState {
     String? reportD,
     String? reportN,
     bool? isLoading,
+    bool? isLoadingAI,
     String? errorMessage,
   }) {
     return VitalSignFormState(
@@ -105,6 +108,7 @@ class VitalSignFormState {
       reportD: reportD ?? this.reportD,
       reportN: reportN ?? this.reportN,
       isLoading: isLoading ?? this.isLoading,
+      isLoadingAI: isLoadingAI ?? this.isLoadingAI,
       errorMessage: errorMessage,
     );
   }

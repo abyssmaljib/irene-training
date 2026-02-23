@@ -227,25 +227,15 @@ class InvitationNotifier extends StateNotifier<InvitationState> {
       await _service.registerUser(state.email, password);
       debugPrint('Step 1: registerUser SUCCESS');
 
-      // 2. สร้าง/อัพเดต user_info พร้อม nursinghome_id และ role_id
-      // ถ้า step นี้ fail จะต้อง sign out เพื่อไม่ให้เข้า main app
+      // 2. Accept invitation ผ่าน RPC (SECURITY DEFINER)
+      // RPC จะ: สร้าง/update user_info + set nursinghome_id + ลบ invitation
+      // ใช้ RPC เพื่อ bypass RLS ที่ block user ใหม่
       try {
-        debugPrint('Step 2: Calling createUserInfoAndJoin...');
-        await _service.createUserInfoAndJoin(
-          state.email,
-          nursinghomeId,
-          // ส่ง roleId จาก invitation ถ้ามี
-          roleId: state.selectedInvitation?.roleId,
+        debugPrint('Step 2: Calling acceptInvitationAndRejoin...');
+        await _service.acceptInvitationAndRejoin(
+          state.selectedInvitation!.invitationId,
         );
-        debugPrint('Step 2: createUserInfoAndJoin SUCCESS');
-
-        // ลบ invitation หลังจาก accept สำเร็จ
-        // เพื่อป้องกันไม่ให้ถูกใช้ซ้ำ
-        if (state.selectedInvitation != null) {
-          debugPrint('Step 3: Calling deleteInvitation...');
-          await _service.deleteInvitation(state.selectedInvitation!.invitationId);
-          debugPrint('Step 3: deleteInvitation DONE');
-        }
+        debugPrint('Step 2: acceptInvitationAndRejoin SUCCESS');
 
         // สำเร็จ - AuthWrapper จะ navigate อัตโนมัติ
         debugPrint('=== InvitationNotifier.register() ALL STEPS COMPLETE ===');
@@ -255,8 +245,8 @@ class InvitationNotifier extends StateNotifier<InvitationState> {
         // แม้ว่า AuthWrapper จะ rebuild แต่ InvitationScreen อาจยังอยู่บน stack
         state = state.copyWith(isLoading: false);
       } catch (e) {
-        // createUserInfoAndJoin failed - ต้อง sign out เพื่อ "undo"
-        debugPrint('InvitationNotifier: createUserInfoAndJoin failed: $e');
+        // acceptInvitationAndRejoin failed - ต้อง sign out เพื่อ "undo"
+        debugPrint('InvitationNotifier: acceptInvitationAndRejoin failed: $e');
         debugPrint('InvitationNotifier: Signing out to prevent navigation');
 
         // Sign out เพื่อไม่ให้ AuthWrapper navigate ไป main app
@@ -286,9 +276,9 @@ class InvitationNotifier extends StateNotifier<InvitationState> {
 
   /// Login user ที่มีอยู่แล้ว และเข้าร่วม nursinghome
   ///
-  /// Flow:
+  /// Flow (สำหรับ returning user ที่เคยออกจาก nursinghome):
   /// 1. Login ใน Supabase Auth
-  /// 2. อัพเดต user_info พร้อม nursinghome_id
+  /// 2. Accept invitation ผ่าน RPC (bypass RLS + reset employment_type + ลบ invitation)
   /// 3. AuthWrapper จะ navigate ไป MainNavigationScreen อัตโนมัติ
   ///
   /// Note: ถ้า step 2 fail จะ sign out เพื่อไม่ให้ AuthWrapper navigate
@@ -299,8 +289,8 @@ class InvitationNotifier extends StateNotifier<InvitationState> {
       return;
     }
 
-    final nursinghomeId = state.selectedInvitation?.nursinghomeId;
-    if (nursinghomeId == null) {
+    final invitationId = state.selectedInvitation?.invitationId;
+    if (invitationId == null) {
       state = state.copyWith(errorMessage: 'กรุณาเลือกศูนย์ดูแลก่อน');
       return;
     }
@@ -312,22 +302,17 @@ class InvitationNotifier extends StateNotifier<InvitationState> {
       // Note: หลัง login สำเร็จ AuthWrapper จะเริ่ม navigate ไป MainScreen
       await _service.loginUser(state.email, password);
 
-      // 2. อัพเดต user_info พร้อม nursinghome_id
-      // ถ้า step นี้ fail จะต้อง sign out
+      // 2. Accept invitation ผ่าน RPC (SECURITY DEFINER)
+      // RPC จะ: update nursinghome_id + reset employment_type + ลบ invitation
+      // ใช้ RPC เพื่อ bypass RLS ที่ block resigned/no-nursinghome users
       try {
-        await _service.joinNursinghome(nursinghomeId);
-
-        // ลบ invitation หลังจาก accept สำเร็จ
-        // เพื่อป้องกันไม่ให้ถูกใช้ซ้ำ
-        if (state.selectedInvitation != null) {
-          await _service.deleteInvitation(state.selectedInvitation!.invitationId);
-        }
+        await _service.acceptInvitationAndRejoin(invitationId);
 
         // สำเร็จ - AuthWrapper จะ navigate อัตโนมัติ
         debugPrint('InvitationNotifier: Login and join successful');
       } catch (e) {
-        // joinNursinghome failed - ต้อง sign out
-        debugPrint('InvitationNotifier: joinNursinghome failed: $e');
+        // acceptInvitationAndRejoin failed - ต้อง sign out
+        debugPrint('InvitationNotifier: acceptInvitationAndRejoin failed: $e');
         debugPrint('InvitationNotifier: Signing out to prevent navigation');
 
         await Supabase.instance.client.auth.signOut();
@@ -351,6 +336,36 @@ class InvitationNotifier extends StateNotifier<InvitationState> {
         isLoading: false,
         errorMessage: _getGeneralErrorMessage(e),
       );
+    }
+  }
+
+  /// Accept invitation โดยตรง (สำหรับ user ที่ login อยู่แล้ว)
+  ///
+  /// ใช้เมื่อ user มี session อยู่แล้วแต่ไม่มี nursinghome_id
+  /// ไม่ต้อง login ซ้ำ — เรียก acceptInvitationAndRejoin RPC ได้เลย
+  ///
+  /// Returns: true ถ้าสำเร็จ, false ถ้า error
+  Future<bool> acceptInvitationDirectly(Invitation invitation) async {
+    state = state.copyWith(
+      selectedInvitation: invitation,
+      isLoading: true,
+      clearErrorMessage: true,
+    );
+
+    try {
+      // เรียก RPC accept_invitation_and_rejoin โดยตรง
+      // RPC จะ: update nursinghome_id + reset employment_type + ลบ invitation
+      await _service.acceptInvitationAndRejoin(invitation.invitationId);
+      debugPrint('InvitationNotifier: Direct accept successful');
+      state = state.copyWith(isLoading: false);
+      return true;
+    } catch (e) {
+      debugPrint('InvitationNotifier: Direct accept failed: $e');
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: _getGeneralErrorMessage(e),
+      );
+      return false;
     }
   }
 

@@ -20,6 +20,7 @@ import 'core/services/app_version_service.dart';
 import 'core/services/force_update_service.dart';
 import 'core/services/onesignal_service.dart';
 import 'core/widgets/force_update_dialog.dart';
+import 'features/auth/screens/invitation_screen.dart';
 import 'features/auth/screens/welcome_screen.dart';
 import 'features/navigation/screens/main_navigation_screen.dart';
 import 'features/profile_setup/screens/unified_profile_setup_screen.dart';
@@ -337,6 +338,10 @@ enum EmploymentStatus {
 class _EmploymentCheckWrapperState extends State<EmploymentCheckWrapper> {
   EmploymentStatus _status = EmploymentStatus.loading;
 
+  /// ป้องกัน auto-navigate ซ้ำ — navigate ไปหน้าค้นหาคำเชิญแค่ครั้งแรก
+  /// ถ้ากลับมาแล้วยัง noNursinghome จะแสดงหน้า error พร้อมปุ่มค้นหาแทน
+  bool _autoNavigatedToInvitation = false;
+
   @override
   void initState() {
     super.initState();
@@ -368,6 +373,57 @@ class _EmploymentCheckWrapperState extends State<EmploymentCheckWrapper> {
   Future<void> _logout() async {
     UserService().clearCache();
     await Supabase.instance.client.auth.signOut();
+  }
+
+  /// Sign out แล้วไปหน้า InvitationScreen ให้ user ค้นหาคำเชิญ
+  /// ดึง email ก่อน sign out เพื่อ pre-fill ใน InvitationScreen
+  Future<void> _navigateToInvitation() async {
+    // เก็บ email ไว้ก่อน sign out (จะหายไปหลัง sign out)
+    final email = Supabase.instance.client.auth.currentUser?.email ?? '';
+
+    // Sign out เพื่อให้ user ใช้ InvitationScreen ปกติ (ใส่ password + login)
+    await _logout();
+
+    // หลัง sign out → AuthWrapper จะ rebuild เป็น WelcomeScreen
+    // แต่เราสามารถ push InvitationScreen ผ่าน navigator key ได้
+    // ใช้ Future.delayed เพื่อรอให้ AuthWrapper rebuild เสร็จก่อน
+    if (mounted) {
+      // Navigate ไป InvitationScreen พร้อม email ที่ pre-fill ไว้
+      Future.delayed(const Duration(milliseconds: 300), () {
+        navigatorKey.currentState?.push(
+          MaterialPageRoute(
+            builder: (_) => InvitationScreen(initialEmail: email),
+          ),
+        );
+      });
+    }
+  }
+
+  /// ไปหน้า InvitationScreen โดยไม่ต้อง sign out (user มี session อยู่แล้ว)
+  /// ใช้สำหรับ user ที่ไม่มี nursinghome_id
+  /// หลัง accept invitation สำเร็จ → กลับมา re-check employment status
+  Future<void> _navigateToInvitationDirectly() async {
+    final email = Supabase.instance.client.auth.currentUser?.email ?? '';
+
+    if (!mounted) return;
+
+    // Push InvitationScreen แบบ alreadyAuthenticated
+    // ไม่ต้อง login ซ้ำ — กดเลือก NH แล้ว accept ได้เลย
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => InvitationScreen(
+          initialEmail: email,
+          alreadyAuthenticated: true,
+        ),
+      ),
+    );
+
+    // กลับมาจาก InvitationScreen → re-check employment status
+    if (mounted) {
+      setState(() => _status = EmploymentStatus.loading);
+      _checkEmploymentStatus();
+    }
   }
 
   @override
@@ -416,7 +472,7 @@ class _EmploymentCheckWrapperState extends State<EmploymentCheckWrapper> {
 
                   // Description
                   Text(
-                    'บัญชีของคุณถูกระงับการใช้งานเนื่องจากพ้นสภาพการเป็นพนักงาน\n\nหากมีข้อสงสัย กรุณาติดต่อหัวหน้างานหรือฝ่ายบุคคล',
+                    'บัญชีของคุณถูกระงับการใช้งานเนื่องจากพ้นสภาพการเป็นพนักงาน\n\nหากได้รับคำเชิญจากสถานดูแล กดปุ่มด้านล่างเพื่อเข้าร่วม',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                           color: AppColors.textSecondary,
@@ -425,13 +481,28 @@ class _EmploymentCheckWrapperState extends State<EmploymentCheckWrapper> {
                   ),
                   const SizedBox(height: 48),
 
-                  // Logout button
+                  // ปุ่มค้นหาคำเชิญ — sign out แล้วไปหน้า InvitationScreen
+                  // เพื่อให้ user ใส่ password ยืนยันตัวตนใหม่
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton(
-                      onPressed: _logout,
+                      onPressed: () => _navigateToInvitation(),
                       style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.error,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: const Text('ค้นหาคำเชิญ'),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Logout button
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: _logout,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.error,
+                        side: BorderSide(color: AppColors.error),
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
                       child: const Text('ออกจากระบบ'),
@@ -444,7 +515,21 @@ class _EmploymentCheckWrapperState extends State<EmploymentCheckWrapper> {
         );
 
       case EmploymentStatus.noNursinghome:
-        // หน้า error สำหรับ user ที่ไม่มี nursinghome_id
+        // ครั้งแรกที่เจอ noNursinghome → auto-navigate ไปหน้าค้นหาคำเชิญเลย
+        // ถ้ากลับมาแล้วยัง noNursinghome → แสดงหน้า error พร้อมปุ่มค้นหา
+        if (!_autoNavigatedToInvitation) {
+          _autoNavigatedToInvitation = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _navigateToInvitationDirectly();
+          });
+          // แสดง loading ขณะรอ navigate
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        // กลับมาจาก InvitationScreen แล้วยัง noNursinghome
+        // แสดงหน้า error พร้อมปุ่มค้นหาคำเชิญ
         return Scaffold(
           body: SafeArea(
             child: Padding(
@@ -469,7 +554,7 @@ class _EmploymentCheckWrapperState extends State<EmploymentCheckWrapper> {
 
                   // Title
                   Text(
-                    'ยังไม่ได้รับการกำหนดสถานที่',
+                    'ยังไม่ได้เข้าร่วมสถานดูแล',
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
@@ -478,7 +563,7 @@ class _EmploymentCheckWrapperState extends State<EmploymentCheckWrapper> {
 
                   // Description
                   Text(
-                    'บัญชีของคุณยังไม่ได้ถูกกำหนดให้อยู่ในสถานดูแลใดๆ\n\nกรุณาติดต่อหัวหน้างานหรือฝ่ายบุคคลเพื่อดำเนินการ',
+                    'บัญชีของคุณยังไม่ได้เข้าร่วมสถานดูแลใดๆ\n\nหากได้รับคำเชิญ กดปุ่มด้านล่างเพื่อค้นหาและเข้าร่วม',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                           color: AppColors.textSecondary,
@@ -487,18 +572,15 @@ class _EmploymentCheckWrapperState extends State<EmploymentCheckWrapper> {
                   ),
                   const SizedBox(height: 48),
 
-                  // Retry button
+                  // ปุ่มค้นหาคำเชิญ (primary action)
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton(
-                      onPressed: () {
-                        setState(() => _status = EmploymentStatus.loading);
-                        _checkEmploymentStatus();
-                      },
+                      onPressed: () => _navigateToInvitationDirectly(),
                       style: FilledButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
-                      child: const Text('ลองใหม่'),
+                      child: const Text('ค้นหาคำเชิญ'),
                     ),
                   ),
                   const SizedBox(height: 12),

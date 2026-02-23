@@ -12,6 +12,8 @@ import '../../checklist/models/system_role.dart';
 import '../models/medicine_summary.dart';
 import '../services/medicine_service.dart';
 import '../widgets/medicine_card.dart';
+import '../widgets/turn_off_medicine_sheet.dart';
+import '../widgets/turn_on_medicine_sheet.dart';
 import 'medicine_photos_screen.dart';
 import 'add_medicine_to_resident_screen.dart';
 import 'edit_medicine_screen.dart';
@@ -210,6 +212,32 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
     );
 
     // ถ้าเพิ่มยาสำเร็จ ให้ reload รายการยา
+    if (result == true) {
+      _loadMedicines();
+    }
+  }
+
+  /// แสดง bottom sheet สำหรับ on/off ยา
+  /// ถ้ายา active → เปิด TurnOffMedicineSheet (หยุดยา)
+  /// ถ้ายา off → เปิด TurnOnMedicineSheet (กลับมาใช้ยา)
+  Future<void> _showToggleSheet(MedicineSummary medicine) async {
+    bool? result;
+
+    if (medicine.isActive) {
+      // ยากำลังใช้อยู่ → เปิด sheet หยุดยา
+      result = await TurnOffMedicineSheet.show(
+        context,
+        medicine: medicine,
+      );
+    } else {
+      // ยาหยุดไปแล้ว → เปิด sheet กลับมาใช้ยา
+      result = await TurnOnMedicineSheet.show(
+        context,
+        medicine: medicine,
+      );
+    }
+
+    // ถ้าทำสำเร็จ → reload รายการยา
     if (result == true) {
       _loadMedicines();
     }
@@ -574,11 +602,15 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
 
             // Medicine cards
             // กดที่ card เพื่อแก้ไขยา (เฉพาะหัวหน้าเวรขึ้นไป)
+            // กดค้างที่ card เพื่อ on/off ยา (เฉพาะหัวหน้าเวรขึ้นไป)
             ...medicines.map((med) => Padding(
                   padding: EdgeInsets.only(bottom: AppSpacing.sm),
                   child: MedicineCard(
                     medicine: med,
                     onTap: () => _navigateToEditMedicine(med),
+                    onLongPress: (_systemRole?.canQC ?? false)
+                        ? () => _showToggleSheet(med)
+                        : null,
                   ),
                 )),
           ],

@@ -6,12 +6,15 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/buttons.dart';
 import '../../../core/widgets/irene_app_bar.dart';
-import '../../../core/widgets/network_image.dart';
 import '../../../core/widgets/success_popup.dart';
 import '../models/medicine_summary.dart';
 import '../providers/edit_medicine_form_provider.dart';
 import '../widgets/time_slot_chips.dart';
 import '../widgets/before_after_chips.dart';
+import '../widgets/medicine_info_card.dart';
+import '../widgets/turn_off_medicine_sheet.dart';
+import '../widgets/turn_on_medicine_sheet.dart';
+import 'edit_medicine_db_screen.dart';
 
 /// หน้าแก้ไขยาของ Resident
 ///
@@ -102,6 +105,47 @@ class _EditMedicineScreenState extends ConsumerState<EditMedicineScreen> {
     }
   }
 
+  /// เปิดหน้าแก้ไขยาในฐานข้อมูล (med_DB)
+  Future<void> _openEditMedicineDB() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditMedicineDBScreen(
+          medDbId: widget.medicine.medDbId!,
+        ),
+      ),
+    );
+
+    // ถ้าแก้ไขสำเร็จ → pop กลับไปหน้า list พร้อม refresh
+    if (result == true && mounted) {
+      Navigator.pop(context, true);
+    }
+  }
+
+  /// เปิด bottom sheet หยุดยา (On → Off)
+  Future<void> _showTurnOffSheet() async {
+    final result = await TurnOffMedicineSheet.show(
+      context,
+      medicine: widget.medicine,
+    );
+    // ถ้าหยุดยาสำเร็จ → กลับไปหน้า list พร้อม refresh
+    if (result == true && mounted) {
+      Navigator.pop(context, true);
+    }
+  }
+
+  /// เปิด bottom sheet กลับมาใช้ยา (Off → On)
+  Future<void> _showTurnOnSheet() async {
+    final result = await TurnOnMedicineSheet.show(
+      context,
+      medicine: widget.medicine,
+    );
+    // ถ้าเปิดใช้ยาสำเร็จ → กลับไปหน้า list พร้อม refresh
+    if (result == true && mounted) {
+      Navigator.pop(context, true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // ฟัง form state
@@ -153,8 +197,13 @@ class _EditMedicineScreenState extends ConsumerState<EditMedicineScreen> {
                 ),
                 const SizedBox(height: AppSpacing.md),
 
-                // แสดงข้อมูลยาที่กำลังแก้ไข (read-only)
-                _MedicineInfoCard(medicine: widget.medicine),
+                // แสดงข้อมูลยาที่กำลังแก้ไข (กดเพื่อไปแก้ไขข้อมูลใน DB ได้)
+                MedicineInfoCard(
+                  medicine: widget.medicine,
+                  onTapEdit: widget.medicine.medDbId != null
+                      ? () => _openEditMedicineDB()
+                      : null,
+                ),
 
                 const SizedBox(height: AppSpacing.lg),
 
@@ -352,7 +401,96 @@ class _EditMedicineScreenState extends ConsumerState<EditMedicineScreen> {
                 const SizedBox(height: AppSpacing.lg),
 
                 // ==========================================
-                // Error message & Submit button
+                // Section 5: เปลี่ยนสถานะยา (On/Off)
+                // ==========================================
+                _SectionHeader(
+                  icon: widget.medicine.isActive
+                      ? HugeIcons.strokeRoundedToggleOff
+                      : HugeIcons.strokeRoundedToggleOn,
+                  title: 'เปลี่ยนสถานะยา',
+                ),
+                const SizedBox(height: AppSpacing.md),
+
+                // Container แยกชัดเจน ป้องกันกดผิด
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    color: widget.medicine.isActive
+                        ? AppColors.error.withValues(alpha: 0.05)
+                        : AppColors.success.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: widget.medicine.isActive
+                          ? AppColors.error.withValues(alpha: 0.2)
+                          : AppColors.success.withValues(alpha: 0.2),
+                      width: 1,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // คำอธิบาย
+                      Text(
+                        widget.medicine.isActive
+                            ? 'หยุดใช้ยาตัวนี้ ระบบจะบันทึกเหตุผลและวันที่หยุด'
+                            : 'กลับมาใช้ยาตัวนี้อีกครั้ง ระบบจะสร้างรายการยาใหม่',
+                        style: AppTypography.bodySmall.copyWith(
+                          color: AppColors.secondaryText,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+
+                      // ปุ่ม On/Off
+                      if (widget.medicine.isActive)
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: state.isLoading ? null : _showTurnOffSheet,
+                            icon: HugeIcon(
+                              icon: HugeIcons.strokeRoundedToggleOff,
+                              color: AppColors.error,
+                              size: 20,
+                            ),
+                            label: Text('หยุดยาตัวนี้'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.error,
+                              side: BorderSide(color: AppColors.error),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        )
+                      else
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: state.isLoading ? null : _showTurnOnSheet,
+                            icon: HugeIcon(
+                              icon: HugeIcons.strokeRoundedToggleOn,
+                              color: AppColors.success,
+                              size: 20,
+                            ),
+                            label: Text('เริ่มใช้ยาอีกครั้ง'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.success,
+                              side: BorderSide(color: AppColors.success),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: AppSpacing.lg),
+
+                // ==========================================
+                // Error message & Submit button (ล่างสุด)
                 // ==========================================
                 if (state.errorMessage != null) ...[
                   Container(
@@ -506,114 +644,6 @@ class _LabeledField extends StatelessWidget {
         const SizedBox(height: AppSpacing.xs),
         child,
       ],
-    );
-  }
-}
-
-/// Card แสดงข้อมูลยาที่กำลังแก้ไข (read-only)
-class _MedicineInfoCard extends StatelessWidget {
-  const _MedicineInfoCard({required this.medicine});
-
-  final MedicineSummary medicine;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.alternate, width: 1),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // รูปยา
-          _buildMedicineImage(),
-          const SizedBox(width: AppSpacing.md),
-          // ข้อมูลยา
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Generic name
-                if (medicine.genericName != null && medicine.genericName!.isNotEmpty)
-                  Text(
-                    medicine.genericName!,
-                    style: AppTypography.heading3.copyWith(fontWeight: FontWeight.w600),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                // Brand name
-                if (medicine.brandName != null && medicine.brandName!.isNotEmpty)
-                  Text(
-                    medicine.brandName!,
-                    style: AppTypography.body.copyWith(color: AppColors.secondaryText),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                // Strength
-                if (medicine.str != null && medicine.str!.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    medicine.str!,
-                    style: AppTypography.bodySmall.copyWith(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-                // Route & Unit
-                if (medicine.route != null || medicine.unit != null) ...[
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    [medicine.route, medicine.unit].where((e) => e != null && e.isNotEmpty).join(' - '),
-                    style: AppTypography.bodySmall.copyWith(color: AppColors.secondaryText),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMedicineImage() {
-    final imageUrl = medicine.frontFoiled;
-
-    // รูปยา - ใช้ IreneNetworkImage ที่มี timeout และ retry
-    if (imageUrl != null && imageUrl.isNotEmpty) {
-      return IreneNetworkImage(
-        imageUrl: imageUrl,
-        width: 64,
-        height: 64,
-        fit: BoxFit.cover,
-        memCacheWidth: 200,
-        borderRadius: BorderRadius.circular(12),
-        compact: true,
-        errorPlaceholder: _buildPlaceholderImage(),
-      );
-    }
-
-    return _buildPlaceholderImage();
-  }
-
-  Widget _buildPlaceholderImage() {
-    return Container(
-      width: 64,
-      height: 64,
-      decoration: BoxDecoration(
-        color: AppColors.alternate,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Center(
-        child: HugeIcon(
-          icon: HugeIcons.strokeRoundedMedicine02,
-          color: AppColors.secondaryText,
-          size: 32,
-        ),
-      ),
     );
   }
 }

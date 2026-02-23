@@ -10,10 +10,15 @@ class MedicineCard extends StatelessWidget {
   final MedicineSummary medicine;
   final VoidCallback? onTap;
 
+  /// Callback เมื่อกดค้าง → เปิด On/Off bottom sheet
+  /// ส่งมาเฉพาะ user ที่มีสิทธิ์ (canQC)
+  final VoidCallback? onLongPress;
+
   const MedicineCard({
     super.key,
     required this.medicine,
     this.onTap,
+    this.onLongPress,
   });
 
   @override
@@ -28,6 +33,7 @@ class MedicineCard extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
+          onLongPress: onLongPress,
           borderRadius: AppRadius.smallRadius,
           child: Padding(
             padding: AppSpacing.cardPadding,
@@ -100,33 +106,51 @@ class MedicineCard extends StatelessWidget {
 
                 AppSpacing.verticalGapMd,
 
-                // Meal times badges
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
+                // Meal times badges + hint (ถ้าไม่มี daysOfWeek)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    // Before/After food badges
-                    if (medicine.isBeforeFood)
-                      _buildMealBadge('ก่อนอาหาร', AppColors.tagPendingBg, AppColors.tagPendingText),
-                    if (medicine.isAfterFood)
-                      _buildMealBadge('หลังอาหาร', AppColors.tagReadBg, AppColors.tagReadText),
+                    Expanded(
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          // Before/After food badges
+                          if (medicine.isBeforeFood)
+                            _buildMealBadge('ก่อนอาหาร', AppColors.tagPendingBg, AppColors.tagPendingText),
+                          if (medicine.isAfterFood)
+                            _buildMealBadge('หลังอาหาร', AppColors.tagReadBg, AppColors.tagReadText),
 
-                    // Time of day badges
-                    if (medicine.isMorning)
-                      _buildTimeBadge('เช้า'),
-                    if (medicine.isNoon)
-                      _buildTimeBadge('กลางวัน'),
-                    if (medicine.isEvening)
-                      _buildTimeBadge('เย็น'),
-                    if (medicine.isBedtime)
-                      _buildTimeBadge('ก่อนนอน'),
+                          // Time of day badges
+                          if (medicine.isMorning)
+                            _buildTimeBadge('เช้า'),
+                          if (medicine.isNoon)
+                            _buildTimeBadge('กลางวัน'),
+                          if (medicine.isEvening)
+                            _buildTimeBadge('เย็น'),
+                          if (medicine.isBedtime)
+                            _buildTimeBadge('ก่อนนอน'),
+                        ],
+                      ),
+                    ),
+                    // Hint อยู่บรรทัดเดียวกับ badges (เฉพาะเมื่อไม่มี daysOfWeek)
+                    if (onLongPress != null && medicine.daysOfWeek.isEmpty)
+                      _buildOnOffHint(),
                   ],
                 ),
 
-                // Days of week (if specific days)
+                // Days of week + hint (if specific days)
                 if (medicine.daysOfWeek.isNotEmpty) ...[
                   AppSpacing.verticalGapSm,
-                  _buildDaysOfWeek(),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Expanded(child: _buildDaysOfWeek()),
+                      // Hint อยู่บรรทัดเดียวกับ daysOfWeek
+                      if (onLongPress != null)
+                        _buildOnOffHint(),
+                    ],
+                  ),
                 ],
               ],
             ),
@@ -254,6 +278,31 @@ class MedicineCard extends StatelessWidget {
           color: AppColors.primary,
           fontWeight: FontWeight.w500,
         ),
+      ),
+    );
+  }
+
+  /// Hint เล็กๆ มุมขวาล่าง บอก user ว่ากดค้างเพื่อ on/off ได้
+  Widget _buildOnOffHint() {
+    return Padding(
+      padding: const EdgeInsets.only(left: 8),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          HugeIcon(
+            icon: HugeIcons.strokeRoundedTouch01,
+            size: 12,
+            color: AppColors.secondaryText.withValues(alpha: 0.5),
+          ),
+          SizedBox(width: 4),
+          Text(
+            'กดค้างเพื่อ on/off',
+            style: AppTypography.caption.copyWith(
+              fontSize: 10,
+              color: AppColors.secondaryText.withValues(alpha: 0.5),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -1317,3 +1317,146 @@ extension MedicineServiceMedicineList on MedicineService {
     }
   }
 }
+
+// ==========================================
+// Extension สำหรับ On/Off ยา (หยุดยา / กลับมาใช้ยา)
+// ==========================================
+
+extension MedicineServiceOnOff on MedicineService {
+  /// หยุดยา (On → Off)
+  ///
+  /// Logic ตาม app เดิม:
+  /// 1. INSERT med_history record ใหม่พร้อม off_date
+  /// 2. ไม่ต้อง update medicine_list — view คำนวณ status จาก med_history
+  ///
+  /// [medicineListId] - id ของ medicine_list ที่จะหยุด
+  /// [onDate] - วันที่เริ่มให้ยา (จาก firstMedHistoryOnDate)
+  /// [offDate] - วันที่หยุดยา (คำนวณจาก form: offDateIsYesterday convention)
+  /// [note] - เหตุผล/คำสั่งแพทย์
+  /// [newSetting] - สรุป setting ยาปัจจุบัน (audit trail)
+  /// [reconcile] - จำนวนยาคงเหลือ
+  /// [userId] - UUID ของ user ที่ทำรายการ
+  Future<bool> turnOffMedicine({
+    required int medicineListId,
+    required DateTime onDate,
+    required DateTime offDate,
+    String? note,
+    String? newSetting,
+    double? reconcile,
+    required String userId,
+  }) async {
+    try {
+      // INSERT med_history record ใหม่ที่มี off_date
+      // medicine_summary view จะคำนวณ status = 'off' จาก off_date ที่ผ่านมาแล้ว
+      final historyData = <String, dynamic>{
+        'med_list_id': medicineListId,
+        'on_date': _formatDate(onDate),
+        'off_date': _formatDate(offDate),
+        if (note != null && note.isNotEmpty) 'note': note,
+        if (newSetting != null && newSetting.isNotEmpty)
+          'new_setting': newSetting,
+        if (reconcile != null) 'reconcile': reconcile,
+        'user_id': userId,
+      };
+
+      await _supabase.from('med_history').insert(historyData);
+
+      // Invalidate cache เพราะ status ยาเปลี่ยน
+      invalidateCache();
+
+      return true;
+    } catch (e) {
+      debugPrint('[MedicineService] turnOffMedicine error: $e');
+      return false;
+    }
+  }
+
+  /// กลับมาใช้ยา (Off → On)
+  ///
+  /// Logic ตาม app เดิม:
+  /// 1. ดึง MedicineListItem เดิม
+  /// 2. INSERT medicine_list ใหม่ (duplicate ทุก field จากของเดิม)
+  /// 3. INSERT med_history record ใหม่บน medicine_list ใหม่
+  ///
+  /// การ duplicate medicine_list เป็นสิ่งจำเป็น เพราะ:
+  /// - medicine_list เดิมมี med_history ที่มี off_date → view คำนวณ status = 'off'
+  /// - medicine_list ใหม่จะมี med_history ที่ on_date = วันนี้, off_date = null → status = 'on'
+  ///
+  /// [medicineListId] - id ของ medicine_list เดิมที่จะกลับมาใช้
+  /// [startDate] - วันที่เริ่มใช้ยาอีกครั้ง
+  /// [offDate] - วันที่หยุดยา (null = ใช้ต่อเนื่อง)
+  /// [note] - เหตุผลที่กลับมาใช้
+  /// [newSetting] - สรุป setting ยา
+  /// [reconcile] - จำนวนยาคงเหลือ
+  /// [userId] - UUID ของ user ที่ทำรายการ
+  Future<bool> turnOnMedicine({
+    required int medicineListId,
+    required DateTime startDate,
+    DateTime? offDate,
+    String? note,
+    String? newSetting,
+    double? reconcile,
+    required String userId,
+  }) async {
+    try {
+      // 1. ดึงข้อมูล medicine_list เดิม
+      final originalItem = await getMedicineListItemById(medicineListId);
+      if (originalItem == null) {
+        debugPrint('[MedicineService] turnOnMedicine: ไม่พบ medicine_list id=$medicineListId');
+        return false;
+      }
+
+      // 2. INSERT medicine_list ใหม่ (duplicate ทุก field จากของเดิม)
+      // ใช้ข้อมูลจาก medicine_list เดิมทั้งหมด เพื่อให้ยาตัวใหม่มี setting เหมือนเดิม
+      final duplicateData = <String, dynamic>{
+        'med_DB_id': originalItem.medDbId,
+        'resident_id': originalItem.residentId,
+        'take_tab': originalItem.takeTab,
+        'BLDB': originalItem.bldb,
+        'BeforeAfter': originalItem.beforeAfter,
+        if (originalItem.everyHr != null) 'every_hr': originalItem.everyHr,
+        if (originalItem.typeOfTime != null)
+          'typeOfTime': originalItem.typeOfTime,
+        if (originalItem.daysOfWeek != null &&
+            originalItem.daysOfWeek!.isNotEmpty)
+          'DaysOfWeek': originalItem.daysOfWeek,
+        'prn': originalItem.prn,
+        if (originalItem.underlyingDiseaseTag != null &&
+            originalItem.underlyingDiseaseTag!.isNotEmpty)
+          'underlying_disease_tag': originalItem.underlyingDiseaseTag,
+        // MedString ชี้ไปที่ medicine_list เดิม (สำหรับ grouping)
+        'MedString': originalItem.id,
+      };
+
+      final newMedicineResponse = await _supabase
+          .from('medicine_List')
+          .insert(duplicateData)
+          .select()
+          .single();
+
+      final newMedicineListId = newMedicineResponse['id'] as int;
+
+      // 3. INSERT med_history record ใหม่บน medicine_list ใหม่
+      final historyData = <String, dynamic>{
+        'med_list_id': newMedicineListId,
+        'on_date': _formatDate(startDate),
+        if (offDate != null) 'off_date': _formatDate(offDate),
+        if (note != null && note.isNotEmpty) 'note': note,
+        if (newSetting != null && newSetting.isNotEmpty)
+          'new_setting': newSetting,
+        if (reconcile != null) 'reconcile': reconcile,
+        'user_id': userId,
+      };
+
+      await _supabase.from('med_history').insert(historyData);
+
+      // Invalidate cache เพราะมียาใหม่
+      invalidateCache();
+
+      return true;
+    } catch (e) {
+      debugPrint('[MedicineService] turnOnMedicine error: $e');
+      return false;
+    }
+  }
+}

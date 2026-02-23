@@ -25,9 +25,15 @@ class InvitationScreen extends ConsumerStatefulWidget {
   /// Email ที่ส่งมาจากหน้า login (ถ้ามี)
   final String? initialEmail;
 
+  /// true = user login อยู่แล้ว (ไม่ต้องใส่ password ซ้ำ)
+  /// ใช้สำหรับ user ที่ไม่มี nursinghome_id แต่มี session อยู่
+  /// เมื่อเลือก invitation จะ accept โดยตรงผ่าน RPC
+  final bool alreadyAuthenticated;
+
   const InvitationScreen({
     super.key,
     this.initialEmail,
+    this.alreadyAuthenticated = false,
   });
 
   @override
@@ -54,17 +60,30 @@ class _InvitationScreenState extends ConsumerState<InvitationScreen> {
     // ใช้ email จากหน้า login ถ้ามี
     _emailController = TextEditingController(text: widget.initialEmail ?? '');
 
-    // Listen for auth state changes
-    // เมื่อ register/login สำเร็จ Supabase จะ emit signedIn event
-    // ให้ pop หน้านี้ออกเพื่อให้ AuthWrapper แสดงหน้าถัดไป
-    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
-      debugPrint('InvitationScreen: Auth state changed: ${data.event}');
-      if (data.event == AuthChangeEvent.signedIn && mounted) {
-        debugPrint('InvitationScreen: Signed in! Popping screen...');
-        // Pop หน้านี้ออก ให้ AuthWrapper แสดง ProfileSetupScreen หรือ MainScreen
-        Navigator.of(context).popUntil((route) => route.isFirst);
+    if (widget.alreadyAuthenticated) {
+      // User login อยู่แล้ว → ไม่ต้อง listen auth state changes
+      // เพราะจะ accept invitation โดยตรงผ่าน RPC แล้ว pop เอง
+
+      // Auto-search ถ้ามี email
+      if (widget.initialEmail != null && widget.initialEmail!.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _searchInvitations();
+        });
       }
-    });
+    } else {
+      // Flow ปกติ: Listen for auth state changes
+      // เมื่อ register/login สำเร็จ Supabase จะ emit signedIn event
+      // ให้ pop หน้านี้ออกเพื่อให้ AuthWrapper แสดงหน้าถัดไป
+      _authSubscription =
+          Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+        debugPrint('InvitationScreen: Auth state changed: ${data.event}');
+        if (data.event == AuthChangeEvent.signedIn && mounted) {
+          debugPrint('InvitationScreen: Signed in! Popping screen...');
+          // Pop หน้านี้ออก ให้ AuthWrapper แสดง ProfileSetupScreen หรือ MainScreen
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        }
+      });
+    }
   }
 
   @override
@@ -281,6 +300,29 @@ class _InvitationScreenState extends ConsumerState<InvitationScreen> {
     );
   }
 
+  /// Accept invitation โดยตรง (ไม่ต้อง login ซ้ำ)
+  /// ใช้เมื่อ user มี session อยู่แล้ว (alreadyAuthenticated = true)
+  Future<void> _acceptDirectly(Invitation invitation) async {
+    final success = await ref
+        .read(invitationProvider.notifier)
+        .acceptInvitationDirectly(invitation);
+
+    if (!mounted) return;
+
+    if (success) {
+      // สำเร็จ → pop กลับไปให้ EmploymentCheckWrapper re-check
+      Navigator.of(context).pop();
+    } else {
+      // แสดง error ใน snackbar
+      final errorMessage = ref.read(invitationProvider).errorMessage;
+      if (errorMessage != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(errorMessage)),
+        );
+      }
+    }
+  }
+
   void _searchInvitations() {
     // Clear error ก่อน search
     ref.read(invitationProvider.notifier).clearError();
@@ -357,9 +399,15 @@ class _InvitationScreenState extends ConsumerState<InvitationScreen> {
           onTap: isLoading
               ? null
               : () {
-                  ref
-                      .read(invitationProvider.notifier)
-                      .selectInvitation(invitation);
+                  if (widget.alreadyAuthenticated) {
+                    // User login อยู่แล้ว → accept invitation โดยตรง
+                    _acceptDirectly(invitation);
+                  } else {
+                    // Flow ปกติ → ไปหน้า login/register
+                    ref
+                        .read(invitationProvider.notifier)
+                        .selectInvitation(invitation);
+                  }
                 },
           borderRadius: AppRadius.mediumRadius,
           child: Container(
@@ -463,7 +511,8 @@ class _InvitationScreenState extends ConsumerState<InvitationScreen> {
                             ),
                           )
                         : Text(
-                            'เลือก',
+                            // เปลี่ยนข้อความตาม auth state
+                            widget.alreadyAuthenticated ? 'เข้าร่วม' : 'เลือก',
                             style: AppTypography.bodySmall.copyWith(
                               color: AppColors.surface,
                               fontWeight: FontWeight.w600,

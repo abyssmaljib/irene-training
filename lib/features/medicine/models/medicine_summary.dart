@@ -22,6 +22,13 @@ class MedicineSummary {
   final String? unit;
   final bool? prn; // ยาตามอาการ
 
+  // ข้อมูลเพิ่มเติมจาก view (ใช้สำหรับ on/off toggle + reconcile)
+  final int? medDbId; // FK ไปยัง med_DB (จำเป็นสำหรับ duplicate medicine_list ตอน off→on)
+  final int? lastMedHistoryId; // id ของ med_history ล่าสุด
+  final double? lastMedHistoryReconcile; // จำนวนยาคงเหลือล่าสุด (pre-fill ในฟอร์ม on)
+  final String? lastMedHistoryNote; // หมายเหตุของ med_history ล่าสุด
+  final String? lastMedHistoryNewSetting; // setting string ของ med_history ล่าสุด
+
   // ATC Classification
   final String? atcLevel1Code;
   final String? atcLevel1NameTh;
@@ -59,6 +66,11 @@ class MedicineSummary {
     this.atcLevel1NameTh,
     this.atcLevel2Code,
     this.atcLevel2NameTh,
+    this.medDbId,
+    this.lastMedHistoryId,
+    this.lastMedHistoryReconcile,
+    this.lastMedHistoryNote,
+    this.lastMedHistoryNewSetting,
     this.frontFoiled,
     this.backFoiled,
     this.frontNude,
@@ -87,6 +99,11 @@ class MedicineSummary {
       route: json['route'],
       unit: json['unit'],
       prn: json['prn'] as bool?,
+      medDbId: json['med_DB_id'] as int?,
+      lastMedHistoryId: json['last_med_history_id'] as int?,
+      lastMedHistoryReconcile: _parseDouble(json['last_med_history_reconcile']),
+      lastMedHistoryNote: json['last_med_history_note'] as String?,
+      lastMedHistoryNewSetting: json['last_med_history_new_setting'] as String?,
       atcLevel1Code: json['atc_level1_code'],
       atcLevel1NameTh: json['atc_level1_name_th'],
       atcLevel2Code: json['atc_level2_code'],
@@ -134,6 +151,9 @@ class MedicineSummary {
 
   /// ตรวจสอบว่ายานี้ active อยู่หรือไม่
   bool get isActive => status?.toLowerCase() == 'on';
+
+  /// ตรวจสอบว่ายานี้ถูกหยุดใช้แล้วหรือไม่
+  bool get isOff => status?.toLowerCase() == 'off';
 
   /// แสดงชื่อยาสำหรับ display
   String get displayName => genericName ?? brandName ?? 'ไม่ระบุชื่อ';

@@ -9,7 +9,12 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/irene_app_bar.dart';
 import '../models/post.dart';
 import '../providers/post_provider.dart';
+import '../widgets/create_ticket_bottom_sheet.dart';
+import '../widgets/full_screen_image_viewer.dart';
+import '../widgets/ticket_detail_bottom_sheet.dart';
 import '../widgets/video_player_widget.dart';
+import '../../checklist/providers/task_provider.dart' show currentUserSystemRoleProvider;
+import 'board_screen.dart' show postTicketProvider;
 
 /// หน้าแสดง posts ที่ต้องอ่านก่อนลงเวร
 /// แสดงทีละ post และเลื่อนไปต่อเมื่อกด "รับทราบ"
@@ -67,12 +72,81 @@ class _RequiredPostsScreenState extends ConsumerState<RequiredPostsScreen> {
   Widget build(BuildContext context) {
     final postAsync = ref.watch(postDetailProvider(_currentPostId));
     final currentUserId = ref.watch(postCurrentUserIdProvider);
+    final systemRoleAsync = ref.watch(currentUserSystemRoleProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: IreneSecondaryAppBar(
         title: 'โพสที่ต้องอ่าน',
         onBack: () => Navigator.pop(context, false),
+        actions: [
+          // ปุ่มตั๋ว - แสดงเฉพาะหัวหน้าเวรขึ้นไป (level >= 30)
+          postAsync.maybeWhen(
+            data: (post) {
+              if (post == null) return const SizedBox.shrink();
+
+              final userRoleLevel = systemRoleAsync.valueOrNull?.level;
+              if (userRoleLevel == null || userRoleLevel < 30) {
+                return const SizedBox.shrink();
+              }
+
+              // ดึงสถานะตั๋วของโพสนี้
+              final ticketAsync =
+                  ref.watch(postTicketProvider(_currentPostId));
+              final existingTicket = ticketAsync.valueOrNull;
+
+              // กำหนดสีตามว่ามีตั๋วหรือยัง
+              final Color iconColor;
+              if (existingTicket != null) {
+                switch (existingTicket.status) {
+                  case 'open':
+                    iconColor = AppColors.tagPendingText;
+                  case 'in_progress':
+                    iconColor = AppColors.secondary;
+                  case 'completed':
+                  case 'closed':
+                    iconColor = AppColors.tagPassedText;
+                  case 'cancelled':
+                    iconColor = AppColors.tagNeutralText;
+                  default:
+                    iconColor = AppColors.primary;
+                }
+              } else {
+                iconColor = AppColors.primary;
+              }
+
+              return IconButton(
+                icon: HugeIcon(
+                  icon: HugeIcons.strokeRoundedTicket02,
+                  color: iconColor,
+                ),
+                onPressed: () {
+                  if (existingTicket != null) {
+                    // มีตั๋วแล้ว → เปิดดูรายละเอียด
+                    showTicketDetailBottomSheet(
+                      context,
+                      ticket: existingTicket,
+                    );
+                  } else {
+                    // ยังไม่มี → สร้างตั๋วใหม่
+                    showCreateTicketBottomSheet(
+                      context,
+                      post: post,
+                      onTicketCreated: () {
+                        ref.invalidate(
+                            postTicketProvider(_currentPostId));
+                      },
+                    );
+                  }
+                },
+                tooltip: existingTicket != null
+                    ? 'ดูตั๋ว #${existingTicket.id}'
+                    : 'สร้างตั๋ว',
+              );
+            },
+            orElse: () => const SizedBox.shrink(),
+          ),
+        ],
       ),
       body: postAsync.when(
         data: (post) {
@@ -371,6 +445,7 @@ class _RequiredPostsScreenState extends ConsumerState<RequiredPostsScreen> {
   }
 
   Widget _buildImageGallery(List<String> urls) {
+    // กรอง URL ที่ valid เท่านั้น
     final validUrls = urls
         .map((url) => url.trim())
         .where((url) =>
@@ -389,24 +464,32 @@ class _RequiredPostsScreenState extends ConsumerState<RequiredPostsScreen> {
         itemBuilder: (context, index) {
           return Padding(
             padding: EdgeInsets.only(right: 8),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: CachedNetworkImage(
-                imageUrl: validUrls[index],
-                height: 200,
-                fit: BoxFit.cover,
-                placeholder: (context, url) => Container(
+            // กดเพื่อขยายรูปเต็มจอ พร้อม zoom และ swipe ดูรูปอื่น
+            child: GestureDetector(
+              onTap: () => showFullScreenImage(
+                context,
+                urls: validUrls,
+                initialIndex: index,
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: CachedNetworkImage(
+                  imageUrl: validUrls[index],
                   height: 200,
-                  width: 200,
-                  color: AppColors.background,
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-                errorWidget: (context, url, error) => Container(
-                  height: 200,
-                  width: 200,
-                  color: AppColors.background,
-                  child: Center(
-                    child: HugeIcon(icon: HugeIcons.strokeRoundedImage01, color: AppColors.secondaryText),
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => Container(
+                    height: 200,
+                    width: 200,
+                    color: AppColors.background,
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                  errorWidget: (context, url, error) => Container(
+                    height: 200,
+                    width: 200,
+                    color: AppColors.background,
+                    child: Center(
+                      child: HugeIcon(icon: HugeIcons.strokeRoundedImage01, color: AppColors.secondaryText),
+                    ),
                   ),
                 ),
               ),

@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/services/user_service.dart';
+import '../../board/services/ai_helper_service.dart';
+import '../models/vital_sign.dart';
 import '../models/vital_sign_form_state.dart';
 import '../services/vital_sign_service.dart';
 
@@ -45,22 +47,23 @@ class VitalSignFormNotifier
   /// Initialize form with default values and loaded data
   Future<void> _initialize() async {
     try {
-      // 1. Load last vital sign for constipation calculation
-      final lastVital = await _service.getLastVitalSign(residentId);
-      _lastConstipation = lastVital?.constipation;
-
-      // 2. Get report amount for constipation increment
-      _reportAmount = await _service.getResidentReportAmount(residentId);
-
-      // 3. Load templates
-      final templates = await _service.getReportTemplates(residentId);
-
-      // 4. Detect current shift
+      // Detect shift ก่อน (ใช้แค่เวลา ไม่ต้อง query)
       final now = DateTime.now();
       final shift = _detectShift(now);
 
-      // 5. Load report subjects for shift
-      final subjectRows = await _service.getReportSubjects(residentId, shift);
+      // ยิง 4 queries พร้อมกัน — ไม่มีตัวไหนพึ่งกัน
+      final results = await Future.wait([
+        _service.getLastVitalSign(residentId),       // [0] last vital
+        _service.getResidentReportAmount(residentId), // [1] report amount
+        _service.getReportTemplates(residentId),      // [2] templates
+        _service.getReportSubjects(residentId, shift), // [3] subjects + choices
+      ]);
+
+      final lastVital = results[0] as VitalSign?;
+      _lastConstipation = lastVital?.constipation;
+      _reportAmount = results[1] as int;
+      final templates = results[2] as Map<String, String>?;
+      final subjectRows = results[3] as List<Map<String, dynamic>>;
       final ratings = <int, RatingData>{};
       for (final row in subjectRows) {
         final relationId = row['id'] as int;
@@ -297,6 +300,137 @@ class VitalSignFormNotifier
   }
 
   // ==========================================
+  // AI Shift Summary
+  // ==========================================
+
+  /// สร้างสรุปเวรโดย AI แล้ว auto-fill ลงช่อง reportD/reportN
+  /// เรียก Edge Function ที่ query ข้อมูลทุกตารางแล้วส่ง Gemini สรุป
+  /// รวมข้อมูลจากฟอร์มปัจจุบัน (vital signs, ratings) ที่ยังไม่ได้ save ด้วย
+  Future<void> generateAIShiftSummary({
+    required String residentName,
+    required int nursinghomeId,
+  }) async {
+    final currentData = state.value;
+    if (currentData == null) return;
+
+    // เปิด loading state
+    state = AsyncValue.data(currentData.copyWith(isLoadingAI: true));
+
+    final aiService = AiHelperService();
+    try {
+      // แปลง DateTime เป็น 'YYYY-MM-DD'
+      final date = currentData.selectedDateTime;
+      final dateStr =
+          '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+
+      // รวบรวมข้อมูลที่ user กรอกในฟอร์ม (ยังไม่ save) เพื่อส่งให้ AI รวมในสรุป
+      final formData = _buildCurrentFormData(currentData);
+
+      final result = await aiService.generateShiftSummary(
+        residentId: residentId,
+        residentName: residentName,
+        date: dateStr,
+        shift: currentData.shift,
+        nursinghomeId: nursinghomeId,
+        currentFormData: formData,
+      );
+
+      // อ่าน state ล่าสุดอีกครั้ง (อาจเปลี่ยนระหว่างรอ)
+      final latestData = state.value;
+      if (latestData == null) return;
+
+      if (result != null && result.isNotEmpty) {
+        // Auto-fill ลงช่อง report ตามเวร
+        if (latestData.shift == 'เวรเช้า') {
+          state = AsyncValue.data(latestData.copyWith(
+            reportD: result,
+            isLoadingAI: false,
+          ));
+        } else {
+          state = AsyncValue.data(latestData.copyWith(
+            reportN: result,
+            isLoadingAI: false,
+          ));
+        }
+      } else {
+        state = AsyncValue.data(latestData.copyWith(isLoadingAI: false));
+      }
+    } catch (e) {
+      final latestData = state.value;
+      if (latestData != null) {
+        state = AsyncValue.data(latestData.copyWith(isLoadingAI: false));
+      }
+    } finally {
+      aiService.dispose();
+    }
+  }
+
+  /// รวบรวมข้อมูลจากฟอร์มปัจจุบัน (ยังไม่ save) เพื่อส่งให้ Edge Function
+  /// รวมเข้ากับข้อมูลจาก DB แล้วให้ AI สรุปรวมกัน
+  Map<String, dynamic> _buildCurrentFormData(VitalSignFormState data) {
+    final Map<String, dynamic> formData = {};
+
+    // --- Vital Signs ที่ user กรอกในฟอร์ม ---
+    final Map<String, dynamic> vitalSigns = {};
+    if (data.sBP != null && data.sBP!.isNotEmpty) vitalSigns['sBP'] = data.sBP;
+    if (data.dBP != null && data.dBP!.isNotEmpty) vitalSigns['dBP'] = data.dBP;
+    if (data.pr != null && data.pr!.isNotEmpty) vitalSigns['PR'] = data.pr;
+    if (data.rr != null && data.rr!.isNotEmpty) vitalSigns['RR'] = data.rr;
+    if (data.temp != null && data.temp!.isNotEmpty) {
+      vitalSigns['Temp'] = data.temp;
+    }
+    if (data.o2 != null && data.o2!.isNotEmpty) vitalSigns['O2'] = data.o2;
+    if (data.dtx != null && data.dtx!.isNotEmpty) vitalSigns['DTX'] = data.dtx;
+    if (data.insulin != null && data.insulin!.isNotEmpty) {
+      vitalSigns['Insulin'] = data.insulin;
+    }
+    if (data.input != null && data.input!.isNotEmpty) {
+      vitalSigns['Input'] = data.input;
+    }
+    if (data.output != null && data.output!.isNotEmpty) {
+      vitalSigns['Output'] = data.output;
+    }
+    if (data.napkin != null && data.napkin!.isNotEmpty) {
+      vitalSigns['napkin'] = data.napkin;
+    }
+    if (data.defecation != null) {
+      vitalSigns['defecation'] = data.defecation! ? 'ถ่ายแล้ว' : 'ยังไม่ถ่าย';
+    }
+    if (data.constipation != null && data.constipation!.isNotEmpty) {
+      vitalSigns['constipation'] = data.constipation;
+    }
+    if (vitalSigns.isNotEmpty) formData['vital_signs'] = vitalSigns;
+
+    // --- Ratings (Scale ประเมินสุขภาพ) ---
+    // ส่งเฉพาะที่ user กรอกแล้ว (rating != null)
+    final List<Map<String, dynamic>> ratingsList = [];
+    for (final entry in data.ratings.entries) {
+      final r = entry.value;
+      if (r.rating != null && r.rating! > 0) {
+        ratingsList.add({
+          'subject': r.subjectName,
+          'rating': r.rating,
+          // ข้อความ choice เช่น "ดี", "ปานกลาง" ถ้ามี
+          if (r.selectedChoiceText != null) 'choice': r.selectedChoiceText,
+          if (r.description != null && r.description!.isNotEmpty)
+            'note': r.description,
+        });
+      }
+    }
+    if (ratingsList.isNotEmpty) formData['ratings'] = ratingsList;
+
+    // --- บันทึกที่ NA เขียนไว้แล้วในช่องรายงาน ---
+    // ส่งเนื้อหาที่ NA พิมพ์ไว้ (เช่น "วันนี้อารมณ์ดี ยิ้มแย้ม...") ให้ AI เอาไปรวมในสรุป
+    // ใช้ key 'report_template' เพื่อ backward compat กับ Edge Function
+    final report = data.shift == 'เวรเช้า' ? data.reportD : data.reportN;
+    if (report != null && report.trim().isNotEmpty) {
+      formData['report_template'] = report;
+    }
+
+    return formData;
+  }
+
+  // ==========================================
   // Validation
   // ==========================================
 
@@ -445,7 +579,7 @@ class EditVitalSignFormNotifier
   /// Initialize form with existing vital sign data
   Future<void> _initialize() async {
     try {
-      // 1. Load existing vital sign with ratings
+      // Step 1: ต้องดึง vital sign ก่อน เพราะต้องรู้ shift ก่อนถึงจะ query subjects ได้
       final data = await _service.getVitalSignWithRatings(vitalSignId);
       if (data == null) {
         state = AsyncValue.error('ไม่พบข้อมูล Vital Sign', StackTrace.current);
@@ -454,20 +588,20 @@ class EditVitalSignFormNotifier
 
       final vitalSign = data['vitalSign'] as Map<String, dynamic>;
       final existingRatings = data['ratings'] as List<dynamic>;
-
-      // 2. Load last vital sign for constipation calculation
-      final lastVital = await _service.getLastVitalSign(residentId);
-      _lastConstipation = lastVital?.constipation;
-
-      // 3. Get report amount for constipation increment
-      _reportAmount = await _service.getResidentReportAmount(residentId);
-
-      // 4. Get shift from existing data
       final shift = vitalSign['shift'] as String? ?? 'เวรเช้า';
       final isFullReport = vitalSign['isFullReport'] as bool? ?? true;
 
-      // 5. Load report subjects for shift (for rating options)
-      final subjectRows = await _service.getReportSubjects(residentId, shift);
+      // Step 2: ยิง 3 queries พร้อมกัน (ไม่พึ่งกัน แต่ต้องรู้ shift จาก step 1)
+      final results = await Future.wait([
+        _service.getLastVitalSign(residentId),        // [0] last vital
+        _service.getResidentReportAmount(residentId),  // [1] report amount
+        _service.getReportSubjects(residentId, shift), // [2] subjects + choices
+      ]);
+
+      final lastVital = results[0] as VitalSign?;
+      _lastConstipation = lastVital?.constipation;
+      _reportAmount = results[1] as int;
+      final subjectRows = results[2] as List<Map<String, dynamic>>;
       final ratings = <int, RatingData>{};
 
       for (final row in subjectRows) {

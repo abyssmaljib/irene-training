@@ -43,12 +43,13 @@ class VitalSignService {
   }
 
   /// Get report subjects by shift with choices
+  /// ดึง relations + choices ทั้งหมดใน 2 queries (แทน N+1)
   Future<List<Map<String, dynamic>>> getReportSubjects(
     int residentId,
     String shift,
   ) async {
     try {
-      // First get the report relations
+      // Query 1: ดึง relations ทั้งหมดของ resident + shift
       final relations = await _supabase
           .from('vw_resident_report_relation')
           .select()
@@ -56,28 +57,37 @@ class VitalSignService {
           .eq('shift', shift)
           .order('subject_id', ascending: true);
 
-      // Then for each relation, fetch the choices for that subject
-      final enrichedRelations = <Map<String, dynamic>>[];
-      for (final relation in relations) {
-        final subjectId = relation['subject_id'] as int;
+      if (relations.isEmpty) return [];
 
-        // Get choices ordered by Scale (1-5)
-        final choices = await _supabase
-            .from('Report_Choice')
-            .select('Choice, Scale')
-            .eq('Subject', subjectId)
-            .order('Scale', ascending: true);
+      // รวม subject_id ทั้งหมดที่ต้องดึง choices
+      final subjectIds = relations
+          .map((r) => r['subject_id'] as int)
+          .toSet()
+          .toList();
 
-        // Extract choice texts ordered by scale
-        final choiceTexts = choices.map((c) => c['Choice'] as String).toList();
+      // Query 2: ดึง choices ทั้งหมดในครั้งเดียว (แทนที่จะวน loop ทีละ subject)
+      final allChoices = await _supabase
+          .from('Report_Choice')
+          .select('Choice, Scale, Subject')
+          .inFilter('Subject', subjectIds)
+          .order('Scale', ascending: true);
 
-        enrichedRelations.add({
-          ...relation,
-          'choices': choiceTexts,
-        });
+      // สร้าง map: subjectId -> [choice texts sorted by scale]
+      final choicesMap = <int, List<String>>{};
+      for (final c in allChoices) {
+        final subjectId = c['Subject'] as int;
+        choicesMap.putIfAbsent(subjectId, () => []);
+        choicesMap[subjectId]!.add(c['Choice'] as String);
       }
 
-      return enrichedRelations;
+      // รวม relations + choices เข้าด้วยกัน
+      return relations.map((relation) {
+        final subjectId = relation['subject_id'] as int;
+        return {
+          ...relation,
+          'choices': choicesMap[subjectId] ?? [],
+        };
+      }).toList();
     } catch (_) {
       return [];
     }

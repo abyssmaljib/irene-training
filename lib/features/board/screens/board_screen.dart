@@ -20,7 +20,11 @@ import '../widgets/post_search_bar.dart';
 import '../widgets/post_filter_drawer.dart';
 import '../widgets/create_post_bottom_sheet.dart';
 import '../widgets/edit_post_bottom_sheet.dart' show showEditPostBottomSheet, navigateToAdvancedEditPostScreen;
+import '../widgets/create_ticket_bottom_sheet.dart';
+import '../widgets/full_screen_image_viewer.dart';
+import '../widgets/ticket_detail_bottom_sheet.dart';
 import '../widgets/video_player_widget.dart';
+import '../services/ticket_service.dart';
 import '../../checklist/providers/task_provider.dart' show currentUserSystemRoleProvider;
 import 'advanced_create_post_screen.dart';
 import 'required_posts_screen.dart';
@@ -741,6 +745,13 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
   }
 }
 
+/// Provider ดึงตั๋วที่สร้างจากโพสนี้ (ถ้ามี)
+/// ใช้ .family เพื่อ cache ต่อ postId
+final postTicketProvider =
+    FutureProvider.family<TicketSummary?, int>((ref, postId) async {
+  return TicketService.instance.getTicketForPost(postId);
+});
+
 /// หน้ารายละเอียดโพส
 class PostDetailScreen extends ConsumerStatefulWidget {
   final int postId;
@@ -790,6 +801,78 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
       appBar: IreneSecondaryAppBar(
         title: 'รายละเอียดโพส',
         actions: [
+          // ปุ่มตั๋ว - แสดงเฉพาะหัวหน้าเวรขึ้นไป (level >= 30)
+          // ถ้ามีตั๋วแล้ว = เปลี่ยนสีเป็นสีตามสถานะ + กดเพื่อดูรายละเอียด
+          // ถ้ายังไม่มี = สี primary + กดเพื่อสร้างตั๋วใหม่
+          postAsync.maybeWhen(
+            data: (post) {
+              if (post == null) return const SizedBox.shrink();
+
+              final userRoleLevel = systemRoleAsync.valueOrNull?.level;
+              // ซ่อนปุ่มถ้า role level < 30
+              if (userRoleLevel == null || userRoleLevel < 30) {
+                return const SizedBox.shrink();
+              }
+
+              // ดึงสถานะตั๋วของโพสนี้
+              final ticketAsync =
+                  ref.watch(postTicketProvider(widget.postId));
+              final existingTicket = ticketAsync.valueOrNull;
+
+              // กำหนดสีตามว่ามีตั๋วหรือยัง
+              final Color iconColor;
+              if (existingTicket != null) {
+                // มีตั๋วแล้ว → สีตามสถานะ
+                switch (existingTicket.status) {
+                  case 'open':
+                    iconColor = AppColors.tagPendingText;
+                  case 'in_progress':
+                    iconColor = AppColors.secondary;
+                  case 'completed':
+                  case 'closed':
+                    iconColor = AppColors.tagPassedText;
+                  case 'cancelled':
+                    iconColor = AppColors.tagNeutralText;
+                  default:
+                    iconColor = AppColors.primary;
+                }
+              } else {
+                // ยังไม่มีตั๋ว → สี primary
+                iconColor = AppColors.primary;
+              }
+
+              return IconButton(
+                icon: HugeIcon(
+                  icon: HugeIcons.strokeRoundedTicket02,
+                  color: iconColor,
+                ),
+                onPressed: () {
+                  if (existingTicket != null) {
+                    // มีตั๋วแล้ว → เปิดดูรายละเอียด
+                    showTicketDetailBottomSheet(
+                      context,
+                      ticket: existingTicket,
+                    );
+                  } else {
+                    // ยังไม่มี → สร้างตั๋วใหม่
+                    showCreateTicketBottomSheet(
+                      context,
+                      post: post,
+                      onTicketCreated: () {
+                        // Invalidate provider เพื่อ refresh สถานะปุ่ม
+                        ref.invalidate(
+                            postTicketProvider(widget.postId));
+                      },
+                    );
+                  }
+                },
+                tooltip: existingTicket != null
+                    ? 'ดูตั๋ว #${existingTicket.id}'
+                    : 'สร้างตั๋ว',
+              );
+            },
+            orElse: () => const SizedBox.shrink(),
+          ),
           // Edit button - show only if user can edit
           postAsync.maybeWhen(
             data: (post) {
@@ -1127,7 +1210,7 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
           return Padding(
             padding: EdgeInsets.only(right: 8),
             child: GestureDetector(
-              onTap: () => _showFullScreenImage(context, validUrls, index),
+              onTap: () => showFullScreenImage(context, urls: validUrls, initialIndex: index),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: CachedNetworkImage(
@@ -1179,19 +1262,6 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
     );
   }
 
-  /// แสดงรูปเต็มจอพร้อม zoom และ swipe ดูรูปอื่น
-  void _showFullScreenImage(
-      BuildContext context, List<String> urls, int initialIndex) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => _FullScreenImageViewer(
-          imageUrls: urls,
-          initialIndex: initialIndex,
-        ),
-      ),
-    );
-  }
 
   /// สร้าง Video Section สำหรับแสดงวิดีโอที่อัพโหลด
   Widget _buildVideoSection(Post post) {
@@ -1548,100 +1618,4 @@ class _WrongAnswerDialogContentState extends State<_WrongAnswerDialogContent>
   }
 }
 
-/// Full screen image viewer with zoom and swipe
-class _FullScreenImageViewer extends StatefulWidget {
-  final List<String> imageUrls;
-  final int initialIndex;
 
-  const _FullScreenImageViewer({
-    required this.imageUrls,
-    required this.initialIndex,
-  });
-
-  @override
-  State<_FullScreenImageViewer> createState() => _FullScreenImageViewerState();
-}
-
-class _FullScreenImageViewerState extends State<_FullScreenImageViewer> {
-  late PageController _pageController;
-  late int _currentIndex;
-
-  @override
-  void initState() {
-    super.initState();
-    _currentIndex = widget.initialIndex;
-    _pageController = PageController(initialPage: widget.initialIndex);
-  }
-
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: IreneSecondaryAppBar(
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
-        title: widget.imageUrls.length > 1
-            ? '${_currentIndex + 1} / ${widget.imageUrls.length}'
-            : null,
-        centerTitle: true,
-      ),
-      body: PageView.builder(
-        controller: _pageController,
-        itemCount: widget.imageUrls.length,
-        onPageChanged: (index) {
-          setState(() => _currentIndex = index);
-        },
-        itemBuilder: (context, index) {
-          return InteractiveViewer(
-            minScale: 0.5,
-            maxScale: 4.0,
-            child: Center(
-              child: CachedNetworkImage(
-                imageUrl: widget.imageUrls[index],
-                fit: BoxFit.cover,
-                progressIndicatorBuilder: (context, url, progress) => Center(
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      CircularProgressIndicator(
-                        value: progress.progress,
-                        color: AppColors.primary,
-                        strokeWidth: 3,
-                        backgroundColor: Colors.white24,
-                      ),
-                      if (progress.progress != null)
-                        Text(
-                          '${(progress.progress! * 100).toInt()}%',
-                          style: AppTypography.caption.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                errorWidget: (context, url, error) => Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    HugeIcon(icon: HugeIcons.strokeRoundedImage01, size: AppIconSize.xxxl, color: Colors.white54),
-                    SizedBox(height: 8),
-                    Text(
-                      'ไม่สามารถโหลดรูปได้',
-                      style: AppTypography.body.copyWith(color: Colors.white54),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}

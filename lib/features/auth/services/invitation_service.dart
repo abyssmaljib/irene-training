@@ -20,31 +20,32 @@ class InvitationService {
 
   /// ค้นหา invitations ตาม email
   ///
-  /// Query จาก view `invitations_with_nursinghomes`
-  /// โดยกรองเฉพาะที่ยังไม่ได้ accept (accepted_user_info = false)
+  /// ใช้ RPC `search_invitations_by_email` (SECURITY DEFINER)
+  /// เพื่อ bypass RLS บน invitations table
+  /// ทำให้ทั้ง user ใหม่ (unauthenticated) และ user ที่ resigned/ไม่มี nursinghome
+  /// สามารถค้นหา invitation ได้
   ///
   /// [email] - email ที่ต้องการค้นหา (case-insensitive)
-  /// Returns - List ของ Invitation ที่พบ
+  /// Returns - List ของ Invitation ที่พบ (เฉพาะที่ยังไม่ accept)
   Future<List<Invitation>> getInvitationsByEmail(String email) async {
     try {
-      // Normalize email to lowercase ก่อน query
       final normalizedEmail = email.trim().toLowerCase();
 
       debugPrint('InvitationService: Searching invitations for $normalizedEmail');
 
-      // Query invitations_with_nursinghomes view
-      // View นี้มีการ JOIN invitations + nursinghomes + user_info
-      final response = await _client
-          .from('invitations_with_nursinghomes')
-          .select()
-          .ilike('user_email', normalizedEmail) // case-insensitive match
-          .eq('accepted_user_info', false); // เฉพาะที่ยังไม่ accept
+      // ใช้ RPC แทน direct view query เพื่อ bypass RLS
+      // RPC จะ return เฉพาะ invitations ที่ยังไม่ accepted
+      final response = await _client.rpc(
+        'search_invitations_by_email',
+        params: {'p_email': normalizedEmail},
+      );
 
-      debugPrint('InvitationService: Found ${response.length} invitations');
+      final data = response as List;
+      debugPrint('InvitationService: Found ${data.length} invitations');
 
       // แปลง JSON เป็น List<Invitation>
-      return response
-          .map((json) => Invitation.fromJson(json))
+      return data
+          .map((json) => Invitation.fromJson(json as Map<String, dynamic>))
           .toList();
     } catch (e) {
       debugPrint('InvitationService: Error searching invitations: $e');
@@ -130,14 +131,40 @@ class InvitationService {
     }
   }
 
-  /// อัพเดต user_info ให้เข้าร่วม nursinghome
+  /// Accept invitation และ rejoin nursinghome ผ่าน RPC
   ///
-  /// Note: ฟังก์ชันนี้จะ switch nursinghome โดยตรง ไม่ต้อง confirm
+  /// ใช้ RPC `accept_invitation_and_rejoin` (SECURITY DEFINER)
+  /// เพื่อ bypass RLS บน user_info table
+  /// RPC จะทำทุกอย่างใน 1 call:
+  /// - Update nursinghome_id + reset employment_type เป็น NULL
+  /// - หรือสร้าง user_info ใหม่ (ถ้ายังไม่มี)
+  /// - ลบ invitation (ป้องกันใช้ซ้ำ)
+  ///
+  /// [invitationId] - ID ของ invitation ที่ต้องการ accept
+  Future<void> acceptInvitationAndRejoin(int invitationId) async {
+    try {
+      debugPrint('InvitationService: Accepting invitation $invitationId via RPC');
+
+      final response = await _client.rpc(
+        'accept_invitation_and_rejoin',
+        params: {'p_invitation_id': invitationId},
+      );
+
+      debugPrint('InvitationService: Accept invitation response: $response');
+    } catch (e) {
+      debugPrint('InvitationService: Error accepting invitation: $e');
+      rethrow;
+    }
+  }
+
+  /// อัพเดต user_info ให้เข้าร่วม nursinghome (backup path)
+  ///
+  /// Note: ควรใช้ acceptInvitationAndRejoin() แทน เพราะ bypass RLS ได้
+  /// method นี้เก็บไว้เป็น fallback
   ///
   /// [nursinghomeId] - ID ของ nursinghome ที่ต้องการเข้าร่วม
   Future<void> joinNursinghome(int nursinghomeId) async {
     try {
-      // ดึง current user id จาก auth
       final userId = _client.auth.currentUser?.id;
       if (userId == null) {
         throw Exception('User not logged in');
@@ -145,10 +172,11 @@ class InvitationService {
 
       debugPrint('InvitationService: Joining nursinghome $nursinghomeId for user $userId');
 
-      // อัพเดต user_info โดยใช้ auth user id
-      // Note: user_info.id = auth user id (UUID)
+      // อัพเดต user_info พร้อม reset employment_type เป็น NULL
+      // เพื่อให้ user ที่เคย resigned กลับมาใช้งานได้
       await _client.from('user_info').update({
         'nursinghome_id': nursinghomeId,
+        'employment_type': null, // reset จาก 'resigned' เป็น active
       }).eq('id', userId);
 
       debugPrint('InvitationService: Successfully joined nursinghome');

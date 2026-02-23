@@ -879,85 +879,88 @@ class _ImageUploadBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: isUploading ? null : onTap,
-      child: Container(
-        height: 100,
-        decoration: BoxDecoration(
-          color: AppColors.background,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: imageUrl != null ? AppColors.primary : AppColors.alternate,
-            width: imageUrl != null ? 2 : 1,
+    // ใช้ AspectRatio 1:1 เพื่อให้รูปเป็นจตุรัส ไม่ว่าจอจะกว้างแค่ไหน
+    return AspectRatio(
+      aspectRatio: 1,
+      child: GestureDetector(
+        onTap: isUploading ? null : onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.background,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: imageUrl != null ? AppColors.primary : AppColors.alternate,
+              width: imageUrl != null ? 2 : 1,
+            ),
           ),
-        ),
-        child: isUploading
-            ? const Center(
-                child: SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              )
-            : imageUrl != null
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(11),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        // รูปยา - ใช้ IreneNetworkImage ที่มี timeout และ retry
-                        IreneNetworkImage(
-                          imageUrl: imageUrl!,
-                          fit: BoxFit.cover,
-                          memCacheWidth: 200,
-                          compact: true,
-                          errorPlaceholder: _buildPlaceholder(),
-                        ),
-                        // Label overlay
-                        Positioned(
-                          bottom: 0,
-                          left: 0,
-                          right: 0,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 2,
-                              horizontal: 4,
-                            ),
-                            color: Colors.black54,
-                            child: Text(
-                              label,
-                              style: AppTypography.caption.copyWith(
-                                color: Colors.white,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
+          child: isUploading
+              ? const Center(
+                  child: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                )
+              : imageUrl != null
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(11),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          // รูปยา - ใช้ IreneNetworkImage ที่มี timeout และ retry
+                          IreneNetworkImage(
+                            imageUrl: imageUrl!,
+                            fit: BoxFit.cover,
+                            memCacheWidth: 200,
+                            compact: true,
+                            errorPlaceholder: _buildPlaceholder(),
                           ),
-                        ),
-                        // Clear button (ถ้ามี)
-                        if (onClear != null)
+                          // Label overlay
                           Positioned(
-                            top: 4,
-                            right: 4,
-                            child: GestureDetector(
-                              onTap: onClear,
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: BoxDecoration(
-                                  color: Colors.black54,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: HugeIcon(
-                                  icon: HugeIcons.strokeRoundedCancel01,
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 2,
+                                horizontal: 4,
+                              ),
+                              color: Colors.black54,
+                              child: Text(
+                                label,
+                                style: AppTypography.caption.copyWith(
                                   color: Colors.white,
-                                  size: 16,
                                 ),
+                                textAlign: TextAlign.center,
                               ),
                             ),
                           ),
-                      ],
-                    ),
-                  )
-                : _buildPlaceholder(),
+                          // Clear button (ถ้ามี)
+                          if (onClear != null)
+                            Positioned(
+                              top: 4,
+                              right: 4,
+                              child: GestureDetector(
+                                onTap: onClear,
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black54,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: HugeIcon(
+                                    icon: HugeIcons.strokeRoundedCancel01,
+                                    color: Colors.white,
+                                    size: 16,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    )
+                  : _buildPlaceholder(),
+        ),
       ),
     );
   }

@@ -13,6 +13,7 @@ import '../widgets/create_vital_sign/vital_input_section.dart';
 import '../widgets/create_vital_sign/care_input_section.dart';
 import '../widgets/create_vital_sign/rating_section.dart';
 import '../widgets/create_vital_sign/shift_card.dart';
+import '../widgets/create_vital_sign/ai_shift_summary_button.dart';
 import '../widgets/create_vital_sign/preview_vital_sign_dialog.dart';
 
 /// Single-page scrollable form for creating vital sign records
@@ -455,22 +456,43 @@ class CreateVitalSignScreen extends ConsumerWidget {
   Widget _buildGeneralReportSection(BuildContext context, WidgetRef ref, dynamic data) {
     final notifier = ref.read(vitalSignFormProvider(residentId).notifier);
 
-    // Show different field based on shift
-    if (data.shift == 'เวรเช้า') {
-      return _GeneralReportField(
-        label: 'รายงานเพิ่มเติมนอกเหนือจากการประเมินด้วยดาว',
-        initialValue: data.reportD,
-        onChanged: notifier.setReportD,
-        minLines: 5,
-      );
-    } else {
-      return _GeneralReportField(
-        label: 'รายงานเพิ่มเติมนอกเหนือจากการประเมินด้วยดาว',
-        initialValue: data.reportN,
-        onChanged: notifier.setReportN,
-        minLines: 3,
-      );
-    }
+    // ปุ่ม AI สรุปเวร — ส่งเข้าไปวางมุมบนขวาของ card
+    final aiButton = AiShiftSummaryButton(
+      residentId: residentId,
+      residentName: residentName ?? '',
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Text field สำหรับรายงาน + ปุ่ม AI อยู่มุมบนขวาของ card
+        if (data.shift == 'เวรเช้า')
+          _GeneralReportField(
+            label: 'รายงานเพิ่มเติมนอกเหนือจากการประเมินด้วยดาว',
+            initialValue: data.reportD,
+            onChanged: notifier.setReportD,
+            minLines: 5,
+            aiButton: aiButton,
+          )
+        else
+          _GeneralReportField(
+            label: 'รายงานเพิ่มเติมนอกเหนือจากการประเมินด้วยดาว',
+            initialValue: data.reportN,
+            onChanged: notifier.setReportN,
+            minLines: 3,
+            aiButton: aiButton,
+          ),
+
+        // Disclaimer — เตือนให้ตรวจสอบก่อน save
+        const SizedBox(height: 4),
+        Text(
+          'โปรดตรวจสอบข้อมูลก่อนบันทึก เนื่องจาก AI อาจสรุปไม่ครบถ้วน',
+          style: AppTypography.caption.copyWith(
+            color: AppColors.secondaryText,
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildCollapsibleSection({
@@ -534,12 +556,15 @@ class _GeneralReportField extends StatefulWidget {
     required this.initialValue,
     required this.onChanged,
     this.minLines = 5,
+    this.aiButton,
   });
 
   final String? label;
   final String? initialValue;
   final ValueChanged<String> onChanged;
   final int minLines;
+  /// ปุ่ม AI สรุปเวร — วางไว้มุมบนขวาของ card (ถ้ามี)
+  final Widget? aiButton;
 
   @override
   State<_GeneralReportField> createState() => _GeneralReportFieldState();
@@ -589,12 +614,19 @@ class _GeneralReportFieldState extends State<_GeneralReportField> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'มีรายงานเพิ่มเติมมั้ย?',
-              style: AppTypography.label.copyWith(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.w500,
-              ),
+            // Header row: ชื่อ card + ปุ่ม AI (ถ้ามี) อยู่มุมบนขวา
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'มีรายงานเพิ่มเติมมั้ย?',
+                  style: AppTypography.label.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                if (widget.aiButton != null) widget.aiButton!,
+              ],
             ),
             const SizedBox(height: 8),
             TextField(

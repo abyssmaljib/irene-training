@@ -80,6 +80,11 @@ Uses `flutter_riverpod` for state management. Provider files go in `features/*/p
 
 Supabase is initialized in `main.dart` with config from `core/config/supabase_config.dart`.
 
+**Supabase Project ID:** `amthgthvrxhlxpttioxu`
+
+- ใช้ project ID นี้เมื่อใช้งาน MCP (Model Context Protocol) tools
+- สำหรับจัดการ database, migrations, edge functions ผ่าน Supabase MCP
+
 ### Network Images (สำคัญมาก!)
 
 **ทุกรูปที่โหลดจาก network ต้องใช้ `IreneNetworkImage` หรือ `IreneNetworkAvatar`** เพื่อ UX ที่ดี:
