@@ -25,6 +25,7 @@ import '../../../core/widgets/nps_scale.dart';
 import '../../board/screens/advanced_create_post_screen.dart';
 import '../../board/services/post_action_service.dart';
 import '../../board/widgets/video_player_widget.dart';
+import '../../../core/widgets/webview_screen.dart';
 
 /// หน้ารายละเอียด Task แบบ Full Page
 class TaskDetailScreen extends ConsumerStatefulWidget {
@@ -289,6 +290,13 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                     if (_task.description != null &&
                         _task.description!.isNotEmpty) ...[
                       _buildDescriptionSection(),
+                      AppSpacing.verticalGapMd,
+                    ],
+
+                    // Form URL (ถ้ามี) - ลิงก์เปิดแบบฟอร์มภายในแอป
+                    if (_task.formUrl != null &&
+                        _task.formUrl!.isNotEmpty) ...[
+                      _buildFormUrlSection(),
                       AppSpacing.verticalGapMd,
                     ],
 
@@ -710,6 +718,99 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           AppSpacing.verticalGapSm,
           Text(_task.description!, style: AppTypography.body),
         ],
+      ),
+    );
+  }
+
+  /// Card สำหรับเปิดแบบฟอร์ม (Google Form หรือเว็บอื่นๆ)
+  /// กดแล้วจะเปิด WebView ภายในแอป ไม่ต้องออกไป browser ภายนอก
+  Widget _buildFormUrlSection() {
+    // ดึง domain จาก URL มาแสดงเป็น subtitle เช่น "forms.google.com"
+    String displayUrl = _task.formUrl!;
+    try {
+      final uri = Uri.parse(displayUrl);
+      displayUrl = uri.host; // เอาแค่ domain เช่น forms.google.com
+    } catch (_) {
+      // ถ้า parse ไม่ได้ ใช้ URL เต็ม
+    }
+
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () {
+          // เปิด WebView ภายในแอป (Android/iOS) หรือ browser ภายนอก (Windows)
+          WebViewScreen.openUrl(
+            context,
+            url: _task.formUrl!,
+            title: 'แบบฟอร์ม',
+          );
+        },
+        child: Container(
+          padding: EdgeInsets.all(AppSpacing.md),
+          decoration: BoxDecoration(
+            // พื้นหลัง teal อ่อนมากๆ ให้โดดเด่นกว่า card ปกติ
+            color: AppColors.primary.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(12),
+            // ขอบสี primary ให้เห็นชัดว่ากดได้
+            border: Border.all(
+              color: AppColors.primary.withValues(alpha: 0.3),
+              width: 1.5,
+            ),
+          ),
+          child: Row(
+            children: [
+              // ไอคอนแบบฟอร์ม
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.accent1, // พื้นหลัง teal อ่อน
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Center(
+                  child: HugeIcon(
+                    icon: HugeIcons.strokeRoundedNote,
+                    size: 20,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+              AppSpacing.horizontalGapMd,
+              // ข้อความ "เปิดแบบฟอร์ม" + domain URL
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'เปิดแบบฟอร์ม',
+                      style: AppTypography.subtitle.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      displayUrl,
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.secondaryText,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              // ลูกศรชี้ขวา บอกว่ากดได้
+              HugeIcon(
+                icon: HugeIcons.strokeRoundedArrowRight01,
+                size: 20,
+                color: AppColors.secondaryText,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
