@@ -72,6 +72,8 @@
 	<string>แอปต้องการเข้าถึงไมโครโฟนเพื่อบันทึกวิดีโอประกอบการดูแลผู้สูงอายุ</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>แอปต้องการเข้าถึงตำแหน่งเพื่อตรวจสอบตำแหน่งสำหรับการลงเวลา (Clock-In) และบันทึกข้อมูลการดูแลผู้สูงอายุ</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>แอปต้องการเข้าถึงตำแหน่งเพื่อตรวจสอบตำแหน่งสำหรับการลงเวลา (Clock-In) และบันทึกข้อมูลการดูแลผู้สูงอายุ</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>
