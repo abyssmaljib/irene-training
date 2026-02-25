@@ -151,12 +151,14 @@ class _CreateTicketBottomSheetState
   @override
   Widget build(BuildContext context) {
     // คำนวณ padding สำหรับ keyboard
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    // ใช้ viewInsetsOf/sizeOf แทน .of() เพื่อ subscribe เฉพาะสิ่งที่ต้องการ
+    // ลดการ rebuild ทุก MediaQuery change ตอน keyboard animation
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
 
     return Container(
       // จำกัดความสูงไม่เกิน 85% ของหน้าจอ
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.85,
+        maxHeight: MediaQuery.sizeOf(context).height * 0.85,
       ),
       padding: EdgeInsets.only(bottom: bottomInset),
       decoration: const BoxDecoration(

@@ -992,7 +992,9 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
 
   Widget _buildBottomBar(CreatePostState state) {
     // รับค่า keyboard padding
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    // ใช้ viewInsetsOf แทน .of().viewInsets เพื่อ subscribe เฉพาะ viewInsets
+    // ไม่ rebuild เมื่อ MediaQuery อื่นเปลี่ยน (เช่น orientation, textScaleFactor)
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
 
     return Container(
       padding: EdgeInsets.fromLTRB(16, 8, 16, 8 + bottomInset),
@@ -1732,7 +1734,9 @@ class _CreatePostBottomSheetWrapperState
   @override
   Widget build(BuildContext context) {
     // คำนวณความสูงของ modal (85% ของหน้าจอ)
-    final screenHeight = MediaQuery.of(context).size.height;
+    // ใช้ sizeOf แทน .of().size เพื่อ subscribe เฉพาะ size change
+    // ไม่ rebuild ทุกเฟรมตอน keyboard animation (viewInsets เปลี่ยน)
+    final screenHeight = MediaQuery.sizeOf(context).height;
     final modalHeight = screenHeight * 0.85;
 
     return PopScope(

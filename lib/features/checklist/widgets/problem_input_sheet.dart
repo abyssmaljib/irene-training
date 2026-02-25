@@ -122,7 +122,8 @@ class _ProblemInputSheetState extends State<ProblemInputSheet> {
   @override
   Widget build(BuildContext context) {
     // คำนวณ padding สำหรับ keyboard
-    final bottomPadding = MediaQuery.of(context).viewInsets.bottom;
+    // ใช้ viewInsetsOf แทน .of().viewInsets เพื่อลดการ rebuild ตอน keyboard animation
+    final bottomPadding = MediaQuery.viewInsetsOf(context).bottom;
 
     return Container(
       padding: EdgeInsets.only(bottom: bottomPadding),

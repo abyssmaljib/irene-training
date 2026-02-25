@@ -160,7 +160,15 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // ปิด resizeToAvoidBottomInset เพื่อป้องกัน Scaffold resize body ทุกเฟรม
+      // ระหว่าง keyboard animation → ทำให้เนื้อหาไม่กระตุก
+      resizeToAvoidBottomInset: false,
       body: SingleChildScrollView(
+        // เพิ่ม padding ล่างตาม viewInsets เพื่อให้ scroll ผ่านคีย์บอร์ดได้
+        // ใช้ viewInsetsOf แทน .of().viewInsets เพื่อ subscribe เฉพาะ viewInsets ไม่ใช่ทุก MediaQuery change
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(context).bottom,
+        ),
         child: Column(
           children: [
             // Header with gradient

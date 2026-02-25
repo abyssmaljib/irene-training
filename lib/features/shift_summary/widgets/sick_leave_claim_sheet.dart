@@ -48,7 +48,8 @@ class _SickLeaveClaimSheetState extends ConsumerState<SickLeaveClaimSheet> {
 
     return Container(
       padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
+        // ใช้ viewInsetsOf แทน .of().viewInsets เพื่อลดการ rebuild ตอน keyboard animation
+        bottom: MediaQuery.viewInsetsOf(context).bottom,
       ),
       decoration: BoxDecoration(
         color: AppColors.surface,

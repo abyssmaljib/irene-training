@@ -492,14 +492,15 @@ class _AdvancedEditPostScreenState
   }
 
   Widget _buildBottomBar(EditPostState state) {
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    // ไม่ต้องใช้ viewInsets เพราะ Scaffold จัดการ keyboard avoidance
+    // ให้ bottomNavigationBar อัตโนมัติ (ลดการ rebuild ทุกเฟรม)
     // ต้องมีข้อความ + ต้องมี tag (เดิมหรือเลือกใหม่) + ไม่กำลัง submit
     final hasTag = state.selectedTag != null || state.originalTagName != null;
     final canSubmit =
         _textController.text.trim().isNotEmpty && hasTag && !_isSubmitting;
 
     return Container(
-      padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + bottomInset),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       decoration: BoxDecoration(
         color: AppColors.surface,
         border: Border(

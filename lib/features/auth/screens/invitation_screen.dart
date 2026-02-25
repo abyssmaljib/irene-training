@@ -221,7 +221,8 @@ class _InvitationScreenState extends ConsumerState<InvitationScreen> {
 
   Widget _buildEmailInputSection(InvitationState state) {
     // ตรวจสอบว่า keyboard ขึ้นหรือไม่
-    final keyboardVisible = MediaQuery.of(context).viewInsets.bottom > 50;
+    // ใช้ viewInsetsOf แทน .of().viewInsets เพื่อลดการ rebuild ตอน keyboard animation
+    final keyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 50;
 
     return Column(
       key: const ValueKey('email_input'),

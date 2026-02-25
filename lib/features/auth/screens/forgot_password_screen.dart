@@ -92,6 +92,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surface,
+      // ปิด resizeToAvoidBottomInset เพื่อป้องกัน Scaffold resize body ทุกเฟรม
+      // ระหว่าง keyboard animation → ทำให้เนื้อหาไม่กระตุก
+      resizeToAvoidBottomInset: false,
       body: SafeArea(
         child: Column(
           children: [
@@ -101,7 +104,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             // Content
             Expanded(
               child: SingleChildScrollView(
-                padding: EdgeInsets.all(AppSpacing.lg),
+                // เพิ่ม padding ล่างตาม viewInsets เพื่อให้ scroll ผ่านคีย์บอร์ดได้
+                padding: EdgeInsets.fromLTRB(
+                  AppSpacing.lg,
+                  AppSpacing.lg,
+                  AppSpacing.lg,
+                  AppSpacing.lg + MediaQuery.viewInsetsOf(context).bottom,
+                ),
                 child: _emailSent ? _buildSuccessState() : _buildForm(),
               ),
             ),

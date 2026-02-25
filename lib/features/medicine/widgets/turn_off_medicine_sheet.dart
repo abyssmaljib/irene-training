@@ -107,13 +107,14 @@ class _TurnOffMedicineSheetState extends ConsumerState<TurnOffMedicineSheet> {
         turnOffMedicineProvider(widget.medicine.medicineListId));
 
     // คำนวณ padding สำหรับ keyboard
-    final bottomPadding = MediaQuery.of(context).viewInsets.bottom;
+    // ใช้ viewInsetsOf/sizeOf แทน .of() เพื่อลดการ rebuild ตอน keyboard animation
+    final bottomPadding = MediaQuery.viewInsetsOf(context).bottom;
 
     return Container(
       padding: EdgeInsets.only(bottom: bottomPadding),
       // จำกัดความสูงไม่ให้เกิน 85% ของหน้าจอ
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.85,
+        maxHeight: MediaQuery.sizeOf(context).height * 0.85,
       ),
       decoration: BoxDecoration(
         color: AppColors.surface,

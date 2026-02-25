@@ -901,7 +901,9 @@ class _AdvancedCreatePostScreenState
   }
 
   Widget _buildBottomBar(CreatePostState state) {
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    // ไม่ต้องใช้ MediaQuery.viewInsets ที่นี่
+    // เพราะ Scaffold จัดการ keyboard avoidance ให้ bottomNavigationBar อัตโนมัติ
+    // การเพิ่ม viewInsets.bottom ซ้ำจะทำให้ padding เกินจริง + rebuild ทุกเฟรมตอน keyboard ขึ้น
 
     // Mutual exclusion: เลือกได้อย่างเดียว รูป หรือ วิดีโอ
     final hasImages = state.hasImages;
@@ -917,7 +919,7 @@ class _AdvancedCreatePostScreenState
         !_isSubmitting && hasTag && (!widget.isFromTask || hasMedia);
 
     return Container(
-      padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + bottomInset),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       decoration: BoxDecoration(
         color: AppColors.surface,
         border: Border(

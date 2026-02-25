@@ -50,6 +50,8 @@ import '../../learning/models/badge.dart' as learning; // สำหรับ moc
 import '../services/shift_summary_service.dart' as clock_out_summary; // สำหรับ ShiftSummary (clock out)
 import '../widgets/clock_out_summary_modal.dart'; // สำหรับ dev test
 import '../models/shift_leader.dart'; // สำหรับ mock ShiftLeader ใน dev button
+import '../../settings/services/clockin_verification_service.dart'; // สำหรับตรวจ GPS+WiFi ก่อนขึ้นเวร
+import '../../../core/widgets/buttons.dart'; // สำหรับ PrimaryButton ใน verification dialog
 
 /// หน้าหลัก - Dashboard with Clock-in/Clock-out
 /// ใช้ ConsumerStatefulWidget เพื่อให้ pull to refresh สามารถ invalidate
@@ -433,6 +435,51 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       return;
     }
 
+    // ============================================
+    // ตรวจสอบ GPS + WiFi ก่อนอนุญาตให้ขึ้นเวร
+    // ============================================
+    // ดึง nursinghomeId เพื่อใช้ query ค่า GPS/WiFi ที่ admin ตั้งไว้
+    final nursinghomeId = await _userService.getNursinghomeId();
+    if (nursinghomeId == null || !mounted) return;
+
+    // แสดง loading บนปุ่มขณะตรวจสอบ
+    setState(() => _isClockingIn = true);
+
+    ClockInVerificationResult? verificationResult;
+    try {
+      // เรียก service ตรวจ GPS + WiFi พร้อมกัน
+      verificationResult = await ClockInVerificationService().verify(nursinghomeId);
+    } catch (e) {
+      debugPrint('[HomeScreen] Clock-in verification error: $e');
+    }
+
+    if (!mounted) return;
+    // ปิด loading หลังตรวจเสร็จ (จะเปิดใหม่ตอน clock-in จริง)
+    setState(() => _isClockingIn = false);
+
+    // ตรวจผลลัพธ์: ต้องผ่านทั้ง GPS AND WiFi
+    // null = admin ไม่ได้ตั้งค่า → ข้ามเงื่อนไขนั้น (ถือว่าผ่าน)
+    if (verificationResult != null) {
+      final gps = verificationResult.gpsMatch;
+      final wifi = verificationResult.wifiMatch;
+      final gpsErr = verificationResult.gpsError;
+      final wifiErr = verificationResult.wifiError;
+
+      // เช็คว่ามีเงื่อนไขที่ fail หรือ error ไหม
+      // gps == false หรือ gpsErr != null → GPS ไม่ผ่าน
+      // wifi == false หรือ wifiErr != null → WiFi ไม่ผ่าน
+      final gpsFailed = gps == false || gpsErr != null;
+      final wifiFailed = wifi == false || wifiErr != null;
+
+      if (gpsFailed || wifiFailed) {
+        // มีเงื่อนไขไม่ผ่าน → แสดง dialog แจ้ง user
+        if (mounted) {
+          _showVerificationFailedDialog(verificationResult);
+        }
+        return;
+      }
+    }
+
     // แสดงหน้าไพ่ทาโร่ก่อนขึ้นเวร
     if (!mounted) return;
     final selectedCard = await TarotCardScreen.show(context);
@@ -474,6 +521,271 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (mounted) {
         setState(() => _isClockingIn = false);
       }
+    }
+  }
+
+  // ============================================
+  // Dialog แจ้งผลตรวจ GPS/WiFi ไม่ผ่าน
+  // ============================================
+  // แสดงเมื่อ user กดขึ้นเวรแต่ไม่ผ่านเงื่อนไข GPS หรือ WiFi
+  // ใช้ pattern คล้าย ConfirmDialog (icon + title + image + message + button)
+  void _showVerificationFailedDialog(ClockInVerificationResult result) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: AppRadius.largeRadius,
+        ),
+        backgroundColor: AppColors.surface,
+        contentPadding: EdgeInsets.zero,
+        content: Container(
+          constraints: const BoxConstraints(maxWidth: 320),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(height: AppSpacing.lg),
+
+              // Icon เตือน (สีส้ม)
+              Container(
+                width: 40,
+                height: 40,
+                decoration: const BoxDecoration(
+                  color: AppColors.tagPendingBg,
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: HugeIcon(
+                    icon: HugeIcons.strokeRoundedAlert02,
+                    color: const Color(0xFFF59E0B),
+                    size: AppIconSize.lg,
+                  ),
+                ),
+              ),
+
+              SizedBox(height: AppSpacing.sm),
+
+              // Title
+              Text(
+                'ไม่สามารถขึ้นเวรได้',
+                style: AppTypography.title.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+                textAlign: TextAlign.center,
+              ),
+
+              SizedBox(height: AppSpacing.xs),
+
+              // รูปแมว (ตาม pattern ConfirmDialog)
+              Image.asset(
+                'assets/images/confirm_cat.webp',
+                width: 100,
+                height: 100,
+                fit: BoxFit.contain,
+              ),
+
+              SizedBox(height: AppSpacing.sm),
+
+              // ข้อความอธิบาย
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                child: Text(
+                  'กรุณาตรวจสอบเงื่อนไขต่อไปนี้',
+                  style: AppTypography.body.copyWith(
+                    color: AppColors.secondaryText,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+
+              SizedBox(height: AppSpacing.md),
+
+              // รายการสถานะ GPS / WiFi
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                child: Column(
+                  children: [
+                    // --- GPS Status ---
+                    if (result.gpsMatch != null || result.gpsError != null)
+                      _buildVerificationRow(
+                        icon: HugeIcons.strokeRoundedLocation01,
+                        label: 'ตำแหน่ง GPS',
+                        passed: result.gpsMatch == true,
+                        detail: _buildGpsDetailText(result),
+                        error: result.gpsError,
+                      ),
+
+                    // --- WiFi Status ---
+                    if (result.wifiMatch != null || result.wifiError != null) ...[
+                      // เพิ่ม divider ระหว่าง GPS กับ WiFi (ถ้ามีทั้งคู่)
+                      if (result.gpsMatch != null || result.gpsError != null)
+                        Divider(height: 1, color: AppColors.alternate),
+                      _buildVerificationRow(
+                        icon: HugeIcons.strokeRoundedWifi01,
+                        label: 'WiFi',
+                        passed: result.wifiMatch == true,
+                        detail: _buildWifiDetailText(result),
+                        error: result.wifiError,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+
+              SizedBox(height: AppSpacing.md),
+
+              // ปุ่ม "รับทราบ" (ปุ่มเดียว)
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  AppSpacing.lg, 0, AppSpacing.lg, AppSpacing.lg,
+                ),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: PrimaryButton(
+                    text: 'รับทราบ',
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// แต่ละ row แสดงสถานะ GPS หรือ WiFi ใน verification dialog
+  /// คล้าย pattern _buildStatusRow ในหน้า Settings
+  Widget _buildVerificationRow({
+    required dynamic icon,
+    required String label,
+    required bool passed,
+    String? detail,
+    String? error,
+  }) {
+    // กำหนดสีและ icon ตามสถานะ
+    final Color statusColor;
+    final String statusText;
+    final dynamic statusIcon;
+
+    if (error != null) {
+      // มี error (เช่น ไม่ได้รับสิทธิ์) → สีส้มเตือน
+      statusColor = Colors.orange;
+      statusText = 'ไม่ทราบ';
+      statusIcon = HugeIcons.strokeRoundedAlert02;
+    } else if (passed) {
+      // ผ่าน → สีเขียว
+      statusColor = AppColors.success;
+      statusText = 'ผ่าน';
+      statusIcon = HugeIcons.strokeRoundedCheckmarkCircle02;
+    } else {
+      // ไม่ผ่าน → สีแดง
+      statusColor = AppColors.error;
+      statusText = 'ไม่ผ่าน';
+      statusIcon = HugeIcons.strokeRoundedCancelCircle;
+    }
+
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
+      child: Row(
+        children: [
+          // Icon container (วงกลมสี)
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: statusColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Center(
+              child: HugeIcon(
+                icon: icon,
+                color: statusColor,
+                size: AppIconSize.lg,
+              ),
+            ),
+          ),
+          SizedBox(width: AppSpacing.sm),
+          // Label + Detail text
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: AppTypography.body),
+                if (detail != null || error != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    error ?? detail ?? '',
+                    style: AppTypography.caption.copyWith(
+                      color: error != null
+                          ? Colors.orange.shade700
+                          : AppColors.secondaryText,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          // Status badge (ผ่าน/ไม่ผ่าน)
+          Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: AppSpacing.sm,
+              vertical: AppSpacing.xs,
+            ),
+            decoration: BoxDecoration(
+              color: statusColor.withValues(alpha: 0.1),
+              borderRadius: AppRadius.smallRadius,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                HugeIcon(
+                  icon: statusIcon,
+                  size: AppIconSize.sm,
+                  color: statusColor,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  statusText,
+                  style: AppTypography.caption.copyWith(
+                    color: statusColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// สร้าง detail text สำหรับ GPS ใน verification dialog
+  /// เช่น "ศูนย์ดูแลฯ - ห่าง 120 ม. (รัศมี 500 ม.)"
+  String? _buildGpsDetailText(ClockInVerificationResult result) {
+    if (result.distanceMeters == null) return result.locationName;
+
+    final distance = result.distanceMeters!.round();
+    final radius = result.registeredRadius?.round();
+    final name = result.locationName;
+
+    String text = '';
+    if (name != null) text += '$name - ';
+    text += 'ห่าง $distance ม.';
+    if (radius != null) text += ' (รัศมี $radius ม.)';
+    return text;
+  }
+
+  /// สร้าง detail text สำหรับ WiFi ใน verification dialog
+  /// เช่น "เชื่อมต่อ: IreneNH-5G (ไม่ได้ลงทะเบียน)"
+  String? _buildWifiDetailText(ClockInVerificationResult result) {
+    if (result.currentSsid == null || result.currentSsid!.isEmpty) {
+      return 'ไม่ได้เชื่อมต่อ WiFi';
+    }
+    if (result.wifiMatch == true) {
+      return 'เชื่อมต่อ: ${result.currentSsid}';
+    } else {
+      return 'เชื่อมต่อ: ${result.currentSsid} (ไม่ได้ลงทะเบียน)';
     }
   }
 

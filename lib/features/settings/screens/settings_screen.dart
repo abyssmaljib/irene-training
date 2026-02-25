@@ -32,6 +32,7 @@ import '../../profile_setup/screens/unified_profile_setup_screen.dart';
 import '../../profile_setup/providers/profile_setup_provider.dart';
 import '../../points/points.dart';
 import '../../home/screens/bug_report_list_screen.dart';
+import '../services/clockin_verification_service.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -53,6 +54,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _isLoading = true;
   String? _error;
   String _appVersion = '';
+
+  // ผลการตรวจสอบ Clock-In (WiFi + GPS)
+  ClockInVerificationResult? _clockInResult;
+  bool _isVerifying = false;
 
   // Dev emails that can change role
   static const _devEmails = ['beautyheechul@gmail.com'];
@@ -82,6 +87,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _loadSystemRole(),
       _loadAllUsers(),
     ]);
+
+    // โหลดสถานะ Clock-In หลังจากได้ user profile (ต้องใช้ nursinghomeId)
+    _loadClockInVerification();
   }
 
   /// โหลด version ของแอปจาก package_info_plus
@@ -95,6 +103,34 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       }
     } catch (e) {
       debugPrint('Load app version error: $e');
+    }
+  }
+
+  /// โหลดสถานะ Clock-In Verification (GPS + WiFi)
+  /// ตรวจสอบว่าเครื่องปัจจุบันอยู่ในรัศมี GPS และเชื่อมต่อ WiFi ที่ลงทะเบียนหรือไม่
+  Future<void> _loadClockInVerification() async {
+    // ต้องมี nursinghomeId จึงจะตรวจสอบได้
+    final nursinghomeId = _userProfile?.nursinghomeId;
+    if (nursinghomeId == null) return;
+
+    if (mounted) {
+      setState(() => _isVerifying = true);
+    }
+
+    try {
+      final service = ClockInVerificationService();
+      final result = await service.verify(nursinghomeId);
+      if (mounted) {
+        setState(() {
+          _clockInResult = result;
+          _isVerifying = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('[Settings] Clock-In verification error: $e');
+      if (mounted) {
+        setState(() => _isVerifying = false);
+      }
     }
   }
 
@@ -389,6 +425,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ],
             AppSpacing.verticalGapMd,
+            // สถานะ Clock-In (GPS + WiFi) - แสดงผลการตรวจสอบ
+            _buildClockInStatusSection(),
             // Menu Section
             _buildMenuSection(),
             AppSpacing.verticalGapMd,
@@ -445,6 +483,283 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         color: AppColors.primary,
       ),
     );
+  }
+
+  // ============================================
+  // Clock-In Status Section
+  // ============================================
+  // แสดงสถานะ GPS + WiFi สำหรับ Clock-In
+  // ตรวจสอบว่าเครื่องปัจจุบันผ่านเงื่อนไขที่ admin ตั้งไว้หรือไม่
+
+  Widget _buildClockInStatusSection() {
+    // ถ้ากำลังตรวจสอบ → แสดง loading
+    if (_isVerifying) {
+      return _buildSettingsSection(
+        title: 'สถานะ Clock-In',
+        children: [
+          Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.lg,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.primary,
+                  ),
+                ),
+                SizedBox(width: AppSpacing.sm),
+                Text(
+                  'กำลังตรวจสอบ...',
+                  style: AppTypography.bodySmall.copyWith(
+                    color: AppColors.secondaryText,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
+    // ถ้าไม่มีผลลัพธ์ (ยังไม่ได้ตรวจ หรือไม่มี nursinghomeId) → ไม่แสดง
+    if (_clockInResult == null) return const SizedBox.shrink();
+
+    final result = _clockInResult!;
+
+    // ถ้าทั้ง GPS และ WiFi ไม่ได้เปิดใช้ (null = ไม่ได้ตั้งค่า) → ไม่แสดง
+    if (result.gpsMatch == null && result.wifiMatch == null &&
+        result.gpsError == null && result.wifiError == null) {
+      return const SizedBox.shrink();
+    }
+
+    // สร้างรายการ status items ที่จะแสดง
+    final List<Widget> statusItems = [];
+
+    // --- GPS Status ---
+    if (result.gpsMatch != null || result.gpsError != null) {
+      statusItems.add(
+        _buildStatusRow(
+          icon: HugeIcons.strokeRoundedLocation01,
+          label: 'ตำแหน่ง GPS',
+          isMatch: result.gpsMatch,
+          detail: _buildGpsDetail(result),
+          error: result.gpsError,
+        ),
+      );
+    }
+
+    // --- WiFi Status ---
+    if (result.wifiMatch != null || result.wifiError != null) {
+      // เพิ่ม divider ระหว่าง GPS กับ WiFi
+      if (statusItems.isNotEmpty) {
+        statusItems.add(Divider(height: 1, color: AppColors.alternate));
+      }
+      statusItems.add(
+        _buildStatusRow(
+          icon: HugeIcons.strokeRoundedWifi01,
+          label: 'WiFi',
+          isMatch: result.wifiMatch,
+          detail: _buildWifiDetail(result),
+          error: result.wifiError,
+        ),
+      );
+    }
+
+    // ถ้าไม่มี items → ไม่แสดง
+    if (statusItems.isEmpty) return const SizedBox.shrink();
+
+    return _buildSettingsSection(
+      title: 'สถานะ Clock-In',
+      children: [
+        // แสดงแต่ละ status item
+        ...statusItems,
+        // ปุ่ม refresh สำหรับตรวจสอบใหม่
+        Divider(height: 1, color: AppColors.alternate),
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: _loadClockInVerification,
+            borderRadius: BorderRadius.only(
+              bottomLeft: Radius.circular(12),
+              bottomRight: Radius.circular(12),
+            ),
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  HugeIcon(
+                    icon: HugeIcons.strokeRoundedRefresh,
+                    size: AppIconSize.sm,
+                    color: AppColors.primary,
+                  ),
+                  SizedBox(width: AppSpacing.xs),
+                  Text(
+                    'ตรวจสอบอีกครั้ง',
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// แต่ละ row ใน Clock-In Status Section
+  /// แสดง icon, label, สถานะ (true/false/error), และรายละเอียด
+  Widget _buildStatusRow({
+    required dynamic icon,
+    required String label,
+    required bool? isMatch,
+    String? detail,
+    String? error,
+  }) {
+    // กำหนดสีตามสถานะ
+    final Color statusColor;
+    final String statusText;
+    final dynamic statusIcon;
+
+    if (error != null) {
+      // มี error → สีเหลืองเตือน
+      statusColor = Colors.orange;
+      statusText = 'ไม่ทราบ';
+      statusIcon = HugeIcons.strokeRoundedAlert02;
+    } else if (isMatch == true) {
+      // ผ่าน → สีเขียว
+      statusColor = AppColors.success;
+      statusText = 'ผ่าน';
+      statusIcon = HugeIcons.strokeRoundedCheckmarkCircle02;
+    } else {
+      // ไม่ผ่าน → สีแดง
+      statusColor = AppColors.error;
+      statusText = 'ไม่ผ่าน';
+      statusIcon = HugeIcons.strokeRoundedCancelCircle;
+    }
+
+    return Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.md,
+      ),
+      child: Row(
+        children: [
+          // Icon container
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: statusColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Center(
+              child: HugeIcon(
+                icon: icon,
+                color: statusColor,
+                size: AppIconSize.lg,
+              ),
+            ),
+          ),
+          SizedBox(width: AppSpacing.md),
+          // Label + Detail
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: AppTypography.body),
+                if (detail != null || error != null) ...[
+                  SizedBox(height: 2),
+                  Text(
+                    error ?? detail ?? '',
+                    style: AppTypography.caption.copyWith(
+                      color: error != null
+                          ? Colors.orange.shade700
+                          : AppColors.secondaryText,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          // Status badge
+          Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: AppSpacing.sm,
+              vertical: AppSpacing.xs,
+            ),
+            decoration: BoxDecoration(
+              color: statusColor.withValues(alpha: 0.1),
+              borderRadius: AppRadius.smallRadius,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                HugeIcon(
+                  icon: statusIcon,
+                  size: AppIconSize.sm,
+                  color: statusColor,
+                ),
+                SizedBox(width: 4),
+                Text(
+                  statusText,
+                  style: AppTypography.caption.copyWith(
+                    color: statusColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// สร้าง detail text สำหรับ GPS status
+  /// เช่น "ห่างจาก 'ศูนย์ดูแลฯ' 120 ม. (รัศมี 500 ม.)"
+  String? _buildGpsDetail(ClockInVerificationResult result) {
+    if (result.distanceMeters == null) return result.locationName;
+
+    final distance = result.distanceMeters!.round();
+    final radius = result.registeredRadius?.round();
+    final name = result.locationName;
+
+    // สร้างข้อความแสดงระยะทาง
+    String text = '';
+    if (name != null) text += '$name - ';
+    text += 'ห่าง $distance ม.';
+    if (radius != null) text += ' (รัศมี $radius ม.)';
+
+    return text;
+  }
+
+  /// สร้าง detail text สำหรับ WiFi status
+  /// เช่น "เชื่อมต่อ: IreneNH-5G" หรือ "ไม่ได้เชื่อมต่อ WiFi"
+  String? _buildWifiDetail(ClockInVerificationResult result) {
+    if (result.currentSsid == null || result.currentSsid!.isEmpty) {
+      return 'ไม่ได้เชื่อมต่อ WiFi';
+    }
+
+    if (result.wifiMatch == true) {
+      // เชื่อมต่อ WiFi ที่ลงทะเบียน
+      return 'เชื่อมต่อ: ${result.currentSsid}';
+    } else {
+      // เชื่อมต่อ WiFi อื่นที่ไม่ได้ลงทะเบียน
+      return 'เชื่อมต่อ: ${result.currentSsid} (ไม่ได้ลงทะเบียน)';
+    }
   }
 
   /// สร้างเมนูทั้งหมดโดยจัดกลุ่มเป็น 4 sections

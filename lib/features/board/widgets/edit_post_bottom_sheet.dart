@@ -933,7 +933,9 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
   }
 
   Widget _buildBottomBar(EditPostState state) {
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    // ใช้ viewInsetsOf แทน .of().viewInsets เพื่อ subscribe เฉพาะ viewInsets
+    // ลดการ rebuild ทุก MediaQuery change ตอน keyboard animation
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
 
     return Container(
       padding: EdgeInsets.fromLTRB(16, 8, 16, 8 + bottomInset),
@@ -1291,7 +1293,8 @@ class _EditPostBottomSheetWrapperState
   @override
   Widget build(BuildContext context) {
     // คำนวณความสูงของ modal (70% ของหน้าจอ)
-    final screenHeight = MediaQuery.of(context).size.height;
+    // ใช้ sizeOf แทน .of().size เพื่อไม่ rebuild ตอน keyboard animation
+    final screenHeight = MediaQuery.sizeOf(context).height;
     final modalHeight = screenHeight * 0.7;
 
     return PopScope(

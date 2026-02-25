@@ -94,7 +94,8 @@ class _ChatInputBarState extends State<ChatInputBar> {
         right: AppSpacing.sm,
         top: AppSpacing.sm,
         // เพิ่ม padding ด้านล่างสำหรับ safe area
-        bottom: MediaQuery.of(context).viewPadding.bottom + AppSpacing.sm,
+        // ใช้ viewPaddingOf แทน .of().viewPadding เพื่อลดการ rebuild ตอน keyboard animation
+        bottom: MediaQuery.viewPaddingOf(context).bottom + AppSpacing.sm,
       ),
       decoration: BoxDecoration(
         color: AppColors.surface,

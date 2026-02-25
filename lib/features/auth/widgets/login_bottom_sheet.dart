@@ -164,7 +164,8 @@ class _LoginBottomSheetState extends State<LoginBottomSheet> {
   Widget build(BuildContext context) {
     // คำนวณ padding สำหรับ keyboard
     // เมื่อ keyboard ขึ้น ให้ bottom sheet ขยับขึ้นตาม
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    // ใช้ viewInsetsOf แทน .of().viewInsets เพื่อลดการ rebuild ตอน keyboard animation
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
 
     return Container(
       // ใช้ AnimatedPadding เพื่อให้ขยับขึ้นเมื่อ keyboard แสดง
