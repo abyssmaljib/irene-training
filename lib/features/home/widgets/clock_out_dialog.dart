@@ -12,7 +12,8 @@ import '../../incident_reflection/models/incident.dart';
 import '../../incident_reflection/services/incident_service.dart';
 import '../../learning/models/badge.dart' as learning;
 import '../../learning/services/badge_service.dart';
-import '../../points/services/points_service.dart';
+// ปิด penalty ชั่วคราว — รอดู trend dead air ก่อน
+// import '../../points/services/points_service.dart';
 import '../models/shift_leader.dart';
 import '../services/clock_service.dart';
 import '../services/home_service.dart';
@@ -103,7 +104,8 @@ class _ClockOutDialogState extends State<ClockOutDialog> {
   final _homeService = HomeService.instance;
   final _badgeService = BadgeService();
   final _incidentService = IncidentService.instance;
-  final _pointsService = PointsService();
+  // ปิด penalty ชั่วคราว — รอดู trend dead air ก่อน
+  // final _pointsService = PointsService();
   final _shiftSummaryService = ShiftSummaryService.instance;
   late ConfettiController _confettiController;
 
@@ -223,15 +225,17 @@ class _ClockOutDialogState extends State<ClockOutDialog> {
 
       deadAirMinutes = stats.deadAirMinutes;
 
-      // บันทึก dead air penalty (ถ้ามี)
-      if (deadAirMinutes > 0) {
-        await _pointsService.recordDeadAirPenalty(
-          userId: widget.userId,
-          clockRecordId: widget.clockRecordId,
-          deadAirMinutes: deadAirMinutes,
-          nursinghomeId: widget.nursinghomeId,
-        );
-      }
+      // Dead air penalty ปิดไว้ชั่วคราว
+      // เพื่อดู trend แนวโน้มการทำงานจาก raw dead air ก่อน
+      // ค่อยตัดสินใจกลับมาเปิด penalty ทีหลังเมื่อได้ข้อมูลเพียงพอ
+      // if (deadAirMinutes > 0) {
+      //   await _pointsService.recordDeadAirPenalty(
+      //     userId: widget.userId,
+      //     clockRecordId: widget.clockRecordId,
+      //     deadAirMinutes: deadAirMinutes,
+      //     nursinghomeId: widget.nursinghomeId,
+      //   );
+      // }
     }
 
     // 2. Clock out

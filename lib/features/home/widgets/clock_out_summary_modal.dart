@@ -242,12 +242,12 @@ class _ClockOutSummaryModalState extends State<ClockOutSummaryModal>
             ),
           ),
           AppSpacing.verticalGapSm,
-          // Animated counter
+          // Animated counter — ใช้ totalPoints แทน netPoints เพราะปิด penalty แล้ว
           AnimatedBuilder(
             animation: _counterController,
             builder: (context, child) {
               final value =
-                  (points.netPoints * _counterController.value).round();
+                  (points.totalPoints * _counterController.value).round();
               return Text(
                 '+$value',
                 style: AppTypography.heading1.copyWith(
@@ -258,23 +258,23 @@ class _ClockOutSummaryModalState extends State<ClockOutSummaryModal>
               );
             },
           ),
-          // Dead air penalty (ถ้ามี)
-          if (points.deadAirPenalty > 0) ...[
-            AppSpacing.verticalGapXs,
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                'ทำไรอยู่อ่ะ: -${points.deadAirPenalty}',
-                style: AppTypography.caption.copyWith(
-                  color: Colors.white.withValues(alpha: 0.9),
-                ),
-              ),
-            ),
-          ],
+          // Dead air penalty ปิดไว้ชั่วคราว — รอดู trend ก่อน
+          // if (points.deadAirPenalty > 0) ...[
+          //   AppSpacing.verticalGapXs,
+          //   Container(
+          //     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          //     decoration: BoxDecoration(
+          //       color: Colors.white.withValues(alpha: 0.2),
+          //       borderRadius: BorderRadius.circular(12),
+          //     ),
+          //     child: Text(
+          //       'ทำไรอยู่อ่ะ: -${points.deadAirPenalty}',
+          //       style: AppTypography.caption.copyWith(
+          //         color: Colors.white.withValues(alpha: 0.9),
+          //       ),
+          //     ),
+          //   ),
+          // ],
           AppSpacing.verticalGapMd,
           // Breakdown
           Row(

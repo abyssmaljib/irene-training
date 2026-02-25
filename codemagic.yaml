@@ -87,7 +87,7 @@ workflows:
         - env_secrets  # Contains SUPABASE_URL, SUPABASE_ANON_KEY, CLARITY_PROJECT_ID
       ios_signing:
         provisioning_profiles:
-          - Codemagic_2026_Prov_Profile
+          - Codemagic2026Wifi
         certificates:
           - Codemagic_2026_Cer
       vars:
