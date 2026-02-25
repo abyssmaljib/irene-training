@@ -462,14 +462,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (verificationResult != null) {
       final gps = verificationResult.gpsMatch;
       final wifi = verificationResult.wifiMatch;
-      final gpsErr = verificationResult.gpsError;
-      final wifiErr = verificationResult.wifiError;
 
-      // เช็คว่ามีเงื่อนไขที่ fail หรือ error ไหม
-      // gps == false หรือ gpsErr != null → GPS ไม่ผ่าน
-      // wifi == false หรือ wifiErr != null → WiFi ไม่ผ่าน
-      final gpsFailed = gps == false || gpsErr != null;
-      final wifiFailed = wifi == false || wifiErr != null;
+      // เช็คว่ามีเงื่อนไขที่ fail ไหม (เฉพาะ match == false เท่านั้นถือว่าไม่ผ่าน)
+      // error (เช่น ไม่ได้รับสิทธิ์, iOS ไม่มี entitlement) → แสดง warning แต่ไม่ block
+      // เพราะไม่ใช่ความผิดของ user ที่ระบบดึงข้อมูลไม่ได้
+      final gpsFailed = gps == false;
+      final wifiFailed = wifi == false;
 
       if (gpsFailed || wifiFailed) {
         // มีเงื่อนไขไม่ผ่าน → แสดง dialog แจ้ง user
