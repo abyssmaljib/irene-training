@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hugeicons/hugeicons.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/error_state.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../profile_setup/providers/profile_setup_provider.dart';
@@ -30,8 +31,12 @@ class ProfileCompletionCard extends ConsumerWidget {
     return completionAsync.when(
       // กำลังโหลด - ไม่แสดงอะไร
       loading: () => const SizedBox.shrink(),
-      // Error - ไม่แสดงอะไร
-      error: (_, _) => const SizedBox.shrink(),
+      // แสดง error แทน SizedBox.shrink() เพื่อให้ user รู้ว่าเกิดข้อผิดพลาด
+      error: (error, _) => ErrorStateWidget(
+        message: 'โหลดข้อมูลโปรไฟล์ไม่สำเร็จ',
+        compact: true,
+        onRetry: () => ref.invalidate(profileCompletionStatusProvider),
+      ),
       // มีข้อมูล
       data: (status) {
         // ถ้ากรอกครบแล้ว ไม่ต้องแสดง card

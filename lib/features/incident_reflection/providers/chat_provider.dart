@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/services/user_service.dart';
+import '../../points/services/points_service.dart';
 import '../models/chat_message.dart';
 import '../models/incident.dart';
 import '../models/reflection_pillars.dart';
@@ -126,6 +127,12 @@ class ChatNotifier extends StateNotifier<ChatState> {
   /// ใช้เพื่อแสดง popup แค่ครั้งแรกเท่านั้น
   bool _hasShownSummaryPopup = false;
 
+  /// Flag ว่า incident เสร็จแล้วตั้งแต่ตอน load มา (ไม่ได้เสร็จใน session นี้)
+  /// true = เปิดดู incident ที่เสร็จแล้ว (ครั้งที่ 2+) → ไม่แสดง coin overlay
+  /// false = เพิ่งเสร็จใน session นี้ หรือยังไม่เสร็จ → แสดง coin ได้
+  bool _wasAlreadyCompleteOnLoad = false;
+  bool get wasAlreadyCompleteOnLoad => _wasAlreadyCompleteOnLoad;
+
   ChatNotifier(this._ref)
       : _aiService = AiChatService.instance,
         _incidentService = IncidentService.instance,
@@ -143,6 +150,10 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
     // คำนวณ pillars progress จาก incident
     final pillarsProgress = incident.pillarsProgress;
+
+    // จำไว้ว่า incident เสร็จแล้วตั้งแต่ตอน load มาหรือเปล่า
+    // ถ้าเสร็จแล้ว = เปิดดูครั้งที่ 2+ → ไม่ต้องแสดง coin overlay
+    _wasAlreadyCompleteOnLoad = pillarsProgress.isComplete;
 
     state = ChatState(
       messages: messages,
@@ -323,12 +334,11 @@ class ChatNotifier extends StateNotifier<ChatState> {
           isSending: false,
           pillarsProgress: response.pillarsProgress,
           isComplete: response.isComplete,
-          // Trigger popup ถ้าครบครั้งแรก
-          shouldShowSummaryPopup: shouldTriggerPopup,
-          // อัพเดต Core Value picker state
+          // ไม่ set shouldShowSummaryPopup ตรงนี้!
+          // ให้ _generateSummaryForPopup() เป็นคน set หลัง summary พร้อมแล้ว
+          // เพื่อให้ listener ตรวจจับ change ได้ถูกต้อง
           showCoreValuePicker: response.showCoreValuePicker,
           availableCoreValues: response.availableCoreValues,
-          // อัพเดต current pillar ที่กำลังถามอยู่
           currentPillar: response.currentPillar,
         );
 
@@ -341,9 +351,15 @@ class ChatNotifier extends StateNotifier<ChatState> {
           await _savePillarContent(response.pillarContent!);
         }
 
-        // ถ้า trigger popup แล้ว ให้ generate summary ทันที
+        // ถ้าครบ 4 Pillars → ให้คะแนนคืนทันที + generate summary สำหรับ popup
         if (shouldTriggerPopup) {
-          debugPrint('ChatNotifier: 4 Pillars complete! Generating summary...');
+          debugPrint('ChatNotifier: 4 Pillars complete! Giving bonus + generating summary...');
+
+          // คืนคะแนน 50% ทันที (ไม่ต้องรอ user กด "ยืนยัน" ใน popup)
+          // duplicate check ใน recordIncidentReflectionBonus ป้องกันให้ซ้ำไม่ได้
+          _lastBonusAwarded = await _giveReflectionBonus();
+          debugPrint('ChatNotifier: bonus awarded = $_lastBonusAwarded');
+
           await _generateSummaryForPopup();
         }
 
@@ -421,12 +437,23 @@ class ChatNotifier extends StateNotifier<ChatState> {
       );
 
       if (summary != null) {
+        // บันทึกสรุปลง DB ทันที (ไม่ต้องรอ user กด confirm)
+        await _incidentService.saveReflectionSummary(
+          _currentIncident!.id,
+          summary,
+        );
+        debugPrint('ChatNotifier: summary saved to DB');
+
         state = state.copyWith(
           isGeneratingSummary: false,
+          isComplete: true,
           currentSummary: summary,
           shouldShowSummaryPopup: true,
         );
-        debugPrint('ChatNotifier: summary generated for popup');
+
+        // Refresh list เพื่อให้หน้า list อัพเดตสถานะ
+        _ref.invalidate(myIncidentsProvider);
+        debugPrint('ChatNotifier: summary generated + saved for popup');
       } else {
         state = state.copyWith(
           isGeneratingSummary: false,
@@ -451,14 +478,16 @@ class ChatNotifier extends StateNotifier<ChatState> {
     debugPrint('ChatNotifier: summary popup dismissed');
   }
 
-  /// บันทึก summary และจบการถอดบทเรียน
-  /// เรียกเมื่อ user กด "ยืนยันและบันทึก" ใน popup
-  Future<bool> confirmAndSaveSummary() async {
-    if (_currentIncident == null) return false;
-    if (state.currentSummary == null) return false;
+  /// บันทึก summary แบบ manual (ไม่ใช้แล้วจาก auto-popup flow)
+  /// ยังเก็บไว้เป็น fallback สำหรับ edge case
+  /// bonus ถูกให้ตอน auto-complete ใน sendMessage() แล้ว
+  Future<int> confirmAndSaveSummary() async {
+    debugPrint('📝 confirmAndSaveSummary: START');
+
+    if (_currentIncident == null) return -1;
+    if (state.currentSummary == null) return -1;
 
     try {
-      // บันทึกสรุปลง database
       await _incidentService.saveReflectionSummary(
         _currentIncident!.id,
         state.currentSummary!,
@@ -469,38 +498,99 @@ class ChatNotifier extends StateNotifier<ChatState> {
         shouldShowSummaryPopup: false,
       );
 
-      // Invalidate incidents provider เพื่อ refresh list
       _ref.invalidate(myIncidentsProvider);
-
-      debugPrint('ChatNotifier: summary confirmed and saved');
-      return true;
+      debugPrint('📝 confirmAndSaveSummary: DONE');
+      return _lastBonusAwarded;
     } catch (e) {
-      state = state.copyWith(
-        error: 'ไม่สามารถบันทึกได้: $e',
-      );
-      return false;
+      debugPrint('❌ confirmAndSaveSummary: ERROR: $e');
+      return -1;
     }
   }
 
+  /// คะแนนที่ได้คืนล่าสุด (per person) — ใช้แสดง UI หลังถอดบทเรียนเสร็จ
+  int _lastBonusAwarded = 0;
+  int get lastBonusAwarded => _lastBonusAwarded;
+
+  /// เคลียร์ bonus ที่แสดงไปแล้ว (เรียกหลัง coin overlay แสดงเสร็จ)
+  /// ป้องกัน coin overlay ซ้ำเมื่อกด banner อีกครั้ง
+  void clearBonusAwarded() {
+    _lastBonusAwarded = 0;
+  }
+
+  /// คืนคะแนน 50% หลังถอดบทเรียนเสร็จ
+  /// return คะแนนที่คืนต่อคน — **always return expected amount** เพื่อแสดง UI
+  /// แม้ insert Point_Transaction จะ fail ก็ยังแสดง overlay ให้ user เห็น
+  Future<int> _giveReflectionBonus() async {
+    debugPrint('🎁 _giveReflectionBonus: START');
+
+    if (_currentIncident == null) {
+      debugPrint('🎁 _giveReflectionBonus: _currentIncident is null → return 0');
+      return 0;
+    }
+
+    final incident = _currentIncident!;
+    // คำนวณ expected bonus จาก severity (ใช้แสดง UI เสมอ)
+    final perPerson = PointsConfig.incidentReflectionBonus(incident.severity.value);
+    debugPrint(
+      '🎁 _giveReflectionBonus: severity=${incident.severity.value}, '
+      'perPerson=$perPerson, staffIds=${incident.staffIds}, '
+      'nhId=${incident.nursinghomeId}',
+    );
+
+    if (perPerson <= 0) {
+      debugPrint('🎁 _giveReflectionBonus: perPerson <= 0 → return 0');
+      return 0;
+    }
+
+    // พยายาม record bonus ลง DB (best-effort — ไม่ block UI)
+    try {
+      final pointsService = PointsService();
+      final totalBonus = await pointsService.recordIncidentReflectionBonus(
+        incidentId: incident.id,
+        severity: incident.severity.value,
+        staffIds: incident.staffIds,
+        nursinghomeId: incident.nursinghomeId,
+      );
+      debugPrint('🎁 _giveReflectionBonus: DB record result totalBonus=$totalBonus');
+    } catch (e) {
+      debugPrint('⚠️ _giveReflectionBonus: DB record failed: $e');
+      // ไม่ return 0 — ยังคงแสดง UI overlay ให้ user เห็น
+    }
+
+    debugPrint('🎁 _giveReflectionBonus: returning perPerson=$perPerson');
+    return perPerson;
+  }
+
+
   /// สร้างสรุป 4 Pillars จาก AI
   Future<ReflectionSummary?> generateSummary() async {
-    if (_currentIncident == null) return null;
-    if (state.isGeneratingSummary) return null;
+    debugPrint('📋 generateSummary: START');
+    if (_currentIncident == null) {
+      debugPrint('📋 generateSummary: _currentIncident is null');
+      return null;
+    }
+    if (state.isGeneratingSummary) {
+      debugPrint('📋 generateSummary: already generating');
+      return null;
+    }
 
     state = state.copyWith(isGeneratingSummary: true, clearError: true);
 
     try {
+      debugPrint('📋 generateSummary: calling AI...');
       final summary = await _aiService.generateSummary(
         incidentId: _currentIncident!.id,
         chatHistory: state.messages.where((m) => !m.isLoading).toList(),
       );
 
       if (summary != null) {
-        // บันทึกสรุปลง database
+        debugPrint('📋 generateSummary: AI returned summary, saving to DB...');
+        // บันทึกสรุปลง database (เปลี่ยน reflection_status → completed)
         await _incidentService.saveReflectionSummary(
           _currentIncident!.id,
           summary,
         );
+        debugPrint('📋 generateSummary: saved to DB OK');
 
         state = state.copyWith(
           isGeneratingSummary: false,
@@ -510,7 +600,11 @@ class ChatNotifier extends StateNotifier<ChatState> {
         // Invalidate incidents provider เพื่อ refresh list
         _ref.invalidate(myIncidentsProvider);
 
-        debugPrint('ChatNotifier: summary generated and saved');
+        // คืนคะแนน 50% ให้ staff — await เพื่อเก็บ bonus สำหรับแสดง UI
+        debugPrint('📋 generateSummary: calling _giveReflectionBonus...');
+        _lastBonusAwarded = await _giveReflectionBonus();
+
+        debugPrint('ChatNotifier: summary generated and saved, bonus: $_lastBonusAwarded');
         return summary;
       } else {
         state = state.copyWith(
@@ -571,6 +665,8 @@ class ChatNotifier extends StateNotifier<ChatState> {
   void reset() {
     _currentIncident = null;
     _hasShownSummaryPopup = false;
+    _lastBonusAwarded = 0;
+    _wasAlreadyCompleteOnLoad = false;
     state = const ChatState();
   }
 

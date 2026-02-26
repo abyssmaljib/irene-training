@@ -2,30 +2,33 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 
-/// StatusBadge - Widget สำหรับแสดง badge/tag ที่ใช้ซ้ำได้ทั้ง app
-/// รองรับทั้งแบบ text-only และ icon + text
+/// CustomBadge - Badge/tag ที่กำหนดสีเองได้อิสระ
+/// ใช้สำหรับ badge ที่ไม่ได้มี status ตายตัว (passed/pending/failed)
+/// ถ้าต้องการ badge แบบ status ให้ใช้ StatusBadge ใน tags_badges.dart แทน
 ///
 /// ตัวอย่างการใช้งาน:
 /// ```dart
-/// // แบบ text-only
-/// StatusBadge(
+/// // แบบ text-only — กำหนดสีเอง
+/// CustomBadge(
 ///   label: 'Zone A',
 ///   backgroundColor: AppColors.accent1,
 ///   textColor: AppColors.primary,
 /// )
 ///
 /// // แบบ icon + text
-/// StatusBadge(
+/// CustomBadge(
 ///   label: 'พนักงาน',
 ///   icon: HugeIcons.strokeRoundedUserAccount,
 ///   backgroundColor: Color(0xFFE8DEF8),
 ///   textColor: Color(0xFF6750A4),
 /// )
 ///
-/// // แบบ hashtag
-/// StatusBadge.hashtag(label: 'สุขภาพ')
+/// // ใช้ factory ที่มีให้
+/// CustomBadge.hashtag(label: 'สุขภาพ')
+/// CustomBadge.zone(zoneName: 'Zone A')
+/// CustomBadge.role(roleName: 'พยาบาล')
 /// ```
-class StatusBadge extends StatelessWidget {
+class CustomBadge extends StatelessWidget {
   /// ข้อความที่แสดงใน badge
   final String label;
 
@@ -54,7 +57,7 @@ class StatusBadge extends StatelessWidget {
   /// Font weight (default: normal)
   final FontWeight? fontWeight;
 
-  const StatusBadge({
+  const CustomBadge({
     super.key,
     required this.label,
     required this.backgroundColor,
@@ -69,11 +72,11 @@ class StatusBadge extends StatelessWidget {
 
   /// Factory สำหรับ hashtag style (#tag)
   /// ใช้สี primary โดยอัตโนมัติ
-  factory StatusBadge.hashtag({
+  factory CustomBadge.hashtag({
     required String label,
     double fontSize = 10,
   }) {
-    return StatusBadge(
+    return CustomBadge(
       label: '#$label',
       backgroundColor: AppColors.primary.withValues(alpha: 0.1),
       textColor: AppColors.primary,
@@ -85,8 +88,8 @@ class StatusBadge extends StatelessWidget {
   }
 
   /// Factory สำหรับ zone badge
-  factory StatusBadge.zone({required String zoneName}) {
-    return StatusBadge(
+  factory CustomBadge.zone({required String zoneName}) {
+    return CustomBadge(
       label: zoneName,
       backgroundColor: AppColors.accent1,
       textColor: AppColors.primary,
@@ -94,11 +97,11 @@ class StatusBadge extends StatelessWidget {
   }
 
   /// Factory สำหรับ role badge
-  factory StatusBadge.role({
+  factory CustomBadge.role({
     required String roleName,
     dynamic icon,
   }) {
-    return StatusBadge(
+    return CustomBadge(
       label: roleName,
       icon: icon,
       backgroundColor: const Color(0xFFE8DEF8), // สีม่วงอ่อน pastel

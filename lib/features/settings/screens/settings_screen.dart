@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/widgets/confirm_dialog.dart';
 import '../../../core/widgets/network_image.dart';
 import '../../../core/services/user_service.dart';
@@ -16,6 +17,7 @@ import '../../learning/screens/directory_screen.dart';
 import '../../learning/screens/badge_collection_screen.dart';
 import '../models/user_profile.dart';
 import '../../../core/widgets/irene_app_bar.dart';
+import '../../../core/widgets/shimmer_loading.dart';
 import '../../shift_summary/screens/shift_summary_screen.dart';
 import '../../shift_summary/services/shift_summary_service.dart';
 import '../../shift_summary/providers/shift_summary_provider.dart';
@@ -242,24 +244,60 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
+  /// Pull to refresh — โหลดข้อมูลทั้งหมดใหม่ + invalidate providers ที่แสดง badge
+  Future<void> _onRefresh() async {
+    // Invalidate Riverpod providers เพื่อให้ badge counts โหลดใหม่
+    ref.invalidate(unreadNotificationCountProvider);
+    ref.invalidate(pendingDDCountProvider);
+    ref.invalidate(pendingIncidentCountProvider);
+    ref.invalidate(profileCompletionStatusProvider);
+    ref.invalidate(pendingAbsenceCountProvider);
+
+    // โหลดข้อมูล profile, role, system role, all users ใหม่
+    await Future.wait([
+      _loadUserProfile(),
+      _loadUserRole(),
+      _loadSystemRole(),
+      _loadAllUsers(),
+    ]);
+
+    // โหลดสถานะ Clock-In ใหม่
+    _loadClockInVerification();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.primaryBackground,
-      body: CustomScrollView(
-        slivers: [
-          IreneAppBar(
-            title: 'โปรไฟล์',
-          ),
-          SliverToBoxAdapter(child: _buildBody()),
-        ],
+      body: RefreshIndicator(
+        onRefresh: _onRefresh,
+        color: AppColors.primary,
+        child: CustomScrollView(
+          // ต้องใช้ AlwaysScrollableScrollPhysics เพื่อให้ pull-to-refresh ทำงาน
+          // แม้ content สั้นกว่าหน้าจอ
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            IreneAppBar(
+              title: 'โปรไฟล์',
+            ),
+            SliverToBoxAdapter(child: _buildBody()),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildBody() {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return ShimmerWrapper(
+        isLoading: true,
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
+          child: Column(
+            children: List.generate(5, (_) => const SkeletonListItem()),
+          ),
+        ),
+      );
     }
 
     if (_error != null) {
@@ -1339,12 +1377,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('กลับมาเป็นตัวคุณเองแล้ว'),
-        backgroundColor: AppColors.primary,
-      ),
-    );
+    AppSnackbar.info(context, 'กลับมาเป็นตัวคุณเองแล้ว');
   }
 
   /// Invalidate all service caches when switching users
@@ -1662,12 +1695,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     if (!success) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('เกิดข้อผิดพลาดในการสวมรอย'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      AppSnackbar.error(context, 'เกิดข้อผิดพลาดในการสวมรอย');
       return;
     }
 
@@ -1685,12 +1713,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('สวมรอยเป็น: ${user.displayName}'),
-        backgroundColor: Colors.purple,
-      ),
-    );
+    AppSnackbar.info(context, 'สวมรอยเป็น: ${user.displayName}');
   }
 
   Widget _buildDevRoleSelector() {
@@ -1798,21 +1821,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       await _loadUserRole();
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'เปลี่ยน role เป็น: ${roleName ?? "พนักงาน"}',
-          ),
-          backgroundColor: AppColors.primary,
-        ),
-      );
+      AppSnackbar.success(context, 'เปลี่ยน role เป็น: ${roleName ?? "พนักงาน"}');
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('ไม่สามารถเปลี่ยน role ได้'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      AppSnackbar.error(context, 'ไม่สามารถเปลี่ยน role ได้');
     }
   }
 
@@ -1964,20 +1975,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ? 'ไม่ระบุ'
           : _allSystemRoles.firstWhere((r) => r.id == roleId).name;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('เปลี่ยนตำแหน่งเป็น: $roleName'),
-          backgroundColor: AppColors.primary,
-        ),
-      );
+      AppSnackbar.success(context, 'เปลี่ยนตำแหน่งเป็น: $roleName');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('ไม่สามารถเปลี่ยนตำแหน่งได้'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      AppSnackbar.error(context, 'ไม่สามารถเปลี่ยนตำแหน่งได้');
     }
   }
 

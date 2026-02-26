@@ -10,6 +10,7 @@ import '../../../core/widgets/irene_app_bar.dart';
 import '../../board/models/post.dart';
 import '../../board/screens/board_screen.dart';
 import '../providers/activity_log_provider.dart';
+import '../../../core/widgets/shimmer_loading.dart';
 
 /// หน้าแสดงบันทึกกิจกรรมทั้งหมดของ resident
 class ActivityLogScreen extends ConsumerStatefulWidget {
@@ -161,8 +162,14 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
         ],
       ),
       body: postsAsync.when(
-        loading: () => Center(
-          child: CircularProgressIndicator(color: AppColors.primary),
+        loading: () => ShimmerWrapper(
+          isLoading: true,
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
+            child: Column(
+              children: List.generate(5, (_) => const SkeletonListItem()),
+            ),
+          ),
         ),
         error: (e, _) => _buildError(e.toString()),
         data: (allPosts) {

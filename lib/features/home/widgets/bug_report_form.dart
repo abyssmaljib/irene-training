@@ -8,6 +8,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/services/app_version_service.dart';
 import '../services/bug_report_service.dart';
+import '../../../core/widgets/app_snackbar.dart';
 
 /// Form สำหรับรายงานปัญหา/Bug
 /// แสดงเป็น dialog หรือ bottom sheet
@@ -214,21 +215,11 @@ class _BugReportFormState extends State<BugReportForm> {
 
     if (result != null) {
       // Success
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('ส่งรายงานปัญหาเรียบร้อยแล้ว'),
-          backgroundColor: AppColors.primary,
-        ),
-      );
+      AppSnackbar.success(context, 'ส่งรายงานปัญหาเรียบร้อยแล้ว');
       widget.onSubmitSuccess?.call();
     } else {
       // Error
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      AppSnackbar.error(context, 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
     }
   }
 

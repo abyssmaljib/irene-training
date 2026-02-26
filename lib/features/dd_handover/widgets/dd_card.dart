@@ -22,15 +22,13 @@ class DDCard extends StatelessWidget {
     this.isOverdue = false,
   });
 
-  // สีพิเศษสำหรับ DD Card (ปกติ)
-  static const _backgroundColor = Color(0xFFFFFFD9);
-  static const _borderColor = Color(0xFFF1EF99);
-  // สีสำหรับ upcoming (ไฮไลต์ส้ม - กำลังจะถึง)
-  static const _upcomingBackgroundColor = Color(0xFFFFF9C4);
-  static const _upcomingBorderColor = Color(0xFFFFB300);
-  // สีสำหรับ overdue (แดงพาสเทล - เลยเวลาแล้วยังไม่ได้ทำ)
-  static const _overdueBackgroundColor = Color(0xFFFFEBEE);
-  static const _overdueBorderColor = Color(0xFFEF9A9A);
+  // ใช้สีจาก AppColors.ddXxx แทน hardcode — ง่ายต่อการเปลี่ยน theme
+  static const _backgroundColor = AppColors.ddPendingBg;
+  static const _borderColor = AppColors.ddPendingBorder;
+  static const _upcomingBackgroundColor = AppColors.ddUpcomingBg;
+  static const _upcomingBorderColor = AppColors.ddUpcomingAccent;
+  static const _overdueBackgroundColor = AppColors.ddOverdueBg;
+  static const _overdueBorderColor = AppColors.ddOverdueBorder;
 
   @override
   Widget build(BuildContext context) {

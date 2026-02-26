@@ -6,6 +6,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/filter_drawer_shell.dart';
 import '../../../core/widgets/irene_app_bar.dart';
 import '../../../core/widgets/input_fields.dart';
+import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/widgets/toggle_switch.dart';
 import '../../../core/services/user_service.dart';
 import '../../checklist/models/system_role.dart';
@@ -17,6 +18,7 @@ import '../widgets/turn_on_medicine_sheet.dart';
 import 'medicine_photos_screen.dart';
 import 'add_medicine_to_resident_screen.dart';
 import 'edit_medicine_screen.dart';
+import '../../../core/widgets/shimmer_loading.dart';
 
 /// ข้อมูลประเภทยาสำหรับ filter chips
 class _GroupInfo {
@@ -248,12 +250,7 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
   Future<void> _navigateToEditMedicine(MedicineSummary medicine) async {
     // ตรวจสอบสิทธิ์ - ต้องเป็นหัวหน้าเวรขึ้นไป
     if (!(_systemRole?.canQC ?? false)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('คุณไม่มีสิทธิ์แก้ไขยา'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      AppSnackbar.warning(context, 'คุณไม่มีสิทธิ์แก้ไขยา');
       return;
     }
 
@@ -474,19 +471,13 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
 
   Widget _buildMedicineList() {
     if (_isLoading) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(color: AppColors.primary),
-            AppSpacing.verticalGapMd,
-            Text(
-              'กำลังโหลดรายการยา...',
-              style: AppTypography.body.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ],
+      return ShimmerWrapper(
+        isLoading: true,
+        child: Padding(
+          padding: EdgeInsets.all(AppSpacing.md),
+          child: Column(
+            children: List.generate(5, (_) => const SkeletonListItem()),
+          ),
         ),
       );
     }

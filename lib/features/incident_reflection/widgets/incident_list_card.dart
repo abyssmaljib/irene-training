@@ -216,17 +216,15 @@ class IncidentListCard extends StatelessWidget {
     }
   }
 
-  /// ดึงสีตาม severity
+  /// ดึงสีตาม severity (LEVEL_1 = เขียว, LEVEL_2 = ส้ม, LEVEL_3 = แดง)
   Color _getSeverityColor(IncidentSeverity severity) {
     switch (severity) {
-      case IncidentSeverity.low:
+      case IncidentSeverity.level1:
         return AppColors.tagPassedText;
-      case IncidentSeverity.medium:
+      case IncidentSeverity.level2:
         return AppColors.warning;
-      case IncidentSeverity.high:
+      case IncidentSeverity.level3:
         return AppColors.error;
-      case IncidentSeverity.critical:
-        return const Color(0xFF7B1F3B); // Dark red
     }
   }
 

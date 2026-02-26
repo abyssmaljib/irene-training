@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hugeicons/hugeicons.dart';
 import '../../../core/services/user_service.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/error_state.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../models/dd_record.dart';
@@ -47,7 +48,12 @@ class _DDSummaryCardState extends ConsumerState<DDSummaryCard> {
 
     return pendingRecordsAsync.when(
       loading: () => _buildLoadingCard(),
-      error: (_, _) => const SizedBox.shrink(),
+      // แสดง error แทน SizedBox.shrink() เพื่อให้ user รู้ว่าเกิดข้อผิดพลาด
+      error: (error, _) => ErrorStateWidget(
+        message: 'โหลดข้อมูล DD ไม่สำเร็จ',
+        compact: true,
+        onRetry: () => ref.invalidate(pendingDDRecordsProvider),
+      ),
       data: (records) {
         if (records.isEmpty) return const SizedBox.shrink();
         return _buildCard(context, records);

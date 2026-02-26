@@ -11,6 +11,8 @@ import '../models/shift_activity_stats.dart';
 import '../services/clock_service.dart';
 import '../services/home_service.dart';
 import '../../navigation/screens/main_navigation_screen.dart';
+import '../../../core/widgets/app_snackbar.dart';
+import '../../../core/widgets/shimmer_loading.dart';
 
 class ShiftSummaryScreen extends StatefulWidget {
   final ClockInOut currentShift;
@@ -102,9 +104,7 @@ class _ShiftSummaryScreenState extends State<ShiftSummaryScreen> {
     if (_remainingTasks > 0) return;
     
     if (_shiftSurveyController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('กรุณาเขียนสรุปเวรด้วยนะคะ')),
-      );
+      AppSnackbar.warning(context, 'กรุณาเขียนสรุปเวรด้วยนะคะ');
       return;
     }
 
@@ -154,9 +154,7 @@ class _ShiftSummaryScreenState extends State<ShiftSummaryScreen> {
            Navigator.of(context).pop(true);
         }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('เกิดข้อผิดพลาดในการลงเวร')),
-        );
+        AppSnackbar.error(context, 'เกิดข้อผิดพลาดในการลงเวร');
       }
     }
   }
@@ -166,7 +164,12 @@ class _ShiftSummaryScreenState extends State<ShiftSummaryScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? ShimmerWrapper(
+              isLoading: true,
+              child: Column(
+                children: List.generate(3, (_) => const SkeletonCard()),
+              ),
+            )
           : SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,

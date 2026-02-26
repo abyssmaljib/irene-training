@@ -5,6 +5,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/widgets/buttons.dart';
+import '../../../../core/widgets/app_snackbar.dart';
 import '../../../../core/widgets/network_image.dart';
 import '../../models/vital_sign.dart';
 import '../../models/vital_sign_form_state.dart';
@@ -412,24 +413,7 @@ class PreviewVitalSignDialog extends StatelessWidget {
           child: TextButton.icon(
             onPressed: () {
               Clipboard.setData(ClipboardData(text: formattedReport));
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Row(
-                    children: [
-                      HugeIcon(
-                        icon: HugeIcons.strokeRoundedTick02,
-                        color: Colors.white,
-                        size: AppIconSize.md,
-                      ),
-                      const SizedBox(width: 8),
-                      const Text('คัดลอกรายงานแล้ว'),
-                    ],
-                  ),
-                  backgroundColor: AppColors.success,
-                  behavior: SnackBarBehavior.floating,
-                  duration: const Duration(seconds: 2),
-                ),
-              );
+              AppSnackbar.success(context, 'คัดลอกรายงานแล้ว');
             },
             icon: HugeIcon(
               icon: HugeIcons.strokeRoundedCopy01,

@@ -119,7 +119,9 @@ enum NotificationType {
   comment('comment'),
   system('system'),
   review('review'),
-  assignment('assignment');  // การมอบหมายผู้รับบริการ
+  assignment('assignment'),  // การมอบหมายผู้รับบริการ
+  incident('incident'),      // เหตุการณ์/อุบัติเหตุ
+  points('points');           // คะแนน (ได้รับ/ถูกหัก)
 
   final String value;
   const NotificationType(this.value);
@@ -150,6 +152,10 @@ enum NotificationType {
         return 'ทบทวน';
       case NotificationType.assignment:
         return 'มอบหมายงาน';
+      case NotificationType.incident:
+        return 'เหตุการณ์';
+      case NotificationType.points:
+        return 'คะแนน';
     }
   }
 }

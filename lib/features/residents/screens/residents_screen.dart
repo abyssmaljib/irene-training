@@ -20,6 +20,7 @@ import '../widgets/residents_filter_drawer.dart';
 import 'resident_detail_screen.dart';
 import 'create_vital_sign_screen.dart';
 import '../../../core/widgets/tags_badges.dart';
+import '../../../core/widgets/shimmer_loading.dart';
 
 /// หน้าคนไข้ - Residents
 /// แสดงรายชื่อคนไข้ พร้อม swipe action จัดยา/รายงาน
@@ -531,8 +532,16 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
   List<Widget> _buildResidentSlivers() {
     if (_isLoadingResidents) {
       return [
-        SliverFillRemaining(
-          child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+        SliverToBoxAdapter(
+          child: ShimmerWrapper(
+            isLoading: true,
+            child: Padding(
+              padding: EdgeInsets.only(top: AppSpacing.md),
+              child: Column(
+                children: List.generate(5, (_) => const SkeletonListItem()),
+              ),
+            ),
+          ),
         ),
       ];
     }

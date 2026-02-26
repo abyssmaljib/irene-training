@@ -8,6 +8,7 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/widgets/coin_reward_overlay.dart';
 import '../../../core/widgets/confirm_dialog.dart';
 import '../../../core/widgets/irene_app_bar.dart';
 import '../models/incident.dart';
@@ -62,7 +63,13 @@ class _IncidentChatScreenState extends ConsumerState<IncidentChatScreen> {
   void dispose() {
     _scrollController.dispose();
     // Reset chat state เมื่อออกจากหน้า
-    ref.read(chatProvider.notifier).reset();
+    // ใช้ try-catch เพราะ ref อาจใช้ไม่ได้ใน dispose() (widget disposed ก่อน)
+    try {
+      ref.read(chatProvider.notifier).reset();
+    } catch (_) {
+      // ignore — reset ไม่สำคัญแล้วเพราะ wasAlreadyCompleteOnLoad
+      // จะ detect ให้ถูกต้องตอน loadFromIncident() ครั้งถัดไป
+    }
     super.dispose();
   }
 
@@ -127,13 +134,15 @@ class _IncidentChatScreenState extends ConsumerState<IncidentChatScreen> {
     if (!confirmed) return;
 
     // Generate summary
+    debugPrint('🖥️ _handleGenerateSummary: calling generateSummary...');
     final summary = await ref.read(chatProvider.notifier).generateSummary();
+    debugPrint('🖥️ _handleGenerateSummary: summary=${summary != null ? "OK" : "null"}, mounted=$mounted');
 
     if (summary != null && mounted) {
       // แสดง success dialog พร้อมสรุป
       await showDialog(
         context: context,
-        builder: (context) => AlertDialog(
+        builder: (dialogCtx) => AlertDialog(
           title: Row(
             children: [
               HugeIcon(
@@ -163,10 +172,7 @@ class _IncidentChatScreenState extends ConsumerState<IncidentChatScreen> {
           ),
           actions: [
             ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context); // ปิด dialog
-                Navigator.pop(context); // กลับไปหน้า list
-              },
+              onPressed: () => Navigator.pop(dialogCtx),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
@@ -176,7 +182,38 @@ class _IncidentChatScreenState extends ConsumerState<IncidentChatScreen> {
           ],
         ),
       );
+
+      // หลัง dialog ปิด → แสดง bonus dialog ก่อนกลับหน้า list
+      if (mounted) {
+        final bonus = ref.read(chatProvider.notifier).lastBonusAwarded;
+        debugPrint('🖥️ _handleGenerateSummary: lastBonusAwarded=$bonus, mounted=$mounted');
+        if (bonus > 0) {
+          // เคลียร์ bonus ทันทีก่อนแสดง coin overlay (ป้องกันแสดงซ้ำ)
+          ref.read(chatProvider.notifier).clearBonusAwarded();
+          debugPrint('🖥️ _handleGenerateSummary: showing coin overlay...');
+          await _showBonusPointsDialog(bonus);
+          debugPrint('🖥️ _handleGenerateSummary: coin overlay closed');
+        } else {
+          debugPrint('🖥️ _handleGenerateSummary: bonus <= 0, SKIPPING overlay');
+        }
+      }
+      if (mounted) {
+        debugPrint('🖥️ _handleGenerateSummary: popping back to list');
+        Navigator.pop(context); // กลับไปหน้า list
+      }
     }
+  }
+
+  /// แสดง coin animation แจ้งคะแนนที่ได้คืนหลังถอดบทเรียนเสร็จ
+  /// [bonusPerPerson] คะแนนที่ได้คืนต่อคน (เช่น 50, 150, 250)
+  Future<void> _showBonusPointsDialog(int bonusPerPerson) async {
+    await CoinRewardOverlay.show(
+      context,
+      points: bonusPerPerson,
+      title: 'ได้รับคะแนนคืน!',
+      pointsLabel: '+$bonusPerPerson คะแนน',
+      subtitle: 'ถอดบทเรียนเสร็จ ได้คืน 50%',
+    );
   }
 
   Widget _buildSummarySection(String title, String content) {
@@ -199,19 +236,33 @@ class _IncidentChatScreenState extends ConsumerState<IncidentChatScreen> {
     );
   }
 
-  /// แสดง popup สรุปเมื่อกดปุ่ม "การถอดบทเรียนเสร็จสิ้นแล้ว"
-  /// ดึงข้อมูลล่าสุดจาก Supabase แล้วแสดง popup พร้อมปุ่มกลับหน้า list
+  /// แสดง coin overlay + popup สรุปเมื่อกดปุ่ม "การถอดบทเรียนเสร็จสิ้นแล้ว"
+  /// ครั้งแรก (เพิ่ง complete): coin overlay → summary popup → navigate back
+  /// ครั้งต่อไป (เปิดดูทีหลัง): summary popup → navigate back (ไม่มี coin)
   Future<void> _showCompletedSummaryAndGoBack() async {
-    // ดึงข้อมูลล่าสุดจาก DB (ไม่ใช้ widget.incident เพราะเป็นข้อมูลเก่า)
+    // 1) แสดง coin overlay เฉพาะ "เพิ่ง complete ใน session นี้"
+    // ตรวจจาก wasAlreadyCompleteOnLoad:
+    //   false = เพิ่ง complete ใน session นี้ → แสดง coin
+    //   true  = เปิดดู incident ที่เสร็จแล้ว (ครั้งที่ 2+) → ข้าม coin
+    final notifier = ref.read(chatProvider.notifier);
+    final justCompletedNow = !notifier.wasAlreadyCompleteOnLoad;
+    final bonus = notifier.lastBonusAwarded;
+
+    if (justCompletedNow && bonus > 0) {
+      // เคลียร์ bonus ทันทีก่อนแสดง เพื่อป้องกันกด banner ซ้ำแล้วเห็น coin อีก
+      notifier.clearBonusAwarded();
+      await _showBonusPointsDialog(bonus);
+      if (!mounted) return;
+    }
+
+    // 2) ดึงข้อมูลล่าสุดจาก DB (ไม่ใช้ widget.incident เพราะเป็นข้อมูลเก่า)
     final incidentService = IncidentService.instance;
     final latestIncident = await incidentService.getIncidentById(widget.incident.id);
 
     if (!mounted) return;
 
-    // ถ้าดึงไม่ได้ ใช้ข้อมูลเดิม
     final incident = latestIncident ?? widget.incident;
 
-    // สร้าง summary จากข้อมูลล่าสุด
     final summary = ReflectionSummary(
       whyItMatters: incident.whyItMatters ?? '',
       rootCause: incident.rootCause ?? '',
@@ -220,66 +271,21 @@ class _IncidentChatScreenState extends ConsumerState<IncidentChatScreen> {
       preventionPlan: incident.preventionPlan ?? '',
     );
 
-    // แสดง popup สรุป
+    // 3) แสดง summary popup
     await showDialog(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => ReflectionSummaryPopup(
         summary: summary,
-        isViewMode: true, // โหมดดูอย่างเดียว - แสดงปุ่ม "เสร็จสิ้น" อย่างเดียว
-        onEdit: () {
-          // ไม่ใช้ในโหมด view
-          Navigator.of(dialogContext).pop();
-        },
+        isViewMode: true,
+        onEdit: () => Navigator.of(dialogContext).pop(),
         onConfirm: () {
           Navigator.of(dialogContext).pop();
-          // Invalidate provider เพื่อ refresh list หน้า list
           ref.invalidate(myIncidentsProvider);
-          // กลับหน้า list
           Navigator.of(context).pop();
         },
       ),
     );
-  }
-
-  /// แสดง Summary Popup อัตโนมัติเมื่อครบ 4 Pillars
-  /// Popup นี้แสดงครั้งแรกครั้งเดียว หลังจากนั้นต้องกดปุ่ม "สรุป" เอง
-  Future<void> _showSummaryPopup(ReflectionSummary summary) async {
-    // ใช้ addPostFrameCallback เพื่อให้แน่ใจว่า build เสร็จแล้ว
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted) return;
-
-      // แสดง popup
-      final confirmed = await showDialog<bool>(
-        context: context,
-        barrierDismissible: false,
-        builder: (dialogContext) => ReflectionSummaryPopup(
-          summary: summary,
-          onEdit: () {
-            // User กด "แก้ไข" - กลับไปคุยต่อ
-            Navigator.of(dialogContext).pop(false);
-          },
-          onConfirm: () {
-            // User กด "ยืนยันและบันทึก"
-            Navigator.of(dialogContext).pop(true);
-          },
-        ),
-      );
-
-      if (!mounted) return;
-
-      if (confirmed == true) {
-        // User กด "ยืนยันและบันทึก" - บันทึกและกลับหน้า list
-        final success =
-            await ref.read(chatProvider.notifier).confirmAndSaveSummary();
-        if (success && mounted) {
-          Navigator.of(context).pop(); // กลับหน้า list
-        }
-      } else {
-        // User กด "แก้ไข" - dismiss popup และให้คุยต่อได้
-        ref.read(chatProvider.notifier).dismissSummaryPopup();
-      }
-    });
   }
 
   @override
@@ -298,14 +304,9 @@ class _IncidentChatScreenState extends ConsumerState<IncidentChatScreen> {
         _scrollToBottom();
       }
 
-      // แสดง Summary Popup เมื่อครบ 4 Pillars (ครั้งแรก)
-      // ตรวจสอบว่า shouldShowSummaryPopup เปลี่ยนจาก false → true
-      // และมี currentSummary พร้อมแสดง
-      if (previous?.shouldShowSummaryPopup != true &&
-          next.shouldShowSummaryPopup == true &&
-          next.currentSummary != null) {
-        _showSummaryPopup(next.currentSummary!);
-      }
+      // ไม่ auto-trigger ทั้ง coin overlay และ summary popup
+      // user กด banner "การถอดบทเรียนเสร็จสิ้นแล้ว" → _showCompletedSummaryAndGoBack()
+      // จัดการทั้ง coin (ครั้งแรก) + summary popup
     });
 
     return Scaffold(

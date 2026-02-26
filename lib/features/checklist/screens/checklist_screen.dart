@@ -6,6 +6,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/irene_app_bar.dart';
+import '../../../core/widgets/shimmer_loading.dart';
 import '../../home/models/zone.dart';
 import '../../home/models/clock_in_out.dart';
 import '../../settings/screens/settings_screen.dart';
@@ -540,7 +541,12 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
           },
         );
       },
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => ShimmerWrapper(
+        isLoading: true,
+        child: Column(
+          children: List.generate(5, (_) => const SkeletonListItem()),
+        ),
+      ),
       error: (error, _) => Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -614,7 +620,12 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
           },
         );
       },
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => ShimmerWrapper(
+        isLoading: true,
+        child: Column(
+          children: List.generate(5, (_) => const SkeletonListItem()),
+        ),
+      ),
       error: (error, _) => Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,

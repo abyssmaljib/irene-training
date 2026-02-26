@@ -4,10 +4,12 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/widgets/irene_app_bar.dart';
 import '../models/vital_sign.dart';
 import '../services/resident_detail_service.dart';
 import 'edit_vital_sign_screen.dart';
+import '../../../core/widgets/shimmer_loading.dart';
 
 /// หน้าแสดงประวัติสัญญาณชีพของ resident (Infinite scroll)
 class VitalSignLogScreen extends ConsumerStatefulWidget {
@@ -134,8 +136,14 @@ class _VitalSignLogScreenState extends ConsumerState<VitalSignLogScreen> {
 
   Widget _buildBody() {
     if (_isInitialLoading) {
-      return Center(
-        child: CircularProgressIndicator(color: AppColors.primary),
+      return ShimmerWrapper(
+        isLoading: true,
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
+          child: Column(
+            children: List.generate(5, (_) => const SkeletonListItem()),
+          ),
+        ),
       );
     }
 
@@ -442,13 +450,7 @@ class _VitalSignRow extends StatelessWidget {
   }
 
   void _showShareOptions(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('แชร์สัญญาณชีพ - Coming Soon'),
-        backgroundColor: AppColors.primary,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    AppSnackbar.info(context, 'แชร์สัญญาณชีพ - Coming Soon');
   }
 }
 

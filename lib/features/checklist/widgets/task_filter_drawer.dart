@@ -14,6 +14,7 @@ import '../../home/services/clock_service.dart';
 import '../../shift_summary/services/shift_summary_service.dart';
 import '../../dd_handover/services/dd_service.dart';
 import '../providers/task_provider.dart';
+import '../../../core/widgets/app_snackbar.dart';
 
 /// Provider สำหรับ all users (dev mode)
 final _allUsersProvider = FutureProvider<List<DevUserInfo>>((ref) async {
@@ -847,12 +848,7 @@ class _ImpersonationBanner extends ConsumerWidget {
     // Close drawer
     Navigator.of(context).pop();
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('กลับมาเป็นตัวคุณเองแล้ว'),
-        backgroundColor: AppColors.primary,
-      ),
-    );
+    AppSnackbar.success(context, 'กลับมาเป็นตัวคุณเองแล้ว');
   }
 }
 
@@ -1039,12 +1035,7 @@ class _DevModeUserSelectorState extends ConsumerState<_DevModeUserSelector> {
 
     if (!success) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('เกิดข้อผิดพลาดในการสวมรอย'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      AppSnackbar.error(context, 'เกิดข้อผิดพลาดในการสวมรอย');
       return;
     }
 
@@ -1074,12 +1065,7 @@ class _DevModeUserSelectorState extends ConsumerState<_DevModeUserSelector> {
     if (!mounted) return;
     Navigator.of(context).pop();
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('สวมรอยเป็น: ${user.displayName}'),
-        backgroundColor: Colors.cyan,
-      ),
-    );
+    AppSnackbar.info(context, 'สวมรอยเป็น: ${user.displayName}');
   }
 }
 

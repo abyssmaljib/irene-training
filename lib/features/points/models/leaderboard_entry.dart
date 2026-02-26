@@ -5,6 +5,7 @@
 enum LeaderboardPeriod {
   thisWeek('this_week', 'สัปดาห์นี้'),
   thisMonth('this_month', 'เดือนนี้'),
+  rolling3m('rolling_3m', '3 เดือน'), // Rolling 3-month window (ใช้คำนวณ tier percentile)
   allTime('all_time', 'ทั้งหมด');
 
   final String value;
@@ -26,6 +27,11 @@ class LeaderboardEntry {
   final String? tierColor;
   final int rank;
 
+  // Percentile fields (จาก user_tier_cache)
+  // null ถ้ายังไม่ได้คำนวณ หรือ period ไม่ใช่ rolling_3m
+  final double? percentile;
+  final int? rollingPoints; // คะแนนใน rolling 3-month window
+
   const LeaderboardEntry({
     required this.userId,
     this.nickname,
@@ -37,6 +43,8 @@ class LeaderboardEntry {
     this.tierIcon,
     this.tierColor,
     required this.rank,
+    this.percentile,
+    this.rollingPoints,
   });
 
   factory LeaderboardEntry.fromJson(Map<String, dynamic> json) {
@@ -51,6 +59,9 @@ class LeaderboardEntry {
       tierIcon: json['tier_icon'] as String?,
       tierColor: json['tier_color'] as String?,
       rank: (json['rank'] as num?)?.toInt() ?? 0,
+      // Percentile fields — null ถ้า DB ยังไม่มีข้อมูล
+      percentile: (json['percentile'] as num?)?.toDouble(),
+      rollingPoints: (json['rolling_points'] as num?)?.toInt(),
     );
   }
 
@@ -72,6 +83,15 @@ class LeaderboardEntry {
       default:
         return null;
     }
+  }
+
+  /// แสดง percentile เช่น "Top 5.3%"
+  /// null ถ้ายังไม่ได้คำนวณ
+  String? get percentileDisplay {
+    if (percentile == null) return null;
+    final topPercent = (100 - percentile!).clamp(0, 100);
+    if (topPercent < 1) return '#1';
+    return 'Top ${topPercent.toStringAsFixed(topPercent == topPercent.roundToDouble() ? 0 : 1)}%';
   }
 
   @override

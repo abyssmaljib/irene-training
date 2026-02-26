@@ -7,6 +7,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../providers/edit_post_provider.dart';
 import '../services/ai_helper_service.dart';
+import '../../../core/widgets/app_snackbar.dart';
 
 /// AI Summary widget for advanced edit post screen
 /// Shows AI summarize button and result when text > 50 chars
@@ -80,12 +81,8 @@ class _EditAiSummaryWidgetState extends ConsumerState<EditAiSummaryWidget> {
       ref.read(editPostProvider(widget.postId).notifier).clearAiSummary();
       widget.onReplaceText?.call();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('เพิ่มสรุปในข้อความแล้ว'),
-          duration: Duration(seconds: 2),
-        ),
-      );
+      // แจ้งเพิ่มสรุป AI ลงในข้อความสำเร็จ
+      AppSnackbar.success(context, 'เพิ่มสรุปในข้อความแล้ว');
     }
   }
 
@@ -93,12 +90,8 @@ class _EditAiSummaryWidgetState extends ConsumerState<EditAiSummaryWidget> {
     final summary = ref.read(editPostProvider(widget.postId)).aiSummary;
     if (summary != null) {
       Clipboard.setData(ClipboardData(text: summary));
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('คัดลอกข้อความแล้ว'),
-          duration: Duration(seconds: 2),
-        ),
-      );
+      // แจ้งคัดลอกข้อความสรุปสำเร็จ
+      AppSnackbar.success(context, 'คัดลอกข้อความแล้ว');
     }
   }
 

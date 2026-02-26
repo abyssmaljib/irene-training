@@ -7,6 +7,7 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/app_snackbar.dart';
 import '../services/shift_summary_service.dart';
 
 /// Bottom sheet สำหรับแนบหลักฐานการลาป่วย
@@ -307,12 +308,7 @@ class _SickLeaveClaimSheetState extends ConsumerState<SickLeaveClaimSheet> {
 
       if (mounted) {
         Navigator.pop(context, true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('บันทึกการลาป่วยเรียบร้อย'),
-            backgroundColor: AppColors.success,
-          ),
-        );
+        AppSnackbar.success(context, 'บันทึกการลาป่วยเรียบร้อย');
       }
     } catch (e) {
       setState(() {

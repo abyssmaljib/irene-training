@@ -11,6 +11,9 @@ enum PointTransactionType {
   taskCompleted('task_completed', 'ทำงานเสร็จ', '✅'),
   taskDifficult('task_difficult', 'งานยาก', '💪'),
   medArrange('MedArrange', 'จัดยา', '💊'),
+  incidentPenalty('incident_penalty', 'หักคะแนน Incident', '⚠️'),
+  incidentReflectionBonus('incident_reflection_bonus', 'คืนคะแนนถอดบทเรียน', '📝'),
+  lateClockIn('late_clock_in', 'ขึ้นเวรสาย', '⏰'),
   manualAdjustment('manual_adjustment', 'ปรับปรุงคะแนน', '🔧'),
   transfer('transfer', 'โอนคะแนน', '🔄'),
   periodReward('period_reward', 'รางวัลประจำรอบ', '🎁'),
@@ -119,6 +122,7 @@ class PointTransaction {
 }
 
 /// สรุป points ของ user
+/// รองรับทั้ง fixed threshold (เดิม) และ percentile-based (ใหม่)
 class UserPointsSummary {
   final String userId;
   final String? nickname;
@@ -130,7 +134,7 @@ class UserPointsSummary {
   final int monthPoints;
   final int transactionCount;
 
-  // Tier info
+  // Tier info (ใช้ได้ทั้ง fixed และ percentile mode)
   final String? tierId;
   final String? tierName;
   final String? tierNameTh;
@@ -138,6 +142,14 @@ class UserPointsSummary {
   final String? tierColor;
   final String? nextTierName;
   final int? nextTierMinPoints;
+
+  // Percentile-based fields (ใหม่)
+  // ถ้า percentile != null แสดงว่าใช้ percentile mode
+  final double? percentile; // Percentile ของ user (0-100)
+  final int? rollingPoints; // คะแนนใน rolling 3-month window
+  final int? rankInCohort; // อันดับที่ในกลุ่ม eligible
+  final int? cohortSize; // จำนวนคน eligible ทั้งหมด
+  final int? pointsGapToNext; // คะแนนโดยประมาณที่ต้องเพิ่มเพื่อถึง tier ถัดไป
 
   const UserPointsSummary({
     required this.userId,
@@ -156,6 +168,11 @@ class UserPointsSummary {
     this.tierColor,
     this.nextTierName,
     this.nextTierMinPoints,
+    this.percentile,
+    this.rollingPoints,
+    this.rankInCohort,
+    this.cohortSize,
+    this.pointsGapToNext,
   });
 
   factory UserPointsSummary.fromJson(Map<String, dynamic> json) {
@@ -175,30 +192,49 @@ class UserPointsSummary {
       tierIcon: json['tier_icon'] as String?,
       tierColor: json['tier_color'] as String?,
       nextTierName: json['next_tier_name'] as String?,
-      nextTierMinPoints: json['next_tier_min_points'] as int?,
+      nextTierMinPoints: (json['next_tier_min_points'] as num?)?.toInt(),
+      // Percentile fields — null ถ้ายังไม่ถูกคำนวณ (fallback ไป fixed mode)
+      percentile: (json['percentile'] as num?)?.toDouble(),
+      rollingPoints: (json['rolling_points'] as num?)?.toInt(),
+      rankInCohort: (json['rank_in_cohort'] as num?)?.toInt(),
+      cohortSize: (json['cohort_size'] as num?)?.toInt(),
+      pointsGapToNext: (json['points_gap_to_next'] as num?)?.toInt(),
     );
   }
+
+  /// เช็คว่าใช้ percentile mode หรือไม่
+  /// ถ้า percentile != null แสดงว่า user ถูกคำนวณแล้ว
+  bool get isPercentileMode => percentile != null;
 
   /// ชื่อ tier ที่แสดง
   String get tierDisplayName => tierNameTh ?? tierName ?? 'Bronze';
 
   /// Progress ไป tier ถัดไป (0.0 - 1.0)
+  /// - percentile mode: ใช้ gap ที่คำนวณจาก DB
+  /// - fixed mode: ใช้ min_points range เดิม
   double get progressToNextTier {
-    if (nextTierMinPoints == null) return 1.0;
+    if (nextTierName == null && nextTierMinPoints == null) return 1.0;
 
-    // หา current tier min points (ประมาณจาก tier name)
+    if (isPercentileMode && pointsGapToNext != null && rollingPoints != null) {
+      // Percentile mode: คำนวณจาก rolling_points กับ gap
+      if (pointsGapToNext == 0) return 0.95;
+      final totalNeeded = pointsGapToNext! + rollingPoints!;
+      if (totalNeeded <= 0) return 0.5;
+      return (rollingPoints! / totalNeeded).clamp(0.0, 0.99);
+    }
+
+    // Fixed mode fallback
+    if (nextTierMinPoints == null) return 1.0;
     final currentMin = _estimateCurrentTierMin();
     final nextMin = nextTierMinPoints!;
     final range = nextMin - currentMin;
-
     if (range <= 0) return 1.0;
-
     final progress = (totalPoints - currentMin) / range;
     return progress.clamp(0.0, 1.0);
   }
 
+  /// Fallback สำหรับ fixed mode — ประมาณ current tier min points จากชื่อ tier
   int _estimateCurrentTierMin() {
-    // ใช้ค่า default ตาม tier name
     switch (tierName?.toLowerCase()) {
       case 'bronze':
         return 0;
@@ -217,10 +253,28 @@ class UserPointsSummary {
 
   /// Points ที่ต้องการเพื่อไป tier ถัดไป
   int get pointsToNextTier {
+    if (isPercentileMode && pointsGapToNext != null) {
+      return pointsGapToNext!.clamp(0, 999999);
+    }
     if (nextTierMinPoints == null) return 0;
     return (nextTierMinPoints! - totalPoints).clamp(0, nextTierMinPoints!);
   }
 
   /// ถึง tier สูงสุดแล้วหรือไม่
-  bool get isMaxTier => nextTierMinPoints == null;
+  bool get isMaxTier =>
+      nextTierName == null && nextTierMinPoints == null;
+
+  /// แสดง percentile เป็นข้อความ เช่น "Top 5.3%"
+  String? get percentileDisplay {
+    if (percentile == null) return null;
+    final topPercent = (100 - percentile!).clamp(0, 100);
+    if (topPercent < 1) return '#1';
+    return 'Top ${topPercent.toStringAsFixed(topPercent == topPercent.roundToDouble() ? 0 : 1)}%';
+  }
+
+  /// แสดงอันดับ เช่น "อันดับ 2 จาก 18 คน"
+  String? get rankDisplay {
+    if (rankInCohort == null || cohortSize == null) return null;
+    return 'อันดับ $rankInCohort จาก $cohortSize คน';
+  }
 }

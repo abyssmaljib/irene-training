@@ -5,6 +5,7 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/widgets/input_fields.dart';
 import '../../../core/widgets/buttons.dart';
 import '../screens/forgot_password_screen.dart';
@@ -106,10 +107,7 @@ class _LoginBottomSheetState extends State<LoginBottomSheet> {
       setState(() => _otpSent = true);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('ส่งรหัส OTP ไปที่ ${_emailController.text} แล้ว')),
-        );
+        AppSnackbar.success(context, 'ส่งรหัส OTP ไปที่ ${_emailController.text} แล้ว');
       }
     } catch (e) {
       setState(() => _errorMessage = 'ไม่สามารถส่ง OTP ได้ กรุณาลองใหม่');

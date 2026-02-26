@@ -7,6 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/confirm_dialog.dart';
+import '../../../core/widgets/app_snackbar.dart';
 import 'handover_toggle_widget.dart';
 import '../models/post.dart';
 import '../providers/edit_post_provider.dart';
@@ -1070,9 +1071,8 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
     final remaining = state.remainingImageSlots;
 
     if (remaining <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('เลือกรูปได้สูงสุด 5 รูป')),
-      );
+      // แจ้งเตือนเลือกรูปเกินจำนวนที่กำหนด
+      AppSnackbar.warning(context, 'เลือกรูปได้สูงสุด 5 รูป');
       return;
     }
 
@@ -1090,9 +1090,8 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
 
     // เช็คว่าสามารถเพิ่มวีดีโอได้หรือไม่
     if (!state.canAddVideo) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ไม่สามารถเพิ่มวีดีโอได้ (มีรูปภาพหรือวีดีโออยู่แล้ว)')),
-      );
+      // แจ้งเตือนไม่สามารถเพิ่มวีดีโอได้
+      AppSnackbar.warning(context, 'ไม่สามารถเพิ่มวีดีโอได้ (มีรูปภาพหรือวีดีโออยู่แล้ว)');
       return;
     }
 
@@ -1107,9 +1106,8 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
 
     // ถ้าติ๊กส่งเวร บังคับต้องกรอกรายละเอียด
     if (text.isEmpty && state.isHandover) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('กรุณากรอกรายละเอียดเมื่อติ๊กส่งเวร')),
-      );
+      // แจ้งเตือน validation: ต้องกรอกรายละเอียดเมื่อติ๊กส่งเวร
+      AppSnackbar.warning(context, 'กรุณากรอกรายละเอียดเมื่อติ๊กส่งเวร');
       return;
     }
 
@@ -1216,9 +1214,8 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
           Navigator.pop(context);
           widget.onPostUpdated?.call();
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('บันทึกสำเร็จ')),
-          );
+          // แจ้งบันทึกโพสสำเร็จ
+          AppSnackbar.success(context, 'บันทึกสำเร็จ');
         }
       } else {
         throw Exception('ไม่สามารถบันทึกได้');
@@ -1228,9 +1225,8 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
           .read(editPostProvider(widget.post.id).notifier)
           .setError(e.toString());
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('เกิดข้อผิดพลาด: $e')),
-        );
+        // แจ้ง error เมื่อบันทึกโพสไม่สำเร็จ
+        AppSnackbar.error(context, 'เกิดข้อผิดพลาด: $e');
       }
     } finally {
       // Clear upload status และ submitting state ทุกกรณี

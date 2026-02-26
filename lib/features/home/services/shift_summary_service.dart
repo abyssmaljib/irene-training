@@ -29,8 +29,12 @@ class ShiftPointsSummary {
   /// Dead air penalty (ติดลบ)
   final int deadAirPenalty;
 
-  /// Points สุทธิ (หลังหัก penalty)
-  int get netPoints => totalPoints - deadAirPenalty.abs();
+  /// Late clock-in penalty (ติดลบ) — หักคะแนนเมื่อขึ้นเวรสาย
+  final int lateClockInPenalty;
+
+  /// Points สุทธิ (หลังหัก penalty ทั้งหมด)
+  int get netPoints =>
+      totalPoints - deadAirPenalty.abs() - lateClockInPenalty.abs();
 
   /// จำนวน transactions ทั้งหมด
   final int transactionCount;
@@ -43,6 +47,7 @@ class ShiftPointsSummary {
     this.badgePoints = 0,
     this.medicinePhotoPoints = 0,
     this.deadAirPenalty = 0,
+    this.lateClockInPenalty = 0,
     this.transactionCount = 0,
   });
 }
@@ -184,6 +189,7 @@ class ShiftSummaryService {
       int badgePoints = 0;
       int medicinePhotoPoints = 0;
       int deadAirPenalty = 0;
+      int lateClockInPenalty = 0;
 
       for (final row in result) {
         final points = (row['point_change'] as num?)?.toInt() ?? 0;
@@ -202,6 +208,8 @@ class ShiftSummaryService {
           medicinePhotoPoints += points;
         } else if (type == 'dead_air_penalty') {
           deadAirPenalty += points.abs(); // เก็บเป็นค่าบวก
+        } else if (type == 'late_clock_in') {
+          lateClockInPenalty += points.abs(); // เก็บเป็นค่าบวก
         }
       }
 
@@ -215,6 +223,7 @@ class ShiftSummaryService {
         badgePoints: badgePoints,
         medicinePhotoPoints: medicinePhotoPoints,
         deadAirPenalty: deadAirPenalty,
+        lateClockInPenalty: lateClockInPenalty,
         transactionCount: result.length,
       );
     } catch (e) {

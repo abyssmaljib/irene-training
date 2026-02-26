@@ -6,6 +6,7 @@ import '../../../core/services/user_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/app_snackbar.dart';
 import '../../home/screens/home_screen.dart';
 import '../../checklist/screens/checklist_screen.dart';
 import '../../board/screens/board_screen.dart';
@@ -660,15 +661,9 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
     // Increment user change counter เพื่อ refresh Riverpod providers
     ref.read(userChangeCounterProvider.notifier).state++;
 
-    // แสดง snackbar แจ้งเตือน
+    // แจ้ง user ว่าหยุด impersonate แล้ว
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('กลับมาเป็นตัวคุณเองแล้ว'),
-          backgroundColor: AppColors.success,
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      AppSnackbar.success(context, 'กลับมาเป็นตัวคุณเองแล้ว');
     }
   }
 }

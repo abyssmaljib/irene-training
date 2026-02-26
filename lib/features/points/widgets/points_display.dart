@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hugeicons/hugeicons.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/error_state.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../models/models.dart';
@@ -38,7 +39,12 @@ class PointsDisplay extends ConsumerWidget {
         return _buildContent(context, summary);
       },
       loading: () => _buildLoading(context),
-      error: (_, _) => _buildEmpty(context),
+      // แสดง error แทน empty เพื่อให้ user รู้ว่าเกิดข้อผิดพลาดและกดลองใหม่ได้
+      error: (error, _) => ErrorStateWidget(
+        message: 'โหลดข้อมูลคะแนนไม่สำเร็จ',
+        compact: true,
+        onRetry: () => ref.invalidate(userPointsSummaryProvider),
+      ),
     );
   }
 
@@ -334,8 +340,13 @@ class PointsBadge extends ConsumerWidget {
           ),
         );
       },
+      // แสดง error แทน SizedBox.shrink() เพื่อให้ user รู้ว่าเกิดข้อผิดพลาด
       loading: () => const SizedBox.shrink(),
-      error: (_, _) => const SizedBox.shrink(),
+      error: (error, _) => ErrorStateWidget(
+        message: 'โหลดข้อมูลคะแนนไม่สำเร็จ',
+        compact: true,
+        onRetry: () => ref.invalidate(userPointsSummaryProvider),
+      ),
     );
   }
 }

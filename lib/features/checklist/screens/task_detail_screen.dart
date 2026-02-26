@@ -26,6 +26,8 @@ import '../../board/screens/advanced_create_post_screen.dart';
 import '../../board/services/post_action_service.dart';
 import '../../board/widgets/video_player_widget.dart';
 import '../../../core/widgets/webview_screen.dart';
+import '../../../core/widgets/app_snackbar.dart';
+import '../../../core/widgets/shimmer_loading.dart';
 
 /// หน้ารายละเอียด Task แบบ Full Page
 class TaskDetailScreen extends ConsumerStatefulWidget {
@@ -637,9 +639,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
             difficultyScore: _task.difficultyScore,
           );
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('ไม่สามารถอัพเดตคะแนนได้')),
-        );
+        AppSnackbar.error(context, 'ไม่สามารถอัพเดตคะแนนได้');
       }
     }
   }
@@ -923,10 +923,11 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
 
   Widget _buildMedicineGrid() {
     if (_isLoadingMedicines) {
-      return Container(
-        height: 200,
-        alignment: Alignment.center,
-        child: const CircularProgressIndicator(),
+      return ShimmerWrapper(
+        isLoading: true,
+        child: Column(
+          children: List.generate(2, (_) => const SkeletonCard()),
+        ),
       );
     }
 
@@ -2204,9 +2205,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         _isLoading = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('ไม่สามารถบันทึกได้ กรุณาลองใหม่')),
-        );
+        AppSnackbar.error(context, 'ไม่สามารถบันทึกได้ กรุณาลองใหม่');
       }
     }
   }
@@ -2285,9 +2284,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         _isLoading = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('ไม่สามารถบันทึกได้ กรุณาลองใหม่')),
-        );
+        AppSnackbar.error(context, 'ไม่สามารถบันทึกได้ กรุณาลองใหม่');
       }
     }
   }
@@ -2334,9 +2331,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         _isLoading = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('ไม่สามารถบันทึกได้ กรุณาลองใหม่')),
-        );
+        AppSnackbar.error(context, 'ไม่สามารถบันทึกได้ กรุณาลองใหม่');
       }
     }
   }
@@ -2447,9 +2442,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         _isLoading = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('ไม่สามารถยกเลิกได้ กรุณาลองใหม่')),
-        );
+        AppSnackbar.error(context, 'ไม่สามารถยกเลิกได้ กรุณาลองใหม่');
       }
     }
   }
@@ -2517,9 +2510,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       debugPrint('Error uploading photo: $e');
       setState(() => _isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('ไม่สามารถอัพโหลดรูปได้ กรุณาลองใหม่')),
-        );
+        AppSnackbar.error(context, 'ไม่สามารถอัพโหลดรูปได้ กรุณาลองใหม่');
       }
     }
   }
@@ -2570,9 +2561,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     final confirmImage = _task.confirmImage;
 
     if (taskRepeatId == null || confirmImage == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ไม่สามารถแทนที่รูปตัวอย่างได้')),
-      );
+      AppSnackbar.error(context, 'ไม่สามารถแทนที่รูปตัวอย่างได้');
       return;
     }
 
@@ -2603,16 +2592,12 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       await _refreshTaskData();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('แทนที่รูปตัวอย่างเรียบร้อย')),
-        );
+        AppSnackbar.success(context, 'แทนที่รูปตัวอย่างเรียบร้อย');
       }
     } catch (e) {
       debugPrint('Error replacing sample image: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('ไม่สามารถแทนที่รูปตัวอย่างได้ กรุณาลองใหม่')),
-        );
+        AppSnackbar.error(context, 'ไม่สามารถแทนที่รูปตัวอย่างได้ กรุณาลองใหม่');
       }
     } finally {
       if (mounted) {

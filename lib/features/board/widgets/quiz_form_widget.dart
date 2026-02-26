@@ -7,6 +7,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../providers/create_post_provider.dart';
 import '../services/ai_helper_service.dart';
+import '../../../core/widgets/app_snackbar.dart';
 
 /// Quiz form widget for advanced create post screen
 /// Allows users to create a quiz with question and 3 choices (A, B, C)
@@ -99,9 +100,8 @@ class _QuizFormWidgetState extends ConsumerState<QuizFormWidget> {
   Future<void> _generateQuizWithAI() async {
     final text = widget.postText ?? ref.read(createPostProvider).text;
     if (text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('กรุณาใส่รายละเอียดก่อน')),
-      );
+      // แจ้งเตือน validation: ต้องใส่เนื้อหาก่อนสร้าง quiz ด้วย AI
+      AppSnackbar.warning(context, 'กรุณาใส่รายละเอียดก่อน');
       return;
     }
 
@@ -130,32 +130,20 @@ class _QuizFormWidgetState extends ConsumerState<QuizFormWidget> {
         // Start cooldown to prevent rate limiting
         _startCooldown();
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('สร้างคำถามสำเร็จ กดแทนที่เพื่อใช้งาน'),
-            backgroundColor: AppColors.success,
-          ),
-        );
+        // แจ้ง AI สร้างคำถามสำเร็จ
+        AppSnackbar.success(context, 'สร้างคำถามสำเร็จ กดแทนที่เพื่อใช้งาน');
       } else {
         if (mounted) {
           ref.read(createPostProvider.notifier).setLoadingQuizAI(false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('ไม่สามารถสร้างคำถามได้ กรุณาลองใหม่'),
-              backgroundColor: AppColors.error,
-            ),
-          );
+          // แจ้ง error เมื่อ AI สร้างคำถามไม่สำเร็จ
+          AppSnackbar.error(context, 'ไม่สามารถสร้างคำถามได้ กรุณาลองใหม่');
         }
       }
     } catch (e) {
       if (mounted) {
         ref.read(createPostProvider.notifier).setLoadingQuizAI(false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('เกิดข้อผิดพลาด: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
+        // แจ้ง error เมื่อเกิดข้อผิดพลาดระหว่างสร้างคำถาม
+        AppSnackbar.error(context, 'เกิดข้อผิดพลาด: $e');
       }
     }
   }
@@ -173,12 +161,8 @@ class _QuizFormWidgetState extends ConsumerState<QuizFormWidget> {
     // Apply to provider state
     ref.read(createPostProvider.notifier).applyAiQuizToForm();
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('แทนที่คำถามเรียบร้อย'),
-        backgroundColor: AppColors.success,
-      ),
-    );
+    // แจ้งแทนที่คำถามจาก AI สำเร็จ
+    AppSnackbar.success(context, 'แทนที่คำถามเรียบร้อย');
   }
 
   @override

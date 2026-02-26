@@ -17,6 +17,7 @@ import '../widgets/time_slot_chips.dart';
 import '../widgets/before_after_chips.dart';
 import 'create_medicine_db_screen.dart';
 import 'edit_medicine_db_screen.dart';
+import '../../../core/widgets/shimmer_loading.dart';
 
 /// หน้าเพิ่มยาให้ Resident
 ///
@@ -208,7 +209,15 @@ class _AddMedicineToResidentScreenState
       ),
       body: formState.when(
         // กำลังโหลด
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => ShimmerWrapper(
+          isLoading: true,
+          child: Padding(
+            padding: EdgeInsets.all(AppSpacing.md),
+            child: Column(
+              children: List.generate(3, (_) => const SkeletonListItem()),
+            ),
+          ),
+        ),
         // Error
         error: (error, _) => Center(
           child: Column(

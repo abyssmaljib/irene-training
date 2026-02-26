@@ -3,8 +3,10 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/buttons.dart';
 import '../../../core/widgets/irene_app_bar.dart';
 import '../models/app_notification.dart';
+import '../services/notification_navigator.dart';
 
 /// หน้าแสดงรายละเอียด notification เต็มๆ
 /// แสดง title, body, เวลา, ประเภท และรูปภาพ (ถ้ามี)
@@ -50,6 +52,9 @@ class NotificationDetailScreen extends StatelessWidget {
             AppSpacing.verticalGapXl,
             // Metadata section
             _buildMetadata(),
+            // ปุ่ม "ดูเพิ่มเติม" — แสดงเฉพาะเมื่อมีหน้าเป้าหมายให้ navigate ไป
+            if (NotificationNavigator.hasNavigableTarget(notification))
+              _buildGoToButton(context),
             AppSpacing.verticalGapXl,
           ],
         ),
@@ -296,6 +301,29 @@ class NotificationDetailScreen extends StatelessWidget {
     );
   }
 
+  /// ปุ่ม navigate ไปหน้าที่เกี่ยวข้อง
+  /// ใช้ PrimaryButton (reusable widget) แทน inline ElevatedButton
+  Widget _buildGoToButton(BuildContext context) {
+    final label = NotificationNavigator.getTargetLabel(notification);
+
+    return Column(
+      children: [
+        AppSpacing.verticalGapMd,
+        PrimaryButton(
+          text: label,
+          icon: HugeIcons.strokeRoundedArrowRight01,
+          width: double.infinity,
+          onPressed: () async {
+            await NotificationNavigator.navigateToTarget(
+              context,
+              notification,
+            );
+          },
+        ),
+      ],
+    );
+  }
+
   /// แปลงชื่อ table เป็นชื่อที่อ่านง่าย
   String _getReadableTableName(String tableName) {
     switch (tableName) {
@@ -340,6 +368,10 @@ class NotificationDetailScreen extends StatelessWidget {
         return HugeIcons.strokeRoundedBook02;
       case NotificationType.assignment:
         return HugeIcons.strokeRoundedUserAdd01;
+      case NotificationType.incident:
+        return HugeIcons.strokeRoundedAlert02;
+      case NotificationType.points:
+        return HugeIcons.strokeRoundedCoins01;
     }
   }
 
@@ -363,23 +395,30 @@ class NotificationDetailScreen extends StatelessWidget {
         return AppColors.pastelRed;
       case NotificationType.assignment:
         return AppColors.secondary;
+      case NotificationType.incident:
+        return AppColors.error;
+      case NotificationType.points:
+        return AppColors.pastelYellow;
     }
   }
 
   /// Format วันที่เป็นภาษาไทยแบบ manual (ไม่ต้องใช้ intl locale)
   String _formatThaiDate(DateTime date) {
+    // แปลงเป็น local time ก่อน เพราะ createdAt จาก Supabase มาเป็น UTC
+    final local = date.toLocal();
+
     const thaiDays = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
     const thaiMonths = [
       'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
       'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
     ];
 
-    final dayName = thaiDays[date.weekday % 7];
-    final monthName = thaiMonths[date.month - 1];
-    final buddhistYear = date.year + 543;
-    final hour = date.hour.toString().padLeft(2, '0');
-    final minute = date.minute.toString().padLeft(2, '0');
+    final dayName = thaiDays[local.weekday % 7];
+    final monthName = thaiMonths[local.month - 1];
+    final buddhistYear = local.year + 543;
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
 
-    return 'วัน$dayName ที่ ${date.day} $monthName $buddhistYear เวลา $hour:$minute น.';
+    return 'วัน$dayName ที่ ${local.day} $monthName $buddhistYear เวลา $hour:$minute น.';
   }
 }

@@ -5,6 +5,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/irene_app_bar.dart';
+import '../../../core/widgets/shimmer_loading.dart';
 import '../models/time_block_progress.dart';
 import '../models/time_block_task.dart';
 import '../services/home_service.dart';
@@ -113,8 +114,12 @@ class _TimeBlockDetailScreenState extends State<TimeBlockDetailScreen> {
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
-        SizedBox(height: MediaQuery.of(context).size.height * 0.3),
-        const Center(child: CircularProgressIndicator()),
+        ShimmerWrapper(
+          isLoading: true,
+          child: Column(
+            children: List.generate(3, (_) => const SkeletonListItem()),
+          ),
+        ),
       ],
     );
   }

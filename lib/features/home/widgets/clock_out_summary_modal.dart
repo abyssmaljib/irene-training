@@ -2,10 +2,10 @@ import 'dart:math';
 import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
-import 'package:lottie/lottie.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/coin_reward_overlay.dart';
 import '../../../core/widgets/network_image.dart';
 import '../services/shift_summary_service.dart';
 
@@ -52,9 +52,6 @@ class _ClockOutSummaryModalState extends State<ClockOutSummaryModal>
   // Animations
   late Animation<Offset> _slideAnimation;
   late Animation<double> _fadeAnimation;
-
-  // Coin animation state - แสดง animation เหรียญเมื่อกด "รับเลย"
-  bool _showCoinAnimation = false;
 
   // ป้องกันการเรียก onClose หลายครั้ง
   bool _hasClosed = false;
@@ -171,8 +168,7 @@ class _ClockOutSummaryModalState extends State<ClockOutSummaryModal>
             ],
           ),
         ),
-        // Coin animation overlay - แสดงเมื่อกด "รับเลย"
-        if (_showCoinAnimation) _buildCoinAnimationOverlay(),
+        // (Coin animation ย้ายไปใช้ CoinRewardOverlay.show() ใน _handleClaim)
       ],
     );
   }
@@ -536,7 +532,7 @@ class _ClockOutSummaryModalState extends State<ClockOutSummaryModal>
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
-        onPressed: _showCoinAnimation ? null : _handleClaim,
+        onPressed: _handleClaim,
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
@@ -570,65 +566,14 @@ class _ClockOutSummaryModalState extends State<ClockOutSummaryModal>
     widget.onClose?.call();
   }
 
-  /// Handle claim button press - แสดง coin animation แล้วปิด
-  void _handleClaim() {
-    setState(() => _showCoinAnimation = true);
-
-    // Safety timeout - ถ้า animation ไม่ทำงาน 3 วินาทีให้ปิด modal
-    Future.delayed(const Duration(seconds: 3), _closeModal);
-  }
-
-  /// Coin animation overlay - แสดงเหรียญตกลงมาตรงกลาง
-  Widget _buildCoinAnimationOverlay() {
-    return GestureDetector(
-      // กดที่ไหนก็ได้เพื่อปิด (กรณี animation ค้าง)
-      onTap: _closeModal,
-      child: Container(
-        color: Colors.black.withValues(alpha: 0.7),
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Coin Lottie animation พร้อม error handling
-              Lottie.asset(
-                'assets/animations/coin_reward.json',
-                width: 200,
-                height: 200,
-                repeat: false,
-                onLoaded: (composition) {
-                  // เมื่อ animation เล่นจบ ให้ปิด modal
-                  Future.delayed(composition.duration, _closeModal);
-                },
-                errorBuilder: (context, error, stackTrace) {
-                  // ถ้าโหลด Lottie ไม่ได้ แสดง emoji แทน แล้วปิด
-                  Future.delayed(const Duration(milliseconds: 800), _closeModal);
-                  return const Text(
-                    '🪙',
-                    style: TextStyle(fontSize: 100),
-                  );
-                },
-              ),
-              AppSpacing.verticalGapMd,
-              // แสดง points ที่ได้รับ
-              Text(
-                '+${widget.summary.points.netPoints} Points!',
-                style: AppTypography.heading2.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              AppSpacing.verticalGapMd,
-              // Hint ให้ user รู้ว่ากดปิดได้
-              Text(
-                'แตะเพื่อปิด',
-                style: AppTypography.caption.copyWith(
-                  color: Colors.white.withValues(alpha: 0.6),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+  /// Handle claim button press - แสดง coin animation (reusable) แล้วปิด modal
+  Future<void> _handleClaim() async {
+    // แสดง CoinRewardOverlay — จะ auto-close หลัง animation จบ
+    await CoinRewardOverlay.show(
+      context,
+      points: widget.summary.points.netPoints,
     );
+    // animation จบแล้ว → ปิด modal
+    _closeModal();
   }
 }

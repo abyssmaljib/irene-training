@@ -3,6 +3,7 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../../core/widgets/app_snackbar.dart';
 import '../../screens/create_vital_sign_screen.dart';
 
 /// Quick Action FAB สำหรับหน้า Resident Detail
@@ -221,15 +222,6 @@ class _QuickActionSheet extends StatelessWidget {
   }
 
   void _showComingSoon(BuildContext context, String feature) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$feature - เร็วๆ นี้'),
-        backgroundColor: AppColors.primary,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
-      ),
-    );
+    AppSnackbar.info(context, '$feature - เร็วๆ นี้');
   }
 }

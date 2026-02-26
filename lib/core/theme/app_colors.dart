@@ -118,4 +118,35 @@ class AppColors {
     end: Alignment.bottomRight,
     colors: [Color(0xFF0D9488), Color(0xFF55B1C9)],
   );
+
+  // Tier/Rank Colors (ใช้ใน points ranking)
+  static const Color tierGold = Color(0xFFFFD700); // ทอง
+  static const Color tierSilver = Color(0xFFC0C0C0); // เงิน
+  static const Color tierBronze = Color(0xFFCD7F32); // ทองแดง
+  static const Color tierGoldBg = Color(0xFFFFF8E1); // พื้นหลังทอง (pastel)
+  static const Color tierSilverBg = Color(0xFFF5F5F5); // พื้นหลังเงิน
+  static const Color tierBronzeBg = Color(0xFFFBE9E7); // พื้นหลังทองแดง
+  // เวอร์ชันเข้ม — ใช้ใน gradient pedestal
+  static const Color tierGoldDark = Color(0xFFB8860B); // ทองเข้ม (DarkGoldenrod)
+  static const Color tierSilverDark = Color(0xFF808080); // เงินเข้ม
+  static const Color tierBronzeDark = Color(0xFF8B5A2B); // ทองแดงเข้ม (SaddleBrown)
+
+  // DD Handover Status Colors
+  static const Color ddPendingBg = Color(0xFFFFFFD9); // รอดำเนินการ - พื้นหลังเหลืองอ่อน
+  static const Color ddPendingBorder = Color(0xFFF1EF99); // รอดำเนินการ - ขอบเหลือง
+  static const Color ddUpcomingBg = Color(0xFFFFF9C4); // กำลังจะถึง - พื้นหลังครีม
+  static const Color ddUpcomingAccent = Color(0xFFFFB300); // กำลังจะถึง - accent ส้ม
+  static const Color ddOverdueBg = Color(0xFFFFEBEE); // เลยกำหนด - พื้นหลังชมพู
+  static const Color ddOverdueBorder = Color(0xFFEF9A9A); // เลยกำหนด - ขอบแดง
+
+  // Task Progress Badge Colors (ใช้ใน checklist time section)
+  static const Color progressPendingText = Color(0xFFA08030); // เหลืองทองเข้ม - ยังมีงานค้าง
+  static const Color progressPendingBg = Color(0xFFE8D5A0); // เหลืองครีม - ยังมีงานค้าง
+
+  // Points Gradient (ใช้ใน points display)
+  static const LinearGradient pointsGradient = LinearGradient(
+    colors: [Color(0xFFFFD700), Color(0xFFFFA000)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
 }

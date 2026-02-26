@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/error_state.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/irene_app_bar.dart';
@@ -34,8 +35,13 @@ class PointsHistoryScreen extends ConsumerWidget {
             data: (summary) => summary != null
                 ? _buildHeader(summary)
                 : const SizedBox.shrink(),
+            // แสดง error แทน SizedBox.shrink() เพื่อให้ user รู้ว่าเกิดข้อผิดพลาด
             loading: () => const SizedBox.shrink(),
-            error: (_, _) => const SizedBox.shrink(),
+            error: (error, _) => ErrorStateWidget(
+              message: 'โหลดข้อมูลคะแนนไม่สำเร็จ',
+              compact: true,
+              onRetry: () => ref.invalidate(userPointsSummaryProvider),
+            ),
           ),
 
           // Transaction list

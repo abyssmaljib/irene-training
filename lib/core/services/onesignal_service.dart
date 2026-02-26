@@ -102,6 +102,7 @@ class OneSignalService {
 
   /// Navigate ไปหน้า notification detail โดยใช้ notification ID
   /// และ trigger global refresh เพื่อให้ HomeScreen โหลดข้อมูลใหม่
+  /// จะแสดงหน้า NotificationDetailScreen ซึ่งมีปุ่ม "ดูเพิ่มเติม" ให้กดไปหน้าที่เกี่ยวข้อง
   Future<void> _navigateToNotificationDetail(int notificationId) async {
     debugPrint('OneSignal: Navigating to notification detail: $notificationId');
 
@@ -134,7 +135,8 @@ class OneSignalService {
       // Mark as read
       await NotificationService.instance.markAsRead(notificationId);
 
-      // Navigate ไปหน้า detail
+      // Navigate ไปหน้า NotificationDetailScreen
+      // (มีปุ่ม "ดูเพิ่มเติม" ให้ user กดไปหน้าที่เกี่ยวข้องได้)
       navigator.push(
         MaterialPageRoute(
           builder: (_) => NotificationDetailScreen(notification: notification),

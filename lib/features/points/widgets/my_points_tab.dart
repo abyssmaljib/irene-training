@@ -4,6 +4,8 @@ import 'package:hugeicons/hugeicons.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/error_state.dart';
+import '../../../core/widgets/shimmer_loading.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../models/models.dart';
@@ -32,14 +34,24 @@ class MyPointsTab extends ConsumerWidget {
           data: (summary) =>
               summary != null ? _buildSummaryCard(summary) : const SizedBox.shrink(),
           loading: () => _buildSummarySkeleton(),
-          error: (_, _) => const SizedBox.shrink(),
+          // แสดง error แทน SizedBox.shrink() เพื่อให้ user รู้ว่าเกิดข้อผิดพลาด
+          error: (error, _) => ErrorStateWidget(
+            message: 'โหลดข้อมูลคะแนนไม่สำเร็จ',
+            compact: true,
+            onRetry: () => ref.invalidate(userPointsSummaryProvider),
+          ),
         ),
 
         // History List
         Expanded(
           child: historyAsync.when(
             data: (history) => _buildHistoryList(history),
-            loading: () => const Center(child: CircularProgressIndicator()),
+            loading: () => ShimmerWrapper(
+              isLoading: true,
+              child: Column(
+                children: List.generate(2, (_) => const SkeletonCard()),
+              ),
+            ),
             error: (e, _) => Center(child: Text('เกิดข้อผิดพลาด: $e')),
           ),
         ),
@@ -47,17 +59,20 @@ class MyPointsTab extends ConsumerWidget {
     );
   }
 
+  // สี tier ที่เข้มขึ้นสำหรับ light background
+  // DB colors บางตัวจางมาก (Silver=#C0C0C0, Platinum=#E5E4E2, Diamond=#B9F2FF)
+  static const _tierDisplayColors = {
+    'Bronze': Color(0xFF92400E),   // amber-800
+    'Silver': Color(0xFF4B5563),   // gray-600
+    'Gold': Color(0xFFB45309),     // amber-700
+    'Platinum': Color(0xFF6D28D9), // violet-700
+    'Diamond': Color(0xFF0369A1),  // sky-700
+  };
+
   /// Card แสดง tier, total points, week/month points, และ progress bar
   Widget _buildSummaryCard(UserPointsSummary summary) {
-    // Parse tier color จาก hex string
-    Color tierColor = AppColors.primary;
-    if (summary.tierColor != null) {
-      try {
-        tierColor = Color(
-          int.parse(summary.tierColor!.replaceFirst('#', '0xFF')),
-        );
-      } catch (_) {}
-    }
+    // ใช้ mapping สีเข้มแทน DB color ที่จางเกินไปบนพื้นขาว
+    final tierColor = _tierDisplayColors[summary.tierName] ?? AppColors.primary;
 
     return Container(
       margin: const EdgeInsets.all(AppSpacing.md),
@@ -100,17 +115,44 @@ class MyPointsTab extends ConsumerWidget {
               ),
               const SizedBox(width: AppSpacing.md),
 
-              // Tier name + total points
+              // Tier name + total points + percentile info
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      summary.tierDisplayName,
-                      style: AppTypography.label.copyWith(
-                        color: tierColor,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    // Tier name + percentile badge (ถ้ามี)
+                    Row(
+                      children: [
+                        Text(
+                          summary.tierDisplayName,
+                          style: AppTypography.label.copyWith(
+                            color: tierColor,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        // แสดง "Top X%" badge ถ้าเป็น percentile mode
+                        if (summary.percentileDisplay != null) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: tierColor.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              summary.percentileDisplay!,
+                              style: AppTypography.caption.copyWith(
+                                color: tierColor,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -120,6 +162,16 @@ class MyPointsTab extends ConsumerWidget {
                         color: AppColors.primaryText,
                       ),
                     ),
+                    // แสดง "อันดับ X จาก Y คน" ถ้าเป็น percentile mode
+                    if (summary.rankDisplay != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        summary.rankDisplay!,
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -146,7 +198,11 @@ class MyPointsTab extends ConsumerWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'อีก ${summary.pointsToNextTier} คะแนน',
+                  // Percentile mode: แสดงจำนวนคะแนนที่ต้องเพิ่ม
+                  // Fixed mode: แสดงจำนวนคะแนนที่เหลือ
+                  summary.isPercentileMode
+                      ? 'อีก ~${summary.pointsToNextTier} คะแนน'
+                      : 'อีก ${summary.pointsToNextTier} คะแนน',
                   style: AppTypography.caption.copyWith(
                     color: AppColors.textSecondary,
                   ),
@@ -161,75 +217,95 @@ class MyPointsTab extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: AppSpacing.md),
+          ] else ...[
+            // ถึง tier สูงสุดแล้ว — แสดงข้อความพิเศษ
+            if (summary.isPercentileMode) ...[
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                '🎉 คุณอยู่ระดับสูงสุดแล้ว!',
+                style: AppTypography.caption.copyWith(
+                  color: tierColor,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+            ],
           ],
 
-          // สัปดาห์นี้ / เดือนนี้
+          // สถิติคะแนน: สัปดาห์นี้ / เดือนนี้ / 3 เดือน (ถ้ามี)
           Row(
             children: [
               // สัปดาห์นี้
               Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.md,
-                    vertical: AppSpacing.sm,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.success.withValues(alpha: 0.1),
-                    borderRadius: AppRadius.smallRadius,
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        'สัปดาห์นี้',
-                        style: AppTypography.caption.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '+${summary.weekPoints}',
-                        style: AppTypography.title.copyWith(
-                          color: AppColors.success,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
+                child: _buildStatBox(
+                  label: 'สัปดาห์นี้',
+                  value: summary.weekPoints,
+                  color: AppColors.success,
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
               // เดือนนี้
               Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.md,
-                    vertical: AppSpacing.sm,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.1),
-                    borderRadius: AppRadius.smallRadius,
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        'เดือนนี้',
-                        style: AppTypography.caption.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '+${summary.monthPoints}',
-                        style: AppTypography.title.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
+                child: _buildStatBox(
+                  label: 'เดือนนี้',
+                  value: summary.monthPoints,
+                  color: AppColors.primary,
                 ),
               ),
+              // 3 เดือนล่าสุด (แสดงเฉพาะ percentile mode)
+              if (summary.rollingPoints != null) ...[
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: _buildStatBox(
+                    label: '3 เดือน',
+                    value: summary.rollingPoints!,
+                    color: tierColor,
+                    showSign: false, // Rolling points ไม่ต้องใส่ +/-
+                  ),
+                ),
+              ],
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Stat box สำหรับแสดงคะแนนแต่ละช่วงเวลา (สัปดาห์นี้, เดือนนี้, 3 เดือน)
+  Widget _buildStatBox({
+    required String label,
+    required int value,
+    required Color color,
+    bool showSign = true, // ใส่ +/- นำหน้าหรือไม่
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: AppRadius.smallRadius,
+      ),
+      child: Column(
+        children: [
+          Text(
+            label,
+            style: AppTypography.caption.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            showSign
+                ? '${value >= 0 ? '+' : ''}$value'
+                : '$value',
+            style: AppTypography.title.copyWith(
+              color: showSign
+                  ? (value >= 0 ? color : AppColors.error)
+                  : color,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ],
       ),

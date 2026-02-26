@@ -7,6 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/irene_app_bar.dart';
+import '../../../core/widgets/shimmer_loading.dart';
 import '../models/post.dart';
 import '../providers/post_provider.dart';
 import '../widgets/create_ticket_bottom_sheet.dart';
@@ -240,7 +241,12 @@ class _RequiredPostsScreenState extends ConsumerState<RequiredPostsScreen> {
             ],
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => ShimmerWrapper(
+          isLoading: true,
+          child: Column(
+            children: List.generate(3, (_) => const SkeletonCard()),
+          ),
+        ),
         error: (e, _) => Center(
           child: Text('เกิดข้อผิดพลาด: $e', style: AppTypography.body),
         ),

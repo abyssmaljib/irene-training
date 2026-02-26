@@ -5,6 +5,7 @@ import '../../../core/services/user_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/widgets/irene_app_bar.dart';
 import '../../../core/widgets/success_popup.dart';
 import '../providers/resident_detail_provider.dart';
@@ -162,34 +163,7 @@ class CreateVitalSignScreen extends ConsumerWidget {
                       if (validationError != null) {
                         // แสดง error snackbar
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Row(
-                                children: [
-                                  HugeIcon(
-                                    icon: HugeIcons.strokeRoundedAlert02,
-                                    color: Colors.white,
-                                    size: AppIconSize.xl,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      validationError,
-                                      style: AppTypography.body.copyWith(
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              backgroundColor: AppColors.error,
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              duration: const Duration(seconds: 3),
-                            ),
-                          );
+                          AppSnackbar.error(context, validationError);
                         }
                         return;
                       }
@@ -232,34 +206,7 @@ class CreateVitalSignScreen extends ConsumerWidget {
                           if (context.mounted) Navigator.of(context).pop(true);
                         } else if (!success && context.mounted) {
                           // แสดง error snackbar ถ้า submit ไม่สำเร็จ
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Row(
-                                children: [
-                                  HugeIcon(
-                                    icon: HugeIcons.strokeRoundedAlert02,
-                                    color: Colors.white,
-                                    size: AppIconSize.xl,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      data.errorMessage ?? 'เกิดข้อผิดพลาด',
-                                      style: AppTypography.body.copyWith(
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              backgroundColor: AppColors.error,
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              duration: const Duration(seconds: 3),
-                            ),
-                          );
+                          AppSnackbar.error(context, data.errorMessage ?? 'เกิดข้อผิดพลาด');
                         }
                       }
                     },

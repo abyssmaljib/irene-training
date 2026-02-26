@@ -344,6 +344,16 @@ class _PodiumItem extends StatelessWidget {
             fontWeight: FontWeight.w500,
           ),
         ),
+
+        // แสดง "Top X%" ถ้ามีข้อมูล percentile
+        if (entry.percentileDisplay != null)
+          Text(
+            entry.percentileDisplay!,
+            style: AppTypography.caption.copyWith(
+              color: AppColors.textSecondary,
+              fontSize: 10,
+            ),
+          ),
         const SizedBox(height: AppSpacing.xs),
 
         // Pedestal (แท่นรางวัล)
@@ -390,15 +400,15 @@ class _PodiumItem extends StatelessWidget {
     );
   }
 
-  /// สีของแท่นรางวัลตามอันดับ
+  /// สีของแท่นรางวัลตามอันดับ — ใช้ AppColors.tierXxx จาก design system
   List<Color> _pedestalColors() {
     switch (entry.rank) {
-      case 1: // ทอง
-        return [const Color(0xFFFFD700), const Color(0xFFB8860B)];
+      case 1: // ทอง — gradient จากสว่างไปเข้ม
+        return [AppColors.tierGold, AppColors.tierGoldDark];
       case 2: // เงิน
-        return [const Color(0xFFC0C0C0), const Color(0xFF808080)];
+        return [AppColors.tierSilver, AppColors.tierSilverDark];
       case 3: // ทองแดง
-        return [const Color(0xFFCD7F32), const Color(0xFF8B5A2B)];
+        return [AppColors.tierBronze, AppColors.tierBronzeDark];
       default:
         return [AppColors.primary, AppColors.primary];
     }
@@ -488,18 +498,59 @@ class _RankingListItem extends StatelessWidget {
                 if (entry.tierName != null)
                   Row(
                     children: [
-                      if (entry.tierIcon != null)
-                        Text(
-                          entry.tierIcon!,
-                          style: const TextStyle(fontSize: 12),
+                      // Tier badge — ใช้สีเข้มจาก mapping แทน DB color ที่จางเกินไป
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
                         ),
-                      const SizedBox(width: 4),
-                      Text(
-                        entry.tierName!,
-                        style: AppTypography.caption.copyWith(
-                          color: AppColors.textSecondary,
+                        decoration: BoxDecoration(
+                          color: _parseTierBgColor(),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (entry.tierIcon != null)
+                              Text(
+                                entry.tierIcon!,
+                                style: const TextStyle(fontSize: 11),
+                              ),
+                            if (entry.tierIcon != null)
+                              const SizedBox(width: 3),
+                            Text(
+                              entry.tierName!,
+                              style: AppTypography.caption.copyWith(
+                                color: _parseTierColor(entry.tierColor),
+                                fontWeight: FontWeight.w600,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
+                      // แสดง "Top X%" badge ข้าง tier ถ้ามี
+                      if (entry.percentileDisplay != null) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 1,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            entry.percentileDisplay!,
+                            style: AppTypography.caption.copyWith(
+                              color: AppColors.primary,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
               ],
@@ -532,5 +583,36 @@ class _RankingListItem extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// สี tier ที่เข้มขึ้นสำหรับ light background
+  /// DB colors บางตัวจางมาก (Silver=#C0C0C0, Platinum=#E5E4E2, Diamond=#B9F2FF)
+  /// ใช้ mapping ตาม tier name แทนเพื่อให้อ่านง่าย
+  static const _tierTextColors = {
+    'Bronze': Color(0xFF92400E),   // amber-800
+    'Silver': Color(0xFF4B5563),   // gray-600
+    'Gold': Color(0xFFB45309),     // amber-700
+    'Platinum': Color(0xFF6D28D9), // violet-700
+    'Diamond': Color(0xFF0369A1),  // sky-700
+  };
+
+  static const _tierBgColors = {
+    'Bronze': Color(0xFFFEF3C7),   // amber-100
+    'Silver': Color(0xFFF3F4F6),   // gray-100
+    'Gold': Color(0xFFFEF3C7),     // amber-100
+    'Platinum': Color(0xFFEDE9FE), // violet-100
+    'Diamond': Color(0xFFE0F2FE),  // sky-100
+  };
+
+  /// ดึงสีตัวอักษรของ tier
+  Color _parseTierColor(String? tierColor) {
+    // ใช้ mapping ตาม tierName แทน hex color จาก DB
+    return _tierTextColors[entry.tierName] ?? AppColors.primary;
+  }
+
+  /// ดึงสีพื้นหลังของ tier
+  Color _parseTierBgColor() {
+    return _tierBgColors[entry.tierName] ??
+        AppColors.primary.withValues(alpha: 0.1);
   }
 }

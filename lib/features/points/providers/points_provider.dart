@@ -166,7 +166,8 @@ final userRewardsProvider = FutureProvider<List<RewardWithStatus>>((ref) async {
 
 /// StateNotifier สำหรับ selected period ใน leaderboard
 class LeaderboardPeriodNotifier extends StateNotifier<LeaderboardPeriod> {
-  LeaderboardPeriodNotifier() : super(LeaderboardPeriod.allTime);
+  // Default เป็น rolling_3m เพราะ tier คำนวณจาก rolling 3-month window
+  LeaderboardPeriodNotifier() : super(LeaderboardPeriod.rolling3m);
 
   void setPeriod(LeaderboardPeriod period) {
     state = period;
@@ -223,4 +224,33 @@ final userPeriodRewardsProvider =
   return service.getUserPeriodRewards(userId);
 });
 
-// Note: simpleLeaderboardProvider removed - using history view instead
+/// Provider สำหรับ user's season results (ผลสรุป Season แบบเกมออนไลน์)
+/// เรียงจาก season ล่าสุดก่อน
+final userSeasonResultsProvider =
+    FutureProvider<List<SeasonResult>>((ref) async {
+  ref.watch(userChangeCounterProvider);
+  final userId = UserService().effectiveUserId;
+  if (userId == null) return [];
+
+  final service = ref.read(pointsServiceProvider);
+  return service.getSeasonResults(userId);
+});
+
+/// Provider สำหรับ current active season period
+/// ใช้แสดงชื่อ season ปัจจุบัน, วันเหลือ, etc.
+final currentSeasonProvider =
+    FutureProvider.family<Map<String, dynamic>?, int?>(
+  (ref, nursinghomeId) async {
+    final service = ref.read(pointsServiceProvider);
+    return service.getCurrentSeason(nursinghomeId: nursinghomeId);
+  },
+);
+
+/// Provider สำหรับ season leaderboard (ผลลัพธ์ทั้งหมดของ 1 season)
+final seasonLeaderboardProvider =
+    FutureProvider.family<List<SeasonResult>, String>(
+  (ref, seasonPeriodId) async {
+    final service = ref.read(pointsServiceProvider);
+    return service.getSeasonLeaderboard(seasonPeriodId);
+  },
+);

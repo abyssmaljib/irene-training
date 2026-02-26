@@ -13,6 +13,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/providers/shared_preferences_provider.dart';
 import '../../../core/widgets/confirm_dialog.dart';
+import '../../../core/widgets/app_snackbar.dart';
 import '../models/new_tag.dart';
 import '../models/post_draft.dart';
 import '../providers/create_post_provider.dart';
@@ -1170,9 +1171,8 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
     final remaining = 5 - state.selectedImages.length - state.uploadedImageUrls.length;
 
     if (remaining <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('เลือกรูปได้สูงสุด 5 รูป')),
-      );
+      // แจ้งเตือนเลือกรูปเกินจำนวนที่กำหนด
+      AppSnackbar.warning(context, 'เลือกรูปได้สูงสุด 5 รูป');
       return;
     }
 
@@ -1521,25 +1521,22 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
     // ถ้าติ๊ก "ส่งเวร" บังคับต้องกรอกรายละเอียด
     // เพื่อให้พี่เลี้ยงเขียนข้อมูลสำคัญที่ต้องส่งต่อให้เวรถัดไป
     if (state.isHandover && text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('กรุณากรอกรายละเอียดเมื่อติ๊กส่งเวร')),
-      );
+      // แจ้งเตือน validation: ต้องกรอกรายละเอียดเมื่อติ๊กส่งเวร
+      AppSnackbar.warning(context, 'กรุณากรอกรายละเอียดเมื่อติ๊กส่งเวร');
       return;
     }
 
     // ป้องกัน submit ขณะ video กำลัง upload
     if (state.isUploadingVideo) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('กรุณารอให้วีดีโออัพโหลดเสร็จก่อน')),
-      );
+      // แจ้งเตือนให้รอ video upload เสร็จก่อน
+      AppSnackbar.info(context, 'กรุณารอให้วีดีโออัพโหลดเสร็จก่อน');
       return;
     }
 
     // ป้องกัน submit ถ้า video upload error (ต้อง retry หรือลบก่อน)
     if (state.videoUploadError != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('กรุณาลองอัพโหลดวีดีโอใหม่ หรือลบวีดีโอออก')),
-      );
+      // แจ้งเตือนให้แก้ไข video upload error ก่อน submit
+      AppSnackbar.warning(context, 'กรุณาลองอัพโหลดวีดีโอใหม่ หรือลบวีดีโอออก');
       return;
     }
 
@@ -1649,9 +1646,8 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
     } catch (e) {
       ref.read(createPostProvider.notifier).setError(e.toString());
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('เกิดข้อผิดพลาด: $e')),
-        );
+        // แจ้ง error เมื่อสร้างโพสไม่สำเร็จ
+        AppSnackbar.error(context, 'เกิดข้อผิดพลาด: $e');
       }
     } finally {
       ref.read(createPostProvider.notifier).setSubmitting(false);

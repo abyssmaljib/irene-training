@@ -98,6 +98,42 @@ class PointsConfig {
     return (deadAirMinutes / 10).floor(); // ปัดลง
   }
 
+  // ==================== Incident Penalty ====================
+
+  /// คะแนนที่หักตาม severity ของ incident
+  /// LEVEL_1 = 100, LEVEL_2 = 300, LEVEL_3 = 500
+  static int incidentPenalty(String severity) {
+    switch (severity.toUpperCase()) {
+      case 'LEVEL_2':
+        return 300;
+      case 'LEVEL_3':
+        return 500;
+      case 'LEVEL_1':
+      default:
+        return 100;
+    }
+  }
+
+  /// คะแนนที่คืนเมื่อถอดบทเรียนเสร็จ (50% ของ penalty)
+  /// LEVEL_1 = +50, LEVEL_2 = +150, LEVEL_3 = +250
+  static int incidentReflectionBonus(String severity) {
+    return (incidentPenalty(severity) * 0.5).round();
+  }
+
+  // ==================== Late Clock-In Penalty ====================
+
+  /// Grace period (นาที) - สาย 5 นาทีแรกไม่โดนหัก
+  static const int lateClockInGraceMinutes = 5;
+
+  /// คำนวณ penalty จากเวลาที่สาย (นาที)
+  /// สาย 5-15 นาที = -50, 15-30 นาที = -100, >30 นาที = -150
+  static int lateClockInPenalty(int lateMinutes) {
+    if (lateMinutes <= 5) return 0;
+    if (lateMinutes <= 15) return 50;
+    if (lateMinutes <= 30) return 100;
+    return 150;
+  }
+
   // ==================== Legacy (deprecated) ====================
 
   /// ทำ task เสร็จ (base) - deprecated, ใช้ calculateTaskPoints แทน
@@ -402,6 +438,63 @@ class PointsService {
     );
   }
 
+  /// บันทึก bonus เมื่อถอดบทเรียน incident เสร็จ (คืน 50% ของ penalty)
+  /// เรียกจาก chat_provider หลัง user กดส่งสำเร็จ
+  ///
+  /// [incidentId] - ID ของ incident
+  /// [severity] - ระดับ severity (LEVEL_1, LEVEL_2, LEVEL_3)
+  /// [staffIds] - รายการ staff ที่เกี่ยวข้อง (ทุกคนได้คืน)
+  /// คืน total bonus ที่ให้สำเร็จ (สำหรับแสดง feedback)
+  Future<int> recordIncidentReflectionBonus({
+    required int incidentId,
+    required String severity,
+    required List<String> staffIds,
+    int? nursinghomeId,
+  }) async {
+    if (staffIds.isEmpty) return 0;
+
+    final bonus = PointsConfig.incidentReflectionBonus(severity);
+    if (bonus <= 0) return 0;
+
+    // ตรวจสอบว่าเคยให้ bonus ไปแล้วหรือยัง (ป้องกันซ้ำ)
+    try {
+      final existing = await _client
+          .from('Point_Transaction')
+          .select('id')
+          .eq('transaction_type', 'incident_reflection_bonus')
+          .eq('reference_type', 'incident_reflection')
+          .eq('reference_id', incidentId.toString())
+          .limit(1)
+          .maybeSingle();
+
+      if (existing != null) {
+        debugPrint('📊 Incident reflection bonus already given for incident $incidentId');
+        return 0;
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error checking existing bonus: $e');
+      // ดำเนินการต่อ — ถ้าเช็คไม่ได้ก็ให้ bonus ไป (ดีกว่าไม่ให้)
+    }
+
+    int totalBonus = 0;
+    // ให้ bonus ทุกคนใน staff_id[]
+    for (final staffId in staffIds) {
+      final result = await recordTransaction(
+        userId: staffId,
+        points: bonus,
+        transactionType: 'incident_reflection_bonus',
+        description: 'คืนคะแนน 50%: ถอดบทเรียนเสร็จ (${severity.toUpperCase()})',
+        referenceType: 'incident_reflection',
+        referenceId: incidentId.toString(),
+        nursinghomeId: nursinghomeId,
+      );
+      if (result > 0) totalBonus += result;
+    }
+
+    debugPrint('📊 Incident reflection bonus: +$bonus x ${staffIds.length} staff = $totalBonus total');
+    return totalBonus;
+  }
+
   /// บันทึก points สำหรับ Task Completed (Legacy - deprecated)
   /// - 5 points base
   /// - + (difficulty_score - 5) bonus ถ้า difficulty > 5
@@ -580,6 +673,69 @@ class PointsService {
     } catch (e) {
       debugPrint('❌ Error getting user history: $e');
       return [];
+    }
+  }
+
+  // ==================== Season Results ====================
+
+  /// ดึงผลสรุป Season ของ user (แบบเกมออนไลน์)
+  /// เรียงจาก season ล่าสุดก่อน
+  Future<List<SeasonResult>> getSeasonResults(String userId) async {
+    try {
+      final result = await _client
+          .from('season_results')
+          .select()
+          .eq('user_id', userId)
+          .order('created_at', ascending: false);
+
+      return (result as List)
+          .map((e) => SeasonResult.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      debugPrint('❌ Error getting season results: $e');
+      return [];
+    }
+  }
+
+  /// ดึง season results ทั้งหมดของ season (ทุก user)
+  /// ใช้แสดง leaderboard ของ season นั้นๆ
+  Future<List<SeasonResult>> getSeasonLeaderboard(String seasonPeriodId) async {
+    try {
+      final result = await _client
+          .from('season_results')
+          .select()
+          .eq('season_period_id', seasonPeriodId)
+          .order('final_rank');
+
+      return (result as List)
+          .map((e) => SeasonResult.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      debugPrint('❌ Error getting season leaderboard: $e');
+      return [];
+    }
+  }
+
+  /// ดึง active seasonal period (season ปัจจุบัน)
+  /// return null ถ้ายังไม่มี seasonal period
+  Future<Map<String, dynamic>?> getCurrentSeason({int? nursinghomeId}) async {
+    try {
+      final query = _client
+          .from('leaderboard_periods')
+          .select()
+          .eq('period_type', 'seasonal')
+          .eq('status', 'active');
+
+      if (nursinghomeId != null) {
+        final result = await query.eq('nursinghome_id', nursinghomeId).maybeSingle();
+        return result;
+      }
+
+      final result = await query.maybeSingle();
+      return result;
+    } catch (e) {
+      debugPrint('❌ Error getting current season: $e');
+      return null;
     }
   }
 

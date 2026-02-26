@@ -620,7 +620,7 @@ Deno.serve(async (req) => {
       headers: {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info',
       },
     })
   }
@@ -713,24 +713,11 @@ Deno.serve(async (req) => {
       console.log(`[generate-shift-summary] current_form_data keys: ${formKeys.join(', ')}`)
     }
 
-    // DEBUG: สร้าง debug info สำหรับตรวจสอบ
-    const debug = {
-      timeRange: { start, end },
-      recordCounts: Object.fromEntries(
-        Object.entries(results).map(([k, v]) => [k, v.length])
-      ),
-      queryErrors: Object.keys(queryErrors).length > 0 ? queryErrors : undefined,
-      inputDate: date,
-      inputShift: shift,
-      inputResidentId: resident_id,
-    }
-
     // ถ้าไม่มีข้อมูลเลย ส่งกลับทันทีโดยไม่ต้องเรียก AI
     if (dataText === 'ไม่มีข้อมูลกิจกรรมในเวรนี้') {
       console.log('[generate-shift-summary] No data found, returning empty message')
       return new Response(JSON.stringify({
         content: 'ไม่มีข้อมูลกิจกรรมในเวรนี้',
-        debug, // TODO: ลบ debug ออกเมื่อ production
       }), {
         headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
       })
@@ -762,8 +749,8 @@ Deno.serve(async (req) => {
       throw new Error('Empty response from AI')
     }
 
-    // 7. ส่งกลับ (รวม debug ด้วย — TODO: ลบ debug ออกเมื่อ production)
-    return new Response(JSON.stringify({ content: responseText.trim(), debug }), {
+    // 7. ส่งกลับ
+    return new Response(JSON.stringify({ content: responseText.trim() }), {
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
     })
 

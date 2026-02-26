@@ -5,6 +5,7 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/widgets/buttons.dart';
 import '../../../core/widgets/input_fields.dart';
 import '../services/profile_setup_service.dart';
@@ -140,28 +141,12 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'บันทึกข้อมูลเรียบร้อย',
-              style: AppTypography.body.copyWith(color: AppColors.surface),
-            ),
-            backgroundColor: AppColors.success,
-          ),
-        );
+        AppSnackbar.success(context, 'บันทึกข้อมูลเรียบร้อย');
       }
     } catch (e) {
       debugPrint('CompleteProfileScreen: Error saving: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'บันทึกไม่สำเร็จ: $e',
-              style: AppTypography.body.copyWith(color: AppColors.surface),
-            ),
-            backgroundColor: AppColors.error,
-          ),
-        );
+        AppSnackbar.error(context, 'บันทึกไม่สำเร็จ: $e');
       }
     } finally {
       if (mounted) {

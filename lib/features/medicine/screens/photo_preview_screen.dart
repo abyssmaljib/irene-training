@@ -3,9 +3,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:image/image.dart' as img;
-import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/widgets/irene_app_bar.dart';
 
 /// ขนาดสูงสุดของรูปก่อนหมุน (ป้องกัน memory overflow)
@@ -170,12 +170,7 @@ class _PhotoPreviewScreenState extends State<PhotoPreviewScreen> {
     } catch (e) {
       debugPrint('Error rotating image: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('ไม่สามารถหมุนรูปได้'),
-            backgroundColor: AppColors.error,
-          ),
-        );
+        AppSnackbar.error(context, 'ไม่สามารถหมุนรูปได้');
         setState(() => _isProcessing = false);
       }
     }

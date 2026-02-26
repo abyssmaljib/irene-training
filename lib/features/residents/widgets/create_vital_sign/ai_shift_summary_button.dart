@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hugeicons/hugeicons.dart';
 import '../../../../core/services/user_service.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/error_state.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/widgets/buttons.dart';
@@ -192,7 +193,12 @@ class AiShiftSummaryButton extends ConsumerWidget {
 
     return formState.when(
       loading: () => const SizedBox.shrink(),
-      error: (_, _) => const SizedBox.shrink(),
+      // แสดง error แทน SizedBox.shrink() เพื่อให้ user รู้ว่าเกิดข้อผิดพลาด
+      error: (error, _) => ErrorStateWidget(
+        message: 'โหลดข้อมูลไม่สำเร็จ',
+        compact: true,
+        onRetry: () => ref.invalidate(vitalSignFormProvider(residentId)),
+      ),
       data: (data) {
         final isLoading = data.isLoadingAI;
 

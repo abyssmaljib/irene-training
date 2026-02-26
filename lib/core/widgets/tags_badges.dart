@@ -113,41 +113,46 @@ class CategoryChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : AppColors.surface,
-          borderRadius: AppRadius.smallRadius,
-          border: Border.all(
-            color: isSelected ? AppColors.primary : AppColors.inputBorder,
-            width: 1,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label,
-              style: AppTypography.bodySmall.copyWith(
-                color: isSelected ? AppColors.surface : AppColors.textPrimary,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-              ),
+    // Semantics บอก screen reader ว่า chip นี้ถูกเลือกอยู่หรือไม่
+    return Semantics(
+      selected: isSelected,
+      label: label,
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.primary : AppColors.surface,
+            borderRadius: AppRadius.smallRadius,
+            border: Border.all(
+              color: isSelected ? AppColors.primary : AppColors.inputBorder,
+              width: 1,
             ),
-            if (showRemoveIcon && isSelected) ...[
-              AppSpacing.horizontalGapXs,
-              GestureDetector(
-                onTap: onRemove,
-                child: HugeIcon(
-                  icon: HugeIcons.strokeRoundedCancel02,
-                  size: AppIconSize.sm,
-                  color: AppColors.surface,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: AppTypography.bodySmall.copyWith(
+                  color: isSelected ? AppColors.surface : AppColors.textPrimary,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
                 ),
               ),
+              if (showRemoveIcon && isSelected) ...[
+                AppSpacing.horizontalGapXs,
+                GestureDetector(
+                  onTap: onRemove,
+                  child: HugeIcon(
+                    icon: HugeIcons.strokeRoundedCancel02,
+                    size: AppIconSize.sm,
+                    color: AppColors.surface,
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -234,9 +239,8 @@ class ProgressTag extends StatelessWidget {
       ),
       child: Text(
         emoji != null ? '$emoji $text' : text,
-        style: TextStyle(
-          fontFamily: 'MiSansThai',
-          fontSize: 12,
+        // ใช้ AppTypography แทน hardcode font เพื่อ consistency
+        style: AppTypography.caption.copyWith(
           fontWeight: FontWeight.w500,
           color: textColor,
         ),

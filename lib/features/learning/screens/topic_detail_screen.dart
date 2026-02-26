@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/services/user_service.dart';
 import '../models/topic_with_progress.dart';
 import '../models/topic_detail.dart';
@@ -17,6 +18,7 @@ import '../widgets/badge_earned_dialog.dart';
 import '../../../core/widgets/irene_app_bar.dart';
 import 'quiz_screen.dart';
 import 'quiz_result_screen.dart';
+import '../../../core/widgets/shimmer_loading.dart';
 
 class TopicDetailScreen extends StatefulWidget {
   final TopicWithProgress topic;
@@ -343,9 +345,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen>
       if (allQuestions.isEmpty) {
         if (mounted) {
           Navigator.pop(context); // Close loading
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('ไม่มีคำถามในหัวข้อนี้')),
-          );
+          AppSnackbar.warning(context, 'ไม่มีคำถามในหัวข้อนี้');
         }
         return;
       }
@@ -431,9 +431,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen>
     } catch (e) {
       if (mounted) {
         Navigator.pop(context); // Close loading
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('เกิดข้อผิดพลาด: $e')),
-        );
+        AppSnackbar.error(context, 'เกิดข้อผิดพลาด: $e');
       }
     }
   }
@@ -469,7 +467,15 @@ class _TopicDetailScreenState extends State<TopicDetailScreen>
 
   Widget _buildBody() {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return ShimmerWrapper(
+        isLoading: true,
+        child: Padding(
+          padding: EdgeInsets.all(AppSpacing.md),
+          child: Column(
+            children: List.generate(3, (_) => const SkeletonCard()),
+          ),
+        ),
+      );
     }
 
     if (_error != null) {

@@ -7,7 +7,9 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/widgets/irene_app_bar.dart';
+import '../../../core/widgets/shimmer_loading.dart';
 import '../../settings/screens/settings_screen.dart';
 import '../models/post.dart';
 import '../models/post_tab.dart';
@@ -350,9 +352,8 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
 
     if (nursinghomeId == null || userId == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('ไม่สามารถดึงข้อมูลได้')),
-        );
+        // แจ้ง error เมื่อดึงข้อมูล nursinghome/user ไม่ได้
+        AppSnackbar.error(context, 'ไม่สามารถดึงข้อมูลได้');
       }
       return;
     }
@@ -364,9 +365,8 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
       // Refresh badge ด้วย
       refreshPosts(ref);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('ไม่มีโพสที่ต้องอ่านแล้ว 🎉')),
-        );
+        // แจ้งว่าอ่านโพสครบทุกโพสแล้ว
+        AppSnackbar.success(context, 'ไม่มีโพสที่ต้องอ่านแล้ว');
       }
       return;
     }
@@ -444,7 +444,12 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
         return _buildSimplePostsListView(posts);
       },
       loading: () => SliverFillRemaining(
-        child: Center(child: CircularProgressIndicator()),
+        child: ShimmerWrapper(
+          isLoading: true,
+          child: Column(
+            children: List.generate(3, (_) => const SkeletonCard()),
+          ),
+        ),
       ),
       error: (e, _) => SliverFillRemaining(
         child: _buildErrorState(e.toString()),
@@ -499,7 +504,12 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
     // กำลังโหลดครั้งแรก
     if (postsState.isLoading) {
       return SliverFillRemaining(
-        child: Center(child: CircularProgressIndicator()),
+        child: ShimmerWrapper(
+          isLoading: true,
+          child: Column(
+            children: List.generate(3, (_) => const SkeletonCard()),
+          ),
+        ),
       );
     }
 
@@ -695,9 +705,8 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
       refreshPosts(ref);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('เกิดข้อผิดพลาด: $e')),
-        );
+        // แจ้ง error เมื่อกดถูกใจไม่สำเร็จ
+        AppSnackbar.error(context, 'เกิดข้อผิดพลาด: $e');
       }
     }
   }
@@ -709,16 +718,14 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
       if (success) {
         refreshPosts(ref);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('ยกเลิกการส่ง LINE สำเร็จ')),
-          );
+          // แจ้งยกเลิกการส่ง LINE PRN สำเร็จ
+          AppSnackbar.success(context, 'ยกเลิกการส่ง LINE สำเร็จ');
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('เกิดข้อผิดพลาด: $e')),
-        );
+        // แจ้ง error เมื่อยกเลิก PRN ไม่สำเร็จ
+        AppSnackbar.error(context, 'เกิดข้อผิดพลาด: $e');
       }
     }
   }
@@ -730,16 +737,14 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
       if (success) {
         refreshPosts(ref);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('ยกเลิกการส่ง LINE สำเร็จ')),
-          );
+          // แจ้งยกเลิกการส่ง LINE Log สำเร็จ
+          AppSnackbar.success(context, 'ยกเลิกการส่ง LINE สำเร็จ');
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('เกิดข้อผิดพลาด: $e')),
-        );
+        // แจ้ง error เมื่อยกเลิก Log LINE ไม่สำเร็จ
+        AppSnackbar.error(context, 'เกิดข้อผิดพลาด: $e');
       }
     }
   }
@@ -985,7 +990,12 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
             ),
           );
         },
-        loading: () => Center(child: CircularProgressIndicator()),
+        loading: () => ShimmerWrapper(
+          isLoading: true,
+          child: Column(
+            children: List.generate(3, (_) => const SkeletonCard()),
+          ),
+        ),
         error: (e, _) => Center(
           child: Text('เกิดข้อผิดพลาด: $e', style: AppTypography.body),
         ),

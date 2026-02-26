@@ -52,6 +52,7 @@ import '../widgets/clock_out_summary_modal.dart'; // สำหรับ dev test
 import '../models/shift_leader.dart'; // สำหรับ mock ShiftLeader ใน dev button
 import '../../settings/services/clockin_verification_service.dart'; // สำหรับตรวจ GPS+WiFi ก่อนขึ้นเวร
 import '../../../core/widgets/buttons.dart'; // สำหรับ PrimaryButton ใน verification dialog
+import '../../../core/widgets/app_snackbar.dart';
 
 /// หน้าหลัก - Dashboard with Clock-in/Clock-out
 /// ใช้ ConsumerStatefulWidget เพื่อให้ pull to refresh สามารถ invalidate
@@ -426,12 +427,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       await _loadResidentsByZones();
       await _loadOccupiedBreakTimes();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('มีคนไข้ที่เพื่อนเลือกไปแล้ว กรุณาเลือกใหม่'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      AppSnackbar.warning(context, 'มีคนไข้ที่เพื่อนเลือกไปแล้ว กรุณาเลือกใหม่');
       return;
     }
 
@@ -887,9 +883,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _loadCurrentShift(forceRefresh: true);
       _loadDashboardStats();
       _loadMonthlySummary();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ลงเวรเรียบร้อย')),
-      );
+      AppSnackbar.success(context, 'ลงเวรเรียบร้อย');
     }
   }
 
@@ -1528,15 +1522,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   }) {
                     // แสดงผลลัพธ์ใน SnackBar แทนการบันทึกจริง
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(this.context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'DEV: shiftScore=$shiftScore, selfScore=$selfScore, '
-                          'leaderScore=$leaderScore, '
-                          'survey="${shiftSurvey.substring(0, shiftSurvey.length.clamp(0, 30))}..."',
-                        ),
-                        backgroundColor: Colors.orange.shade600,
-                      ),
+                    AppSnackbar.info(
+                      this.context,
+                      'DEV: shiftScore=$shiftScore, selfScore=$selfScore, '
+                      'leaderScore=$leaderScore, '
+                      'survey="${shiftSurvey.substring(0, shiftSurvey.length.clamp(0, 30))}..."',
                     );
                   },
                 ),

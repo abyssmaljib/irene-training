@@ -36,69 +36,75 @@ class _PrimaryButtonState extends State<PrimaryButton> {
   Widget build(BuildContext context) {
     final bool isEnabled = !widget.isDisabled && !widget.isLoading && widget.onPressed != null;
     
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: Focus(
-        onFocusChange: (focused) => setState(() => _isFocused = focused),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          width: widget.width,
-          height: AppSpacing.buttonHeight,
-          child: Material(
-            color: _getBackgroundColor(isEnabled),
-            borderRadius: AppRadius.smallRadius,
-            child: InkWell(
-              onTap: isEnabled ? widget.onPressed : null,
+    // Semantics บอก screen reader ว่านี่คือปุ่ม + สถานะ enabled/loading
+    return Semantics(
+      button: true,
+      enabled: isEnabled,
+      label: widget.isLoading ? '${widget.text} กำลังโหลด' : widget.text,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() => _isHovered = false),
+        child: Focus(
+          onFocusChange: (focused) => setState(() => _isFocused = focused),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: widget.width,
+            height: AppSpacing.buttonHeight,
+            child: Material(
+              color: _getBackgroundColor(isEnabled),
               borderRadius: AppRadius.smallRadius,
-              child: Container(
-                height: AppSpacing.buttonHeight,
-                padding: AppSpacing.buttonPadding,
-                decoration: BoxDecoration(
-                  borderRadius: AppRadius.smallRadius,
-                  border: _isFocused
-                      ? Border.all(color: AppColors.primary.withValues(alpha: 0.5), width: 2)
-                      : null,
-                ),
-                child: Row(
-                  mainAxisSize: widget.width != null ? MainAxisSize.max : MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (widget.isLoading) ...[
-                      SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            AppColors.surface,
+              child: InkWell(
+                onTap: isEnabled ? widget.onPressed : null,
+                borderRadius: AppRadius.smallRadius,
+                child: Container(
+                  height: AppSpacing.buttonHeight,
+                  padding: AppSpacing.buttonPadding,
+                  decoration: BoxDecoration(
+                    borderRadius: AppRadius.smallRadius,
+                    border: _isFocused
+                        ? Border.all(color: AppColors.primary.withValues(alpha: 0.5), width: 2)
+                        : null,
+                  ),
+                  child: Row(
+                    mainAxisSize: widget.width != null ? MainAxisSize.max : MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (widget.isLoading) ...[
+                        SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              AppColors.surface,
+                            ),
                           ),
                         ),
-                      ),
-                    ] else ...[
-                      if (widget.icon != null) ...[
-                        if (widget.icon is IconData)
-                          Icon(
-                            widget.icon,
+                      ] else ...[
+                        if (widget.icon != null) ...[
+                          if (widget.icon is IconData)
+                            Icon(
+                              widget.icon,
+                              color: AppColors.surface,
+                              size: AppIconSize.lg,
+                            )
+                          else
+                            HugeIcon(
+                              icon: widget.icon,
+                              color: AppColors.surface,
+                              size: AppIconSize.lg,
+                            ),
+                          AppSpacing.horizontalGapSm,
+                        ],
+                        Text(
+                          widget.text,
+                          style: AppTypography.button.copyWith(
                             color: AppColors.surface,
-                            size: AppIconSize.lg,
-                          )
-                        else
-                          HugeIcon(
-                            icon: widget.icon,
-                            color: AppColors.surface,
-                            size: AppIconSize.lg,
                           ),
-                        AppSpacing.horizontalGapSm,
+                        ),
                       ],
-                      Text(
-                        widget.text,
-                        style: AppTypography.button.copyWith(
-                          color: AppColors.surface,
-                        ),
-                      ),
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -145,56 +151,62 @@ class _SecondaryButtonState extends State<SecondaryButton> {
   Widget build(BuildContext context) {
     final bool isEnabled = !widget.isDisabled && !widget.isLoading && widget.onPressed != null;
     
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        width: widget.width,
-        height: AppSpacing.buttonHeight,
-        child: OutlinedButton(
-          onPressed: isEnabled ? widget.onPressed : null,
-          style: OutlinedButton.styleFrom(
-            minimumSize: Size(0, AppSpacing.buttonHeight),
-            padding: AppSpacing.buttonPadding,
-            side: BorderSide(
-              color: isEnabled
-                  ? (_isHovered ? AppColors.primaryHover : AppColors.primary)
-                  : AppColors.primaryDisabled,
-              width: 1,
+    // Semantics บอก screen reader ว่านี่คือปุ่ม
+    return Semantics(
+      button: true,
+      enabled: isEnabled,
+      label: widget.isLoading ? '${widget.text} กำลังโหลด' : widget.text,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() => _isHovered = false),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          width: widget.width,
+          height: AppSpacing.buttonHeight,
+          child: OutlinedButton(
+            onPressed: isEnabled ? widget.onPressed : null,
+            style: OutlinedButton.styleFrom(
+              minimumSize: Size(0, AppSpacing.buttonHeight),
+              padding: AppSpacing.buttonPadding,
+              side: BorderSide(
+                color: isEnabled
+                    ? (_isHovered ? AppColors.primaryHover : AppColors.primary)
+                    : AppColors.primaryDisabled,
+                width: 1,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: AppRadius.smallRadius,
+              ),
+              backgroundColor: _isHovered && isEnabled
+                  ? AppColors.primary.withValues(alpha: 0.05)
+                  : Colors.transparent,
             ),
-            shape: RoundedRectangleBorder(
-              borderRadius: AppRadius.smallRadius,
-            ),
-            backgroundColor: _isHovered && isEnabled
-                ? AppColors.primary.withValues(alpha: 0.05)
-                : Colors.transparent,
-          ),
-          child: widget.isLoading
-              ? SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                  ),
-                )
-              : Row(
-                  mainAxisSize: widget.width != null ? MainAxisSize.max : MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (widget.icon != null) ...[
-                      HugeIcon(icon: widget.icon, size: AppIconSize.lg),
-                      AppSpacing.horizontalGapSm,
-                    ],
-                    Text(
-                      widget.text,
-                      style: AppTypography.button.copyWith(
-                        color: isEnabled ? AppColors.primary : AppColors.primaryDisabled,
-                      ),
+            child: widget.isLoading
+                ? SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
                     ),
-                  ],
-                ),
+                  )
+                : Row(
+                    mainAxisSize: widget.width != null ? MainAxisSize.max : MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (widget.icon != null) ...[
+                        HugeIcon(icon: widget.icon, size: AppIconSize.lg),
+                        AppSpacing.horizontalGapSm,
+                      ],
+                      Text(
+                        widget.text,
+                        style: AppTypography.button.copyWith(
+                          color: isEnabled ? AppColors.primary : AppColors.primaryDisabled,
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
         ),
       ),
     );
@@ -232,69 +244,75 @@ class _DangerButtonState extends State<DangerButton> {
   Widget build(BuildContext context) {
     final bool isEnabled = !widget.isDisabled && !widget.isLoading && widget.onPressed != null;
 
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: Focus(
-        onFocusChange: (focused) => setState(() => _isFocused = focused),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          width: widget.width,
-          height: AppSpacing.buttonHeight,
-          child: Material(
-            color: _getBackgroundColor(isEnabled),
-            borderRadius: AppRadius.smallRadius,
-            child: InkWell(
-              onTap: isEnabled ? widget.onPressed : null,
+    // Semantics บอก screen reader ว่านี่คือปุ่มลบ/อันตราย
+    return Semantics(
+      button: true,
+      enabled: isEnabled,
+      label: widget.isLoading ? '${widget.text} กำลังโหลด' : widget.text,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() => _isHovered = false),
+        child: Focus(
+          onFocusChange: (focused) => setState(() => _isFocused = focused),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: widget.width,
+            height: AppSpacing.buttonHeight,
+            child: Material(
+              color: _getBackgroundColor(isEnabled),
               borderRadius: AppRadius.smallRadius,
-              child: Container(
-                height: AppSpacing.buttonHeight,
-                padding: AppSpacing.buttonPadding,
-                decoration: BoxDecoration(
-                  borderRadius: AppRadius.smallRadius,
-                  border: _isFocused
-                      ? Border.all(color: AppColors.error.withValues(alpha: 0.5), width: 2)
-                      : null,
-                ),
-                child: Row(
-                  mainAxisSize: widget.width != null ? MainAxisSize.max : MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (widget.isLoading) ...[
-                      SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            AppColors.surface,
+              child: InkWell(
+                onTap: isEnabled ? widget.onPressed : null,
+                borderRadius: AppRadius.smallRadius,
+                child: Container(
+                  height: AppSpacing.buttonHeight,
+                  padding: AppSpacing.buttonPadding,
+                  decoration: BoxDecoration(
+                    borderRadius: AppRadius.smallRadius,
+                    border: _isFocused
+                        ? Border.all(color: AppColors.error.withValues(alpha: 0.5), width: 2)
+                        : null,
+                  ),
+                  child: Row(
+                    mainAxisSize: widget.width != null ? MainAxisSize.max : MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (widget.isLoading) ...[
+                        SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              AppColors.surface,
+                            ),
                           ),
                         ),
-                      ),
-                    ] else ...[
-                      if (widget.icon != null) ...[
-                        if (widget.icon is IconData)
-                          Icon(
-                            widget.icon,
+                      ] else ...[
+                        if (widget.icon != null) ...[
+                          if (widget.icon is IconData)
+                            Icon(
+                              widget.icon,
+                              color: AppColors.surface,
+                              size: AppIconSize.lg,
+                            )
+                          else
+                            HugeIcon(
+                              icon: widget.icon,
+                              color: AppColors.surface,
+                              size: AppIconSize.lg,
+                            ),
+                          AppSpacing.horizontalGapSm,
+                        ],
+                        Text(
+                          widget.text,
+                          style: AppTypography.button.copyWith(
                             color: AppColors.surface,
-                            size: AppIconSize.lg,
-                          )
-                        else
-                          HugeIcon(
-                            icon: widget.icon,
-                            color: AppColors.surface,
-                            size: AppIconSize.lg,
                           ),
-                        AppSpacing.horizontalGapSm,
+                        ),
                       ],
-                      Text(
-                        widget.text,
-                        style: AppTypography.button.copyWith(
-                          color: AppColors.surface,
-                        ),
-                      ),
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -330,35 +348,49 @@ class AppTextButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final bool isEnabled = !isDisabled && onPressed != null;
     
-    return SizedBox(
-      height: AppSpacing.buttonHeight,
-      child: TextButton(
-        onPressed: isEnabled ? onPressed : null,
-        style: TextButton.styleFrom(
-          minimumSize: Size(0, AppSpacing.buttonHeight),
-          padding: AppSpacing.buttonPadding,
-          shape: RoundedRectangleBorder(
-            borderRadius: AppRadius.smallRadius,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (icon != null) ...[
-              HugeIcon(
-                icon: icon,
-                size: AppIconSize.lg,
-                color: isEnabled ? AppColors.primary : AppColors.primaryDisabled,
-              ),
-              AppSpacing.horizontalGapSm,
-            ],
-            Text(
-              text,
-              style: AppTypography.button.copyWith(
-                color: isEnabled ? AppColors.primary : AppColors.primaryDisabled,
-              ),
+    // Semantics บอก screen reader ว่านี่คือปุ่ม text
+    return Semantics(
+      button: true,
+      enabled: isEnabled,
+      label: text,
+      child: SizedBox(
+        height: AppSpacing.buttonHeight,
+        child: TextButton(
+          onPressed: isEnabled ? onPressed : null,
+          style: TextButton.styleFrom(
+            minimumSize: Size(0, AppSpacing.buttonHeight),
+            padding: AppSpacing.buttonPadding,
+            shape: RoundedRectangleBorder(
+              borderRadius: AppRadius.smallRadius,
             ),
-          ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // รองรับทั้ง IconData (Material) และ HugeIcon
+              if (icon != null) ...[
+                if (icon is IconData)
+                  Icon(
+                    icon,
+                    size: AppIconSize.lg,
+                    color: isEnabled ? AppColors.primary : AppColors.primaryDisabled,
+                  )
+                else
+                  HugeIcon(
+                    icon: icon,
+                    size: AppIconSize.lg,
+                    color: isEnabled ? AppColors.primary : AppColors.primaryDisabled,
+                  ),
+                AppSpacing.horizontalGapSm,
+              ],
+              Text(
+                text,
+                style: AppTypography.button.copyWith(
+                  color: isEnabled ? AppColors.primary : AppColors.primaryDisabled,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

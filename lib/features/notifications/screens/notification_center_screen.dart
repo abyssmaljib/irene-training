@@ -4,8 +4,10 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/irene_app_bar.dart';
+import '../../../core/widgets/shimmer_loading.dart';
 import '../models/app_notification.dart';
 import '../providers/notification_provider.dart';
 import '../widgets/notification_item.dart';
@@ -118,7 +120,12 @@ class _NotificationCenterScreenState extends ConsumerState<NotificationCenterScr
     required bool showAll,
   }) {
     return state.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => ShimmerWrapper(
+        isLoading: true,
+        child: Column(
+          children: List.generate(5, (_) => const SkeletonListItem()),
+        ),
+      ),
       error: (error, _) => _buildErrorState(error.toString()),
       data: (notifications) {
         final filteredNotifications = showAll
@@ -215,20 +222,7 @@ class _NotificationCenterScreenState extends ConsumerState<NotificationCenterScr
   void _onNotificationDismiss(AppNotification notification) {
     ref.read(notificationStateProvider.notifier).deleteNotification(notification.id);
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('ลบการแจ้งเตือนแล้ว'),
-        backgroundColor: AppColors.primary,
-        action: SnackBarAction(
-          label: 'เลิกทำ',
-          textColor: Colors.white,
-          onPressed: () {
-            // TODO: Implement undo
-            ref.read(notificationStateProvider.notifier).refresh();
-          },
-        ),
-      ),
-    );
+    AppSnackbar.success(context, 'ลบการแจ้งเตือนแล้ว');
   }
 
   void _onToggleReadStatus(AppNotification notification) {
@@ -237,24 +231,13 @@ class _NotificationCenterScreenState extends ConsumerState<NotificationCenterScr
       notification.isRead,
     );
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(notification.isRead ? 'ทำเครื่องหมายยังไม่อ่าน' : 'ทำเครื่องหมายอ่านแล้ว'),
-        backgroundColor: AppColors.primary,
-        duration: Duration(seconds: 1),
-      ),
-    );
+    AppSnackbar.info(context, notification.isRead ? 'ทำเครื่องหมายยังไม่อ่าน' : 'ทำเครื่องหมายอ่านแล้ว');
   }
 
   void _markAllAsRead() {
     ref.read(notificationStateProvider.notifier).markAllAsRead();
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('อ่านทั้งหมดแล้ว'),
-        backgroundColor: AppColors.primary,
-      ),
-    );
+    AppSnackbar.success(context, 'อ่านทั้งหมดแล้ว');
   }
 
   Widget _buildMarkAllReadButton(AsyncValue<List<AppNotification>> state) {

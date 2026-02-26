@@ -339,14 +339,14 @@ class _TaskTimeSectionState extends State<TaskTimeSection>
   Color _getProgressColor(int pending, int total) {
     if (total == 0) return AppColors.secondary.withValues(alpha: 0.6);
     if (pending == 0) return AppColors.tagPassedText; // เขียว - ทำครบแล้ว
-    return const Color(0xFFA08030); // เหลืองทองเข้ม - ยังมีงานค้าง
+    return AppColors.progressPendingText; // เหลืองทองเข้ม - ยังมีงานค้าง
   }
 
   /// คำนวณสี background ของ badge ตาม pending count
   Color _getProgressBgColor(int pending, int total) {
     if (total == 0) return AppColors.secondary.withValues(alpha: 0.2);
     if (pending == 0) return AppColors.tagPassedBg; // เขียวอ่อน - ทำครบแล้ว
-    return const Color(0xFFE8D5A0); // เหลืองครีม - ยังมีงานค้าง
+    return AppColors.progressPendingBg; // เหลืองครีม - ยังมีงานค้าง
   }
 
   /// ตรวจสอบว่า timeBlock นี้ครอบคลุมเวลาปัจจุบันหรือไม่

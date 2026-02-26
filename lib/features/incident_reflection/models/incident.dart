@@ -36,28 +36,35 @@ enum ReflectionStatus {
   }
 }
 
-/// ระดับความรุนแรง
+/// ระดับความรุนแรง (ตรงกับค่าใน DB: LEVEL_1, LEVEL_2, LEVEL_3)
 enum IncidentSeverity {
-  low('low', 'เล็กน้อย'),
-  medium('medium', 'ปานกลาง'),
-  high('high', 'สูง'),
-  critical('critical', 'วิกฤต');
+  /// Level 1: ทั่วไป (โค้ชชิ่ง / สอนงาน) — หัก 100 points
+  level1('LEVEL_1', 'Level 1: ทั่วไป'),
+
+  /// Level 2: ตักเตือน (ต้องปรับปรุง) — หัก 300 points
+  level2('LEVEL_2', 'Level 2: ตักเตือน'),
+
+  /// Level 3: รุนแรง (ผิดวินัย / อันตราย) — หัก 500 points
+  level3('LEVEL_3', 'Level 3: รุนแรง');
 
   const IncidentSeverity(this.value, this.displayText);
 
+  /// ค่าที่เก็บใน DB (LEVEL_1, LEVEL_2, LEVEL_3)
   final String value;
+
+  /// ข้อความสำหรับแสดงผล
   final String displayText;
 
+  /// แปลงจาก string เป็น enum (รองรับทั้ง LEVEL_1 และ level_1)
   static IncidentSeverity fromString(String? value) {
-    switch (value?.toLowerCase()) {
-      case 'medium':
-        return IncidentSeverity.medium;
-      case 'high':
-        return IncidentSeverity.high;
-      case 'critical':
-        return IncidentSeverity.critical;
+    switch (value?.toUpperCase()) {
+      case 'LEVEL_2':
+        return IncidentSeverity.level2;
+      case 'LEVEL_3':
+        return IncidentSeverity.level3;
       default:
-        return IncidentSeverity.low;
+        // LEVEL_1 หรือค่าอื่นๆ ที่ไม่รู้จัก → ใช้ level1 เป็น default
+        return IncidentSeverity.level1;
     }
   }
 }
@@ -159,7 +166,7 @@ class Incident {
     this.reportedBy,
     this.incidentDate,
     this.shift,
-    this.severity = IncidentSeverity.low,
+    this.severity = IncidentSeverity.level1,
     this.category,
     this.status,
     this.residentId,
