@@ -73,7 +73,7 @@ export 'core/widgets/nps_scale.dart';
 // =============
 // Feedback
 // =============
-export 'core/widgets/app_snackbar.dart';
+export 'core/widgets/app_toast.dart';
 export 'core/widgets/coin_reward_overlay.dart';
 
 // =============

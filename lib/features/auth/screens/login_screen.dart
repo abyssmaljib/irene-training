@@ -5,7 +5,7 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
-import '../../../core/widgets/app_snackbar.dart';
+import '../../../core/widgets/app_toast.dart';
 import '../../../core/widgets/input_fields.dart';
 import 'invitation_screen.dart';
 import 'forgot_password_screen.dart';
@@ -105,7 +105,7 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _otpSent = true);
 
       if (mounted) {
-        AppSnackbar.success(context, 'ส่งรหัส OTP ไปที่ ${_emailController.text} แล้ว');
+        AppToast.success(context, 'ส่งรหัส OTP ไปที่ ${_emailController.text} แล้ว');
       }
     } catch (e) {
       setState(() => _errorMessage = 'ไม่สามารถส่ง OTP ได้ กรุณาลองใหม่');

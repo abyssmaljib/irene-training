@@ -5,7 +5,7 @@ import '../../../core/services/user_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
-import '../../../core/widgets/app_snackbar.dart';
+import '../../../core/widgets/app_toast.dart';
 import '../../../core/widgets/irene_app_bar.dart';
 import '../../../core/widgets/success_popup.dart';
 import '../providers/resident_detail_provider.dart';
@@ -163,7 +163,7 @@ class CreateVitalSignScreen extends ConsumerWidget {
                       if (validationError != null) {
                         // แสดง error snackbar
                         if (context.mounted) {
-                          AppSnackbar.error(context, validationError);
+                          AppToast.error(context, validationError);
                         }
                         return;
                       }
@@ -206,7 +206,7 @@ class CreateVitalSignScreen extends ConsumerWidget {
                           if (context.mounted) Navigator.of(context).pop(true);
                         } else if (!success && context.mounted) {
                           // แสดง error snackbar ถ้า submit ไม่สำเร็จ
-                          AppSnackbar.error(context, data.errorMessage ?? 'เกิดข้อผิดพลาด');
+                          AppToast.error(context, data.errorMessage ?? 'เกิดข้อผิดพลาด');
                         }
                       }
                     },

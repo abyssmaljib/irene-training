@@ -7,7 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/confirm_dialog.dart';
-import '../../../core/widgets/app_snackbar.dart';
+import '../../../core/widgets/app_toast.dart';
 import 'handover_toggle_widget.dart';
 import '../models/post.dart';
 import '../providers/edit_post_provider.dart';
@@ -1072,7 +1072,7 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
 
     if (remaining <= 0) {
       // แจ้งเตือนเลือกรูปเกินจำนวนที่กำหนด
-      AppSnackbar.warning(context, 'เลือกรูปได้สูงสุด 5 รูป');
+      AppToast.warning(context, 'เลือกรูปได้สูงสุด 5 รูป');
       return;
     }
 
@@ -1091,7 +1091,7 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
     // เช็คว่าสามารถเพิ่มวีดีโอได้หรือไม่
     if (!state.canAddVideo) {
       // แจ้งเตือนไม่สามารถเพิ่มวีดีโอได้
-      AppSnackbar.warning(context, 'ไม่สามารถเพิ่มวีดีโอได้ (มีรูปภาพหรือวีดีโออยู่แล้ว)');
+      AppToast.warning(context, 'ไม่สามารถเพิ่มวีดีโอได้ (มีรูปภาพหรือวีดีโออยู่แล้ว)');
       return;
     }
 
@@ -1107,7 +1107,7 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
     // ถ้าติ๊กส่งเวร บังคับต้องกรอกรายละเอียด
     if (text.isEmpty && state.isHandover) {
       // แจ้งเตือน validation: ต้องกรอกรายละเอียดเมื่อติ๊กส่งเวร
-      AppSnackbar.warning(context, 'กรุณากรอกรายละเอียดเมื่อติ๊กส่งเวร');
+      AppToast.warning(context, 'กรุณากรอกรายละเอียดเมื่อติ๊กส่งเวร');
       return;
     }
 
@@ -1215,7 +1215,7 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
           widget.onPostUpdated?.call();
 
           // แจ้งบันทึกโพสสำเร็จ
-          AppSnackbar.success(context, 'บันทึกสำเร็จ');
+          AppToast.success(context, 'บันทึกสำเร็จ');
         }
       } else {
         throw Exception('ไม่สามารถบันทึกได้');
@@ -1226,7 +1226,7 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
           .setError(e.toString());
       if (mounted) {
         // แจ้ง error เมื่อบันทึกโพสไม่สำเร็จ
-        AppSnackbar.error(context, 'เกิดข้อผิดพลาด: $e');
+        AppToast.error(context, 'เกิดข้อผิดพลาด: $e');
       }
     } finally {
       // Clear upload status และ submitting state ทุกกรณี

@@ -9,7 +9,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/buttons.dart';
 import '../../../core/widgets/irene_app_bar.dart';
-import '../../../core/widgets/app_snackbar.dart';
+import '../../../core/widgets/app_toast.dart';
 import '../../../core/widgets/network_image.dart';
 import '../../../core/widgets/success_popup.dart';
 import '../providers/create_medicine_db_provider.dart';
@@ -174,7 +174,7 @@ class _CreateMedicineDBScreenState
             break;
         }
         if (mounted) {
-          AppSnackbar.error(context, 'ไม่สามารถ upload รูปได้ กรุณาลองใหม่');
+          AppToast.error(context, 'ไม่สามารถ upload รูปได้ กรุณาลองใหม่');
         }
         return;
       }
@@ -197,7 +197,7 @@ class _CreateMedicineDBScreenState
     } catch (e) {
       debugPrint('[CreateMedicineDB] Error picking/uploading image: $e');
       if (mounted) {
-        AppSnackbar.error(context, 'ไม่สามารถ upload รูปได้: $e');
+        AppToast.error(context, 'ไม่สามารถ upload รูปได้: $e');
       }
     }
   }

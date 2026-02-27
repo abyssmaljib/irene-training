@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../../core/widgets/app_snackbar.dart';
+import '../../../core/widgets/app_toast.dart';
 
 import '../../board/screens/board_screen.dart';
 import '../../checklist/services/task_service.dart';
@@ -197,7 +197,7 @@ class NotificationNavigator {
 
   /// แสดง error snackbar
   static void _showError(BuildContext context, String message) {
-    AppSnackbar.error(context, message);
+    AppToast.error(context, message);
   }
 
   /// Fetch data แล้ว navigate พร้อมแสดง loading snackbar
@@ -207,15 +207,15 @@ class NotificationNavigator {
     required Future<T?> Function() fetchData,
     required void Function(T?) onSuccess,
   }) async {
-    // แสดง loading snackbar ขณะ fetch
-    // AppSnackbar.info จะ hideCurrentSnackBar ก่อนแสดงใหม่อัตโนมัติ
-    AppSnackbar.info(context, 'กำลังโหลด...');
+    // แสดง loading toast ขณะ fetch
+    // AppToast.info จะแสดงผ่าน Overlay (auto-dismiss หลัง 3 วิ)
+    AppToast.info(context, 'กำลังโหลด...');
 
     try {
       final data = await fetchData();
       onSuccess(data);
     } catch (e) {
-      // แสดง error (AppSnackbar.error จะซ่อน loading snackbar ให้อัตโนมัติ)
+      // แสดง error toast (Overlay ใหม่จะแทนที่ loading อัตโนมัติ)
       if (context.mounted) {
         _showError(context, 'เกิดข้อผิดพลาดในการโหลดข้อมูล');
       }

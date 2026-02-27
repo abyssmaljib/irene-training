@@ -66,6 +66,9 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
   // Scroll controller
   final ScrollController _scrollController = ScrollController();
 
+  // Timer สำหรับ debounce search (ป้องกัน rebuild ทุก keystroke)
+  Timer? _searchDebounce;
+
   // Cache สำหรับ filtered/grouped results (ลด rebuild overhead)
   List<_ResidentItem>? _cachedFiltered;
   List<String>? _cachedZoneKeys;
@@ -317,6 +320,7 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _reportStatusSubscription?.cancel();
     _reportCompletionService.unsubscribe();
     _searchController.dispose();
@@ -438,9 +442,15 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
       hintText: 'ค้นหาชื่อผู้พัก...',
       isDense: true,
       onChanged: (value) {
-        setState(() {
-          _searchQuery = value;
-          _invalidateCache();
+        // ใช้ debounce 300ms เพื่อไม่ให้ rebuild ทั้งหน้าทุก keystroke
+        _searchDebounce?.cancel();
+        _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+          if (mounted) {
+            setState(() {
+              _searchQuery = value;
+              _invalidateCache();
+            });
+          }
         });
       },
       onClear: () {
@@ -602,30 +612,21 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
 
     final zoneKeys = _cachedZoneKeys ?? grouped.keys.toList();
 
-    return [
-      SliverPadding(
-        padding: EdgeInsets.only(top: AppSpacing.sm),
-        sliver: SliverList(
-          delegate: SliverChildBuilderDelegate(
-            (context, index) {
-              final zoneName = zoneKeys[index];
-              final residents = grouped[zoneName]!;
-              return _buildSection(zoneName, residents);
-            },
-            childCount: grouped.length,
-          ),
-        ),
-      ),
-      SliverPadding(padding: EdgeInsets.only(bottom: AppSpacing.xl)),
+    // สร้าง slivers แยกแต่ละ zone:
+    // - SliverToBoxAdapter สำหรับ header (ชื่อ zone)
+    // - DecoratedSliver + SliverList สำหรับ resident cards (lazy building)
+    // เดิมใช้ Column ซึ่งสร้าง card ทุกตัวพร้อมกัน → กระตุก
+    // ใหม่ใช้ SliverList ซึ่งสร้างเฉพาะ card ที่มองเห็น → ลื่น
+    final List<Widget> slivers = [
+      SliverPadding(padding: EdgeInsets.only(top: AppSpacing.sm)),
     ];
-  }
 
-  Widget _buildSection(String title, List<_ResidentItem> residents) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Section header
-        Padding(
+    for (final zoneName in zoneKeys) {
+      final residents = grouped[zoneName]!;
+
+      // Zone header — ชื่อ zone + จำนวนผู้พัก
+      slivers.add(SliverToBoxAdapter(
+        child: Padding(
           padding: EdgeInsets.fromLTRB(
             AppSpacing.md,
             AppSpacing.md,
@@ -635,7 +636,7 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
           child: Row(
             children: [
               Text(
-                title,
+                zoneName,
                 style: AppTypography.subtitle.copyWith(
                   color: AppColors.primary,
                 ),
@@ -657,24 +658,36 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
             ],
           ),
         ),
+      ));
 
-        // Residents
-        Container(
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            boxShadow: AppShadows.cardShadow,
-          ),
-          child: Column(
-            children: residents.asMap().entries.map((entry) {
-              final index = entry.key;
-              final resident = entry.value;
+      // Resident cards — DecoratedSliver ใส่พื้นหลัง + shadow ครอบทั้ง zone
+      // SliverList ข้างในสร้าง card เฉพาะที่มองเห็น (lazy building)
+      slivers.add(DecoratedSliver(
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          boxShadow: AppShadows.cardShadow,
+        ),
+        sliver: SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, index) {
+              final resident = residents[index];
               final isLast = index == residents.length - 1;
-              return _buildResidentCard(resident, showDivider: !isLast);
-            }).toList(),
+              // RepaintBoundary แยก repaint area ของแต่ละ card
+              // เมื่อ scroll Flutter จะ repaint เฉพาะ card ที่เปลี่ยน
+              return RepaintBoundary(
+                child: _buildResidentCard(resident, showDivider: !isLast),
+              );
+            },
+            childCount: residents.length,
+            // ปิด keep alive เพื่อประหยัด memory เมื่อ card เลื่อนออกจากหน้าจอ
+            addAutomaticKeepAlives: false,
           ),
         ),
-      ],
-    );
+      ));
+    }
+
+    slivers.add(SliverPadding(padding: EdgeInsets.only(bottom: AppSpacing.xl)));
+    return slivers;
   }
 
   Widget _buildResidentCard(_ResidentItem resident, {bool showDivider = true}) {

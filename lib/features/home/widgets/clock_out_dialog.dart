@@ -1,6 +1,6 @@
 import 'dart:math';
 import 'package:confetti/confetti.dart';
-// import 'package:flutter/foundation.dart' show kDebugMode; // ซ่อน dev buttons ไว้
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
@@ -80,7 +80,8 @@ class ClockOutDialog extends StatefulWidget {
   }) async {
     return showDialog<bool>(
       context: context,
-      barrierDismissible: false,
+      // กดข้างนอก dialog เพื่อปิดได้ (ยกเว้นตอน submitting/success ที่ซ่อน X อยู่แล้ว)
+      barrierDismissible: true,
       builder: (context) => ClockOutDialog(
         clockRecordId: clockRecordId,
         shift: shift,
@@ -290,47 +291,32 @@ class _ClockOutDialogState extends State<ClockOutDialog> {
     }
   }
 
-  /// แสดงปุ่มปิดหรือไม่ (ไม่แสดงตอน checking, submitting, success)
-  bool get _showCloseButton =>
-      _step != ClockOutStep.checking &&
-      _step != ClockOutStep.submitting &&
-      _step != ClockOutStep.success;
-
   @override
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: AppRadius.largeRadius,
-          ),
-          child: Container(
-            width: 380,
-            constraints: const BoxConstraints(maxHeight: 700),
-            padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Close button row
-                if (_showCloseButton)
-                  Align(
-                    alignment: Alignment.topRight,
-                    child: IconButton(
-                      onPressed: () => Navigator.of(context).pop(false),
-                      icon: HugeIcon(
-                        icon: HugeIcons.strokeRoundedCancelCircle,
-                        color: AppColors.secondaryText,
-                        size: 28,
-                      ),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                  )
-                else
-                  const SizedBox(height: 28), // Placeholder for spacing
-                // Content
-                Flexible(child: _buildContent()),
-              ],
+        // ป้องกันการปิด dialog ขณะกำลัง submit หรือแสดง success
+        // ถ้าอยู่ระหว่าง submitting/success → ห้ามปิด (กด back หรือกดข้างนอก)
+        PopScope(
+          canPop: _step != ClockOutStep.submitting &&
+              _step != ClockOutStep.success,
+          child: Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: AppRadius.largeRadius,
+            ),
+            child: Container(
+              width: 380,
+              constraints: const BoxConstraints(maxHeight: 700),
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Spacing ด้านบน (เคยเป็นปุ่ม X แต่เอาออกแล้ว — กดข้างนอกปิดได้เลย)
+                  const SizedBox(height: 28),
+                  // Content
+                  Flexible(child: _buildContent()),
+                ],
+              ),
             ),
           ),
         ),
@@ -363,7 +349,6 @@ class _ClockOutDialogState extends State<ClockOutDialog> {
 
   /// DEV: ข้ามทุก check ไปหน้า survey เลย
   /// โหลด shift leader ก่อน (ถ้ายังไม่ได้โหลด) แล้วไปหน้า survey
-  // ignore: unused_element
   Future<void> _devSkipToSurvey() async {
     _shiftLeader ??= await _clockService.getShiftLeader(widget.shift);
     if (mounted) {
@@ -371,21 +356,29 @@ class _ClockOutDialogState extends State<ClockOutDialog> {
     }
   }
 
-  /// DEV: ปุ่มข้ามไปหน้า survey — ซ่อนไว้ เปิดใช้ตอน debug
+  /// DEV: ลงเวรเลยโดยไม่ต้องกรอก form — ส่ง dummy values
+  Future<void> _devDirectClockOut() async {
+    _shiftLeader ??= await _clockService.getShiftLeader(widget.shift);
+    await _handleSurveySubmit(
+      shiftScore: 5,
+      selfScore: 5,
+      shiftSurvey: '[DEV] auto clock out',
+    );
+  }
+
+  /// DEV: ปุ่มข้ามไป survey — แสดงเฉพาะ debug mode
   Widget _buildDevSkipButton() {
-    // ซ่อน dev button — เปิด kDebugMode check เมื่อต้องการทดสอบ
-    return const SizedBox.shrink();
-    // if (!kDebugMode) return const SizedBox.shrink();
-    // return TextButton(
-    //   onPressed: _devSkipToSurvey,
-    //   child: Text(
-    //     'DEV: ข้ามไป survey',
-    //     style: AppTypography.bodySmall.copyWith(
-    //       color: Colors.orange.shade700,
-    //       fontWeight: FontWeight.w600,
-    //     ),
-    //   ),
-    // );
+    if (!kDebugMode) return const SizedBox.shrink();
+    return TextButton(
+      onPressed: _devSkipToSurvey,
+      child: Text(
+        'DEV: ข้ามไป clock out',
+        style: AppTypography.bodySmall.copyWith(
+          color: Colors.orange.shade700,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
   }
 
   Widget _buildContent() {
@@ -503,12 +496,6 @@ class _ClockOutDialogState extends State<ClockOutDialog> {
           ],
 
           AppSpacing.verticalGapLg,
-
-          // Close Button
-          SecondaryButton(
-            text: 'ปิด',
-            onPressed: () => Navigator.of(context).pop(false),
-          ),
 
           // DEV: ข้ามไป survey
           _buildDevSkipButton(),
@@ -765,10 +752,33 @@ class _ClockOutDialogState extends State<ClockOutDialog> {
   }
 
   Widget _buildSurveyContent() {
-    return ClockOutSurveyForm(
-      onSubmit: _handleSurveySubmit,
-      isLoading: _isSubmitting,
-      shiftLeader: _shiftLeader,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // DEV: ปุ่มลงเวรเลยไม่ต้องกรอก form
+        if (kDebugMode)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+            child: TextButton(
+              onPressed: _isSubmitting ? null : _devDirectClockOut,
+              child: Text(
+                'DEV: ลงเวรเลย (ข้าม form)',
+                style: AppTypography.bodySmall.copyWith(
+                  color: Colors.orange.shade700,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        // Survey form จริง
+        Flexible(
+          child: ClockOutSurveyForm(
+            onSubmit: _handleSurveySubmit,
+            isLoading: _isSubmitting,
+            shiftLeader: _shiftLeader,
+          ),
+        ),
+      ],
     );
   }
 

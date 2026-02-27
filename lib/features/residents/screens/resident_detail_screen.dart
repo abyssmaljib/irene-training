@@ -11,7 +11,7 @@ import '../widgets/resident_detail/view_segmented_control.dart';
 import '../widgets/resident_detail/care_dashboard_view.dart';
 import '../widgets/resident_detail/clinical_view.dart';
 import '../widgets/resident_detail/profile_info_view.dart';
-import '../../../core/widgets/app_snackbar.dart';
+import '../../../core/widgets/app_toast.dart';
 import '../widgets/resident_detail/quick_action_fab.dart';
 import '../widgets/resident_detail/clinical_action_fab.dart';
 
@@ -148,7 +148,7 @@ class _ResidentDetailScreenState extends ConsumerState<ResidentDetailScreen> {
             expandedHeight: 148,
             onBackPressed: () => Navigator.of(context).pop(),
             onCallPressed: () {
-              AppSnackbar.info(context, 'โทรหาญาติ - Coming Soon');
+              AppToast.info(context, 'โทรหาญาติ - Coming Soon');
             },
             onMorePressed: () => _showMoreOptions(context),
             onShowMoreDiseases: () {
@@ -235,7 +235,7 @@ class _ResidentDetailScreenState extends ConsumerState<ResidentDetailScreen> {
                   label: 'แก้ไขข้อมูล',
                   onTap: () {
                     Navigator.pop(context);
-                    AppSnackbar.info(context, 'แก้ไขข้อมูล - Coming Soon');
+                    AppToast.info(context, 'แก้ไขข้อมูล - Coming Soon');
                   },
                 ),
                 _buildOptionItem(
@@ -243,7 +243,7 @@ class _ResidentDetailScreenState extends ConsumerState<ResidentDetailScreen> {
                   label: 'ดูประวัติทั้งหมด',
                   onTap: () {
                     Navigator.pop(context);
-                    AppSnackbar.info(context, 'ประวัติทั้งหมด - Coming Soon');
+                    AppToast.info(context, 'ประวัติทั้งหมด - Coming Soon');
                   },
                 ),
                 _buildOptionItem(
@@ -251,7 +251,7 @@ class _ResidentDetailScreenState extends ConsumerState<ResidentDetailScreen> {
                   label: 'พิมพ์รายงาน',
                   onTap: () {
                     Navigator.pop(context);
-                    AppSnackbar.info(context, 'พิมพ์รายงาน - Coming Soon');
+                    AppToast.info(context, 'พิมพ์รายงาน - Coming Soon');
                   },
                 ),
               ],

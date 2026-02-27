@@ -235,6 +235,7 @@ class TaskServiceV2 {
   /// video จะดึงจาก Post ผ่าน post_id ใน view แทน
   /// [difficultyScore] - คะแนนความยากของงาน 1-10 (optional)
   /// [difficultyRatedBy] - UUID ของ user ที่ให้คะแนน (optional, ถ้าไม่ระบุจะใช้ userId)
+  /// [skipPointsRecording] - ข้าม recording points (ใช้สำหรับ batch mode ที่จัดการ points เอง)
   Future<bool> markTaskComplete(
     int logId,
     String userId, {
@@ -242,6 +243,7 @@ class TaskServiceV2 {
     int? postId,
     int? difficultyScore,
     String? difficultyRatedBy,
+    bool skipPointsRecording = false,
   }) async {
     try {
       await _supabase.from('A_Task_logs_ver2').update({
@@ -261,26 +263,28 @@ class TaskServiceV2 {
           'markTaskComplete (V2): log $logId marked as complete (postId: $postId, difficulty: $difficultyScore)');
 
       // บันทึก points สำหรับ task completion
-      // ดึงชื่อ task จาก cache หรือ database
-      try {
-        String taskName = 'งาน';
-        final cachedTask = _cachedTasks?.where((t) => t.logId == logId).firstOrNull;
-        if (cachedTask != null) {
-          taskName = cachedTask.title ?? 'งาน';
-        }
+      // ข้ามถ้า skipPointsRecording = true (batch mode จัดการ points แยก)
+      if (!skipPointsRecording) {
+        try {
+          String taskName = 'งาน';
+          final cachedTask = _cachedTasks?.where((t) => t.logId == logId).firstOrNull;
+          if (cachedTask != null) {
+            taskName = cachedTask.title ?? 'งาน';
+          }
 
-        // ใช้ V1 เพราะ context นี้ไม่มี actualMinutes, expectedMinutes, completionType
-        // ignore: deprecated_member_use_from_same_package
-        final points = await PointsService().recordTaskCompleted(
-          userId: userId,
-          taskLogId: logId,
-          taskName: taskName,
-          difficultyScore: difficultyScore,
-        );
-        debugPrint('markTaskComplete (V2): recorded $points points');
-      } catch (e) {
-        // ไม่ให้ error จาก points กระทบ task completion
-        debugPrint('markTaskComplete (V2): failed to record points: $e');
+          // ใช้ V1 เพราะ context นี้ไม่มี actualMinutes, expectedMinutes, completionType
+          // ignore: deprecated_member_use_from_same_package
+          final points = await PointsService().recordTaskCompleted(
+            userId: userId,
+            taskLogId: logId,
+            taskName: taskName,
+            difficultyScore: difficultyScore,
+          );
+          debugPrint('markTaskComplete (V2): recorded $points points');
+        } catch (e) {
+          // ไม่ให้ error จาก points กระทบ task completion
+          debugPrint('markTaskComplete (V2): failed to record points: $e');
+        }
       }
 
       return true;

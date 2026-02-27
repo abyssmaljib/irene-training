@@ -4,7 +4,10 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/buttons.dart';
+import '../models/batch_task_group.dart';
 import '../models/task_log.dart';
+import '../providers/task_provider.dart';
+import 'batch_task_card.dart';
 import 'task_card.dart';
 
 /// Section สำหรับแสดง tasks ที่ grouped ตาม timeBlock (Expandable)
@@ -18,6 +21,13 @@ class TaskTimeSection extends StatefulWidget {
   final VoidCallback? onExpandChanged; // callback when tapped
   final String? currentUserId; // user ID สำหรับตรวจสอบ unseen badge
 
+  /// Batch mode: mixed list ของ BatchTaskCard + TaskCard
+  /// ถ้า != null จะ render จาก batchItems แทน tasks
+  final List<BatchMixedItem>? batchItems;
+
+  /// Callback เมื่อกด BatchTaskCard (เปิดหน้า BatchTaskScreen)
+  final ValueChanged<BatchTaskGroup>? onBatchGroupTap;
+
   const TaskTimeSection({
     super.key,
     required this.timeBlock,
@@ -27,6 +37,8 @@ class TaskTimeSection extends StatefulWidget {
     this.isExpanded = false,
     this.onExpandChanged,
     this.currentUserId,
+    this.batchItems,
+    this.onBatchGroupTap,
   });
 
   @override
@@ -43,8 +55,9 @@ class _TaskTimeSectionState extends State<TaskTimeSection>
   late Color _headerColor;
   late dynamic _timeIcon;
 
-  // State สำหรับ "ดูเพิ่มเติม"
-  bool _showAllTasks = false;
+  // State สำหรับ "ดูเพิ่มเติม" — ใช้ ValueNotifier แทน setState
+  // เพื่อ rebuild เฉพาะ content ไม่ต้อง rebuild header + animation ทั้งหมด
+  final ValueNotifier<bool> _showAllTasks = ValueNotifier(false);
 
   @override
   void initState() {
@@ -81,7 +94,7 @@ class _TaskTimeSectionState extends State<TaskTimeSection>
       } else {
         _controller.reverse();
         // Reset "ดูเพิ่มเติม" เมื่อปิด section
-        _showAllTasks = false;
+        _showAllTasks.value = false;
       }
     }
   }
@@ -89,6 +102,7 @@ class _TaskTimeSectionState extends State<TaskTimeSection>
   @override
   void dispose() {
     _controller.dispose();
+    _showAllTasks.dispose();
     super.dispose();
   }
 
@@ -219,56 +233,136 @@ class _TaskTimeSectionState extends State<TaskTimeSection>
   }
 
   Widget _buildContent() {
-    final taskCount = widget.tasks.length;
+    // ถ้ามี batchItems (batch mode เปิด) → render mixed list
+    if (widget.batchItems != null) {
+      return _buildBatchContent();
+    }
 
-    // สำหรับ tasks จำนวนมาก จำกัด items ที่แสดงครั้งแรก
-    // กดปุ่ม "ดูเพิ่มเติม" เพื่อแสดงทั้งหมด
+    final taskCount = widget.tasks.length;
     const int maxInitialItems = 20;
     final hasMoreTasks = taskCount > maxInitialItems;
-    final displayCount = _showAllTasks ? taskCount : (hasMoreTasks ? maxInitialItems : taskCount);
     final remainingCount = taskCount - maxInitialItems;
 
-    return Container(
-      padding: EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        AppSpacing.sm,
-        AppSpacing.md,
-        AppSpacing.md,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // แสดง tasks (จำกัดจำนวนหรือทั้งหมด)
-          for (int i = 0; i < displayCount; i++)
-            RepaintBoundary(
-              child: TaskCard(
-                task: widget.tasks[i],
-                currentUserId: widget.currentUserId,
-                flat: true, // แสดงแบบ flat ภายใน section
-                onTap: widget.onTaskTap != null
-                    ? () => widget.onTaskTap!(widget.tasks[i])
-                    : null,
-                onCheckChanged: widget.onTaskCheckChanged != null
-                    ? (checked) => widget.onTaskCheckChanged!(widget.tasks[i], checked)
-                    : null,
-              ),
-            ),
-          // ปุ่ม "ดูเพิ่มเติม" หรือ "ย่อ"
-          if (hasMoreTasks)
-            Padding(
-              padding: EdgeInsets.only(top: AppSpacing.sm),
-              child: AppTextButton(
-                text: _showAllTasks ? 'ย่อรายการ' : 'ดูเพิ่มอีก $remainingCount งาน',
-                icon: _showAllTasks ? HugeIcons.strokeRoundedArrowUp02 : HugeIcons.strokeRoundedArrowDown01,
-                onPressed: () {
-                  setState(() {
-                    _showAllTasks = !_showAllTasks;
-                  });
-                },
-              ),
-            ),
-        ],
-      ),
+    // ใช้ ValueListenableBuilder เพื่อ rebuild เฉพาะ content เมื่อกด "ดูเพิ่มเติม"
+    // ไม่ต้อง rebuild header + animation ทั้ง section
+    return ValueListenableBuilder<bool>(
+      valueListenable: _showAllTasks,
+      builder: (context, showAll, _) {
+        final displayCount = showAll ? taskCount : (hasMoreTasks ? maxInitialItems : taskCount);
+
+        return Container(
+          padding: EdgeInsets.fromLTRB(
+            AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.md,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (int i = 0; i < displayCount; i++)
+                RepaintBoundary(
+                  key: ValueKey(widget.tasks[i].logId),
+                  child: TaskCard(
+                    task: widget.tasks[i],
+                    currentUserId: widget.currentUserId,
+                    flat: true,
+                    onTap: widget.onTaskTap != null
+                        ? () => widget.onTaskTap!(widget.tasks[i])
+                        : null,
+                    onCheckChanged: widget.onTaskCheckChanged != null
+                        ? (checked) => widget.onTaskCheckChanged!(widget.tasks[i], checked)
+                        : null,
+                  ),
+                ),
+              if (hasMoreTasks)
+                Padding(
+                  padding: EdgeInsets.only(top: AppSpacing.sm),
+                  child: AppTextButton(
+                    text: showAll ? 'ย่อรายการ' : 'ดูเพิ่มอีก $remainingCount งาน',
+                    icon: showAll ? HugeIcons.strokeRoundedArrowUp02 : HugeIcons.strokeRoundedArrowDown01,
+                    onPressed: () {
+                      _showAllTasks.value = !_showAllTasks.value;
+                    },
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// Render mixed list สำหรับ batch mode
+  /// แสดง BatchTaskCard สำหรับ groups (2+ คนไข้)
+  /// และ TaskCard ปกติสำหรับ tasks ที่ไม่เข้า group
+  Widget _buildBatchContent() {
+    final items = widget.batchItems!;
+    final itemCount = items.length;
+    const int maxInitialItems = 20;
+    final hasMore = itemCount > maxInitialItems;
+    final remainingCount = itemCount - maxInitialItems;
+
+    // ใช้ ValueListenableBuilder เช่นเดียวกับ _buildContent
+    return ValueListenableBuilder<bool>(
+      valueListenable: _showAllTasks,
+      builder: (context, showAll, _) {
+        final displayCount = showAll ? itemCount : (hasMore ? maxInitialItems : itemCount);
+
+        return Container(
+          padding: EdgeInsets.fromLTRB(
+            AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.md,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (int i = 0; i < displayCount; i++)
+                // BatchTaskCard มีหน้าตาเป็น card (มีขอบ/เงา) ต่างจาก TaskCard ที่ซ้อนกันได้
+                // จึงต้องเพิ่มช่องว่างด้านล่างเพื่อแยก card ออกจากกัน
+                Padding(
+                  padding: EdgeInsets.only(
+                    bottom: items[i].isBatch ? AppSpacing.sm : 0,
+                  ),
+                  child: RepaintBoundary(
+                    key: ValueKey(items[i].isBatch
+                        ? 'batch_${items[i].batchGroup!.groupKey}'
+                        : 'task_${items[i].singleTask!.logId}'),
+                    child: items[i].isBatch
+                        ? BatchTaskCard(
+                            group: items[i].batchGroup!,
+                            flat: true,
+                            onTap: widget.onBatchGroupTap != null
+                                ? () => widget.onBatchGroupTap!(items[i].batchGroup!)
+                                : null,
+                          )
+                        : TaskCard(
+                            task: items[i].singleTask!,
+                            currentUserId: widget.currentUserId,
+                            flat: true,
+                            onTap: widget.onTaskTap != null
+                                ? () => widget.onTaskTap!(items[i].singleTask!)
+                                : null,
+                            onCheckChanged: widget.onTaskCheckChanged != null
+                                ? (checked) => widget.onTaskCheckChanged!(
+                                    items[i].singleTask!, checked)
+                                : null,
+                          ),
+                  ),
+                ),
+              if (hasMore)
+                Padding(
+                  padding: EdgeInsets.only(top: AppSpacing.sm),
+                  child: AppTextButton(
+                    text: showAll ? 'ย่อรายการ' : 'ดูเพิ่มอีก $remainingCount รายการ',
+                    icon: showAll
+                        ? HugeIcons.strokeRoundedArrowUp02
+                        : HugeIcons.strokeRoundedArrowDown01,
+                    onPressed: () {
+                      _showAllTasks.value = !_showAllTasks.value;
+                    },
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -487,6 +581,8 @@ class TaskListSection extends StatelessWidget {
               )
         else
           ...tasks.map((task) => Padding(
+                // Key ช่วยให้ Flutter reuse TaskCard ตาม logId
+                key: ValueKey(task.logId),
                 padding: EdgeInsets.only(bottom: AppSpacing.sm),
                 child: TaskCard(
                   task: task,

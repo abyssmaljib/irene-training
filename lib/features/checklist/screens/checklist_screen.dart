@@ -10,6 +10,7 @@ import '../../../core/widgets/shimmer_loading.dart';
 import '../../home/models/zone.dart';
 import '../../home/models/clock_in_out.dart';
 import '../../settings/screens/settings_screen.dart';
+import '../models/batch_task_group.dart';
 import '../models/resident_simple.dart';
 import '../models/task_log.dart';
 import '../providers/task_provider.dart';
@@ -17,6 +18,7 @@ import '../widgets/task_card.dart';
 import '../widgets/task_time_section.dart';
 import '../widgets/task_filter_drawer.dart';
 import '../services/task_realtime_service.dart';
+import 'batch_task_screen.dart';
 import 'task_detail_screen.dart';
 
 /// หน้าเช็คลิสต์ - รายการงาน
@@ -81,14 +83,10 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
     // Auto-initialize "คนไข้ของฉัน" filter เมื่อ user clock in อยู่
     ref.watch(initMyPatientsFilterProvider);
 
+    // watch เฉพาะ viewMode ที่จำเป็นสำหรับ body switching
+    // ส่วน filter bars และ header แยกเป็น ConsumerWidget ย่อย
+    // เพื่อลด rebuild scope — เมื่อ filter เปลี่ยน จะ rebuild เฉพาะส่วนที่เกี่ยว
     final viewMode = ref.watch(taskViewModeProvider);
-    final filteredTasksAsync = ref.watch(filteredTasksProvider);
-    final groupedTasksAsync = ref.watch(groupedTasksProvider);
-    final taskCounts = ref.watch(taskCountsProvider);
-    final zonesAsync = ref.watch(nursinghomeZonesProvider);
-    final selectedZones = ref.watch(selectedZonesFilterProvider);
-    final filteredResidentsAsync = ref.watch(filteredResidentsProvider);
-    final selectedResidents = ref.watch(selectedResidentsFilterProvider);
 
     return Scaffold(
       key: _scaffoldKey,
@@ -98,39 +96,33 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
         // ให้ header float กลับมาทันทีเมื่อ scroll ขึ้น
         floatHeaderSlivers: true,
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
-          IreneAppBar(
-            title: 'เช็คลิสต์',
-            showFilterButton: true,
-            isFilterActive: viewMode != TaskViewMode.upcoming,
-            filterCount: ref.watch(myRolePendingTasksCountProvider),
-            onFilterTap: () {
-              _scaffoldKey.currentState?.openDrawer();
-            },
-            onProfileTap: () {
+          // AppBar — แยกเป็น ConsumerWidget เพื่อ watch provider ของตัวเอง
+          _ChecklistAppBar(
+            scaffoldKey: _scaffoldKey,
+            onSettingsTap: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const SettingsScreen()),
               );
             },
-            trailing: _buildViewModeToggle(viewMode),
           ),
-          // Zone filter chips - floating header
+          // Zone filter chips - floating header (ConsumerWidget แยก)
           SliverPersistentHeader(
             floating: true,
             delegate: _FilterBarDelegate(
-              child: _buildZoneFilterBar(zonesAsync, selectedZones),
+              child: const _ChecklistZoneFilterBar(),
               height: 52,
             ),
           ),
-          // Resident filter chips (แสดงเมื่อเลือก zone) - dynamic height
-          SliverToBoxAdapter(
-            child: _buildResidentFilterBar(filteredResidentsAsync, selectedResidents),
+          // Resident filter chips (ConsumerWidget แยก)
+          const SliverToBoxAdapter(
+            child: _ChecklistResidentFilterBar(),
           ),
-          // Current view mode header - pinned at top
+          // Current view mode header (ConsumerWidget แยก)
           SliverPersistentHeader(
             pinned: true,
             delegate: _FilterBarDelegate(
-              child: _buildViewModeHeader(viewMode, taskCounts),
+              child: const _ChecklistViewModeHeader(),
               height: 72,
             ),
           ),
@@ -142,378 +134,15 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
             await Future.delayed(const Duration(milliseconds: 500));
           },
           child: viewMode == TaskViewMode.all
-              ? _buildGroupedTaskList(groupedTasksAsync)
-              : _buildFilteredTaskList(filteredTasksAsync, viewMode),
+              ? _buildGroupedTaskList()
+              : _buildFilteredTaskList(viewMode),
         ),
       ),
     );
   }
 
-  Widget _buildZoneFilterBar(
-      AsyncValue<List<Zone>> zonesAsync, Set<int> selectedZones) {
-    final currentShiftAsync = ref.watch(currentShiftProvider);
-    final isMyPatientsActive = ref.watch(myPatientsFilterActiveProvider);
-    // ดึง residents ทั้งหมดเพื่อหา zones จาก residents ที่ user รับผิดชอบ
-    final allResidentsAsync = ref.watch(nursinghomeResidentsProvider);
-
-    return Container(
-      padding: EdgeInsets.symmetric(
-          horizontal: AppSpacing.md, vertical: AppSpacing.sm),
-      color: AppColors.surface,
-      child: zonesAsync.when(
-        data: (zones) {
-          if (zones.isEmpty) {
-            // ไม่มี zone - แสดง "ทั้งหมด"
-            return SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  FilterChip(
-                    label: const Text('ทั้งหมด'),
-                    selected: true,
-                    onSelected: (_) {},
-                    selectedColor: AppColors.accent1,
-                    checkmarkColor: AppColors.primary,
-                    labelStyle: TextStyle(color: AppColors.primary),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          // เรียง zones ตามตัวอักษร
-          final sortedZones = List<Zone>.from(zones)
-            ..sort((a, b) => a.name.compareTo(b.name));
-
-          // ตรวจสอบว่า user clock in อยู่หรือไม่
-          final currentShift = currentShiftAsync.valueOrNull;
-          final isClockedIn = currentShift?.isClockedIn ?? false;
-
-          // มี zones - แสดง filter chips
-          return SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                // "คนไข้ของฉัน" chip - แสดงเฉพาะเมื่อ clock in แล้ว
-                if (isClockedIn) ...[
-                  Padding(
-                    padding: EdgeInsets.only(right: AppSpacing.sm),
-                    child: SizedBox(
-                      height: 35,
-                      child: FilterChip(
-                        label: const Text('คนไข้ของฉัน'),
-                        selected: isMyPatientsActive,
-                        onSelected: (_) {
-                          // ส่ง allResidents เพื่อหา zones จาก residents ที่ user รับผิดชอบ
-                          final allResidents = allResidentsAsync.valueOrNull ?? [];
-                          _toggleMyPatientsFilter(currentShift!, allResidents);
-                        },
-                        selectedColor: AppColors.accent1,
-                        checkmarkColor: AppColors.primary,
-                        labelStyle: TextStyle(
-                          color: isMyPatientsActive
-                              ? AppColors.primary
-                              : AppColors.secondaryText,
-                        ),
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    ),
-                  ),
-                ],
-                // "ทั้งหมด" chip
-                Padding(
-                  padding: EdgeInsets.only(right: AppSpacing.sm),
-                  child: SizedBox(
-                    height: 35,
-                    child: FilterChip(
-                      label: const Text('ทั้งหมด'),
-                      selected: selectedZones.isEmpty && !isMyPatientsActive,
-                      onSelected: (_) {
-                        // Clear ทั้ง zones, residents และ myPatients filter
-                        ref.read(selectedZonesFilterProvider.notifier).state = {};
-                        ref.read(selectedResidentsFilterProvider.notifier).state = {};
-                        ref.read(myPatientsFilterActiveProvider.notifier).state = false;
-                      },
-                      selectedColor: AppColors.accent1,
-                      checkmarkColor: AppColors.primary,
-                      labelStyle: TextStyle(
-                        color: (selectedZones.isEmpty && !isMyPatientsActive)
-                            ? AppColors.primary
-                            : AppColors.secondaryText,
-                      ),
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ),
-                ),
-                // Zone chips - แสดงชื่อ zone จาก nursinghome_zone (เรียงตามตัวอักษร)
-                ...sortedZones.map((zone) => Padding(
-                      padding: EdgeInsets.only(right: AppSpacing.sm),
-                      child: SizedBox(
-                        height: 35,
-                        child: FilterChip(
-                          label: Text(zone.name),
-                          selected: selectedZones.contains(zone.id),
-                          onSelected: (selected) {
-                            // ปิด myPatients filter เมื่อเลือก zone อื่น
-                            ref.read(myPatientsFilterActiveProvider.notifier).state = false;
-
-                            final currentZones =
-                                ref.read(selectedZonesFilterProvider);
-                            if (selected) {
-                              ref
-                                  .read(selectedZonesFilterProvider.notifier)
-                                  .state = {...currentZones, zone.id};
-                            } else {
-                              ref
-                                  .read(selectedZonesFilterProvider.notifier)
-                                  .state = currentZones
-                                      .where((z) => z != zone.id)
-                                      .toSet();
-                              // Clear residents selection เมื่อ unselect zone
-                              ref.read(selectedResidentsFilterProvider.notifier).state = {};
-                            }
-                          },
-                          selectedColor: AppColors.accent1,
-                          checkmarkColor: AppColors.primary,
-                          labelStyle: TextStyle(
-                            color: selectedZones.contains(zone.id)
-                                ? AppColors.primary
-                                : AppColors.secondaryText,
-                          ),
-                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          visualDensity: VisualDensity.compact,
-                        ),
-                      ),
-                    )),
-              ],
-            ),
-          );
-        },
-        loading: () => const SizedBox(
-          height: 32,
-          child: Center(
-            child: SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-          ),
-        ),
-        error: (_, _) => const SizedBox.shrink(),
-      ),
-    );
-  }
-
-  /// Toggle "คนไข้ของฉัน" filter
-  /// รับ residents ทั้งหมดเพื่อหา zones จาก residents ที่ user รับผิดชอบ
-  void _toggleMyPatientsFilter(ClockInOut currentShift, List<ResidentSimple> allResidents) {
-    final isActive = ref.read(myPatientsFilterActiveProvider);
-
-    if (isActive) {
-      // ปิด filter - กลับไป "ทั้งหมด"
-      ref.read(myPatientsFilterActiveProvider.notifier).state = false;
-      ref.read(selectedZonesFilterProvider.notifier).state = {};
-      ref.read(selectedResidentsFilterProvider.notifier).state = {};
-    } else {
-      // เปิด filter - set zones และ residents จาก current shift
-      ref.read(myPatientsFilterActiveProvider.notifier).state = true;
-
-      // *** สำคัญ: หา zones จาก residents ที่ user รับผิดชอบ ***
-      // เพราะผู้พักอาจอยู่หลายโซน ไม่ใช่แค่โซนที่เลือกตอน clock in
-      final selectedResidentIds = currentShift.selectedResidentIdList.toSet();
-      final zonesFromResidents = getZonesFromResidentIds(allResidents, selectedResidentIds);
-
-      // ถ้าหา zones จาก residents ได้ ใช้ค่านั้น ไม่งั้นใช้ zones จาก shift
-      final zonesToUse = zonesFromResidents.isNotEmpty
-          ? zonesFromResidents
-          : currentShift.zones.toSet();
-
-      ref.read(selectedZonesFilterProvider.notifier).state = zonesToUse;
-      ref.read(selectedResidentsFilterProvider.notifier).state = selectedResidentIds;
-    }
-  }
-
-  Widget _buildResidentFilterBar(
-      AsyncValue<List<ResidentSimple>> residentsAsync, Set<int> selectedResidents) {
-    return residentsAsync.when(
-      data: (residents) {
-        if (residents.isEmpty) {
-          // ไม่มี residents (ยังไม่ได้เลือก zone) - ไม่แสดงอะไร
-          return const SizedBox.shrink();
-        }
-
-        // แสดง resident filter chips ด้วย Wrap เพื่อให้เห็นทั้งหมด
-        return Container(
-          padding: EdgeInsets.only(
-            left: AppSpacing.md,
-            right: AppSpacing.md,
-            bottom: AppSpacing.xs,
-          ),
-          color: AppColors.surface,
-          child: Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.xs,
-            children: [
-              // "ทั้งหมด" chip
-              SizedBox(
-                height: 28,
-                child: FilterChip(
-                  label: const Text('ทั้งหมด'),
-                  selected: selectedResidents.isEmpty,
-                  onSelected: (_) {
-                    ref.read(selectedResidentsFilterProvider.notifier).state = {};
-                  },
-                  selectedColor: AppColors.pastelLightGreen1,
-                  checkmarkColor: AppColors.tagPassedText,
-                  labelStyle: TextStyle(
-                    color: selectedResidents.isEmpty
-                        ? AppColors.tagPassedText
-                        : AppColors.secondaryText,
-                    fontSize: 12,
-                  ),
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  visualDensity: VisualDensity.compact,
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                ),
-              ),
-              // Resident chips (เรียงตามชื่อแล้วจาก provider)
-              ...residents.map((resident) => SizedBox(
-                    height: 28,
-                    child: FilterChip(
-                      label: Text('คุณ${resident.name}'),
-                      selected: selectedResidents.contains(resident.id),
-                      showCheckmark: false,
-                      onSelected: (selected) {
-                        final current =
-                            ref.read(selectedResidentsFilterProvider);
-                        if (selected) {
-                          ref
-                              .read(selectedResidentsFilterProvider.notifier)
-                              .state = {...current, resident.id};
-                        } else {
-                          ref
-                              .read(selectedResidentsFilterProvider.notifier)
-                              .state = current
-                                  .where((r) => r != resident.id)
-                                  .toSet();
-                        }
-                      },
-                      selectedColor: AppColors.pastelLightGreen1,
-                      labelStyle: TextStyle(
-                        color: selectedResidents.contains(resident.id)
-                            ? AppColors.tagPassedText
-                            : AppColors.secondaryText,
-                        fontSize: 12,
-                      ),
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      visualDensity: VisualDensity.compact,
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                    ),
-                  )),
-            ],
-          ),
-        );
-      },
-      loading: () => const SizedBox.shrink(),
-      error: (_, _) => const SizedBox.shrink(),
-    );
-  }
-
-  Widget _buildViewModeHeader(
-      TaskViewMode viewMode, Map<TaskViewMode, int> taskCounts) {
-    return Container(
-      padding: EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        boxShadow: [AppShadows.subtle],
-      ),
-      child: Row(
-        children: [
-          HugeIcon(icon: _getViewModeIcon(viewMode), color: AppColors.primary, size: AppIconSize.lg),
-          AppSpacing.horizontalGapSm,
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  viewMode.label,
-                  style: AppTypography.title,
-                ),
-                Text(
-                  viewMode.description,
-                  style: AppTypography.caption.copyWith(
-                    color: AppColors.secondaryText,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Task count
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppColors.accent1,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Text(
-              '${taskCounts[viewMode] ?? 0}',
-              style: AppTypography.body.copyWith(
-                color: AppColors.primary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  dynamic _getViewModeIcon(TaskViewMode mode) {
-    switch (mode) {
-      case TaskViewMode.upcoming:
-        return HugeIcons.strokeRoundedTimer01;
-      case TaskViewMode.all:
-        return HugeIcons.strokeRoundedTask01;
-      case TaskViewMode.problem:
-        return HugeIcons.strokeRoundedAlert02;
-      case TaskViewMode.myDone:
-        return HugeIcons.strokeRoundedCheckmarkCircle02;
-    }
-  }
-
-  /// Toggle button สำหรับเปลี่ยนมุมมอง (View Mode) ที่มุมขวาของ AppBar
-  /// กดแล้ววนไปมุมมองถัดไป: upcoming -> all -> problem -> myDone -> upcoming ...
-  Widget _buildViewModeToggle(TaskViewMode currentMode) {
-    return Material(
-      color: AppColors.accent1,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: () {
-          // วนไปมุมมองถัดไป
-          final modes = TaskViewMode.values;
-          final currentIndex = modes.indexOf(currentMode);
-          final nextIndex = (currentIndex + 1) % modes.length;
-          ref.read(taskViewModeProvider.notifier).state = modes[nextIndex];
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          width: 40,
-          height: 40,
-          alignment: Alignment.center,
-          child: HugeIcon(
-            icon: _getViewModeIcon(currentMode),
-            color: AppColors.primary,
-            size: 22,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFilteredTaskList(
-      AsyncValue<List<TaskLog>> tasksAsync, TaskViewMode viewMode) {
+  Widget _buildFilteredTaskList(TaskViewMode viewMode) {
+    final tasksAsync = ref.watch(filteredTasksProvider);
     final currentUserId = ref.watch(currentUserIdProvider);
 
     return tasksAsync.when(
@@ -528,9 +157,13 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
           // แม้ content จะไม่เต็มหน้าจอ
           physics: const AlwaysScrollableScrollPhysics(),
           itemCount: tasks.length,
+          // Optimize: cache items ใกล้เคียงเพื่อลด rebuild เมื่อ scroll
+          cacheExtent: 200,
           itemBuilder: (context, index) {
             final task = tasks[index];
             return Padding(
+              // Key ช่วยให้ Flutter reuse widget แทนการ rebuild ใหม่ทั้งหมด
+              key: ValueKey(task.logId),
               padding: EdgeInsets.only(bottom: AppSpacing.sm),
               child: TaskCard(
                 task: task,
@@ -570,9 +203,16 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
     );
   }
 
-  Widget _buildGroupedTaskList(
-      AsyncValue<Map<String, List<TaskLog>>> groupedTasksAsync) {
+  Widget _buildGroupedTaskList() {
+    final groupedTasksAsync = ref.watch(groupedTasksProvider);
+    final isBatchMode = ref.watch(batchModeEnabledProvider);
+    final batchGroupedAsync = isBatchMode
+        ? ref.watch(batchGroupedTasksProvider)
+        : null;
     final currentUserId = ref.watch(currentUserIdProvider);
+
+    // ถ้ามี batch data → ดึง batch items สำหรับแต่ละ timeBlock
+    final batchData = batchGroupedAsync?.valueOrNull;
 
     return groupedTasksAsync.when(
       data: (groupedTasks) {
@@ -592,18 +232,24 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
           itemCount: sortedTimeBlocks.length,
           // Optimize: cache nearby items เพื่อลดการ rebuild เมื่อ scroll
           cacheExtent: 100,
-          // Optimize: ใช้ addAutomaticKeepAlives เพื่อเก็บ state ของ items
-          addAutomaticKeepAlives: true,
+          // ปิด addAutomaticKeepAlives เพื่อประหยัด memory บนมือถือ spec ต่ำ
+          // (default = true จะเก็บทุก item ไว้ใน memory แม้ offscreen)
+          addAutomaticKeepAlives: false,
           itemBuilder: (context, index) {
             final timeBlock = sortedTimeBlocks[index];
             final tasks = groupedTasks[timeBlock]!;
 
             return RepaintBoundary(
+              // Key ช่วยให้ Flutter reuse TimeSection ตาม timeBlock
+              key: ValueKey(timeBlock),
               child: TaskTimeSection(
                 timeBlock: timeBlock,
                 tasks: tasks,
                 isExpanded: _expandedTimeBlock == timeBlock,
                 currentUserId: currentUserId,
+                // Batch mode: ส่ง batchItems ให้ TaskTimeSection render mixed list
+                batchItems: batchData?[timeBlock],
+                onBatchGroupTap: _onBatchGroupTap,
                 onExpandChanged: () {
                   setState(() {
                     // Accordion behavior: ถ้ากดที่เปิดอยู่ = ปิด, ถ้ากดอันอื่น = เปิดอันใหม่
@@ -703,6 +349,404 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
       context,
       MaterialPageRoute(
         builder: (_) => TaskDetailScreen(task: task),
+      ),
+    );
+  }
+
+  /// เปิดหน้า BatchTaskScreen เมื่อกด BatchTaskCard
+  void _onBatchGroupTap(BatchTaskGroup group) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BatchTaskScreen(group: group),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// แยก ConsumerWidget ย่อย เพื่อลด rebuild scope
+// แต่ละ widget watch เฉพาะ provider ที่ตัวเองต้องการ
+// ============================================================
+
+/// Helper: คืน icon ตาม ViewMode
+dynamic _getViewModeIcon(TaskViewMode mode) {
+  switch (mode) {
+    case TaskViewMode.upcoming:
+      return HugeIcons.strokeRoundedTimer01;
+    case TaskViewMode.all:
+      return HugeIcons.strokeRoundedTask01;
+    case TaskViewMode.problem:
+      return HugeIcons.strokeRoundedAlert02;
+    case TaskViewMode.myDone:
+      return HugeIcons.strokeRoundedCheckmarkCircle02;
+  }
+}
+
+/// AppBar — watch เฉพาะ viewMode, pendingCount
+/// rebuild เฉพาะเมื่อ viewMode หรือ badge count เปลี่ยน
+class _ChecklistAppBar extends ConsumerWidget {
+  final GlobalKey<ScaffoldState> scaffoldKey;
+  final VoidCallback onSettingsTap;
+
+  const _ChecklistAppBar({
+    required this.scaffoldKey,
+    required this.onSettingsTap,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final viewMode = ref.watch(taskViewModeProvider);
+    final pendingCount = ref.watch(myRolePendingTasksCountProvider);
+
+    return IreneAppBar(
+      title: 'เช็คลิสต์',
+      showFilterButton: true,
+      isFilterActive: viewMode != TaskViewMode.upcoming,
+      filterCount: pendingCount,
+      onFilterTap: () {
+        scaffoldKey.currentState?.openDrawer();
+      },
+      onProfileTap: onSettingsTap,
+      trailing: _ViewModeToggle(currentMode: viewMode),
+    );
+  }
+}
+
+/// Toggle button สำหรับเปลี่ยน ViewMode
+/// แยกออกมาเพราะไม่ต้อง rebuild ทั้ง AppBar เมื่อ viewMode เปลี่ยน
+class _ViewModeToggle extends ConsumerWidget {
+  final TaskViewMode currentMode;
+
+  const _ViewModeToggle({required this.currentMode});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Material(
+      color: AppColors.accent1,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: () {
+          // วนไปมุมมองถัดไป
+          final modes = TaskViewMode.values;
+          final currentIndex = modes.indexOf(currentMode);
+          final nextIndex = (currentIndex + 1) % modes.length;
+          ref.read(taskViewModeProvider.notifier).state = modes[nextIndex];
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: 40,
+          height: 40,
+          alignment: Alignment.center,
+          child: HugeIcon(
+            icon: _getViewModeIcon(currentMode),
+            color: AppColors.primary,
+            size: 22,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Zone filter bar — watch เฉพาะ zones, selectedZones, shift, myPatients
+/// rebuild เฉพาะเมื่อ zone selection หรือ shift เปลี่ยน
+class _ChecklistZoneFilterBar extends ConsumerWidget {
+  const _ChecklistZoneFilterBar();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final zonesAsync = ref.watch(nursinghomeZonesProvider);
+    final selectedZones = ref.watch(selectedZonesFilterProvider);
+    final currentShiftAsync = ref.watch(currentShiftProvider);
+    final isMyPatientsActive = ref.watch(myPatientsFilterActiveProvider);
+    final allResidentsAsync = ref.watch(nursinghomeResidentsProvider);
+
+    return Container(
+      padding: EdgeInsets.symmetric(
+          horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+      color: AppColors.surface,
+      child: zonesAsync.when(
+        data: (zones) {
+          if (zones.isEmpty) {
+            return SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  FilterChip(
+                    label: const Text('ทั้งหมด'),
+                    selected: true,
+                    onSelected: (_) {},
+                    selectedColor: AppColors.accent1,
+                    checkmarkColor: AppColors.primary,
+                    labelStyle: TextStyle(color: AppColors.primary),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          final sortedZones = List<Zone>.from(zones)
+            ..sort((a, b) => a.name.compareTo(b.name));
+
+          final currentShift = currentShiftAsync.valueOrNull;
+          final isClockedIn = currentShift?.isClockedIn ?? false;
+
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                // "คนไข้ของฉัน" chip - แสดงเฉพาะเมื่อ clock in แล้ว
+                if (isClockedIn) ...[
+                  Padding(
+                    padding: EdgeInsets.only(right: AppSpacing.sm),
+                    child: SizedBox(
+                      height: 35,
+                      child: FilterChip(
+                        label: const Text('คนไข้ของฉัน'),
+                        selected: isMyPatientsActive,
+                        onSelected: (_) {
+                          final allResidents = allResidentsAsync.valueOrNull ?? [];
+                          _toggleMyPatientsFilter(ref, currentShift!, allResidents);
+                        },
+                        selectedColor: AppColors.accent1,
+                        checkmarkColor: AppColors.primary,
+                        labelStyle: TextStyle(
+                          color: isMyPatientsActive
+                              ? AppColors.primary
+                              : AppColors.secondaryText,
+                        ),
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                  ),
+                ],
+                // "ทั้งหมด" chip
+                Padding(
+                  padding: EdgeInsets.only(right: AppSpacing.sm),
+                  child: SizedBox(
+                    height: 35,
+                    child: FilterChip(
+                      label: const Text('ทั้งหมด'),
+                      selected: selectedZones.isEmpty && !isMyPatientsActive,
+                      onSelected: (_) {
+                        ref.read(selectedZonesFilterProvider.notifier).state = {};
+                        ref.read(selectedResidentsFilterProvider.notifier).state = {};
+                        ref.read(myPatientsFilterActiveProvider.notifier).state = false;
+                      },
+                      selectedColor: AppColors.accent1,
+                      checkmarkColor: AppColors.primary,
+                      labelStyle: TextStyle(
+                        color: (selectedZones.isEmpty && !isMyPatientsActive)
+                            ? AppColors.primary
+                            : AppColors.secondaryText,
+                      ),
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                ),
+                // Zone chips
+                ...sortedZones.map((zone) => Padding(
+                      padding: EdgeInsets.only(right: AppSpacing.sm),
+                      child: SizedBox(
+                        height: 35,
+                        child: FilterChip(
+                          label: Text(zone.name),
+                          selected: selectedZones.contains(zone.id),
+                          onSelected: (selected) {
+                            ref.read(myPatientsFilterActiveProvider.notifier).state = false;
+                            final currentZones = ref.read(selectedZonesFilterProvider);
+                            if (selected) {
+                              ref.read(selectedZonesFilterProvider.notifier).state =
+                                  {...currentZones, zone.id};
+                            } else {
+                              ref.read(selectedZonesFilterProvider.notifier).state =
+                                  currentZones.where((z) => z != zone.id).toSet();
+                              ref.read(selectedResidentsFilterProvider.notifier).state = {};
+                            }
+                          },
+                          selectedColor: AppColors.accent1,
+                          checkmarkColor: AppColors.primary,
+                          labelStyle: TextStyle(
+                            color: selectedZones.contains(zone.id)
+                                ? AppColors.primary
+                                : AppColors.secondaryText,
+                          ),
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ),
+                    )),
+              ],
+            ),
+          );
+        },
+        loading: () => const SizedBox(
+          height: 32,
+          child: Center(
+            child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+          ),
+        ),
+        error: (_, _) => const SizedBox.shrink(),
+      ),
+    );
+  }
+
+  /// Toggle "คนไข้ของฉัน" filter
+  void _toggleMyPatientsFilter(WidgetRef ref, ClockInOut currentShift, List<ResidentSimple> allResidents) {
+    final isActive = ref.read(myPatientsFilterActiveProvider);
+
+    if (isActive) {
+      ref.read(myPatientsFilterActiveProvider.notifier).state = false;
+      ref.read(selectedZonesFilterProvider.notifier).state = {};
+      ref.read(selectedResidentsFilterProvider.notifier).state = {};
+    } else {
+      ref.read(myPatientsFilterActiveProvider.notifier).state = true;
+
+      final selectedResidentIds = currentShift.selectedResidentIdList.toSet();
+      final zonesFromResidents = getZonesFromResidentIds(allResidents, selectedResidentIds);
+
+      final zonesToUse = zonesFromResidents.isNotEmpty
+          ? zonesFromResidents
+          : currentShift.zones.toSet();
+
+      ref.read(selectedZonesFilterProvider.notifier).state = zonesToUse;
+      ref.read(selectedResidentsFilterProvider.notifier).state = selectedResidentIds;
+    }
+  }
+}
+
+/// Resident filter bar — watch เฉพาะ filteredResidents, selectedResidents
+/// rebuild เฉพาะเมื่อ resident selection หรือ zone เปลี่ยน
+class _ChecklistResidentFilterBar extends ConsumerWidget {
+  const _ChecklistResidentFilterBar();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final residentsAsync = ref.watch(filteredResidentsProvider);
+    final selectedResidents = ref.watch(selectedResidentsFilterProvider);
+
+    return residentsAsync.when(
+      data: (residents) {
+        if (residents.isEmpty) return const SizedBox.shrink();
+
+        return Container(
+          padding: EdgeInsets.only(
+            left: AppSpacing.md, right: AppSpacing.md, bottom: AppSpacing.xs,
+          ),
+          color: AppColors.surface,
+          child: Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.xs,
+            children: [
+              SizedBox(
+                height: 28,
+                child: FilterChip(
+                  label: const Text('ทั้งหมด'),
+                  selected: selectedResidents.isEmpty,
+                  onSelected: (_) {
+                    ref.read(selectedResidentsFilterProvider.notifier).state = {};
+                  },
+                  selectedColor: AppColors.pastelLightGreen1,
+                  checkmarkColor: AppColors.tagPassedText,
+                  labelStyle: TextStyle(
+                    color: selectedResidents.isEmpty
+                        ? AppColors.tagPassedText
+                        : AppColors.secondaryText,
+                    fontSize: 12,
+                  ),
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                ),
+              ),
+              ...residents.map((resident) => SizedBox(
+                    height: 28,
+                    child: FilterChip(
+                      label: Text('คุณ${resident.name}'),
+                      selected: selectedResidents.contains(resident.id),
+                      showCheckmark: false,
+                      onSelected: (selected) {
+                        final current = ref.read(selectedResidentsFilterProvider);
+                        if (selected) {
+                          ref.read(selectedResidentsFilterProvider.notifier).state =
+                              {...current, resident.id};
+                        } else {
+                          ref.read(selectedResidentsFilterProvider.notifier).state =
+                              current.where((r) => r != resident.id).toSet();
+                        }
+                      },
+                      selectedColor: AppColors.pastelLightGreen1,
+                      labelStyle: TextStyle(
+                        color: selectedResidents.contains(resident.id)
+                            ? AppColors.tagPassedText
+                            : AppColors.secondaryText,
+                        fontSize: 12,
+                      ),
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                  )),
+            ],
+          ),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
+    );
+  }
+}
+
+/// View mode header — watch เฉพาะ viewMode, taskCounts
+/// rebuild เฉพาะเมื่อ viewMode หรือ task counts เปลี่ยน
+class _ChecklistViewModeHeader extends ConsumerWidget {
+  const _ChecklistViewModeHeader();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final viewMode = ref.watch(taskViewModeProvider);
+    final taskCounts = ref.watch(taskCountsProvider);
+
+    return Container(
+      padding: EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        boxShadow: [AppShadows.subtle],
+      ),
+      child: Row(
+        children: [
+          HugeIcon(icon: _getViewModeIcon(viewMode), color: AppColors.primary, size: AppIconSize.lg),
+          AppSpacing.horizontalGapSm,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(viewMode.label, style: AppTypography.title),
+                Text(
+                  viewMode.description,
+                  style: AppTypography.caption.copyWith(color: AppColors.secondaryText),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.accent1,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Text(
+              '${taskCounts[viewMode] ?? 0}',
+              style: AppTypography.body.copyWith(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

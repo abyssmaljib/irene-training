@@ -6,7 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
-import '../../../core/widgets/app_snackbar.dart';
+import '../../../core/widgets/app_toast.dart';
 import '../../../core/widgets/confirm_dialog.dart';
 import '../../../core/widgets/network_image.dart';
 import '../../../core/services/user_service.dart';
@@ -1377,7 +1377,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     if (!mounted) return;
 
-    AppSnackbar.info(context, 'กลับมาเป็นตัวคุณเองแล้ว');
+    AppToast.info(context, 'กลับมาเป็นตัวคุณเองแล้ว');
   }
 
   /// Invalidate all service caches when switching users
@@ -1695,7 +1695,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     if (!success) {
       if (!mounted) return;
-      AppSnackbar.error(context, 'เกิดข้อผิดพลาดในการสวมรอย');
+      AppToast.error(context, 'เกิดข้อผิดพลาดในการสวมรอย');
       return;
     }
 
@@ -1713,7 +1713,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     if (!mounted) return;
 
-    AppSnackbar.info(context, 'สวมรอยเป็น: ${user.displayName}');
+    AppToast.info(context, 'สวมรอยเป็น: ${user.displayName}');
   }
 
   Widget _buildDevRoleSelector() {
@@ -1821,9 +1821,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       await _loadUserRole();
       if (!mounted) return;
 
-      AppSnackbar.success(context, 'เปลี่ยน role เป็น: ${roleName ?? "พนักงาน"}');
+      AppToast.success(context, 'เปลี่ยน role เป็น: ${roleName ?? "พนักงาน"}');
     } else {
-      AppSnackbar.error(context, 'ไม่สามารถเปลี่ยน role ได้');
+      AppToast.error(context, 'ไม่สามารถเปลี่ยน role ได้');
     }
   }
 
@@ -1975,10 +1975,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ? 'ไม่ระบุ'
           : _allSystemRoles.firstWhere((r) => r.id == roleId).name;
 
-      AppSnackbar.success(context, 'เปลี่ยนตำแหน่งเป็น: $roleName');
+      AppToast.success(context, 'เปลี่ยนตำแหน่งเป็น: $roleName');
     } catch (e) {
       if (!mounted) return;
-      AppSnackbar.error(context, 'ไม่สามารถเปลี่ยนตำแหน่งได้');
+      AppToast.error(context, 'ไม่สามารถเปลี่ยนตำแหน่งได้');
     }
   }
 

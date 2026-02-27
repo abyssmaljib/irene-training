@@ -11,7 +11,7 @@ import '../../../core/widgets/buttons.dart';
 import '../../../core/widgets/checkbox_tile.dart';
 import '../../../core/widgets/input_fields.dart';
 import '../../../core/widgets/success_popup.dart';
-import '../../../core/widgets/app_snackbar.dart';
+import '../../../core/widgets/app_toast.dart';
 import '../models/post.dart';
 import '../services/ticket_service.dart';
 
@@ -99,7 +99,7 @@ class _CreateTicketBottomSheetState
     final title = _titleController.text.trim();
     if (title.isEmpty) {
       // แจ้งเตือน validation: ต้องกรอกหัวข้อตั๋ว
-      AppSnackbar.warning(context, 'กรุณากรอกหัวข้อตั๋ว');
+      AppToast.warning(context, 'กรุณากรอกหัวข้อตั๋ว');
       return;
     }
 
@@ -127,7 +127,7 @@ class _CreateTicketBottomSheetState
       // ล้มเหลว: แสดง error
       setState(() => _isSubmitting = false);
       // แจ้ง error เมื่อสร้างตั๋วไม่สำเร็จ
-      AppSnackbar.error(context, 'สร้างตั๋วไม่สำเร็จ กรุณาลองใหม่');
+      AppToast.error(context, 'สร้างตั๋วไม่สำเร็จ กรุณาลองใหม่');
     }
   }
 

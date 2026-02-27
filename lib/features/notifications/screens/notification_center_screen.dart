@@ -4,7 +4,7 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
-import '../../../core/widgets/app_snackbar.dart';
+import '../../../core/widgets/app_toast.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/irene_app_bar.dart';
 import '../../../core/widgets/shimmer_loading.dart';
@@ -222,7 +222,7 @@ class _NotificationCenterScreenState extends ConsumerState<NotificationCenterScr
   void _onNotificationDismiss(AppNotification notification) {
     ref.read(notificationStateProvider.notifier).deleteNotification(notification.id);
     
-    AppSnackbar.success(context, 'ลบการแจ้งเตือนแล้ว');
+    AppToast.success(context, 'ลบการแจ้งเตือนแล้ว');
   }
 
   void _onToggleReadStatus(AppNotification notification) {
@@ -231,13 +231,13 @@ class _NotificationCenterScreenState extends ConsumerState<NotificationCenterScr
       notification.isRead,
     );
     
-    AppSnackbar.info(context, notification.isRead ? 'ทำเครื่องหมายยังไม่อ่าน' : 'ทำเครื่องหมายอ่านแล้ว');
+    AppToast.info(context, notification.isRead ? 'ทำเครื่องหมายยังไม่อ่าน' : 'ทำเครื่องหมายอ่านแล้ว');
   }
 
   void _markAllAsRead() {
     ref.read(notificationStateProvider.notifier).markAllAsRead();
     
-    AppSnackbar.success(context, 'อ่านทั้งหมดแล้ว');
+    AppToast.success(context, 'อ่านทั้งหมดแล้ว');
   }
 
   Widget _buildMarkAllReadButton(AsyncValue<List<AppNotification>> state) {

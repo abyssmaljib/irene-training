@@ -35,6 +35,8 @@ class TaskCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final showUnseenBadge = task.hasUnseenUpdate(currentUserId);
+    // คำนวณว่าต้องแสดง decorative icon หรือไม่ (ลด widget tree depth เมื่อไม่ต้องใช้ Stack)
+    final showDecorativeIcon = task.hasSampleImage || task.requireImage || task.mustCompleteByPost || task.taskType == 'จัดยา';
 
     return GestureDetector(
       onTap: onTap,
@@ -44,253 +46,38 @@ class TaskCard extends StatelessWidget {
           // Main card content
           Container(
             padding: EdgeInsets.all(flat ? AppSpacing.sm : AppSpacing.md),
+            // ใช้ Clip.hardEdge เฉพาะเมื่อมี decorative icon (ประหยัด GPU)
+            clipBehavior: showDecorativeIcon ? Clip.hardEdge : Clip.none,
             decoration: BoxDecoration(
               color: flat ? Colors.transparent : AppColors.surface,
               borderRadius: AppRadius.mediumRadius,
               boxShadow: flat ? null : [AppShadows.subtle],
               border: flat ? Border(bottom: BorderSide(color: AppColors.alternate.withValues(alpha: 0.5))) : _getBorder(),
             ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                  // Checkbox หรือ Warning icon (สำหรับ problem tasks)
-                  _buildLeadingWidget(),
-                  AppSpacing.horizontalGapMd,
-                  // Content
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Row 1: resident name + taskType
-                        Row(
-                          children: [
-                            // ชื่อผู้พักอาศัย - badge สีเขียวให้โดดเด่นมาก
-                            if (showResident && task.residentName != null) ...[
-                              Flexible(
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 3,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.primary.withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      HugeIcon(
-                                        icon: HugeIcons.strokeRoundedUser,
-                                        size: 16,
-                                        color: AppColors.primary,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Flexible(
-                                        child: Text(
-                                          task.residentName!,
-                                          style: AppTypography.body.copyWith(
-                                            color: AppColors.primary,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                            if (task.taskType != null && task.taskType!.isNotEmpty) ...[
-                              AppSpacing.horizontalGapSm,
-                              _buildTaskTypeBadge(),
-                            ],
-                          ],
+            // ใช้ Stack เฉพาะเมื่อมี decorative icon เพื่อลด widget tree depth
+            child: showDecorativeIcon
+                ? Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      // ใช้ color.withValues(alpha:) แทน Opacity widget
+                      // เพราะ Opacity ทำให้เกิด saveLayer ซึ่งกิน GPU หนักมากใน list
+                      Positioned(
+                        right: -8,
+                        bottom: -8,
+                        child: HugeIcon(
+                          icon: task.taskType == 'จัดยา'
+                              ? HugeIcons.strokeRoundedMedicine02
+                              : (task.hasSampleImage || task.requireImage)
+                                  ? HugeIcons.strokeRoundedCamera01
+                                  : HugeIcons.strokeRoundedFileEdit,
+                          size: 100,
+                          color: AppColors.tertiary.withValues(alpha: 0.16),
                         ),
-                      // Row 2: title only
-                      AppSpacing.verticalGapXs,
-                      Text(
-                        task.title ?? 'ไม่มีชื่องาน',
-                        style: AppTypography.body.copyWith(
-                          decoration:
-                              task.isDone ? TextDecoration.lineThrough : null,
-                          color: task.isDone
-                              ? AppColors.secondaryText
-                              : AppColors.textPrimary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
                       ),
-                      // Row 3: time + zone + role
-                      AppSpacing.verticalGapXs,
-                      Row(
-                        children: [
-                          if (task.expectedDateTime != null) ...[
-                            HugeIcon(icon: HugeIcons.strokeRoundedClock01,
-                                size: 12, color: AppColors.primary),
-                            const SizedBox(width: 4),
-                            Text(
-                              _formatTime(task.expectedDateTime!),
-                              style: AppTypography.caption.copyWith(
-                                color: AppColors.primaryText,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            AppSpacing.horizontalGapSm,
-                          ],
-                          if (showZone && task.zoneName != null) ...[
-                            _buildZoneBadge(),
-                            AppSpacing.horizontalGapSm,
-                          ],
-                          if (showAssignedRole && task.assignedRoleName != null) ...[
-                            _buildRoleBadge(),
-                          ],
-                        ],
-                      ),
-                      // recurNote - ข้อความกำกับสำคัญ
-                      if (task.recurNote != null && task.recurNote!.isNotEmpty) ...[
-                        AppSpacing.verticalGapXs,
-                        Text(
-                          task.recurNote!,
-                          style: AppTypography.caption.copyWith(
-                            color: AppColors.error,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                      // Row สำหรับ badges: taskType, recurrence, daysOfWeek, recurringDates
-                      if (_hasAnyBadges()) ...[
-                        AppSpacing.verticalGapSm,
-                        _buildBadgesRow(),
-                      ],
-                      // Completed by info (if done)
-                      if (task.isDone && task.completedByNickname != null) ...[
-                        AppSpacing.verticalGapXs,
-                        Row(
-                          children: [
-                            HugeIcon(
-                              icon: task.isReferred ? HugeIcons.strokeRoundedHospital01 : HugeIcons.strokeRoundedCheckmarkCircle02,
-                              size: 12,
-                              color: task.isReferred ? AppColors.secondary : AppColors.tagPassedText,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              'โดย ${task.completedByNickname}',
-                              style: AppTypography.caption.copyWith(
-                                color: task.isReferred ? AppColors.secondary : AppColors.tagPassedText,
-                              ),
-                            ),
-                            // เวลาที่ติ๊ก (สีตามความต่างจาก expectedDateTime)
-                            if (task.completedAt != null) ...[
-                              const SizedBox(width: 4),
-                              Text(
-                                _formatCompletedTime(task.completedAt!),
-                                style: AppTypography.caption.copyWith(
-                                  color: task.isReferred
-                                      ? AppColors.secondary
-                                      : _getCompletedTimeColor(task.completedAt!, task.expectedDateTime),
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ],
-                      // Problem type badge (แสดงนอกกล่อง description)
-                      if (showProblemNote && task.isProblem && task.problemType != null) ...[
-                        AppSpacing.verticalGapSm,
-                        Builder(builder: (context) {
-                          // แปลง problemType string เป็น ProblemType enum
-                          final problemType = ProblemType.fromValue(task.problemType);
-                          if (problemType == null) return const SizedBox.shrink();
-                          return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: AppColors.error.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  problemType.emoji,
-                                  style: const TextStyle(fontSize: 14),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  problemType.label,
-                                  style: AppTypography.caption.copyWith(
-                                    color: AppColors.error,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }),
-                      ],
-                      // หมายเหตุสำหรับ problem tasks (เฉพาะ descript)
-                      if (showProblemNote && task.isProblem && task.descript != null && task.descript!.isNotEmpty) ...[
-                        AppSpacing.verticalGapXs,
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: AppColors.surface,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // แสดง descript (หมายเหตุเพิ่มเติม)
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  HugeIcon(
-                                    icon: HugeIcons.strokeRoundedQuoteUp,
-                                    size: 14,
-                                    color: AppColors.secondaryText,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Expanded(
-                                    child: Text(
-                                      task.descript!,
-                                      style: AppTypography.caption.copyWith(
-                                        color: AppColors.textPrimary,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              // แสดงชื่อผู้แจ้ง
-                              if (task.completedByNickname != null) ...[
-                                const SizedBox(height: 2),
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: Text(
-                                    '- ${task.completedByNickname}',
-                                    style: AppTypography.caption.copyWith(
-                                      color: AppColors.secondaryText,
-                                      fontSize: 10,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ],
+                      _buildMainContent(),
                     ],
-                  ),
-                ),
-                // Right side: status badge + task type icons
-                _buildRightColumn(),
-              ],
-            ),
+                  )
+                : _buildMainContent(),
           ),
           // Badge "อัพ" - แสดงเมื่อมี update ที่ user ยังไม่เห็น
           if (showUnseenBadge)
@@ -301,6 +88,192 @@ class TaskCard extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+
+  /// Main content row — แยกออกมาเพื่อใช้ร่วมกันทั้งแบบมี/ไม่มี decorative icon
+  Widget _buildMainContent() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildLeadingWidget(),
+        AppSpacing.horizontalGapMd,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Row 1: resident name + taskType
+              Row(
+                children: [
+                  if (showResident && task.residentName != null) ...[
+                    Flexible(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            HugeIcon(icon: HugeIcons.strokeRoundedUser, size: 16, color: AppColors.primary),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                task.residentName!,
+                                style: AppTypography.body.copyWith(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (task.taskType != null && task.taskType!.isNotEmpty) ...[
+                    AppSpacing.horizontalGapSm,
+                    _buildTaskTypeBadge(),
+                  ],
+                ],
+              ),
+              // Row 2: title
+              AppSpacing.verticalGapXs,
+              Text(
+                task.title ?? 'ไม่มีชื่องาน',
+                style: AppTypography.body.copyWith(
+                  decoration: task.isDone ? TextDecoration.lineThrough : null,
+                  color: task.isDone ? AppColors.secondaryText : AppColors.textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              // Row 3: time + zone + role
+              AppSpacing.verticalGapXs,
+              Row(
+                children: [
+                  if (task.expectedDateTime != null) ...[
+                    HugeIcon(icon: HugeIcons.strokeRoundedClock01, size: 12, color: AppColors.primary),
+                    const SizedBox(width: 4),
+                    Text(
+                      _formatTime(task.expectedDateTime!),
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.primaryText,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    AppSpacing.horizontalGapSm,
+                  ],
+                  if (showZone && task.zoneName != null) ...[
+                    _buildZoneBadge(),
+                    AppSpacing.horizontalGapSm,
+                  ],
+                  if (showAssignedRole && task.assignedRoleName != null) ...[
+                    _buildRoleBadge(),
+                  ],
+                ],
+              ),
+              // recurNote
+              if (task.recurNote != null && task.recurNote!.isNotEmpty) ...[
+                AppSpacing.verticalGapXs,
+                Text(
+                  task.recurNote!,
+                  style: AppTypography.caption.copyWith(color: AppColors.error, fontWeight: FontWeight.w500),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+              // Badges row
+              if (_hasAnyBadges()) ...[
+                AppSpacing.verticalGapSm,
+                _buildBadgesRow(),
+              ],
+              // Completed by info
+              if (task.isDone && task.completedByNickname != null) ...[
+                AppSpacing.verticalGapXs,
+                Row(
+                  children: [
+                    HugeIcon(
+                      icon: task.isReferred ? HugeIcons.strokeRoundedHospital01 : HugeIcons.strokeRoundedCheckmarkCircle02,
+                      size: 12,
+                      color: task.isReferred ? AppColors.secondary : AppColors.tagPassedText,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'โดย ${task.completedByNickname}',
+                      style: AppTypography.caption.copyWith(
+                        color: task.isReferred ? AppColors.secondary : AppColors.tagPassedText,
+                      ),
+                    ),
+                    if (task.completedAt != null) ...[
+                      const SizedBox(width: 4),
+                      Text(
+                        _formatCompletedTime(task.completedAt!),
+                        style: AppTypography.caption.copyWith(
+                          color: task.isReferred
+                              ? AppColors.secondary
+                              : _getCompletedTimeColor(task.completedAt!, task.expectedDateTime),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+              // Problem type badge — ใช้ _buildProblemTypeBadge() แทน Builder
+              if (showProblemNote && task.isProblem && task.problemType != null) ...[
+                AppSpacing.verticalGapSm,
+                _buildProblemTypeBadge(),
+              ],
+              // Problem description
+              if (showProblemNote && task.isProblem && task.descript != null && task.descript!.isNotEmpty) ...[
+                AppSpacing.verticalGapXs,
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          HugeIcon(icon: HugeIcons.strokeRoundedQuoteUp, size: 14, color: AppColors.secondaryText),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              task.descript!,
+                              style: AppTypography.caption.copyWith(color: AppColors.textPrimary),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (task.completedByNickname != null) ...[
+                        const SizedBox(height: 2),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            '- ${task.completedByNickname}',
+                            style: AppTypography.caption.copyWith(color: AppColors.secondaryText, fontSize: 10),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        _buildRightColumn(),
+      ],
     );
   }
 
@@ -326,6 +299,33 @@ class TaskCard extends StatelessWidget {
           fontSize: 10,
           fontWeight: FontWeight.w600,
         ),
+      ),
+    );
+  }
+
+  /// Badge สำหรับ problemType — แทน Builder widget เพื่อลด widget tree depth
+  Widget _buildProblemTypeBadge() {
+    final problemType = ProblemType.fromValue(task.problemType);
+    if (problemType == null) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.error.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(problemType.emoji, style: const TextStyle(fontSize: 14)),
+          const SizedBox(width: 4),
+          Text(
+            problemType.label,
+            style: AppTypography.caption.copyWith(
+              color: AppColors.error,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -558,33 +558,7 @@ class TaskCard extends StatelessWidget {
       );
     }
 
-    // กล้อง = งานที่มีรูปตัวอย่าง หรือต้องถ่ายรูป
-    if (task.hasSampleImage || task.requireImage) {
-      items.add(
-        Padding(
-          padding: EdgeInsets.only(top: items.isEmpty ? 0 : 6),
-          child: HugeIcon(
-            icon: HugeIcons.strokeRoundedCamera01,
-            size: 18,
-            color: AppColors.tertiary,
-          ),
-        ),
-      );
-    }
-
-    // สี่เหลี่ยม = งานที่ต้องทำหลังจากโพสต์
-    if (task.mustCompleteByPost) {
-      items.add(
-        Padding(
-          padding: EdgeInsets.only(top: items.isEmpty ? 0 : 6),
-          child: HugeIcon(
-            icon: HugeIcons.strokeRoundedFileEdit,
-            size: 18,
-            color: AppColors.tertiary,
-          ),
-        ),
-      );
-    }
+    // icon กล้อง/โพส ย้ายไปเป็น decorative background ที่มุมขวาล่างแล้ว
 
     if (items.isEmpty) return const SizedBox.shrink();
 

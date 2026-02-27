@@ -1,3 +1,5 @@
+import 'dart:io'; // ใช้สำหรับ File type ใน camera flow (ไม่รองรับ Web)
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -26,8 +28,12 @@ import '../../board/screens/advanced_create_post_screen.dart';
 import '../../board/services/post_action_service.dart';
 import '../../board/widgets/video_player_widget.dart';
 import '../../../core/widgets/webview_screen.dart';
-import '../../../core/widgets/app_snackbar.dart';
+import '../../../core/widgets/app_toast.dart';
 import '../../../core/widgets/shimmer_loading.dart';
+import 'split_screen_camera_screen.dart';
+import '../../points/services/points_service.dart';
+import '../providers/batch_task_provider.dart';
+import '../widgets/co_worker_picker.dart';
 
 /// หน้ารายละเอียด Task แบบ Full Page
 class TaskDetailScreen extends ConsumerStatefulWidget {
@@ -48,6 +54,9 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
   bool _isLoading = false;
   String? _uploadedImageUrl;
 
+  // เพื่อนร่วมเวรที่เลือกไว้ (สำหรับหาร point)
+  List<CoWorker> _selectedCoWorkers = [];
+
   // สำหรับงานจัดยา
   List<MedicineSummary>? _medicines;
   bool _isLoadingMedicines = false;
@@ -61,7 +70,12 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     _task = widget.task;
 
     // Subscribe to realtime updates for this task
+    // (_refreshTaskData จะเรียก _enrichSampleImageCreator เมื่อมี update)
     _subscribeToTaskUpdates();
+
+    // ดึงชื่อ+รูปผู้สร้างสรรค์รูปตัวอย่าง (view ส่ง NULL มา ต้อง fetch แยก)
+    // เรียกครั้งเดียวตอน init — realtime refresh จะเรียกซ้ำเมื่อมี DB update
+    _enrichSampleImageCreator();
 
     // ถ้าเป็นงานจัดยา ให้โหลดข้อมูลยา
     if (_task.taskType == 'จัดยา' && _task.residentId != null) {
@@ -123,8 +137,39 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         if (_task.isDone && _uploadedImageUrl != null) {
           _uploadedImageUrl = null;
         }
+        // Reset co-workers เมื่อ task status เปลี่ยนผ่าน realtime
+        // ป้องกัน stale co-workers ถูกใช้ซ้ำถ้า admin undo แล้ว user complete ใหม่
+        if (_task.isDone && _selectedCoWorkers.isNotEmpty) {
+          _selectedCoWorkers = [];
+        }
       });
       debugPrint('TaskDetailScreen: task refreshed - status: ${_task.status}');
+
+      // Enrich sample image creator info (view ส่ง nickname/photo_url เป็น NULL)
+      await _enrichSampleImageCreator();
+    }
+  }
+
+  /// ดึงชื่อ+รูปของผู้สร้างสรรค์รูปตัวอย่าง จาก user_info
+  /// เพราะ view ส่ง sampleimage_creator (UUID) มาจริง
+  /// แต่ nickname กับ photo_url เป็น NULL dummy (เพื่อ performance ของ list view)
+  Future<void> _enrichSampleImageCreator() async {
+    final creatorId = _task.sampleImageCreatorId;
+    // ถ้าไม่มี creator UUID หรือมี nickname อยู่แล้ว → ไม่ต้อง fetch
+    if (creatorId == null || creatorId.isEmpty) return;
+    if (_task.sampleImageCreatorNickname != null) return;
+
+    final userInfo = await TaskService.instance.getUserBasicInfo(creatorId);
+    if (userInfo != null && mounted) {
+      setState(() {
+        _task = _task.copyWith(
+          sampleImageCreatorNickname: userInfo['nickname'],
+          sampleImageCreatorPhotoUrl: userInfo['photo_url'],
+        );
+      });
+      debugPrint(
+        'TaskDetailScreen: enriched sample creator - ${userInfo['nickname']}',
+      );
     }
   }
 
@@ -353,6 +398,17 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                       _buildPostponeInfo(),
                     ],
 
+                    // Co-worker picker (แสดงเฉพาะ task ที่ยังไม่ done — ให้เลือกเพื่อนร่วมเวรเพื่อหาร point)
+                    if (!_task.isDone) ...[
+                      AppSpacing.verticalGapMd,
+                      CoWorkerPickerSection(
+                        initialSelection: _selectedCoWorkers,
+                        onChanged: (coWorkers) {
+                          _selectedCoWorkers = coWorkers;
+                        },
+                      ),
+                    ],
+
                     // Bottom padding for action buttons
                     const SizedBox(height: 100),
                   ],
@@ -503,7 +559,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         if (_task.expectedDateTime != null)
           _buildBadge(
             icon: HugeIcons.strokeRoundedClock01,
-            text: DateFormat('HH:mm').format(_task.expectedDateTime!),
+            text: DateFormat('HH:mm').format(_task.expectedDateTime!.toLocal()),
             color: AppColors.tagPendingText,
           ),
 
@@ -520,7 +576,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           _buildBadge(
             icon: HugeIcons.strokeRoundedCheckmarkCircle02,
             text:
-                '${_task.completedByNickname} (${DateFormat('HH:mm').format(_task.completedAt!)})',
+                '${_task.completedByNickname} (${DateFormat('HH:mm').format(_task.completedAt!.toLocal())})',
             color: AppColors.tagPassedText,
           ),
       ],
@@ -639,7 +695,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
             difficultyScore: _task.difficultyScore,
           );
         });
-        AppSnackbar.error(context, 'ไม่สามารถอัพเดตคะแนนได้');
+        AppToast.error(context, 'ไม่สามารถอัพเดตคะแนนได้');
       }
     }
   }
@@ -1129,15 +1185,17 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           style: AppTypography.subtitle.copyWith(fontWeight: FontWeight.w600),
         ),
         AppSpacing.verticalGapSm,
-        // รูปตัวอย่าง - ใช้ IreneNetworkImage ที่มี timeout และ retry
-        GestureDetector(
-          onTap: () => _showExpandedImage(_task.sampleImageUrl!),
-          child: IreneNetworkImage(
-            imageUrl: _task.sampleImageUrl!,
-            height: 300,
-            fit: BoxFit.contain,
-            memCacheWidth: 800,
-            borderRadius: BorderRadius.circular(12),
+        // รูปตัวอย่าง - ใช้ Center ครอบให้ frame รัดรูปพอดี + อยู่กลาง
+        Center(
+          child: GestureDetector(
+            onTap: () => _showExpandedImage(_task.sampleImageUrl!),
+            child: IreneNetworkImage(
+              imageUrl: _task.sampleImageUrl!,
+              height: 300,
+              fit: BoxFit.contain,
+              memCacheWidth: 800,
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
         ),
         // ผู้ถ่ายรูปตัวอย่าง (ถ้ามี) - Badge เกียรติยศ
@@ -1359,15 +1417,17 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           ],
         ),
         AppSpacing.verticalGapSm,
-        // รูป task - ใช้ IreneNetworkImage ที่มี timeout และ retry
-        GestureDetector(
-          onTap: () => _showExpandedImage(imageUrl),
-          child: IreneNetworkImage(
-            imageUrl: imageUrl,
-            height: 300,
-            fit: BoxFit.contain,
-            memCacheWidth: 800,
-            borderRadius: BorderRadius.circular(12),
+        // รูปยืนยัน - ใช้ Center ครอบให้ frame รัดรูปพอดี + อยู่กลาง
+        Center(
+          child: GestureDetector(
+            onTap: () => _showExpandedImage(imageUrl),
+            child: IreneNetworkImage(
+              imageUrl: imageUrl,
+              height: 300,
+              fit: BoxFit.contain,
+              memCacheWidth: 800,
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
         ),
 
@@ -2161,15 +2221,40 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     final rollback = optimisticUpdateTask(ref, optimisticTask);
 
     // === เรียก Server ===
+    // ถ้ามีเพื่อนร่วมเวร → ข้าม points recording ปกติ แล้วจัดการหาร points แยก
+    // ⚠️ Capture ไว้ก่อน เพราะ realtime อาจ reset _selectedCoWorkers = []
+    // หลัง markTaskComplete สำเร็จ (task.isDone → clear coworkers)
+    final capturedCoWorkers = List<CoWorker>.of(_selectedCoWorkers);
+    final hasCoWorkers = capturedCoWorkers.isNotEmpty;
     final success = await service.markTaskComplete(
       capturedLogId,
       userId,
       imageUrl: capturedImageUrl,
       difficultyScore: difficultyScore, // null = ใช้ default ใน database
       difficultyRatedBy: userId,
+      skipPointsRecording: hasCoWorkers,
     );
 
     if (success) {
+      // === หาร Points กับเพื่อนร่วมเวร (ถ้าเลือกไว้) ===
+      // ถ้า recordBatchTaskCompleted fail ก็ไม่ rollback task completion
+      // เพราะงานเสร็จจริง แค่ points ยังไม่ได้บันทึก (สามารถ retry ได้ภายหลัง)
+      if (hasCoWorkers) {
+        try {
+          await PointsService().recordBatchTaskCompleted(
+            completingUserId: userId,
+            taskLogId: capturedLogId,
+            taskName: capturedTitle ?? 'งาน',
+            residentName: _task.residentName ?? '',
+            coWorkerIds: capturedCoWorkers.map((c) => c.userId).toList(),
+            difficultyScore: difficultyScore,
+          );
+        } catch (e) {
+          debugPrint('⚠️ Batch points recording failed: $e');
+          // ไม่ block flow — task ถูก mark complete แล้ว
+        }
+      }
+
       // === Special logic สำหรับ taskType = 'จัดยา' ===
       // ถ้าเป็นงานจัดยา และมีรูปยืนยัน ให้บันทึกลง A_Med_logs ด้วย
       // ใช้ captured values เพราะ _uploadedImageUrl อาจถูก clear โดย Realtime แล้ว
@@ -2205,7 +2290,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         _isLoading = false;
       });
       if (mounted) {
-        AppSnackbar.error(context, 'ไม่สามารถบันทึกได้ กรุณาลองใหม่');
+        AppToast.error(context, 'ไม่สามารถบันทึกได้ กรุณาลองใหม่');
       }
     }
   }
@@ -2284,7 +2369,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         _isLoading = false;
       });
       if (mounted) {
-        AppSnackbar.error(context, 'ไม่สามารถบันทึกได้ กรุณาลองใหม่');
+        AppToast.error(context, 'ไม่สามารถบันทึกได้ กรุณาลองใหม่');
       }
     }
   }
@@ -2331,7 +2416,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         _isLoading = false;
       });
       if (mounted) {
-        AppSnackbar.error(context, 'ไม่สามารถบันทึกได้ กรุณาลองใหม่');
+        AppToast.error(context, 'ไม่สามารถบันทึกได้ กรุณาลองใหม่');
       }
     }
   }
@@ -2442,7 +2527,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         _isLoading = false;
       });
       if (mounted) {
-        AppSnackbar.error(context, 'ไม่สามารถยกเลิกได้ กรุณาลองใหม่');
+        AppToast.error(context, 'ไม่สามารถยกเลิกได้ กรุณาลองใหม่');
       }
     }
   }
@@ -2467,10 +2552,20 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       return;
     }
 
-    final cameraService = CameraService.instance;
+    File? file;
 
-    // ถ่ายรูป
-    final file = await cameraService.takePhoto();
+    // ถ้า task มีรูปตัวอย่าง → เปิดกล้อง split-screen เพื่อถ่ายเทียบรูป
+    if (_task.hasSampleImage) {
+      file = await SplitScreenCameraScreen.show(
+        context: context,
+        sampleImageUrl: _task.sampleImageUrl!,
+      );
+    } else {
+      // ใช้กล้อง native ปกติ (image_picker)
+      final cameraService = CameraService.instance;
+      file = await cameraService.takePhoto();
+    }
+
     if (file == null) return;
 
     // แสดงหน้า Preview ให้หมุนรูปได้
@@ -2480,6 +2575,9 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       imageFile: file,
       photoType: 'task',
       mealLabel: _task.title ?? 'งาน',
+      // ถ้ามีรูปตัวอย่าง → แสดงเทียบในหน้า preview ด้วย
+      sampleImageUrl:
+          _task.hasSampleImage ? _task.sampleImageUrl : null,
     );
 
     // ถ้ายกเลิกจาก preview
@@ -2510,7 +2608,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       debugPrint('Error uploading photo: $e');
       setState(() => _isLoading = false);
       if (mounted) {
-        AppSnackbar.error(context, 'ไม่สามารถอัพโหลดรูปได้ กรุณาลองใหม่');
+        AppToast.error(context, 'ไม่สามารถอัพโหลดรูปได้ กรุณาลองใหม่');
       }
     }
   }
@@ -2561,7 +2659,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     final confirmImage = _task.confirmImage;
 
     if (taskRepeatId == null || confirmImage == null) {
-      AppSnackbar.error(context, 'ไม่สามารถแทนที่รูปตัวอย่างได้');
+      AppToast.error(context, 'ไม่สามารถแทนที่รูปตัวอย่างได้');
       return;
     }
 
@@ -2579,30 +2677,120 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // ดึง uuid ของ current user
-      final userId = ref.read(currentUserIdProvider);
+      // ผู้สร้างสรรค์รูปตัวอย่าง = คนที่ทำ task (completed_by) ไม่ใช่ admin ที่กดปุ่ม
+      final completedBy = _task.completedByUid;
+      final taskTitle = _task.title ?? 'งาน';
+      final logId = _task.logId;
 
-      // Update A_Repeated_Task.sampleImageURL และ sampleImage_creator (uuid)
+      // Update A_Repeated_Task.sampleImageURL และ sampleImage_creator
+      // sampleImage_creator = completed_by (เจ้าของรูป)
       await Supabase.instance.client.from('A_Repeated_Task').update({
         'sampleImageURL': confirmImage,
-        'sampleImage_creator': userId,
+        'sampleImage_creator': completedBy,
       }).eq('id', taskRepeatId);
 
-      // Refresh task data
-      await _refreshTaskData();
-
+      // Optimistic Update — ใส่ชื่อ+รูปของเจ้าของรูป (completed_by) ทันที
+      // ไม่ต้องรอ _refreshTaskData ซึ่ง view จะส่ง nickname กลับมาเป็น NULL
       if (mounted) {
-        AppSnackbar.success(context, 'แทนที่รูปตัวอย่างเรียบร้อย');
+        // ดึงข้อมูล user ของเจ้าของรูป (อาจไม่ใช่ admin ที่กดปุ่ม)
+        final ownerInfo = completedBy != null
+            ? await TaskService.instance.getUserBasicInfo(completedBy)
+            : null;
+        setState(() {
+          _task = _task.copyWith(
+            sampleImageUrl: confirmImage,
+            sampleImageCreatorId: completedBy,
+            sampleImageCreatorNickname:
+                _task.completedByNickname ?? ownerInfo?['nickname'],
+            sampleImageCreatorPhotoUrl: ownerInfo?['photo_url'],
+          );
+        });
+      }
+      // ให้คะแนน + notification แก่เจ้าของรูป (await เพื่อรู้ผลก่อนแจ้ง admin)
+      final ownerNickname = _task.completedByNickname ?? 'ผู้ทำงาน';
+      if (completedBy != null && completedBy.isNotEmpty) {
+        final pointsGiven = await _rewardSampleImageOwner(
+          ownerId: completedBy,
+          taskLogId: logId,
+          taskTitle: taskTitle,
+          imageUrl: confirmImage,
+        );
+
+        if (mounted) {
+          if (pointsGiven > 0) {
+            // แจ้ง admin ว่าให้คะแนนสำเร็จ
+            AppToast.success(
+              context,
+              'แทนที่รูปตัวอย่างเรียบร้อย',
+              subtitle: '✨ ส่ง +$pointsGiven คะแนนให้ $ownerNickname แล้ว',
+            );
+          } else {
+            // เคยให้คะแนน task นี้แล้ว
+            AppToast.info(
+              context,
+              'แทนที่รูปตัวอย่างเรียบร้อย',
+              subtitle: '$ownerNickname เคยได้รับคะแนนจาก task นี้แล้ว',
+            );
+          }
+        }
+      } else {
+        if (mounted) {
+          AppToast.success(context, 'แทนที่รูปตัวอย่างเรียบร้อย');
+        }
       }
     } catch (e) {
       debugPrint('Error replacing sample image: $e');
       if (mounted) {
-        AppSnackbar.error(context, 'ไม่สามารถแทนที่รูปตัวอย่างได้ กรุณาลองใหม่');
+        AppToast.error(context, 'ไม่สามารถแทนที่รูปตัวอย่างได้ กรุณาลองใหม่');
       }
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
       }
+    }
+  }
+
+  /// ให้ 100 คะแนน + ส่ง notification แก่เจ้าของรูปที่ถูกเลือกเป็นตัวอย่าง
+  /// ป้องกัน duplicate: PointsService เช็ค reference_type + reference_id
+  /// คืน points ที่ให้สำเร็จ (100) หรือ 0 ถ้าเคยให้แล้ว / error
+  Future<int> _rewardSampleImageOwner({
+    required String ownerId,
+    required int taskLogId,
+    required String taskTitle,
+    required String imageUrl,
+  }) async {
+    try {
+      // 1. ให้ 100 คะแนน (มี duplicate check ใน recordSampleImageSelected)
+      final pointsAwarded = await PointsService().recordSampleImageSelected(
+        userId: ownerId,
+        taskLogId: taskLogId,
+        taskTitle: taskTitle,
+      );
+
+      // ถ้า pointsAwarded = 0 แปลว่าเคยให้แล้ว → ไม่ต้อง insert notification ซ้ำ
+      if (pointsAwarded == 0) {
+        debugPrint('Sample image reward already given, skip notification');
+        return 0;
+      }
+
+      // 2. Insert notification ให้เจ้าของรูป
+      // trigger pushNotification จะส่ง push อัตโนมัติ
+      await Supabase.instance.client.from('notifications').insert({
+        'title': '✨ รูปของคุณถูกเลือกเป็นตัวอย่าง!',
+        'body':
+            'รูปที่คุณถ่ายใน "$taskTitle" ถูกเลือกเป็นรูปตัวอย่าง +100 คะแนน',
+        'user_id': ownerId,
+        'type': 'task',
+        'reference_table': 'A_Task_logs_ver2',
+        'reference_id': taskLogId,
+        'image_url': imageUrl,
+      });
+
+      debugPrint('Sample image reward + notification sent to $ownerId');
+      return pointsAwarded;
+    } catch (e) {
+      debugPrint('Error rewarding sample image owner: $e');
+      return 0;
     }
   }
 }

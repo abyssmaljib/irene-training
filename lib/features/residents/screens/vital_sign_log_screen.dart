@@ -4,7 +4,7 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
-import '../../../core/widgets/app_snackbar.dart';
+import '../../../core/widgets/app_toast.dart';
 import '../../../core/widgets/irene_app_bar.dart';
 import '../models/vital_sign.dart';
 import '../services/resident_detail_service.dart';
@@ -450,7 +450,7 @@ class _VitalSignRow extends StatelessWidget {
   }
 
   void _showShareOptions(BuildContext context) {
-    AppSnackbar.info(context, 'แชร์สัญญาณชีพ - Coming Soon');
+    AppToast.info(context, 'แชร์สัญญาณชีพ - Coming Soon');
   }
 }
 

@@ -9,7 +9,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../learning/services/badge_service.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
-import '../../../core/widgets/app_snackbar.dart';
+import '../../../core/widgets/app_toast.dart';
 import '../../../core/widgets/buttons.dart';
 import '../../../core/widgets/input_fields.dart';
 import '../services/profile_setup_service.dart';
@@ -1499,7 +1499,7 @@ class _UnifiedProfileSetupScreenState
       }
 
       if (mounted) {
-        AppSnackbar.success(context, 'บันทึกข้อมูลเรียบร้อย');
+        AppToast.success(context, 'บันทึกข้อมูลเรียบร้อย');
 
         if (widget.showAsOnboarding) {
           widget.onComplete?.call();
@@ -1510,7 +1510,7 @@ class _UnifiedProfileSetupScreenState
     } catch (e) {
       debugPrint('UnifiedProfileSetupScreen: Error saving: $e');
       if (mounted) {
-        AppSnackbar.error(context, 'บันทึกไม่สำเร็จ: $e');
+        AppToast.error(context, 'บันทึกไม่สำเร็จ: $e');
       }
     } finally {
       if (mounted) {

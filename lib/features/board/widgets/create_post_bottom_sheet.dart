@@ -13,7 +13,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/providers/shared_preferences_provider.dart';
 import '../../../core/widgets/confirm_dialog.dart';
-import '../../../core/widgets/app_snackbar.dart';
+import '../../../core/widgets/app_toast.dart';
 import '../models/new_tag.dart';
 import '../models/post_draft.dart';
 import '../providers/create_post_provider.dart';
@@ -1172,7 +1172,7 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
 
     if (remaining <= 0) {
       // แจ้งเตือนเลือกรูปเกินจำนวนที่กำหนด
-      AppSnackbar.warning(context, 'เลือกรูปได้สูงสุด 5 รูป');
+      AppToast.warning(context, 'เลือกรูปได้สูงสุด 5 รูป');
       return;
     }
 
@@ -1522,21 +1522,21 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
     // เพื่อให้พี่เลี้ยงเขียนข้อมูลสำคัญที่ต้องส่งต่อให้เวรถัดไป
     if (state.isHandover && text.isEmpty) {
       // แจ้งเตือน validation: ต้องกรอกรายละเอียดเมื่อติ๊กส่งเวร
-      AppSnackbar.warning(context, 'กรุณากรอกรายละเอียดเมื่อติ๊กส่งเวร');
+      AppToast.warning(context, 'กรุณากรอกรายละเอียดเมื่อติ๊กส่งเวร');
       return;
     }
 
     // ป้องกัน submit ขณะ video กำลัง upload
     if (state.isUploadingVideo) {
       // แจ้งเตือนให้รอ video upload เสร็จก่อน
-      AppSnackbar.info(context, 'กรุณารอให้วีดีโออัพโหลดเสร็จก่อน');
+      AppToast.info(context, 'กรุณารอให้วีดีโออัพโหลดเสร็จก่อน');
       return;
     }
 
     // ป้องกัน submit ถ้า video upload error (ต้อง retry หรือลบก่อน)
     if (state.videoUploadError != null) {
       // แจ้งเตือนให้แก้ไข video upload error ก่อน submit
-      AppSnackbar.warning(context, 'กรุณาลองอัพโหลดวีดีโอใหม่ หรือลบวีดีโอออก');
+      AppToast.warning(context, 'กรุณาลองอัพโหลดวีดีโอใหม่ หรือลบวีดีโอออก');
       return;
     }
 
@@ -1647,7 +1647,7 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
       ref.read(createPostProvider.notifier).setError(e.toString());
       if (mounted) {
         // แจ้ง error เมื่อสร้างโพสไม่สำเร็จ
-        AppSnackbar.error(context, 'เกิดข้อผิดพลาด: $e');
+        AppToast.error(context, 'เกิดข้อผิดพลาด: $e');
       }
     } finally {
       ref.read(createPostProvider.notifier).setSubmitting(false);

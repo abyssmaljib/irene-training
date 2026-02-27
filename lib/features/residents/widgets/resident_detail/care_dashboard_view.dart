@@ -6,7 +6,7 @@ import '../../../../core/theme/app_typography.dart';
 import '../../models/resident_detail.dart';
 import '../../models/vital_sign.dart';
 import '../../screens/vital_sign_log_screen.dart';
-import '../../../../core/widgets/app_snackbar.dart';
+import '../../../../core/widgets/app_toast.dart';
 import '../../screens/create_vital_sign_screen.dart';
 import 'vital_sign_snapshot.dart';
 import 'activity_log_section.dart';
@@ -185,7 +185,7 @@ class CareDashboardView extends StatelessWidget {
   }
 
   void _showVitalDetail(BuildContext context, String type) {
-    AppSnackbar.info(context, 'ดูกราฟ $type - เร็วๆ นี้');
+    AppToast.info(context, 'ดูกราฟ $type - เร็วๆ นี้');
   }
 
   void _showAddVitalSign(BuildContext context) {

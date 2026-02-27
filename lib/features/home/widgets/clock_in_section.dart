@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
@@ -34,6 +35,10 @@ class ClockInSection extends StatelessWidget {
   final VoidCallback onClockIn;
   final bool isClockingIn;
 
+  /// Callback สำหรับ dev clock-in (ข้ามทุกอย่าง ใช้ default)
+  /// แสดงเฉพาะ kDebugMode เท่านั้น
+  final VoidCallback? onDevClockIn;
+
   const ClockInSection({
     super.key,
     required this.zones,
@@ -53,6 +58,7 @@ class ClockInSection extends StatelessWidget {
     this.isLoadingBreakTimes = false,
     required this.onClockIn,
     this.isClockingIn = false,
+    this.onDevClockIn,
   });
 
   @override
@@ -338,6 +344,37 @@ class ClockInSection extends StatelessWidget {
               ],
             ),
           ),
+
+        // ปุ่ม DEV Clock-In — ข้ามทุกอย่าง (verification + tarot + selection)
+        // แสดงเฉพาะ debug build เท่านั้น ไม่มีทางเห็นใน release
+        if (kDebugMode && onDevClockIn != null) ...[
+          AppSpacing.verticalGapMd,
+          SizedBox(
+            width: double.infinity,
+            height: 40,
+            child: OutlinedButton.icon(
+              onPressed: isClockingIn ? null : onDevClockIn,
+              icon: HugeIcon(
+                icon: HugeIcons.strokeRoundedBug01,
+                color: AppColors.error,
+                size: 18,
+              ),
+              label: Text(
+                'DEV: Clock-In ข้ามทุกอย่าง',
+                style: AppTypography.bodySmall.copyWith(
+                  color: AppColors.error,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: AppColors.error),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }

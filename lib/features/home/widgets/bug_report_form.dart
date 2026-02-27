@@ -8,7 +8,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/services/app_version_service.dart';
 import '../services/bug_report_service.dart';
-import '../../../core/widgets/app_snackbar.dart';
+import '../../../core/widgets/app_toast.dart';
 
 /// Form สำหรับรายงานปัญหา/Bug
 /// แสดงเป็น dialog หรือ bottom sheet
@@ -215,11 +215,11 @@ class _BugReportFormState extends State<BugReportForm> {
 
     if (result != null) {
       // Success
-      AppSnackbar.success(context, 'ส่งรายงานปัญหาเรียบร้อยแล้ว');
+      AppToast.success(context, 'ส่งรายงานปัญหาเรียบร้อยแล้ว');
       widget.onSubmitSuccess?.call();
     } else {
       // Error
-      AppSnackbar.error(context, 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
+      AppToast.error(context, 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
     }
   }
 

@@ -14,7 +14,7 @@ import '../../home/services/clock_service.dart';
 import '../../shift_summary/services/shift_summary_service.dart';
 import '../../dd_handover/services/dd_service.dart';
 import '../providers/task_provider.dart';
-import '../../../core/widgets/app_snackbar.dart';
+import '../../../core/widgets/app_toast.dart';
 
 /// Provider สำหรับ all users (dev mode)
 final _allUsersProvider = FutureProvider<List<DevUserInfo>>((ref) async {
@@ -101,6 +101,11 @@ class TaskFilterDrawer extends ConsumerWidget {
                     Navigator.of(context).pop();
                   },
                 )),
+
+            const Divider(height: 32),
+
+            // Batch Mode Toggle — รวม task เดียวกันข้ามคนไข้ในโซนเดียวกัน
+            _BatchModeToggle(),
 
             const Divider(height: 32),
 
@@ -257,6 +262,60 @@ class TaskFilterDrawer extends ConsumerWidget {
           side: BorderSide(color: AppColors.primary),
           padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
         ),
+      ),
+    );
+  }
+}
+
+/// Toggle สำหรับเปิด/ปิด Batch Mode
+/// เมื่อเปิด: task เดียวกัน (title+zone+timeBlock) ข้ามคนไข้จะถูกรวมเป็น BatchTaskCard
+/// เมื่อปิด: แสดง task แยกเหมือนเดิมทุกประการ
+class _BatchModeToggle extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isEnabled = ref.watch(batchModeEnabledProvider);
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+      child: Row(
+        children: [
+          // ไอคอนบ่งบอกว่าเป็นโหมด batch (รวมงาน)
+          HugeIcon(
+            icon: HugeIcons.strokeRoundedLayers01,
+            color: isEnabled ? AppColors.primary : AppColors.secondaryText,
+            size: 20,
+          ),
+          AppSpacing.horizontalGapSm,
+          // Label + คำอธิบาย
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'โหมดแบตช์',
+                  style: AppTypography.body.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: isEnabled ? AppColors.primaryText : AppColors.secondaryText,
+                  ),
+                ),
+                Text(
+                  'รวม task เดียวกันข้ามคนไข้',
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.secondaryText,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Switch toggle
+          Switch.adaptive(
+            value: isEnabled,
+            activeTrackColor: AppColors.primary,
+            onChanged: (value) {
+              ref.read(batchModeEnabledProvider.notifier).state = value;
+            },
+          ),
+        ],
       ),
     );
   }
@@ -848,7 +907,7 @@ class _ImpersonationBanner extends ConsumerWidget {
     // Close drawer
     Navigator.of(context).pop();
 
-    AppSnackbar.success(context, 'กลับมาเป็นตัวคุณเองแล้ว');
+    AppToast.success(context, 'กลับมาเป็นตัวคุณเองแล้ว');
   }
 }
 
@@ -1035,7 +1094,7 @@ class _DevModeUserSelectorState extends ConsumerState<_DevModeUserSelector> {
 
     if (!success) {
       if (!mounted) return;
-      AppSnackbar.error(context, 'เกิดข้อผิดพลาดในการสวมรอย');
+      AppToast.error(context, 'เกิดข้อผิดพลาดในการสวมรอย');
       return;
     }
 
@@ -1065,7 +1124,7 @@ class _DevModeUserSelectorState extends ConsumerState<_DevModeUserSelector> {
     if (!mounted) return;
     Navigator.of(context).pop();
 
-    AppSnackbar.info(context, 'สวมรอยเป็น: ${user.displayName}');
+    AppToast.info(context, 'สวมรอยเป็น: ${user.displayName}');
   }
 }
 

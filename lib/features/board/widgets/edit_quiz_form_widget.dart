@@ -7,7 +7,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../providers/edit_post_provider.dart';
 import '../services/ai_helper_service.dart';
-import '../../../core/widgets/app_snackbar.dart';
+import '../../../core/widgets/app_toast.dart';
 
 /// Quiz form widget for advanced edit post screen
 /// Allows users to edit or create a quiz with question and 3 choices (A, B, C)
@@ -107,7 +107,7 @@ class _EditQuizFormWidgetState extends ConsumerState<EditQuizFormWidget> {
     final text = widget.postText ?? ref.read(editPostProvider(widget.postId)).text;
     if (text.trim().isEmpty) {
       // แจ้งเตือน validation: ต้องใส่เนื้อหาก่อนสร้าง quiz ด้วย AI
-      AppSnackbar.warning(context, 'กรุณาใส่รายละเอียดก่อน');
+      AppToast.warning(context, 'กรุณาใส่รายละเอียดก่อน');
       return;
     }
 
@@ -137,19 +137,19 @@ class _EditQuizFormWidgetState extends ConsumerState<EditQuizFormWidget> {
         _startCooldown();
 
         // แจ้ง AI สร้างคำถามสำเร็จ
-        AppSnackbar.success(context, 'สร้างคำถามสำเร็จ กดแทนที่เพื่อใช้งาน');
+        AppToast.success(context, 'สร้างคำถามสำเร็จ กดแทนที่เพื่อใช้งาน');
       } else {
         if (mounted) {
           ref.read(editPostProvider(widget.postId).notifier).setLoadingQuizAI(false);
           // แจ้ง error เมื่อ AI สร้างคำถามไม่สำเร็จ
-          AppSnackbar.error(context, 'ไม่สามารถสร้างคำถามได้ กรุณาลองใหม่');
+          AppToast.error(context, 'ไม่สามารถสร้างคำถามได้ กรุณาลองใหม่');
         }
       }
     } catch (e) {
       if (mounted) {
         ref.read(editPostProvider(widget.postId).notifier).setLoadingQuizAI(false);
         // แจ้ง error เมื่อเกิดข้อผิดพลาดระหว่างสร้างคำถาม
-        AppSnackbar.error(context, 'เกิดข้อผิดพลาด: $e');
+        AppToast.error(context, 'เกิดข้อผิดพลาด: $e');
       }
     }
   }
@@ -168,7 +168,7 @@ class _EditQuizFormWidgetState extends ConsumerState<EditQuizFormWidget> {
     ref.read(editPostProvider(widget.postId).notifier).applyAiQuizToForm();
 
     // แจ้งแทนที่คำถามจาก AI สำเร็จ
-    AppSnackbar.success(context, 'แทนที่คำถามเรียบร้อย');
+    AppToast.success(context, 'แทนที่คำถามเรียบร้อย');
   }
 
   @override

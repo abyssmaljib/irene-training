@@ -11,7 +11,7 @@ import '../models/shift_activity_stats.dart';
 import '../services/clock_service.dart';
 import '../services/home_service.dart';
 import '../../navigation/screens/main_navigation_screen.dart';
-import '../../../core/widgets/app_snackbar.dart';
+import '../../../core/widgets/app_toast.dart';
 import '../../../core/widgets/shimmer_loading.dart';
 
 class ShiftSummaryScreen extends StatefulWidget {
@@ -104,7 +104,7 @@ class _ShiftSummaryScreenState extends State<ShiftSummaryScreen> {
     if (_remainingTasks > 0) return;
     
     if (_shiftSurveyController.text.trim().isEmpty) {
-      AppSnackbar.warning(context, 'กรุณาเขียนสรุปเวรด้วยนะคะ');
+      AppToast.warning(context, 'กรุณาเขียนสรุปเวรด้วยนะคะ');
       return;
     }
 
@@ -154,7 +154,7 @@ class _ShiftSummaryScreenState extends State<ShiftSummaryScreen> {
            Navigator.of(context).pop(true);
         }
       } else {
-        AppSnackbar.error(context, 'เกิดข้อผิดพลาดในการลงเวร');
+        AppToast.error(context, 'เกิดข้อผิดพลาดในการลงเวร');
       }
     }
   }

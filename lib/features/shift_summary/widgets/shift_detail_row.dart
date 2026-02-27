@@ -11,7 +11,7 @@ import '../../board/screens/board_screen.dart';
 import '../../dd_handover/services/dd_service.dart';
 import '../models/clock_summary.dart';
 import '../models/shift_row_type.dart';
-import '../../../core/widgets/app_snackbar.dart';
+import '../../../core/widgets/app_toast.dart';
 import 'sick_leave_claim_sheet.dart';
 
 /// Row แสดงรายละเอียดเวรแต่ละวัน
@@ -450,7 +450,7 @@ class _ShiftDetailRowState extends ConsumerState<ShiftDetailRow>
 
       if (ddRecord == null) {
         if (context.mounted) {
-          AppSnackbar.warning(context, 'ไม่พบข้อมูล DD Record');
+          AppToast.warning(context, 'ไม่พบข้อมูล DD Record');
         }
         return;
       }
@@ -487,7 +487,7 @@ class _ShiftDetailRowState extends ConsumerState<ShiftDetailRow>
       if (context.mounted) Navigator.pop(context);
 
       if (context.mounted) {
-        AppSnackbar.error(context, 'เกิดข้อผิดพลาด: $e');
+        AppToast.error(context, 'เกิดข้อผิดพลาด: $e');
       }
     }
   }

@@ -310,7 +310,49 @@ class ClockService {
     }
   }
 
-  /// ล้าง cache
+  /// ดึงรายชื่อเพื่อนร่วมเวรที่ขึ้นเวรเดียวกันอยู่ตอนนี้
+  /// ใช้สำหรับ batch task mode — เลือกเพื่อนร่วมเวรเพื่อหาร point
+  ///
+  /// Query: clock_in_out_ver2 ที่ nursinghome_id + shift เดียวกัน
+  /// + ยังไม่ clock out (clock_out_timestamp IS NULL)
+  /// + ไม่ใช่ตัวเอง
+  Future<List<Map<String, dynamic>>> getCoWorkersInCurrentShift() async {
+    final userId = _userService.effectiveUserId;
+    final nursinghomeId = await _userService.getNursinghomeId();
+    if (userId == null || nursinghomeId == null) return [];
+
+    // ดึงเวรปัจจุบันเพื่อหา shift type
+    final currentShift = await getCurrentShift();
+    if (currentShift == null) return [];
+
+    try {
+      // กรองเฉพาะวันนี้ เพื่อไม่ให้ดึง clock-in ค้างจากวันก่อนๆ
+      final now = DateTime.now();
+      final todayStart = DateTime(now.year, now.month, now.day);
+
+      final response = await _supabase
+          .from('clock_in_out_ver2')
+          .select('''
+            user_id,
+            user_info:user_id(
+              nickname,
+              photo_url
+            )
+          ''')
+          .eq('nursinghome_id', nursinghomeId)
+          .eq('shift', currentShift.shift)
+          .neq('user_id', userId)
+          .isFilter('clock_out_timestamp', null)
+          .gte('clock_in_timestamp', todayStart.toIso8601String());
+
+      return List<Map<String, dynamic>>.from(response as List);
+    } catch (e) {
+      debugPrint('Error fetching co-workers: $e');
+      return [];
+    }
+  }
+
+  /// ล้าง cache เพื่อบังคับ fetch ข้อมูลใหม่จาก server
   void invalidateCache() {
     _cachedCurrentShift = null;
     _shiftCacheTime = null;

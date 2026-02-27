@@ -3,7 +3,7 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
-import '../../../../core/widgets/app_snackbar.dart';
+import '../../../../core/widgets/app_toast.dart';
 import '../../screens/create_vital_sign_screen.dart';
 
 /// Quick Action FAB สำหรับหน้า Resident Detail
@@ -222,6 +222,6 @@ class _QuickActionSheet extends StatelessWidget {
   }
 
   void _showComingSoon(BuildContext context, String feature) {
-    AppSnackbar.info(context, '$feature - เร็วๆ นี้');
+    AppToast.info(context, '$feature - เร็วๆ นี้');
   }
 }

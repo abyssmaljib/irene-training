@@ -438,6 +438,46 @@ class PointsService {
     );
   }
 
+  /// บันทึก points เมื่อรูปยืนยันของ user ถูกเลือกเป็นรูปตัวอย่าง
+  /// เรียกจาก task_detail_screen หลัง admin กดปุ่ม "แทนที่ตัวอย่าง"
+  ///
+  /// [userId] - ID ของ user ที่ถ่ายรูป (completed_by) ไม่ใช่ admin
+  /// [taskLogId] - ID ของ task log ที่มีรูปถูกเลือก
+  /// [taskTitle] - ชื่อ task สำหรับแสดงใน description
+  /// คืน points ที่ให้สำเร็จ (100) หรือ 0 ถ้าเคยให้แล้ว
+  Future<int> recordSampleImageSelected({
+    required String userId,
+    required int taskLogId,
+    required String taskTitle,
+    int? nursinghomeId,
+  }) async {
+    final referenceId = taskLogId.toString();
+
+    // ตรวจสอบว่าเคยให้ points จาก task log นี้หรือยัง (ป้องกันซ้ำ)
+    final existing = await _client
+        .from('Point_Transaction')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('transaction_type', 'sample_image_selected')
+        .eq('reference_id', referenceId)
+        .maybeSingle();
+
+    if (existing != null) {
+      debugPrint('📊 Sample image reward already given for task $taskLogId');
+      return 0;
+    }
+
+    return await recordTransaction(
+      userId: userId,
+      points: 100,
+      transactionType: 'sample_image_selected',
+      description: '✨ รูปถูกเลือกเป็นตัวอย่าง: $taskTitle',
+      referenceType: 'task_log',
+      referenceId: referenceId,
+      nursinghomeId: nursinghomeId,
+    );
+  }
+
   /// บันทึก bonus เมื่อถอดบทเรียน incident เสร็จ (คืน 50% ของ penalty)
   /// เรียกจาก chat_provider หลัง user กดส่งสำเร็จ
   ///
@@ -493,6 +533,135 @@ class PointsService {
 
     debugPrint('📊 Incident reflection bonus: +$bonus x ${staffIds.length} staff = $totalBonus total');
     return totalBonus;
+  }
+
+  /// บันทึก points สำหรับ Batch Task Completed (หาร point กับเพื่อนร่วมเวร)
+  ///
+  /// คำนวณ points เหมือน recordTaskCompleted (V1) แล้วหาร
+  /// ด้วยจำนวนคน (completingUser + coWorkers)
+  ///
+  /// สร้าง Point_Transaction record ให้ทุกคน:
+  /// - completingUser = คนที่กดถ่ายรูป+complete
+  /// - coWorkerIds = เพื่อนร่วมเวรที่เลือกไว้
+  ///
+  /// [taskLogId] - ID ของ task log
+  /// [taskName] - ชื่อ task (ใช้ใน description)
+  /// [residentName] - ชื่อคนไข้ (ใช้ใน description)
+  /// [completingUserId] - user ที่กด complete
+  /// [coWorkerIds] - รายชื่อ co-worker user IDs
+  /// [difficultyScore] - คะแนนความยาก (1-10)
+  ///
+  /// คืนค่า points ที่แต่ละคนได้ (หลังหาร)
+  Future<int> recordBatchTaskCompleted({
+    required String completingUserId,
+    required int taskLogId,
+    required String taskName,
+    required String residentName,
+    required List<String> coWorkerIds,
+    int? difficultyScore,
+    int? nursinghomeId,
+  }) async {
+    final referenceId = taskLogId.toString();
+
+    // ตรวจสอบ duplicate — ป้องกันกดซ้ำหรือ retry ให้แต้มซ้ำ
+    final existing = await _client
+        .from('Point_Transaction')
+        .select('id')
+        .eq('user_id', completingUserId)
+        .eq('transaction_type', 'batch_task_completed')
+        .eq('reference_id', referenceId)
+        .maybeSingle();
+
+    if (existing != null) {
+      debugPrint('📊 Batch task already recorded for task $taskLogId');
+      return 0;
+    }
+
+    // คำนวณ total points เหมือน V1: base 5 + difficulty bonus
+    int totalPoints = 5; // base points
+    int diffBonus = 0;
+    if (difficultyScore != null && difficultyScore > 5) {
+      diffBonus = PointsConfig.taskDifficultyBonus(difficultyScore);
+      totalPoints += diffBonus;
+    }
+
+    // หารจำนวนคน (user + co-workers)
+    final totalPeople = 1 + coWorkerIds.length;
+    // ใช้ ~/ (integer division) เพื่อไม่ให้แต้มรวมเกินจริง
+    // เช่น 5 ~/ 3 = 1 (ไม่ใช่ 2 จาก ceil ที่ทำให้แจก 6 แต้มจาก 5)
+    // กรณี totalPeople > totalPoints (เช่น 6 คน 5 แต้ม) → หารได้ 0
+    // ให้ผู้ทำงานได้ totalPoints เต็ม ส่วน co-workers ได้ 1 คนละ
+    // เพื่อให้ทุกคนได้แต้มแต่รวมไม่ inflate มากจนเกินไป
+    final rawPerPerson = totalPoints ~/ totalPeople;
+    final pointsPerPerson = rawPerPerson > 0 ? rawPerPerson : 1;
+    // ผู้ทำงาน: ได้ points เท่ากัน หรือได้ทั้งหมดถ้าหารไม่พอ
+    final completingUserPoints = rawPerPerson > 0 ? rawPerPerson : totalPoints;
+
+    final description =
+        'Batch: $taskName - $residentName (หาร $totalPeople คน)';
+
+    // ดึง nursinghomeId ครั้งเดียวเพื่อ pass ให้ทุกคน (ไม่ต้อง query ซ้ำ)
+    int? nhId = nursinghomeId;
+    if (nhId == null) {
+      final userInfo = await _client
+          .from('user_info')
+          .select('nursinghome_id')
+          .eq('id', completingUserId)
+          .maybeSingle();
+      nhId = userInfo?['nursinghome_id'] as int?;
+    }
+
+    // บันทึก points ให้คนที่ complete (ได้ completingUserPoints)
+    int recorded = 0;
+    final baseResult = await recordTransaction(
+      userId: completingUserId,
+      points: completingUserPoints,
+      transactionType: 'batch_task_completed',
+      description: description,
+      referenceType: 'task_log',
+      referenceId: referenceId,
+      nursinghomeId: nhId,
+    );
+    if (baseResult > 0) recorded++;
+
+    // บันทึก points ให้ co-workers ทุกคน — ใช้ Future.wait เพื่อลด latency
+    // จาก O(N) sequential → O(1) parallel network calls
+    final futures = coWorkerIds.map((coWorkerId) async {
+      final cwResult = await recordTransaction(
+        userId: coWorkerId,
+        points: pointsPerPerson,
+        transactionType: 'batch_task_completed',
+        description: description,
+        referenceType: 'task_log',
+        referenceId: referenceId,
+        nursinghomeId: nhId,
+      );
+      if (cwResult > 0) {
+        recorded++;
+        // แจ้งเตือนเพื่อนร่วมเวรว่าได้รับคะแนนจากการหาร
+        try {
+          await _client.from('notifications').insert({
+            'title': '🎉 ได้รับคะแนนจากเพื่อนร่วมเวร',
+            'body': 'คุณได้ +$pointsPerPerson คะแนน จากงาน $taskName'
+                '${residentName.isNotEmpty ? ' - $residentName' : ''}'
+                ' (หาร $totalPeople คน)',
+            'user_id': coWorkerId,
+            'type': 'points',
+            'reference_table': 'A_Task_logs_ver2',
+            'reference_id': taskLogId,
+          });
+        } catch (e) {
+          // notification ล้มเหลวไม่ควร block flow หลัก
+          debugPrint('⚠️ Failed to send co-worker notification: $e');
+        }
+      }
+    });
+
+    await Future.wait(futures);
+
+    debugPrint(
+        '📊 Batch points: $totalPoints total / $totalPeople people = $pointsPerPerson each ($recorded records)');
+    return pointsPerPerson;
   }
 
   /// บันทึก points สำหรับ Task Completed (Legacy - deprecated)

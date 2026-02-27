@@ -9,6 +9,7 @@ import '../../../core/widgets/irene_app_bar.dart';
 import '../../home/models/zone.dart';
 import '../../home/models/clock_in_out.dart';
 import '../../settings/screens/settings_screen.dart';
+import '../models/batch_task_group.dart';
 import '../models/resident_simple.dart';
 import '../models/task_log.dart';
 import '../providers/task_provider.dart';
@@ -17,6 +18,7 @@ import '../widgets/task_card.dart';
 import '../widgets/task_time_section.dart';
 import '../widgets/task_filter_drawer.dart';
 import '../services/task_realtime_service.dart';
+import 'batch_task_screen.dart';
 import 'rls_debug_screen.dart';
 import 'task_detail_screen.dart';
 
@@ -86,6 +88,10 @@ class _ChecklistScreenV2State extends ConsumerState<ChecklistScreenV2> {
     // ✨ ใช้ V2 providers ที่ query จาก v3_task_logs_simplified
     final filteredTasksAsync = ref.watch(filteredTasksV2Provider);
     final groupedTasksAsync = ref.watch(groupedTasksV2Provider);
+    final isBatchMode = ref.watch(batchModeEnabledProvider);
+    final batchGroupedAsync = isBatchMode
+        ? ref.watch(batchGroupedTasksV2Provider)
+        : null;
     // ✨ ใช้ V2 provider แทน V1 เพื่อให้ counts มาจากข้อมูลชุดเดียวกัน
     final taskCounts = ref.watch(taskCountsV2Provider);
     final zonesAsync = ref.watch(nursinghomeZonesProvider);
@@ -163,7 +169,7 @@ class _ChecklistScreenV2State extends ConsumerState<ChecklistScreenV2> {
             await Future.delayed(const Duration(milliseconds: 500));
           },
           child: viewMode == TaskViewMode.all
-              ? _buildGroupedTaskList(groupedTasksAsync)
+              ? _buildGroupedTaskList(groupedTasksAsync, batchGroupedAsync)
               : _buildFilteredTaskList(filteredTasksAsync, viewMode),
         ),
       ),
@@ -587,8 +593,12 @@ class _ChecklistScreenV2State extends ConsumerState<ChecklistScreenV2> {
   }
 
   Widget _buildGroupedTaskList(
-      AsyncValue<Map<String, List<TaskLog>>> groupedTasksAsync) {
+      AsyncValue<Map<String, List<TaskLog>>> groupedTasksAsync,
+      AsyncValue<Map<String, List<BatchMixedItem>>>? batchGroupedAsync) {
     final currentUserId = ref.watch(currentUserIdProvider);
+
+    // ถ้ามี batch data → ดึง batch items สำหรับแต่ละ timeBlock
+    final batchData = batchGroupedAsync?.valueOrNull;
 
     return groupedTasksAsync.when(
       data: (groupedTasks) {
@@ -620,6 +630,9 @@ class _ChecklistScreenV2State extends ConsumerState<ChecklistScreenV2> {
                 tasks: tasks,
                 isExpanded: _expandedTimeBlock == timeBlock,
                 currentUserId: currentUserId,
+                // Batch mode: ส่ง batchItems ให้ TaskTimeSection render mixed list
+                batchItems: batchData?[timeBlock],
+                onBatchGroupTap: _onBatchGroupTap,
                 onExpandChanged: () {
                   setState(() {
                     // Accordion behavior: ถ้ากดที่เปิดอยู่ = ปิด, ถ้ากดอันอื่น = เปิดอันใหม่
@@ -714,6 +727,16 @@ class _ChecklistScreenV2State extends ConsumerState<ChecklistScreenV2> {
       context,
       MaterialPageRoute(
         builder: (_) => TaskDetailScreen(task: task),
+      ),
+    );
+  }
+
+  /// เปิดหน้า BatchTaskScreen เมื่อกด BatchTaskCard
+  void _onBatchGroupTap(BatchTaskGroup group) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BatchTaskScreen(group: group),
       ),
     );
   }

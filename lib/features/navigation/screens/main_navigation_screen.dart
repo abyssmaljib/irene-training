@@ -6,7 +6,7 @@ import '../../../core/services/user_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
-import '../../../core/widgets/app_snackbar.dart';
+import '../../../core/widgets/app_toast.dart';
 import '../../home/screens/home_screen.dart';
 import '../../checklist/screens/checklist_screen.dart';
 import '../../board/screens/board_screen.dart';
@@ -663,7 +663,7 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
 
     // แจ้ง user ว่าหยุด impersonate แล้ว
     if (mounted) {
-      AppSnackbar.success(context, 'กลับมาเป็นตัวคุณเองแล้ว');
+      AppToast.success(context, 'กลับมาเป็นตัวคุณเองแล้ว');
     }
   }
 }

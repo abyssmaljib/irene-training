@@ -5,7 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/confirm_dialog.dart';
-import '../../../core/widgets/app_snackbar.dart';
+import '../../../core/widgets/app_toast.dart';
 import '../../../core/widgets/irene_app_bar.dart';
 import '../../../core/widgets/success_popup.dart';
 import '../providers/vital_sign_form_provider.dart';
@@ -193,7 +193,7 @@ class EditVitalSignScreen extends ConsumerWidget {
                         await SuccessPopup.show(context, emoji: '📝', message: 'บันทึกสำเร็จ');
                         if (context.mounted) Navigator.of(context).pop(true);
                       } else if (!success && context.mounted && data.errorMessage != null) {
-                        AppSnackbar.error(context, data.errorMessage ?? 'เกิดข้อผิดพลาด');
+                        AppToast.error(context, data.errorMessage ?? 'เกิดข้อผิดพลาด');
                       }
                     },
               style: ElevatedButton.styleFrom(

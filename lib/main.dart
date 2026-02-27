@@ -4,7 +4,8 @@ import 'package:clarity_flutter/clarity_flutter.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:firebase_performance/firebase_performance.dart';
+import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 import 'package:onesignal_flutter/onesignal_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -64,6 +65,14 @@ void main() async {
       FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
       return true;
     };
+  }
+
+  // Setup Firebase Performance Monitoring (เฉพาะ release build)
+  // จะเก็บข้อมูลอัตโนมัติ: app start time, HTTP requests, screen rendering (frozen/slow frames)
+  // ดูผลลัพธ์ได้ที่ Firebase Console > Performance
+  // ปิดใน debug เพื่อไม่ให้ debug data ปนกับ production data
+  if (!kIsWeb) {
+    FirebasePerformance.instance.setPerformanceCollectionEnabled(!kDebugMode);
   }
 
   // เปิด Edge-to-Edge mode สำหรับ Android 15+

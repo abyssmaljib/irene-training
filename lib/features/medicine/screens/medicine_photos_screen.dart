@@ -55,7 +55,7 @@ import '../../../core/services/image_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
-import '../../../core/widgets/app_snackbar.dart';
+import '../../../core/widgets/app_toast.dart';
 import '../../../core/widgets/irene_app_bar.dart';
 import '../../../core/widgets/toggle_switch.dart';
 import '../../../core/widgets/success_popup.dart';
@@ -552,7 +552,7 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
       }
 
       if (mounted) {
-        AppSnackbar.error(context, 'เกิดข้อผิดพลาด: $e');
+        AppToast.error(context, 'เกิดข้อผิดพลาด: $e');
       }
     }
   }
@@ -613,7 +613,7 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
           Navigator.pop(context);
         }
         if (mounted) {
-          AppSnackbar.error(context, 'เกิดข้อผิดพลาด: $e');
+          AppToast.error(context, 'เกิดข้อผิดพลาด: $e');
         }
       }
       return;
@@ -654,7 +654,7 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
       }
 
       if (mounted) {
-        AppSnackbar.error(context, 'เกิดข้อผิดพลาด: $e');
+        AppToast.error(context, 'เกิดข้อผิดพลาด: $e');
       }
     }
   }
@@ -694,7 +694,7 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
       }
 
       if (mounted) {
-        AppSnackbar.error(context, 'เกิดข้อผิดพลาด: $e');
+        AppToast.error(context, 'เกิดข้อผิดพลาด: $e');
       }
     }
   }

@@ -7,7 +7,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../providers/create_post_provider.dart';
 import '../services/ai_helper_service.dart';
-import '../../../core/widgets/app_snackbar.dart';
+import '../../../core/widgets/app_toast.dart';
 
 /// AI Summary widget for advanced create post screen
 /// Shows AI summarize button and result when text > 50 chars
@@ -80,7 +80,7 @@ class _AiSummaryWidgetState extends ConsumerState<AiSummaryWidget> {
       widget.onReplaceText?.call();
 
       // แจ้งเพิ่มสรุป AI ลงในข้อความสำเร็จ
-      AppSnackbar.success(context, 'เพิ่มสรุปในข้อความแล้ว');
+      AppToast.success(context, 'เพิ่มสรุปในข้อความแล้ว');
     }
   }
 
@@ -89,7 +89,7 @@ class _AiSummaryWidgetState extends ConsumerState<AiSummaryWidget> {
     if (summary != null) {
       Clipboard.setData(ClipboardData(text: summary));
       // แจ้งคัดลอกข้อความสรุปสำเร็จ
-      AppSnackbar.success(context, 'คัดลอกข้อความแล้ว');
+      AppToast.success(context, 'คัดลอกข้อความแล้ว');
     }
   }
 

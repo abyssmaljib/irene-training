@@ -52,7 +52,7 @@ import '../widgets/clock_out_summary_modal.dart'; // สำหรับ dev test
 import '../models/shift_leader.dart'; // สำหรับ mock ShiftLeader ใน dev button
 import '../../settings/services/clockin_verification_service.dart'; // สำหรับตรวจ GPS+WiFi ก่อนขึ้นเวร
 import '../../../core/widgets/buttons.dart'; // สำหรับ PrimaryButton ใน verification dialog
-import '../../../core/widgets/app_snackbar.dart';
+import '../../../core/widgets/app_toast.dart';
 
 /// หน้าหลัก - Dashboard with Clock-in/Clock-out
 /// ใช้ ConsumerStatefulWidget เพื่อให้ pull to refresh สามารถ invalidate
@@ -427,7 +427,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       await _loadResidentsByZones();
       await _loadOccupiedBreakTimes();
       if (!mounted) return;
-      AppSnackbar.warning(context, 'มีคนไข้ที่เพื่อนเลือกไปแล้ว กรุณาเลือกใหม่');
+      AppToast.warning(context, 'มีคนไข้ที่เพื่อนเลือกไปแล้ว กรุณาเลือกใหม่');
       return;
     }
 
@@ -503,6 +503,94 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           _availableResidents = [];
         });
         // Reload all data after clock in
+        _clockService.invalidateCache();
+        _homeService.invalidateCache();
+        await Future.wait([
+          _loadCurrentShift(forceRefresh: true),
+          _loadDashboardStats(),
+          _loadMonthlySummary(),
+        ]);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isClockingIn = false);
+      }
+    }
+  }
+
+  // ============================================
+  // DEV Clock-In — ข้ามทุกอย่าง (verification + tarot + selection)
+  // ============================================
+  // ใช้ zone แรก, resident ทั้งหมดที่ว่าง, break time แรกของแต่ละ group
+  // แสดงเฉพาะ kDebugMode เท่านั้น
+  Future<void> _handleDevClockIn() async {
+    setState(() => _isClockingIn = true);
+    try {
+      // ใช้ zone แรกที่มี (ถ้ายังไม่โหลดให้ใช้ list ว่าง)
+      final zoneIds = _zones.isNotEmpty ? [_zones.first.id] : <int>[];
+
+      // ใช้ resident ตัวแรกที่ไม่ถูกเลือกโดยคนอื่น (ถ้ามี)
+      final availableResidents = _availableResidents.isNotEmpty
+          ? _availableResidents
+              .where((r) => !_occupiedResidentIds.contains(r.id))
+              .toList()
+          : <ResidentSimple>[];
+      // ถ้ายังไม่มี resident (เพราะยังไม่ได้โหลด) ให้โหลดจาก zone แรก
+      List<int> residentIds;
+      if (availableResidents.isNotEmpty) {
+        residentIds = [availableResidents.first.id];
+      } else if (zoneIds.isNotEmpty) {
+        // โหลด residents จาก zone ที่เลือก
+        final residents = await _zoneService.getResidentsByZones(zoneIds);
+        residentIds =
+            residents.isNotEmpty ? [residents.first.id] : <int>[];
+      } else {
+        residentIds = [];
+      }
+
+      // ใช้ break time แรกของแต่ละ group
+      final breakTimeIds = <int>[];
+      final seenGroups = <String>{};
+      for (final option in _breakTimeOptions) {
+        final groupName = option.breakName ?? 'อื่นๆ';
+        if (!seenGroups.contains(groupName) && option.breakTime.isNotEmpty) {
+          seenGroups.add(groupName);
+          breakTimeIds.add(option.id);
+        }
+      }
+
+      // ถ้า break time ยังไม่โหลด ให้โหลดเอง
+      if (breakTimeIds.isEmpty) {
+        final options =
+            await _clockService.getBreakTimeOptionsForCurrentShift();
+        final seenGroupsFallback = <String>{};
+        for (final option in options) {
+          final groupName = option.breakName ?? 'อื่นๆ';
+          if (!seenGroupsFallback.contains(groupName) &&
+              option.breakTime.isNotEmpty) {
+            seenGroupsFallback.add(groupName);
+            breakTimeIds.add(option.id);
+          }
+        }
+      }
+
+      debugPrint('[DEV] Clock-in with zones=$zoneIds, '
+          'residents=$residentIds, breakTimes=$breakTimeIds');
+
+      final result = await _clockService.clockIn(
+        zoneIds: zoneIds,
+        residentIds: residentIds,
+        breakTimeIds: breakTimeIds,
+      );
+
+      if (result != null && mounted) {
+        setState(() {
+          _currentShift = result;
+          _selectedZoneIds = {};
+          _selectedResidentIds = {};
+          _selectedBreakTimeIds = {};
+          _availableResidents = [];
+        });
         _clockService.invalidateCache();
         _homeService.invalidateCache();
         await Future.wait([
@@ -883,7 +971,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _loadCurrentShift(forceRefresh: true);
       _loadDashboardStats();
       _loadMonthlySummary();
-      AppSnackbar.success(context, 'ลงเวรเรียบร้อย');
+      AppToast.success(context, 'ลงเวรเรียบร้อย');
     }
   }
 
@@ -1062,6 +1150,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           isLoadingBreakTimes: _isLoadingBreakTimes,
           onClockIn: _handleClockIn,
           isClockingIn: _isClockingIn,
+          onDevClockIn: _handleDevClockIn,
         ),
       ],
     );
@@ -1522,7 +1611,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   }) {
                     // แสดงผลลัพธ์ใน SnackBar แทนการบันทึกจริง
                     Navigator.pop(context);
-                    AppSnackbar.info(
+                    AppToast.info(
                       this.context,
                       'DEV: shiftScore=$shiftScore, selfScore=$selfScore, '
                       'leaderScore=$leaderScore, '

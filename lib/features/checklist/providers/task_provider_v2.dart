@@ -205,6 +205,57 @@ final groupedTasksV2Provider =
   );
 });
 
+/// Provider V2 สำหรับ batch grouped tasks (เหมือน batchGroupedTasksProvider แต่ใช้ V2 data)
+/// transform groupedTasksV2Provider เป็น mixed list ของ BatchTaskGroup + single TaskLog
+final batchGroupedTasksV2Provider =
+    Provider<AsyncValue<Map<String, List<BatchMixedItem>>>>((ref) {
+  final groupedAsync = ref.watch(groupedTasksV2Provider);
+
+  return groupedAsync.when(
+    data: (grouped) {
+      final Map<String, List<BatchMixedItem>> result = {};
+
+      for (final entry in grouped.entries) {
+        final timeBlock = entry.key;
+        final tasks = entry.value;
+
+        // group tasks ที่มี title+zone+timeBlock เดียวกัน
+        final batchGroups = groupBatchTasks(tasks);
+
+        // หา tasks ที่ไม่เข้า group (คนไข้เดียวใน key นั้น)
+        final groupedTaskIds = <int>{};
+        for (final group in batchGroups.values) {
+          for (final t in group.tasks) {
+            groupedTaskIds.add(t.logId);
+          }
+        }
+
+        final List<BatchMixedItem> items = [];
+
+        // เพิ่ม batch groups ก่อน (เรียง title)
+        final sortedGroups = batchGroups.values.toList()
+          ..sort((a, b) => a.title.compareTo(b.title));
+        for (final group in sortedGroups) {
+          items.add(BatchMixedItem.batch(group));
+        }
+
+        // เพิ่ม singles ตามหลัง (เรียงตาม order เดิม)
+        for (final task in tasks) {
+          if (!groupedTaskIds.contains(task.logId)) {
+            items.add(BatchMixedItem.single(task));
+          }
+        }
+
+        result[timeBlock] = items;
+      }
+
+      return AsyncValue.data(result);
+    },
+    loading: () => const AsyncValue.loading(),
+    error: (e, st) => AsyncValue.error(e, st),
+  );
+});
+
 /// Provider V2 สำหรับ task counts per view mode
 /// ✅ เหมือน V1 เป๊ะ (taskCountsProvider ใน task_provider.dart)
 final taskCountsV2Provider = Provider<Map<TaskViewMode, int>>((ref) {

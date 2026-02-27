@@ -6,7 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
-import '../../../core/widgets/app_snackbar.dart';
+import '../../../core/widgets/app_toast.dart';
 import '../../../core/widgets/input_fields.dart';
 import '../../../core/widgets/buttons.dart';
 import '../../../core/widgets/empty_state.dart';
@@ -318,7 +318,7 @@ class _InvitationScreenState extends ConsumerState<InvitationScreen> {
       // แสดง error ใน snackbar
       final errorMessage = ref.read(invitationProvider).errorMessage;
       if (errorMessage != null) {
-        AppSnackbar.error(context, errorMessage);
+        AppToast.error(context, errorMessage);
       }
     }
   }

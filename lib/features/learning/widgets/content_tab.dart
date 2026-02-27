@@ -5,7 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
-import '../../../core/widgets/app_snackbar.dart';
+import '../../../core/widgets/app_toast.dart';
 import '../../../core/services/user_service.dart';
 import '../../points/services/points_service.dart';
 import '../models/topic_detail.dart';
@@ -132,7 +132,7 @@ class _ContentTabState extends State<ContentTab> {
       widget.onMarkAsRead();
     } catch (e) {
       if (mounted) {
-        AppSnackbar.error(context, 'เกิดข้อผิดพลาด: $e');
+        AppToast.error(context, 'เกิดข้อผิดพลาด: $e');
       }
     } finally {
       if (mounted) {

@@ -6,6 +6,7 @@ import '../../home/models/zone.dart';
 import '../../home/models/clock_in_out.dart';
 import '../../home/services/zone_service.dart';
 import '../../home/services/clock_service.dart';
+import '../models/batch_task_group.dart';
 import '../models/resident_simple.dart';
 import '../models/system_role.dart';
 import '../models/task_log.dart';
@@ -232,18 +233,20 @@ List<TaskLog> _mergeOptimisticUpdates(
   return merged;
 }
 
-/// Provider สำหรับ filtered tasks ตาม view mode
-/// ใช้ optimistic updates เพื่อให้ UI ตอบสนองทันที
-final filteredTasksProvider = Provider<AsyncValue<List<TaskLog>>>((ref) {
+// ============================================================
+// Shared Base Provider — ทำ merge + filter แค่ครั้งเดียว
+// filteredTasksProvider, groupedTasksProvider, taskCountsProvider
+// ทั้งหมด watch ตัวนี้แทนที่จะทำ filter ซ้ำ 3 รอบ
+// ============================================================
+
+/// Provider สำหรับ tasks ที่ผ่านการ merge optimistic + filter แล้ว
+/// ใช้เป็น base สำหรับ providers อื่นทั้งหมด
+final _baseFilteredTasksProvider = Provider<AsyncValue<List<TaskLog>>>((ref) {
   // Watch refresh counter to enable manual refresh
   ref.watch(taskRefreshCounterProvider);
 
   final tasksAsync = ref.watch(tasksProvider);
   final optimisticUpdates = ref.watch(optimisticTaskUpdatesProvider);
-  final viewMode = ref.watch(taskViewModeProvider);
-  final shiftAsync = ref.watch(userShiftProvider);
-  final userId = ref.watch(currentUserIdProvider);
-  final service = ref.watch(taskServiceProvider);
   final selectedZones = ref.watch(selectedZonesFilterProvider);
   final selectedResidents = ref.watch(selectedResidentsFilterProvider);
   final selectedRoleId = ref.watch(effectiveRoleFilterProvider);
@@ -252,14 +255,29 @@ final filteredTasksProvider = Provider<AsyncValue<List<TaskLog>>>((ref) {
 
   return tasksAsync.when(
     data: (tasks) {
-      // รวม optimistic updates เข้ากับ tasks (ใช้ smart merge)
+      // merge + filter ทำแค่ครั้งเดียว ที่นี่
       final mergedTasks = _mergeOptimisticUpdates(tasks, optimisticUpdates);
-
-      final shift = shiftAsync.valueOrNull;
-
-      // Apply zone, resident, role, and task type filter
       final filteredTasks = _filterByZonesResidentsRoleAndType(
         mergedTasks, selectedZones, selectedResidents, userRole, selectedRoleId, selectedTaskTypes);
+      return AsyncValue.data(filteredTasks);
+    },
+    loading: () => const AsyncValue.loading(),
+    error: (e, st) => AsyncValue.error(e, st),
+  );
+});
+
+/// Provider สำหรับ filtered tasks ตาม view mode
+/// ดึง tasks จาก base provider (ไม่ filter ซ้ำ)
+final filteredTasksProvider = Provider<AsyncValue<List<TaskLog>>>((ref) {
+  final baseAsync = ref.watch(_baseFilteredTasksProvider);
+  final viewMode = ref.watch(taskViewModeProvider);
+  final shiftAsync = ref.watch(userShiftProvider);
+  final userId = ref.watch(currentUserIdProvider);
+  final service = ref.watch(taskServiceProvider);
+
+  return baseAsync.when(
+    data: (filteredTasks) {
+      final shift = shiftAsync.valueOrNull;
 
       switch (viewMode) {
         case TaskViewMode.upcoming:
@@ -279,26 +297,14 @@ final filteredTasksProvider = Provider<AsyncValue<List<TaskLog>>>((ref) {
 });
 
 /// Provider สำหรับ grouped tasks by timeBlock (สำหรับ view mode = all)
-/// ใช้ optimistic updates เพื่อให้ UI ตอบสนองทันที
+/// ดึง tasks จาก base provider (ไม่ filter ซ้ำ)
 final groupedTasksProvider =
     Provider<AsyncValue<Map<String, List<TaskLog>>>>((ref) {
-  final tasksAsync = ref.watch(tasksProvider);
-  final optimisticUpdates = ref.watch(optimisticTaskUpdatesProvider);
+  final baseAsync = ref.watch(_baseFilteredTasksProvider);
   final service = ref.watch(taskServiceProvider);
-  final selectedZones = ref.watch(selectedZonesFilterProvider);
-  final selectedResidents = ref.watch(selectedResidentsFilterProvider);
-  final selectedRoleId = ref.watch(effectiveRoleFilterProvider);
-  final userRole = ref.watch(currentUserSystemRoleProvider).valueOrNull;
-  final selectedTaskTypes = ref.watch(selectedTaskTypesFilterProvider);
 
-  return tasksAsync.when(
-    data: (tasks) {
-      // รวม optimistic updates เข้ากับ tasks (ใช้ smart merge)
-      final mergedTasks = _mergeOptimisticUpdates(tasks, optimisticUpdates);
-
-      // Apply zone, resident, role, and task type filter
-      final filteredTasks = _filterByZonesResidentsRoleAndType(
-        mergedTasks, selectedZones, selectedResidents, userRole, selectedRoleId, selectedTaskTypes);
+  return baseAsync.when(
+    data: (filteredTasks) {
       return AsyncValue.data(service.groupTasksByTimeBlock(filteredTasks));
     },
     loading: () => const AsyncValue.loading(),
@@ -307,29 +313,16 @@ final groupedTasksProvider =
 });
 
 /// Provider สำหรับ task counts per view mode
-/// ใช้ optimistic updates เพื่อให้ count อัพเดตทันที
+/// ดึง tasks จาก base provider (ไม่ filter ซ้ำ) แล้วนับแต่ละ mode
 final taskCountsProvider = Provider<Map<TaskViewMode, int>>((ref) {
-  final tasksAsync = ref.watch(tasksProvider);
-  final optimisticUpdates = ref.watch(optimisticTaskUpdatesProvider);
+  final baseAsync = ref.watch(_baseFilteredTasksProvider);
   final shiftAsync = ref.watch(userShiftProvider);
   final userId = ref.watch(currentUserIdProvider);
   final service = ref.watch(taskServiceProvider);
-  final selectedZones = ref.watch(selectedZonesFilterProvider);
-  final selectedResidents = ref.watch(selectedResidentsFilterProvider);
-  final selectedRoleId = ref.watch(effectiveRoleFilterProvider);
-  final userRole = ref.watch(currentUserSystemRoleProvider).valueOrNull;
-  final selectedTaskTypes = ref.watch(selectedTaskTypesFilterProvider);
 
-  if (!tasksAsync.hasValue) return {};
+  if (!baseAsync.hasValue) return {};
 
-  final allTasks = tasksAsync.value!;
-
-  // รวม optimistic updates เข้ากับ tasks (ใช้ smart merge)
-  final mergedTasks = _mergeOptimisticUpdates(allTasks, optimisticUpdates);
-
-  // Apply zone, resident, role, and task type filter
-  final tasks = _filterByZonesResidentsRoleAndType(
-    mergedTasks, selectedZones, selectedResidents, userRole, selectedRoleId, selectedTaskTypes);
+  final tasks = baseAsync.value!;
   final shift = shiftAsync.valueOrNull;
 
   return {
@@ -448,28 +441,32 @@ final initMyPatientsFilterProvider = Provider<void>((ref) {
   // ถ้า init แล้วสำหรับ user นี้ ไม่ต้องทำอีก
   if (initializedForUser == currentUserId) return;
 
+  // Capture container ก่อนเรียก addPostFrameCallback
+  // เพื่อหลีกเลี่ยง "Cannot use ref functions after dependency changed" error
+  final container = ref.container;
+
   currentShiftAsync.whenData((shift) {
     if (shift != null && shift.isClockedIn) {
       // Set filter เมื่อ user clock in อยู่
       // ใช้ addPostFrameCallback เพื่อหลีกเลี่ยง assertion error
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        ref.read(_myPatientsFilterInitializedForUserProvider.notifier).state = currentUserId;
-        ref.read(myPatientsFilterActiveProvider.notifier).state = true;
+        container.read(_myPatientsFilterInitializedForUserProvider.notifier).state = currentUserId;
+        container.read(myPatientsFilterActiveProvider.notifier).state = true;
 
         // ตอน init ใช้ shift.zones ก่อน (default)
         // เมื่อ user กดปุ่ม "คนไข้ของฉัน" toggle จะหา zones จาก residents ที่ถูกต้อง
-        ref.read(selectedZonesFilterProvider.notifier).state =
+        container.read(selectedZonesFilterProvider.notifier).state =
             shift.zones.toSet();
-        ref.read(selectedResidentsFilterProvider.notifier).state =
+        container.read(selectedResidentsFilterProvider.notifier).state =
             shift.selectedResidentIdList.toSet();
       });
     } else {
       // User is not clocked in - reset filter
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        ref.read(_myPatientsFilterInitializedForUserProvider.notifier).state = currentUserId;
-        ref.read(myPatientsFilterActiveProvider.notifier).state = false;
-        ref.read(selectedZonesFilterProvider.notifier).state = {};
-        ref.read(selectedResidentsFilterProvider.notifier).state = {};
+        container.read(_myPatientsFilterInitializedForUserProvider.notifier).state = currentUserId;
+        container.read(myPatientsFilterActiveProvider.notifier).state = false;
+        container.read(selectedZonesFilterProvider.notifier).state = {};
+        container.read(selectedResidentsFilterProvider.notifier).state = {};
       });
     }
   });
@@ -509,6 +506,118 @@ final availableTaskTypesProvider = Provider<List<String>>((ref) {
 /// ถ้า empty = แสดงทุก type, ถ้ามีค่า = filter เฉพาะ types ที่เลือก
 final selectedTaskTypesFilterProvider = StateProvider<Set<String>>((ref) {
   return {}; // default: แสดงทุก type
+});
+
+/// Provider สำหรับเปิด/ปิด Batch Mode (รวม task เดียวกันข้ามคนไข้)
+/// default: เปิด — ถ้า user ไม่ชินค่อยมาปิดเอง
+final batchModeEnabledProvider = StateProvider<bool>((ref) {
+  return true;
+});
+
+/// Pure function: จัดกลุ่ม tasks ที่มี title+zoneId+timeBlock เดียวกัน
+/// ให้เป็น BatchTaskGroup (เมื่อมี 2+ คนไข้)
+/// tasks ที่มีแค่ 1 คนไข้จะไม่ถูก group — return เป็น null ใน map
+///
+/// Return: Map of groupKey to BatchTaskGroup สำหรับ groups ที่มี 2+ tasks
+/// tasks ที่ไม่เข้า group ให้ consumer จัดการแยกเอง
+Map<String, BatchTaskGroup> groupBatchTasks(List<TaskLog> tasks) {
+  // Step 1: group tasks ตาม key = "title|zoneId|timeBlock"
+  final Map<String, List<TaskLog>> grouped = {};
+  for (final task in tasks) {
+    final key = BatchTaskGroup.buildGroupKey(task);
+    grouped.putIfAbsent(key, () => []).add(task);
+  }
+
+  // Step 2: สร้าง BatchTaskGroup เฉพาะ groups ที่มี 2+ tasks
+  final Map<String, BatchTaskGroup> result = {};
+  for (final entry in grouped.entries) {
+    if (entry.value.length >= 2) {
+      final first = entry.value.first;
+      result[entry.key] = BatchTaskGroup(
+        groupKey: entry.key,
+        title: first.title ?? '',
+        zoneId: first.zoneId ?? 0,
+        zoneName: first.zoneName ?? '',
+        timeBlock: first.timeBlock ?? '',
+        tasks: entry.value,
+        sampleImageUrl: first.sampleImageUrl,
+      );
+    }
+  }
+  return result;
+}
+
+/// Item สำหรับ mixed list ใน TaskTimeSection
+/// อาจเป็น TaskLog เดี่ยว หรือ BatchTaskGroup
+/// ใช้เมื่อ batch mode เปิด เพื่อให้ TaskTimeSection render ทั้ง 2 แบบได้
+class BatchMixedItem {
+  /// task เดี่ยว (ไม่เข้า group) — null ถ้าเป็น batch group
+  final TaskLog? singleTask;
+
+  /// batch group (2+ คนไข้) — null ถ้าเป็น task เดี่ยว
+  final BatchTaskGroup? batchGroup;
+
+  const BatchMixedItem.single(this.singleTask) : batchGroup = null;
+  const BatchMixedItem.batch(this.batchGroup) : singleTask = null;
+
+  bool get isBatch => batchGroup != null;
+  bool get isSingle => singleTask != null;
+}
+
+/// Provider สำหรับ grouped tasks ที่รวม batch groups ด้วย
+/// เมื่อ batch mode เปิด: return Map of timeBlock to List of BatchMixedItem
+/// ใช้แทน groupedTasksProvider ใน TaskTimeSection
+///
+/// Flow: groupedTasksProvider (tasks grouped by timeBlock)
+///   → แต่ละ timeBlock: แยก tasks เป็น batch groups + singles
+///   → สร้าง List of BatchMixedItem (batch groups แสดงก่อน, singles ตามหลัง)
+final batchGroupedTasksProvider =
+    Provider<AsyncValue<Map<String, List<BatchMixedItem>>>>((ref) {
+  final groupedAsync = ref.watch(groupedTasksProvider);
+
+  return groupedAsync.when(
+    data: (grouped) {
+      final Map<String, List<BatchMixedItem>> result = {};
+
+      for (final entry in grouped.entries) {
+        final timeBlock = entry.key;
+        final tasks = entry.value;
+
+        // group tasks ที่มี title+zone+timeBlock เดียวกัน
+        final batchGroups = groupBatchTasks(tasks);
+
+        // หา tasks ที่ไม่เข้า group (คนไข้เดียวใน key นั้น)
+        final groupedTaskIds = <int>{};
+        for (final group in batchGroups.values) {
+          for (final t in group.tasks) {
+            groupedTaskIds.add(t.logId);
+          }
+        }
+
+        final List<BatchMixedItem> items = [];
+
+        // เพิ่ม batch groups ก่อน (เรียง title)
+        final sortedGroups = batchGroups.values.toList()
+          ..sort((a, b) => a.title.compareTo(b.title));
+        for (final group in sortedGroups) {
+          items.add(BatchMixedItem.batch(group));
+        }
+
+        // เพิ่ม singles ตามหลัง (เรียงตาม order เดิม)
+        for (final task in tasks) {
+          if (!groupedTaskIds.contains(task.logId)) {
+            items.add(BatchMixedItem.single(task));
+          }
+        }
+
+        result[timeBlock] = items;
+      }
+
+      return AsyncValue.data(result);
+    },
+    loading: () => const AsyncValue.loading(),
+    error: (e, st) => AsyncValue.error(e, st),
+  );
 });
 
 /// Provider สำหรับ search query ของ task type

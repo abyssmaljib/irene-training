@@ -7,7 +7,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/irene_app_bar.dart';
 import '../../../core/widgets/confirm_dialog.dart';
-import '../../../core/widgets/app_snackbar.dart';
+import '../../../core/widgets/app_toast.dart';
 import '../widgets/handover_toggle_widget.dart';
 import '../models/post.dart';
 import '../providers/edit_post_provider.dart';
@@ -134,7 +134,7 @@ class _AdvancedEditPostScreenState
 
     if (remaining <= 0) {
       // แจ้งเตือนเลือกรูปเกินจำนวนที่กำหนด
-      AppSnackbar.warning(context, 'สูงสุด 5 รูป');
+      AppToast.warning(context, 'สูงสุด 5 รูป');
       return;
     }
 
@@ -151,7 +151,7 @@ class _AdvancedEditPostScreenState
     // เช็คว่าสามารถเพิ่มวีดีโอได้หรือไม่
     if (!state.canAddVideo) {
       // แจ้งเตือนไม่สามารถเพิ่มวีดีโอได้
-      AppSnackbar.warning(context, 'ไม่สามารถเพิ่มวีดีโอได้ (มีรูปภาพหรือวีดีโออยู่แล้ว)');
+      AppToast.warning(context, 'ไม่สามารถเพิ่มวีดีโอได้ (มีรูปภาพหรือวีดีโออยู่แล้ว)');
       return;
     }
 
@@ -170,13 +170,13 @@ class _AdvancedEditPostScreenState
     // ถ้าติ๊กส่งเวร บังคับต้องกรอกรายละเอียด (แสดง error ที่ชัดเจนกว่า)
     if (text.isEmpty && state.isHandover) {
       // แจ้งเตือน validation: ต้องกรอกรายละเอียดเมื่อติ๊กส่งเวร
-      AppSnackbar.warning(context, 'กรุณากรอกรายละเอียดเมื่อติ๊กส่งเวร');
+      AppToast.warning(context, 'กรุณากรอกรายละเอียดเมื่อติ๊กส่งเวร');
       return;
     }
 
     if (text.isEmpty) {
       // แจ้งเตือน validation: ต้องกรอกรายละเอียด
-      AppSnackbar.warning(context, 'กรุณาใส่รายละเอียด');
+      AppToast.warning(context, 'กรุณาใส่รายละเอียด');
       return;
     }
 
@@ -271,7 +271,7 @@ class _AdvancedEditPostScreenState
 
         if (mounted) {
           // แจ้งบันทึกโพสสำเร็จ
-          AppSnackbar.success(context, 'บันทึกสำเร็จ');
+          AppToast.success(context, 'บันทึกสำเร็จ');
           Navigator.of(context).pop(true);
           widget.onPostUpdated?.call();
         }
@@ -281,7 +281,7 @@ class _AdvancedEditPostScreenState
     } catch (e) {
       if (mounted) {
         // แจ้ง error เมื่อบันทึกโพสไม่สำเร็จ
-        AppSnackbar.error(context, 'เกิดข้อผิดพลาด: $e');
+        AppToast.error(context, 'เกิดข้อผิดพลาด: $e');
       }
     } finally {
       // Clear upload status และ submitting state ทุกกรณี

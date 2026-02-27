@@ -5,8 +5,9 @@ import 'package:hugeicons/hugeicons.dart';
 import 'package:image/image.dart' as img;
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
-import '../../../core/widgets/app_snackbar.dart';
+import '../../../core/widgets/app_toast.dart';
 import '../../../core/widgets/irene_app_bar.dart';
+import '../../../core/widgets/network_image.dart';
 
 /// ขนาดสูงสุดของรูปก่อนหมุน (ป้องกัน memory overflow)
 /// ถ้ารูปใหญ่กว่านี้จะ resize ก่อนหมุน
@@ -80,12 +81,14 @@ class PhotoPreviewScreen extends StatefulWidget {
   final File imageFile;
   final String photoType; // '2C' หรือ '3C'
   final String mealLabel; // ชื่อมื้อสำหรับแสดง
+  final String? sampleImageUrl; // รูปตัวอย่างสำหรับเทียบ (optional)
 
   const PhotoPreviewScreen({
     super.key,
     required this.imageFile,
     required this.photoType,
     required this.mealLabel,
+    this.sampleImageUrl,
   });
 
   /// แสดงหน้า preview และรอผลลัพธ์
@@ -95,6 +98,7 @@ class PhotoPreviewScreen extends StatefulWidget {
     required File imageFile,
     required String photoType,
     required String mealLabel,
+    String? sampleImageUrl,
   }) async {
     return Navigator.push<File?>(
       context,
@@ -103,6 +107,7 @@ class PhotoPreviewScreen extends StatefulWidget {
           imageFile: imageFile,
           photoType: photoType,
           mealLabel: mealLabel,
+          sampleImageUrl: sampleImageUrl,
         ),
       ),
     );
@@ -170,7 +175,7 @@ class _PhotoPreviewScreenState extends State<PhotoPreviewScreen> {
     } catch (e) {
       debugPrint('Error rotating image: $e');
       if (mounted) {
-        AppSnackbar.error(context, 'ไม่สามารถหมุนรูปได้');
+        AppToast.error(context, 'ไม่สามารถหมุนรูปได้');
         setState(() => _isProcessing = false);
       }
     }
@@ -188,8 +193,11 @@ class _PhotoPreviewScreenState extends State<PhotoPreviewScreen> {
       _RotateImageParams(bytes: bytes, angle: angle),
     );
 
-    // บันทึกเป็นไฟล์ใหม่
-    final newPath = file.path.replaceAll('.jpg', '_rotated.jpg');
+    // บันทึกเป็นไฟล์ใหม่ — รองรับทุก extension (jpg, jpeg, png, heic, etc.)
+    final lastDot = file.path.lastIndexOf('.');
+    final newPath = lastDot != -1
+        ? '${file.path.substring(0, lastDot)}_rotated.jpg'
+        : '${file.path}_rotated.jpg';
     final newFile = File(newPath);
     await newFile.writeAsBytes(rotatedBytes);
 
@@ -250,15 +258,70 @@ class _PhotoPreviewScreenState extends State<PhotoPreviewScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // รูป Preview
-            Expanded(
-              child: Center(
-                child: Transform.rotate(
-                  angle: _rotationAngle * 3.14159 / 180,
-                  child: _buildImageWidget(),
+            // ถ้ามีรูปตัวอย่าง → แสดง split-screen (ตัวอย่างบน / รูปที่ถ่ายล่าง)
+            if (widget.sampleImageUrl != null) ...[
+              // ===== ครึ่งบน: รูปตัวอย่าง =====
+              Expanded(
+                flex: 1,
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: InteractiveViewer(
+                        minScale: 1.0,
+                        maxScale: 3.0,
+                        child: IreneNetworkImage(
+                          imageUrl: widget.sampleImageUrl!,
+                          fit: BoxFit.contain,
+                          memCacheWidth: 800,
+                        ),
+                      ),
+                    ),
+                    // Label "รูปตัวอย่าง"
+                    Positioned(
+                      top: AppSpacing.sm,
+                      left: AppSpacing.sm,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.sm,
+                          vertical: AppSpacing.xs,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black54,
+                          borderRadius: BorderRadius.circular(AppSpacing.sm),
+                        ),
+                        child: Text(
+                          'รูปตัวอย่าง',
+                          style: AppTypography.caption
+                              .copyWith(color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
+              // เส้นแบ่ง
+              Container(height: 1, color: Colors.white24),
+              // ===== ครึ่งล่าง: รูปที่ถ่าย =====
+              Expanded(
+                flex: 1,
+                child: Center(
+                  child: Transform.rotate(
+                    angle: _rotationAngle * 3.14159265358979 / 180,
+                    child: _buildImageWidget(),
+                  ),
+                ),
+              ),
+            ] else ...[
+              // ไม่มีรูปตัวอย่าง → แสดงแค่รูปที่ถ่ายเต็มจอ (แบบเดิม)
+              Expanded(
+                child: Center(
+                  child: Transform.rotate(
+                    angle: _rotationAngle * 3.14159265358979 / 180,
+                    child: _buildImageWidget(),
+                  ),
+                ),
+              ),
+            ],
 
             // Controls
             Container(

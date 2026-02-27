@@ -6,7 +6,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/filter_drawer_shell.dart';
 import '../../../core/widgets/irene_app_bar.dart';
 import '../../../core/widgets/input_fields.dart';
-import '../../../core/widgets/app_snackbar.dart';
+import '../../../core/widgets/app_toast.dart';
 import '../../../core/widgets/toggle_switch.dart';
 import '../../../core/services/user_service.dart';
 import '../../checklist/models/system_role.dart';
@@ -250,7 +250,7 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
   Future<void> _navigateToEditMedicine(MedicineSummary medicine) async {
     // ตรวจสอบสิทธิ์ - ต้องเป็นหัวหน้าเวรขึ้นไป
     if (!(_systemRole?.canQC ?? false)) {
-      AppSnackbar.warning(context, 'คุณไม่มีสิทธิ์แก้ไขยา');
+      AppToast.warning(context, 'คุณไม่มีสิทธิ์แก้ไขยา');
       return;
     }
 
