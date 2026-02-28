@@ -61,17 +61,21 @@ class TaskCard extends StatelessWidget {
                     children: [
                       // ใช้ color.withValues(alpha:) แทน Opacity widget
                       // เพราะ Opacity ทำให้เกิด saveLayer ซึ่งกิน GPU หนักมากใน list
+                      // decorative icon อยู่กลาง card
                       Positioned(
-                        right: -8,
-                        bottom: -8,
-                        child: HugeIcon(
-                          icon: task.taskType == 'จัดยา'
-                              ? HugeIcons.strokeRoundedMedicine02
-                              : (task.hasSampleImage || task.requireImage)
-                                  ? HugeIcons.strokeRoundedCamera01
-                                  : HugeIcons.strokeRoundedFileEdit,
-                          size: 100,
-                          color: AppColors.tertiary.withValues(alpha: 0.16),
+                        right: -12,
+                        top: 0,
+                        bottom: 0,
+                        child: Center(
+                          child: HugeIcon(
+                            icon: task.taskType == 'จัดยา'
+                                ? HugeIcons.strokeRoundedMedicine02
+                                : (task.hasSampleImage || task.requireImage)
+                                    ? HugeIcons.strokeRoundedCamera01
+                                    : HugeIcons.strokeRoundedFileEdit,
+                            size: 80,
+                            color: AppColors.tertiary.withValues(alpha: 0.12),
+                          ),
                         ),
                       ),
                       _buildMainContent(),

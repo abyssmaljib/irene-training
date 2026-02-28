@@ -14,6 +14,7 @@ import '../models/batch_task_group.dart';
 import '../models/resident_simple.dart';
 import '../models/task_log.dart';
 import '../providers/task_provider.dart';
+import '../widgets/batch_task_card.dart';
 import '../widgets/task_card.dart';
 import '../widgets/task_time_section.dart';
 import '../widgets/task_filter_drawer.dart';
@@ -144,6 +145,8 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
   Widget _buildFilteredTaskList(TaskViewMode viewMode) {
     final tasksAsync = ref.watch(filteredTasksProvider);
     final currentUserId = ref.watch(currentUserIdProvider);
+    // ดึง batch mixed list (null ถ้า batch mode ปิด)
+    final batchMixedAsync = ref.watch(filteredBatchMixedProvider);
 
     return tasksAsync.when(
       data: (tasks) {
@@ -151,18 +154,47 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
           return _buildEmptyState(viewMode);
         }
 
+        // ถ้า batch mode เปิด + มี batchItems → render mixed list
+        final batchItems = batchMixedAsync?.valueOrNull;
+        if (batchItems != null && batchItems.isNotEmpty) {
+          return ListView.builder(
+            padding: EdgeInsets.all(AppSpacing.md),
+            physics: const AlwaysScrollableScrollPhysics(),
+            itemCount: batchItems.length,
+            cacheExtent: 200,
+            itemBuilder: (context, index) {
+              final item = batchItems[index];
+              return Padding(
+                key: ValueKey(item.isBatch
+                    ? 'batch_${item.batchGroup!.groupKey}'
+                    : 'task_${item.singleTask!.logId}'),
+                padding: EdgeInsets.only(bottom: AppSpacing.sm),
+                child: item.isBatch
+                    // BatchTaskCard สำหรับ task ที่มี 2+ คนไข้
+                    ? BatchTaskCard(
+                        group: item.batchGroup!,
+                        onTap: () => _onBatchGroupTap(item.batchGroup!),
+                      )
+                    // TaskCard เดี่ยวสำหรับ task ที่มีคนไข้เดียว
+                    : TaskCard(
+                        task: item.singleTask!,
+                        currentUserId: currentUserId,
+                        onTap: () => _onTaskTap(item.singleTask!),
+                      ),
+              );
+            },
+          );
+        }
+
+        // batch mode ปิด → render flat TaskCard เหมือนเดิม
         return ListView.builder(
           padding: EdgeInsets.all(AppSpacing.md),
-          // เพิ่ม AlwaysScrollableScrollPhysics เพื่อให้ pull to refresh ทำงานได้
-          // แม้ content จะไม่เต็มหน้าจอ
           physics: const AlwaysScrollableScrollPhysics(),
           itemCount: tasks.length,
-          // Optimize: cache items ใกล้เคียงเพื่อลด rebuild เมื่อ scroll
           cacheExtent: 200,
           itemBuilder: (context, index) {
             final task = tasks[index];
             return Padding(
-              // Key ช่วยให้ Flutter reuse widget แทนการ rebuild ใหม่ทั้งหมด
               key: ValueKey(task.logId),
               padding: EdgeInsets.only(bottom: AppSpacing.sm),
               child: TaskCard(

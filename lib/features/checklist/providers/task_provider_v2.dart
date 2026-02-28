@@ -256,6 +256,55 @@ final batchGroupedTasksV2Provider =
   );
 });
 
+/// Provider V2 สำหรับ flat batch mixed list (ใช้กับ view อื่นที่ไม่ใช่ "ทั้งหมด")
+/// แปลง filteredTasksV2Provider (flat list) → List of BatchMixedItem
+/// batch groups แสดงก่อน, singles ตามหลัง
+/// return null ถ้า batch mode ปิด (ให้ UI render flat TaskCard เหมือนเดิม)
+final filteredBatchMixedV2Provider =
+    Provider<AsyncValue<List<BatchMixedItem>>?>((ref) {
+  final isBatchMode = ref.watch(batchModeEnabledProvider);
+  if (!isBatchMode) return null; // batch mode ปิด → ไม่ต้อง group
+
+  final filteredAsync = ref.watch(filteredTasksV2Provider);
+
+  return filteredAsync.when(
+    data: (tasks) {
+      if (tasks.isEmpty) return const AsyncValue.data([]);
+
+      // group tasks ที่มี title+zone+timeBlock เดียวกัน (2+ คนไข้)
+      final batchGroups = groupBatchTasks(tasks);
+
+      // หา logIds ที่อยู่ใน batch group แล้ว
+      final groupedTaskIds = <int>{};
+      for (final group in batchGroups.values) {
+        for (final t in group.tasks) {
+          groupedTaskIds.add(t.logId);
+        }
+      }
+
+      final List<BatchMixedItem> items = [];
+
+      // เพิ่ม batch groups ก่อน (เรียง title)
+      final sortedGroups = batchGroups.values.toList()
+        ..sort((a, b) => a.title.compareTo(b.title));
+      for (final group in sortedGroups) {
+        items.add(BatchMixedItem.batch(group));
+      }
+
+      // เพิ่ม singles ตามหลัง (เรียงตาม order เดิม)
+      for (final task in tasks) {
+        if (!groupedTaskIds.contains(task.logId)) {
+          items.add(BatchMixedItem.single(task));
+        }
+      }
+
+      return AsyncValue.data(items);
+    },
+    loading: () => const AsyncValue.loading(),
+    error: (e, st) => AsyncValue.error(e, st),
+  );
+});
+
 /// Provider V2 สำหรับ task counts per view mode
 /// ✅ เหมือน V1 เป๊ะ (taskCountsProvider ใน task_provider.dart)
 final taskCountsV2Provider = Provider<Map<TaskViewMode, int>>((ref) {
