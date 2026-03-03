@@ -651,8 +651,13 @@ extension MedicineServiceMedDB on MedicineService {
   }) async {
     try {
       // Note: column ใน med_DB ชื่อ atc_level1_id และ atc_level2_id แต่เก็บค่าเป็น text (FK ไปยัง med_atc_level1/2.code)
+      // ดึง UUID ของ user ที่กำลัง login อยู่ เพื่อบันทึกว่าใครเป็นผู้สร้างรายการยา
+      final currentUserId = _supabase.auth.currentUser?.id;
+
       final data = <String, dynamic>{
         'nursinghome_id': nursinghomeId,
+        // บันทึกผู้สร้างรายการยา
+        if (currentUserId != null) 'created_by': currentUserId,
         if (genericName != null && genericName.isNotEmpty) 'generic_name': genericName,
         if (brandName != null && brandName.isNotEmpty) 'brand_name': brandName,
         if (strength != null && strength.isNotEmpty) 'str': strength,
@@ -706,7 +711,14 @@ extension MedicineServiceMedDB on MedicineService {
     String? atcLevel3,
   }) async {
     try {
-      final data = <String, dynamic>{};
+      // ดึง UUID ของ user ที่กำลัง login อยู่ เพื่อบันทึกว่าใครเป็นผู้แก้ไขรายการยา
+      final currentUserId = _supabase.auth.currentUser?.id;
+
+      final data = <String, dynamic>{
+        // บันทึกผู้แก้ไข + เวลาที่แก้ไข ทุกครั้งที่ update
+        if (currentUserId != null) 'updated_by': currentUserId,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      };
 
       // Text fields - update ถ้ามีค่า (empty string = ล้างค่า)
       if (genericName != null) {
@@ -754,11 +766,6 @@ extension MedicineServiceMedDB on MedicineService {
       }
       if (atcLevel3 != null) {
         data['atc_level3'] = atcLevel3.isEmpty ? null : atcLevel3;
-      }
-
-      if (data.isEmpty) {
-        // ไม่มีอะไรต้อง update - return ข้อมูลเดิม
-        return getMedicineById(medDbId);
       }
 
       final response = await _supabase
@@ -828,6 +835,32 @@ extension MedicineServiceMedDB on MedicineService {
       );
     } catch (e) {
       debugPrint('[MedicineService] duplicateMedicine error: $e');
+      return null;
+    }
+  }
+
+  /// ดึงข้อมูล user (ชื่อ, ชื่อเล่น, รูปโปรไฟล์) จาก UUID
+  /// ใช้สำหรับแสดงข้อมูลผู้สร้าง/ผู้แก้ไข รายการยา
+  /// Returns record (nickname, fullName, photoUrl) หรือ null ถ้าไม่พบ
+  Future<({String? nickname, String? fullName, String? photoUrl})?> getUserInfoById(
+    String userId,
+  ) async {
+    try {
+      final response = await _supabase
+          .from('user_info')
+          .select('nickname, full_name, photo_url')
+          .eq('id', userId)
+          .maybeSingle();
+
+      if (response == null) return null;
+
+      return (
+        nickname: response['nickname'] as String?,
+        fullName: response['full_name'] as String?,
+        photoUrl: response['photo_url'] as String?,
+      );
+    } catch (e) {
+      debugPrint('[MedicineService] getUserInfoById error: $e');
       return null;
     }
   }

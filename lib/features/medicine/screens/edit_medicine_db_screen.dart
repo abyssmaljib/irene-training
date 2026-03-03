@@ -585,6 +585,40 @@ class _EditMedicineDBScreenState extends ConsumerState<EditMedicineDBScreen> {
                   const SizedBox(height: AppSpacing.xl),
 
                   // ==========================================
+                  // Section 4: ข้อมูลผู้สร้าง/ผู้แก้ไข
+                  // ==========================================
+                  if (state.createdByName != null ||
+                      state.updatedByName != null) ...[
+                    _SectionHeader(
+                      icon: HugeIcons.strokeRoundedUserMultiple,
+                      title: 'ประวัติการแก้ไข',
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+
+                    // ผู้สร้าง
+                    if (state.createdByName != null)
+                      _AuditInfoRow(
+                        label: 'สร้างโดย',
+                        userName: state.createdByName!,
+                        photoUrl: state.createdByPhotoUrl,
+                        dateTime: state.createdAt,
+                      ),
+
+                    // ผู้แก้ไขล่าสุด
+                    if (state.updatedByName != null) ...[
+                      const SizedBox(height: AppSpacing.sm),
+                      _AuditInfoRow(
+                        label: 'แก้ไขล่าสุดโดย',
+                        userName: state.updatedByName!,
+                        photoUrl: state.updatedByPhotoUrl,
+                        dateTime: state.updatedAt,
+                      ),
+                    ],
+
+                    const SizedBox(height: AppSpacing.xl),
+                  ],
+
+                  // ==========================================
                   // Error message + ปุ่ม
                   // ==========================================
 
@@ -975,5 +1009,99 @@ class _ImageUploadBox extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+/// แสดงข้อมูลผู้สร้าง/ผู้แก้ไข พร้อมรูปโปรไฟล์ ชื่อ และเวลา
+class _AuditInfoRow extends StatelessWidget {
+  const _AuditInfoRow({
+    required this.label,
+    required this.userName,
+    this.photoUrl,
+    this.dateTime,
+  });
+
+  /// label เช่น "สร้างโดย", "แก้ไขล่าสุดโดย"
+  final String label;
+
+  /// ชื่อผู้ใช้ (format: "ชื่อจริง (ชื่อเล่น)")
+  final String userName;
+
+  /// URL รูปโปรไฟล์ (nullable)
+  final String? photoUrl;
+
+  /// เวลาที่สร้าง/แก้ไข (nullable)
+  final DateTime? dateTime;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.alternate, width: 1),
+      ),
+      child: Row(
+        children: [
+          // รูปโปรไฟล์
+          IreneNetworkAvatar(
+            imageUrl: photoUrl,
+            radius: 18,
+            fallbackIcon: HugeIcon(
+              icon: HugeIcons.strokeRoundedUser,
+              color: AppColors.secondaryText,
+              size: 18,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          // ชื่อ + label + เวลา
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // label (สร้างโดย / แก้ไขล่าสุดโดย)
+                Text(
+                  label,
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.secondaryText,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                // ชื่อผู้ใช้
+                Text(
+                  userName,
+                  style: AppTypography.bodySmall.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // เวลา (ถ้ามี)
+          if (dateTime != null)
+            Text(
+              _formatDateTime(dateTime!),
+              style: AppTypography.caption.copyWith(
+                color: AppColors.secondaryText,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// จัดรูปแบบเวลา เช่น "3 มี.ค. 69 14:30"
+  String _formatDateTime(DateTime dt) {
+    final local = dt.toLocal();
+    final thaiMonths = [
+      '', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+      'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.',
+    ];
+    // ใช้ปี พ.ศ. 2 หลักท้าย (เช่น 2569 → 69)
+    final buddhistYear = (local.year + 543) % 100;
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
+    return '${local.day} ${thaiMonths[local.month]} $buddhistYear $hour:$minute';
   }
 }

@@ -50,14 +50,60 @@ class EditMedicineDBFormNotifier
         return;
       }
 
-      // สร้าง state จาก MedDB
-      state = AsyncValue.data(EditMedicineDBFormState.fromMedDB(medicine));
+      // สร้าง state จาก MedDB (ข้อมูลพื้นฐาน + เวลาสร้าง/อัปเดต)
+      var formState = EditMedicineDBFormState.fromMedDB(medicine);
+
+      // Fetch ข้อมูลผู้สร้าง (created_by) แบบ parallel กับผู้แก้ไข (updated_by)
+      // ใช้ Future.wait เพื่อไม่ต้องรอทีละคน
+      final createdByFuture = medicine.createdBy != null
+          ? _service.getUserInfoById(medicine.createdBy!)
+          : Future.value(null);
+      final updatedByFuture = medicine.updatedBy != null
+          ? _service.getUserInfoById(medicine.updatedBy!)
+          : Future.value(null);
+
+      final results = await Future.wait([createdByFuture, updatedByFuture]);
+      final createdByInfo = results[0];
+      final updatedByInfo = results[1];
+
+      // จัดรูปแบบชื่อ: "ชื่อจริง (ชื่อเล่น)" หรือแค่ชื่อเล่น ถ้าไม่มีชื่อจริง
+      if (createdByInfo != null) {
+        formState = formState.copyWith(
+          createdByName: _formatUserName(
+            createdByInfo.fullName,
+            createdByInfo.nickname,
+          ),
+          createdByPhotoUrl: createdByInfo.photoUrl,
+        );
+      }
+      if (updatedByInfo != null) {
+        formState = formState.copyWith(
+          updatedByName: _formatUserName(
+            updatedByInfo.fullName,
+            updatedByInfo.nickname,
+          ),
+          updatedByPhotoUrl: updatedByInfo.photoUrl,
+        );
+      }
+
+      state = AsyncValue.data(formState);
 
       debugPrint('[EditMedicineDBForm] Loaded successfully: ${medicine.displayName}');
     } catch (e, st) {
       debugPrint('[EditMedicineDBForm] Error loading: $e');
       state = AsyncValue.error(e, st);
     }
+  }
+
+  /// จัดรูปแบบชื่อผู้ใช้: "ชื่อจริง (ชื่อเล่น)" หรือแค่ชื่อเล่น/ชื่อจริง
+  String _formatUserName(String? fullName, String? nickname) {
+    final hasFullName = fullName != null && fullName.isNotEmpty;
+    final hasNickname = nickname != null && nickname.isNotEmpty;
+
+    if (hasFullName && hasNickname) return '$fullName ($nickname)';
+    if (hasNickname) return nickname;
+    if (hasFullName) return fullName;
+    return 'ไม่ทราบชื่อ';
   }
 
   // ==========================================

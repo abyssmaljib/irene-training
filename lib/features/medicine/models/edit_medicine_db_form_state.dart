@@ -101,6 +101,28 @@ class EditMedicineDBFormState {
   final bool isUploadingBackNude;
 
   // ==========================================
+  // Audit Info — แสดงข้อมูลผู้สร้าง/ผู้แก้ไข
+  // ==========================================
+
+  /// ชื่อผู้สร้างรายการยา (format: "ชื่อจริง (ชื่อเล่น)")
+  final String? createdByName;
+
+  /// รูปโปรไฟล์ผู้สร้าง
+  final String? createdByPhotoUrl;
+
+  /// เวลาที่สร้าง
+  final DateTime? createdAt;
+
+  /// ชื่อผู้แก้ไขล่าสุด (format: "ชื่อจริง (ชื่อเล่น)")
+  final String? updatedByName;
+
+  /// รูปโปรไฟล์ผู้แก้ไขล่าสุด
+  final String? updatedByPhotoUrl;
+
+  /// เวลาที่แก้ไขล่าสุด
+  final DateTime? updatedAt;
+
+  // ==========================================
   // UI State
   // ==========================================
 
@@ -137,6 +159,12 @@ class EditMedicineDBFormState {
     this.originalBackFoiledUrl,
     this.originalFrontNudeUrl,
     this.originalBackNudeUrl,
+    this.createdByName,
+    this.createdByPhotoUrl,
+    this.createdAt,
+    this.updatedByName,
+    this.updatedByPhotoUrl,
+    this.updatedAt,
     this.isUploadingFrontFoiled = false,
     this.isUploadingBackFoiled = false,
     this.isUploadingFrontNude = false,
@@ -175,6 +203,9 @@ class EditMedicineDBFormState {
       originalBackFoiledUrl: medicine.backFoiled,
       originalFrontNudeUrl: medicine.frontNude,
       originalBackNudeUrl: medicine.backNude,
+      // Audit: เวลาสร้าง/อัปเดต (ชื่อผู้ใช้จะ fetch แยกใน provider)
+      createdAt: medicine.createdAt,
+      updatedAt: medicine.updatedAt,
     );
   }
 
@@ -254,6 +285,12 @@ class EditMedicineDBFormState {
     String? originalBackFoiledUrl,
     String? originalFrontNudeUrl,
     String? originalBackNudeUrl,
+    String? createdByName,
+    String? createdByPhotoUrl,
+    DateTime? createdAt,
+    String? updatedByName,
+    String? updatedByPhotoUrl,
+    DateTime? updatedAt,
     bool? isUploadingFrontFoiled,
     bool? isUploadingBackFoiled,
     bool? isUploadingFrontNude,
@@ -290,6 +327,12 @@ class EditMedicineDBFormState {
       originalBackFoiledUrl: originalBackFoiledUrl ?? this.originalBackFoiledUrl,
       originalFrontNudeUrl: originalFrontNudeUrl ?? this.originalFrontNudeUrl,
       originalBackNudeUrl: originalBackNudeUrl ?? this.originalBackNudeUrl,
+      createdByName: createdByName ?? this.createdByName,
+      createdByPhotoUrl: createdByPhotoUrl ?? this.createdByPhotoUrl,
+      createdAt: createdAt ?? this.createdAt,
+      updatedByName: updatedByName ?? this.updatedByName,
+      updatedByPhotoUrl: updatedByPhotoUrl ?? this.updatedByPhotoUrl,
+      updatedAt: updatedAt ?? this.updatedAt,
       isUploadingFrontFoiled: isUploadingFrontFoiled ?? this.isUploadingFrontFoiled,
       isUploadingBackFoiled: isUploadingBackFoiled ?? this.isUploadingBackFoiled,
       isUploadingFrontNude: isUploadingFrontNude ?? this.isUploadingFrontNude,

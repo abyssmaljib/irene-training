@@ -37,6 +37,12 @@ class MedDB {
   final String? atcLevel2Id;   // FK to med_atc_level2 (หมวดย่อย) - เก็บ code เช่น "A01", "J01"
   final String? atcLevel3;     // หมวดรายละเอียด (free text)
 
+  // Audit fields — ติดตามว่าใครสร้าง/แก้ไขรายการยา
+  final String? createdBy;     // UUID ของ user ที่สร้างรายการยานี้
+  final DateTime? updatedAt;   // เวลาที่อัปเดตล่าสุด
+  final String? updatedBy;     // UUID ของ user ที่แก้ไขล่าสุด
+  final bool? checkedAtc;      // ตรวจสอบ ATC classification แล้วหรือยัง
+
   const MedDB({
     required this.id,
     required this.createdAt,
@@ -56,6 +62,10 @@ class MedDB {
     this.atcLevel1Id,
     this.atcLevel2Id,
     this.atcLevel3,
+    this.createdBy,
+    this.updatedAt,
+    this.updatedBy,
+    this.checkedAtc,
   });
 
   /// สร้าง MedDB จาก JSON (Supabase response)
@@ -80,6 +90,13 @@ class MedDB {
       atcLevel1Id: json['atc_level1_id']?.toString(),
       atcLevel2Id: json['atc_level2_id']?.toString(),
       atcLevel3: json['atc_level3'] as String?,
+      // Audit fields
+      createdBy: json['created_by'] as String?,
+      updatedAt: json['updated_at'] != null
+          ? DateTime.parse(json['updated_at'] as String)
+          : null,
+      updatedBy: json['updated_by'] as String?,
+      checkedAtc: json['checked_atc'] as bool?,
     );
   }
 
@@ -102,6 +119,11 @@ class MedDB {
       if (atcLevel1Id != null) 'atc_level1_id': atcLevel1Id,
       if (atcLevel2Id != null) 'atc_level2_id': atcLevel2Id,
       if (atcLevel3 != null) 'atc_level3': atcLevel3,
+      // Audit fields
+      if (createdBy != null) 'created_by': createdBy,
+      if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
+      if (updatedBy != null) 'updated_by': updatedBy,
+      if (checkedAtc != null) 'checked_atc': checkedAtc,
     };
   }
 
@@ -170,6 +192,10 @@ class MedDB {
     String? atcLevel1Id,
     String? atcLevel2Id,
     String? atcLevel3,
+    String? createdBy,
+    DateTime? updatedAt,
+    String? updatedBy,
+    bool? checkedAtc,
   }) {
     return MedDB(
       id: id ?? this.id,
@@ -190,6 +216,10 @@ class MedDB {
       atcLevel1Id: atcLevel1Id ?? this.atcLevel1Id,
       atcLevel2Id: atcLevel2Id ?? this.atcLevel2Id,
       atcLevel3: atcLevel3 ?? this.atcLevel3,
+      createdBy: createdBy ?? this.createdBy,
+      updatedAt: updatedAt ?? this.updatedAt,
+      updatedBy: updatedBy ?? this.updatedBy,
+      checkedAtc: checkedAtc ?? this.checkedAtc,
     );
   }
 
