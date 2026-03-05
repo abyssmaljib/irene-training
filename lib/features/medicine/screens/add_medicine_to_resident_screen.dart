@@ -191,7 +191,13 @@ class _AddMedicineToResidentScreenState
 
     if (success && mounted) {
       await SuccessPopup.show(context, emoji: '💊', message: 'เพิ่มยาให้คนไข้สำเร็จ');
-      if (mounted) Navigator.pop(context, true);
+      // ส่ง med_history ID กลับแทน true เพื่อให้ caller (เช่น RestockSectionContent)
+      // นำไป link กับ post ภายหลัง — ถ้าไม่มี ID (edge case) ก็ส่ง true แบบเดิม
+      // เพื่อ backward compatibility กับ callers อื่นที่ยังเช็ค result == true
+      final medHistoryId = ref
+          .read(addMedicineFormProvider(widget.residentId).notifier)
+          .lastMedHistoryId;
+      if (mounted) Navigator.pop(context, medHistoryId ?? true);
     }
   }
 

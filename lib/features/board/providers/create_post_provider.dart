@@ -3,6 +3,65 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/new_tag.dart';
 import '../../checklist/providers/task_provider.dart';
 
+// ============================================
+// RestockItem — รายการยาที่จะ restock ใน post
+// ============================================
+// ใช้ใน AdvancedCreatePostScreen เมื่อเลือก resident แล้ว
+// แต่ละ item = 1 ยาของ resident → user เลือก (checkbox) + กรอกจำนวน (smart input)
+class RestockItem {
+  /// ID ของ medicine_list record (FK ไป med_history.med_list_id)
+  final int medicineListId;
+
+  /// ชื่อยาแสดงผล (เช่น "Lercadip 20 mg")
+  final String medicineName;
+
+  /// จำนวนคงเหลือปัจจุบัน (จาก lastMedHistoryReconcile)
+  final double currentReconcile;
+
+  /// หน่วยยา (เช่น "เม็ด", "แคปซูล")
+  final String unit;
+
+  /// user เลือกยาตัวนี้หรือยัง (checkbox)
+  final bool enabled;
+
+  /// raw input ที่ user กรอก (เช่น "+30", "-5", "50")
+  final String inputDisplay;
+
+  /// ค่า reconcile จริงที่จะบันทึกลง med_history
+  /// คำนวณจาก smart input: "+30" → currentReconcile + 30
+  final double reconcile;
+
+  const RestockItem({
+    required this.medicineListId,
+    required this.medicineName,
+    required this.currentReconcile,
+    required this.unit,
+    this.enabled = false,
+    this.inputDisplay = '',
+    this.reconcile = 0,
+  });
+
+  RestockItem copyWith({
+    int? medicineListId,
+    String? medicineName,
+    double? currentReconcile,
+    String? unit,
+    bool? enabled,
+    String? inputDisplay,
+    double? reconcile,
+  }) {
+    return RestockItem(
+      medicineListId: medicineListId ?? this.medicineListId,
+      medicineName: medicineName ?? this.medicineName,
+      currentReconcile: currentReconcile ?? this.currentReconcile,
+      unit: unit ?? this.unit,
+      enabled: enabled ?? this.enabled,
+      inputDisplay: inputDisplay ?? this.inputDisplay,
+      reconcile: reconcile ?? this.reconcile,
+    );
+  }
+}
+
 /// State สำหรับ Create Post form
 class CreatePostState {
   final String text;
@@ -48,6 +107,14 @@ class CreatePostState {
   final int? ddId;
   final String? ddTemplateText;
 
+  // Restock items — รายการยาที่จะ restock พร้อม post นี้
+  // แสดงเมื่อเลือก resident แล้ว ใน AdvancedCreatePostScreen
+  final List<RestockItem> restockItems;
+
+  // เก็บ med_history IDs ที่สร้างระหว่าง session (จากปุ่ม "เพิ่มยาอื่น")
+  // ตอน submit post จะ UPDATE med_history SET post_id สำหรับ IDs เหล่านี้
+  final List<int> pendingMedHistoryIds;
+
   const CreatePostState({
     this.text = '',
     this.selectedTag,
@@ -84,6 +151,10 @@ class CreatePostState {
     // DD Record context
     this.ddId,
     this.ddTemplateText,
+    // Restock items
+    this.restockItems = const [],
+    // Pending med_history IDs (จากปุ่ม "เพิ่มยาอื่น")
+    this.pendingMedHistoryIds = const [],
   });
 
   bool get isValid => text.trim().isNotEmpty;
@@ -113,6 +184,12 @@ class CreatePostState {
       qaAnswer != null;
 
   bool get hasTitle => title != null && title!.trim().isNotEmpty;
+
+  /// มี restock items ที่ enabled อย่างน้อย 1 ตัว
+  bool get hasRestockItems => restockItems.any((i) => i.enabled);
+
+  /// จำนวน restock items ที่ enabled
+  int get enabledRestockCount => restockItems.where((i) => i.enabled).length;
 
   bool get hasAiQuizPreview =>
       aiQuizQuestion != null && aiQuizQuestion!.trim().isNotEmpty;
@@ -164,6 +241,12 @@ class CreatePostState {
     int? ddId,
     String? ddTemplateText,
     bool? clearDD,
+    // Restock items
+    List<RestockItem>? restockItems,
+    bool? clearRestockItems,
+    // Pending med_history IDs (จากปุ่ม "เพิ่มยาอื่น")
+    List<int>? pendingMedHistoryIds,
+    bool? clearPendingMedHistoryIds,
   }) {
     return CreatePostState(
       text: text ?? this.text,
@@ -223,6 +306,14 @@ class CreatePostState {
       // DD Record context
       ddId: clearDD == true ? null : (ddId ?? this.ddId),
       ddTemplateText: clearDD == true ? null : (ddTemplateText ?? this.ddTemplateText),
+      // Restock items — clearRestockItems = true จะ reset เป็น empty list
+      restockItems: clearRestockItems == true
+          ? const []
+          : (restockItems ?? this.restockItems),
+      // Pending med_history IDs — clearPendingMedHistoryIds = true จะ reset เป็น empty list
+      pendingMedHistoryIds: clearPendingMedHistoryIds == true
+          ? const []
+          : (pendingMedHistoryIds ?? this.pendingMedHistoryIds),
     );
   }
 
@@ -288,6 +379,10 @@ class CreatePostNotifier extends StateNotifier<CreatePostState> {
       selectedResidentName: name,
       // reset handover เมื่อเลือก resident และ tag ไม่บังคับส่งเวร
       isHandover: shouldResetHandover ? false : state.isHandover,
+      // เปลี่ยน resident → reset restock items (จะ fetch ใหม่ตาม resident ใหม่)
+      clearRestockItems: true,
+      // เปลี่ยน resident → reset pending med_history IDs (ยาที่สร้างไว้เป็นของ resident เก่า)
+      clearPendingMedHistoryIds: true,
       clearError: true,
     );
   }
@@ -298,6 +393,10 @@ class CreatePostNotifier extends StateNotifier<CreatePostState> {
     state = state.copyWith(
       clearResident: true,
       isHandover: true, // auto-enable ส่งเวรเมื่อไม่มี resident
+      // ยกเลิก resident → ไม่มียาให้ restock
+      clearRestockItems: true,
+      // ยกเลิก resident → reset pending med_history IDs
+      clearPendingMedHistoryIds: true,
       clearError: true,
     );
   }
@@ -590,6 +689,61 @@ class CreatePostNotifier extends StateNotifier<CreatePostState> {
 
   /// Check if current post is for DD record
   bool get hasDDContext => state.ddId != null;
+
+  // === Restock Methods ===
+  // ใช้ใน AdvancedCreatePostScreen เมื่อ fetch ยาของ resident สำเร็จ
+  // แต่ละ method จัดการ restockItems list ใน state
+
+  /// Set restock items (เมื่อ fetch ยาของ resident สำเร็จ)
+  void setRestockItems(List<RestockItem> items) {
+    state = state.copyWith(restockItems: items);
+  }
+
+  /// Toggle เปิด/ปิด restock item ตาม medicineListId
+  void toggleRestockItem(int medicineListId, bool enabled) {
+    final updated = state.restockItems.map((item) {
+      if (item.medicineListId == medicineListId) {
+        return item.copyWith(enabled: enabled);
+      }
+      return item;
+    }).toList();
+    state = state.copyWith(restockItems: updated);
+  }
+
+  /// อัพเดทจำนวน restock (จาก smart input)
+  /// inputDisplay = raw text ที่ user กรอก (เช่น "+30", "-5", "50")
+  /// reconcile = ค่าจริงที่คำนวณแล้ว (เช่น currentReconcile + 30)
+  void updateRestockQuantity(
+    int medicineListId, {
+    required String inputDisplay,
+    required double reconcile,
+  }) {
+    final updated = state.restockItems.map((item) {
+      if (item.medicineListId == medicineListId) {
+        return item.copyWith(
+          inputDisplay: inputDisplay,
+          reconcile: reconcile,
+        );
+      }
+      return item;
+    }).toList();
+    state = state.copyWith(restockItems: updated);
+  }
+
+  /// Clear restock items ทั้งหมด (เมื่อเปลี่ยน/ยกเลิก resident)
+  void clearRestockItems() {
+    state = state.copyWith(clearRestockItems: true);
+  }
+
+  // === Pending Med History Methods ===
+
+  /// เพิ่ม med_history ID ที่ต้อง link กับ post (จากการสร้างยาใหม่ผ่านปุ่ม "เพิ่มยาอื่น")
+  /// ตอน submit post จะ UPDATE med_history SET post_id สำหรับ IDs เหล่านี้
+  void addPendingMedHistoryId(int id) {
+    state = state.copyWith(
+      pendingMedHistoryIds: [...state.pendingMedHistoryIds, id],
+    );
+  }
 }
 
 /// Provider for create post state

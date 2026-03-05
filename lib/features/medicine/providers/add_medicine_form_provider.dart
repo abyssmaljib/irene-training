@@ -36,6 +36,11 @@ class AddMedicineFormNotifier
   // Flag บอกว่า initialize เสร็จหรือยัง
   bool _isInitialized = false;
 
+  /// เก็บ med_history ID ล่าสุดที่สร้างจาก addMedicineToResident
+  /// ใช้สำหรับ link กับ post ภายหลัง (UPDATE post_id ใน med_history)
+  int? _lastMedHistoryId;
+  int? get lastMedHistoryId => _lastMedHistoryId;
+
   /// Initialize form ด้วย default values
   Future<void> _initialize() async {
     try {
@@ -347,6 +352,32 @@ class AddMedicineFormNotifier
       // ใช้ effectiveUserId เพื่อรองรับ impersonation
       final userId = UserService().effectiveUserId;
 
+      // สร้าง new_setting string — บันทึก setting เริ่มต้นตอนเพิ่มยา
+      // ให้ดูย้อนหลังได้ว่าตอนเริ่มยา ตั้ง dose ไว้ยังไง
+      // ลำดับ: dose → ก่อน/หลังอาหาร → เวลาให้ยา (เรียงตามเวลา) → ความถี่ → PRN
+      final settingParts = <String>[];
+      final unitStr = currentState.selectedMedicine?.unit ?? 'เม็ด';
+      settingParts.add('${currentState.takeTab} $unitStr');
+      // ก่อน/หลังอาหาร — ใส่ก่อนเวลาให้ยาเพื่อให้อ่านเป็นธรรมชาติ
+      if (currentState.beforeAfter.isNotEmpty) {
+        settingParts.add(currentState.beforeAfter.join(','));
+      }
+      // เวลาให้ยา — เรียงตามลำดับเวลา: เช้า → กลางวัน → เย็น → ก่อนนอน
+      if (currentState.bldb.isNotEmpty) {
+        const bldbOrder = ['เช้า', 'กลางวัน', 'เย็น', 'ก่อนนอน'];
+        final sortedBldb = List<String>.from(currentState.bldb)
+          ..sort((a, b) => bldbOrder.indexOf(a).compareTo(bldbOrder.indexOf(b)));
+        settingParts.add(sortedBldb.join(','));
+      }
+      final freq = int.tryParse(currentState.everyHr) ?? 1;
+      if (freq != 1 || currentState.typeOfTime != 'วัน') {
+        settingParts.add('ทุก ${currentState.everyHr} ${currentState.typeOfTime}');
+      }
+      if (currentState.prn) {
+        settingParts.add('PRN');
+      }
+      final newSetting = settingParts.join(' | ');
+
       // Insert medicine
       final result = await _service.addMedicineToResident(
         medDbId: currentState.selectedMedDbId!,
@@ -362,9 +393,12 @@ class AddMedicineFormNotifier
         note: currentState.note.isNotEmpty ? currentState.note : null,
         userId: userId,
         reconcile: reconcile,
+        newSetting: newSetting,
       );
 
       if (result != null) {
+        // เก็บ medHistoryId ไว้ให้ caller ดึงไปใช้ link กับ post
+        _lastMedHistoryId = result.medHistoryId;
         state = AsyncValue.data(currentState.copyWith(isLoading: false));
         return true;
       } else {

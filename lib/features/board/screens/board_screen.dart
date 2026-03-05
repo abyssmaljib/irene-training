@@ -962,6 +962,9 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
                   AppSpacing.verticalGapLg,
                 ],
 
+                // ความเคลื่อนไหวยา (ถ้ามี med_history เชื่อมกับ post นี้)
+                _buildMedicineActivitySection(),
+
                 // Images
                 if (post.hasImages) ...[
                   _buildImageGallery(post.allImageUrls),
@@ -1139,6 +1142,128 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
           ),
         );
       }).toList(),
+    );
+  }
+
+  /// แสดง section "ความเคลื่อนไหวยา" — ดึงจาก med_history WHERE post_id
+  /// แสดงเฉพาะเมื่อมี records เชื่อมกับ post นี้
+  Widget _buildMedicineActivitySection() {
+    final medHistoryAsync =
+        ref.watch(postMedHistoryProvider(widget.postId));
+
+    return medHistoryAsync.when(
+      data: (items) {
+        if (items.isEmpty) return const SizedBox.shrink();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Row(
+              children: [
+                HugeIcon(
+                  icon: HugeIcons.strokeRoundedMedicine02,
+                  size: AppIconSize.md,
+                  color: AppColors.primary,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'ความเคลื่อนไหวยา',
+                  style: AppTypography.title.copyWith(fontSize: 16),
+                ),
+              ],
+            ),
+            AppSpacing.verticalGapSm,
+            // Items container
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.15),
+                ),
+              ),
+              child: Column(
+                children: items
+                    .map((item) => _buildMedActivityItem(item))
+                    .toList(),
+              ),
+            ),
+            AppSpacing.verticalGapLg,
+          ],
+        );
+      },
+      // ไม่แสดงอะไรระหว่าง loading/error — ไม่ block UI
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
+    );
+  }
+
+  /// แสดงแต่ละ med_history item — icon + label + ชื่อยา + วิธีรับประทาน + จำนวน
+  Widget _buildMedActivityItem(Map<String, dynamic> item) {
+    final changeType = item['change_type'] as String? ?? 'restock';
+    final reconcile = (item['reconcile'] as num?)?.toDouble();
+    final newSetting = item['new_setting'] as String?;
+    final medList = item['medicine_List'] as Map<String, dynamic>?;
+    final medDb = medList?['med_DB'] as Map<String, dynamic>?;
+    final name = medDb?['generic_name'] ?? 'ไม่ทราบชื่อ';
+    final strength = medDb?['str'] as String?;
+    final unit = medDb?['unit'] as String? ?? 'เม็ด';
+    final displayName = strength != null && strength.isNotEmpty
+        ? '$name $strength'
+        : name.toString();
+
+    // Icon + label ตาม change_type
+    final isAdd = changeType == 'add';
+    final icon = isAdd
+        ? HugeIcons.strokeRoundedAdd01
+        : HugeIcons.strokeRoundedPackageReceive;
+    final label = isAdd ? 'เพิ่มยาใหม่' : 'อัพเดตสต็อก';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          HugeIcon(
+            icon: icon,
+            size: AppIconSize.sm,
+            color: AppColors.primary,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(displayName, style: AppTypography.bodySmall),
+                // วิธีรับประทาน (new_setting) — แสดงเฉพาะยาใหม่ที่มี setting
+                if (newSetting != null && newSetting.isNotEmpty)
+                  Text(
+                    newSetting,
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.secondaryText,
+                    ),
+                  ),
+                // จำนวนสต็อก
+                if (reconcile != null && reconcile > 0)
+                  Text(
+                    'สต็อก: ${reconcile % 1 == 0 ? reconcile.toInt() : reconcile} $unit',
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.secondaryText,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 

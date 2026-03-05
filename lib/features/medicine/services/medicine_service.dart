@@ -1134,8 +1134,9 @@ extension MedicineServiceMedicineList on MedicineService {
   /// เพิ่มยาให้ resident
   /// 1. Insert ไปที่ medicine_list
   /// 2. Insert ไปที่ med_history
-  /// Returns MedicineListItem ที่สร้างใหม่
-  Future<MedicineListItem?> addMedicineToResident({
+  /// Returns record ที่มี MedicineListItem และ medHistoryId
+  /// medHistoryId ใช้สำหรับ link กับ post ภายหลัง (UPDATE post_id ใน med_history)
+  Future<({MedicineListItem medicine, int? medHistoryId})?> addMedicineToResident({
     required int medDbId,
     required int residentId,
     required double takeTab,
@@ -1152,6 +1153,7 @@ extension MedicineServiceMedicineList on MedicineService {
     String? note,
     String? userId,
     double? reconcile,
+    String? newSetting,
   }) async {
     try {
       // 1. Insert medicine_list
@@ -1178,21 +1180,35 @@ extension MedicineServiceMedicineList on MedicineService {
       final newMedicine = MedicineListItem.fromJson(medicineResponse);
 
       // 2. Insert med_history
+      // change_type = 'add' → บอกว่า record นี้เป็นการเพิ่มยาใหม่
+      // new_setting = บันทึก setting เริ่มต้น ให้ดูย้อนหลังได้ว่าตั้ง dose ไว้ยังไงตอนเพิ่มยา
       final historyData = <String, dynamic>{
         'med_list_id': newMedicine.id,
         'on_date': _formatDate(onDate),
+        'change_type': 'add',
         if (offDate != null) 'off_date': _formatDate(offDate),
         if (note != null && note.isNotEmpty) 'note': note,
         if (userId != null) 'user_id': userId,
         if (reconcile != null) 'reconcile': reconcile,
+        if (newSetting != null && newSetting.isNotEmpty)
+          'new_setting': newSetting,
       };
 
-      await _supabase.from('med_history').insert(historyData);
+      // Insert med_history แล้ว return id กลับมา
+      // ใช้ .select('id').single() เพื่อให้ Supabase return row ที่เพิ่ง insert
+      // จะได้ medHistoryId ไว้ link กับ post ภายหลัง
+      final historyResponse = await _supabase
+          .from('med_history')
+          .insert(historyData)
+          .select('id')
+          .single();
+      final medHistoryId = historyResponse['id'] as int;
 
       // Invalidate medicines cache เพราะมียาใหม่
       invalidateCache();
 
-      return newMedicine;
+      // Return ด้วย Dart record type — มีทั้ง medicine object และ medHistoryId
+      return (medicine: newMedicine, medHistoryId: medHistoryId);
     } catch (e) {
       return null;
     }
@@ -1321,11 +1337,14 @@ extension MedicineServiceMedicineList on MedicineService {
           .eq('id', medicineListId);
 
       // 2. Insert med_history record ใหม่ (บันทึกการเปลี่ยนแปลง)
+      // change_type = 'edit' → บอกว่า record นี้เป็นการแก้ไขวิธีรับประทาน
+      // ไม่ใส่ on_date — edit record ไม่ใช่ "เริ่มให้ยา" → on_date ไม่มีความหมาย
+      // medicine_summary view ดึง on_date จาก add/on record แทน (WHERE on_date IS NOT NULL)
       final historyData = <String, dynamic>{
         'med_list_id': medicineListId,
-        'on_date': _formatDate(onDate),
         'note': note,
         'user_id': userId,
+        'change_type': 'edit',
       };
 
       if (offDate != null) {
@@ -1381,10 +1400,12 @@ extension MedicineServiceOnOff on MedicineService {
     try {
       // INSERT med_history record ใหม่ที่มี off_date
       // medicine_summary view จะคำนวณ status = 'off' จาก off_date ที่ผ่านมาแล้ว
+      // change_type = 'off' → บอกว่า record นี้เป็นการหยุดยา
       final historyData = <String, dynamic>{
         'med_list_id': medicineListId,
         'on_date': _formatDate(onDate),
         'off_date': _formatDate(offDate),
+        'change_type': 'off',
         if (note != null && note.isNotEmpty) 'note': note,
         if (newSetting != null && newSetting.isNotEmpty)
           'new_setting': newSetting,
@@ -1432,47 +1453,13 @@ extension MedicineServiceOnOff on MedicineService {
     required String userId,
   }) async {
     try {
-      // 1. ดึงข้อมูล medicine_list เดิม
-      final originalItem = await getMedicineListItemById(medicineListId);
-      if (originalItem == null) {
-        debugPrint('[MedicineService] turnOnMedicine: ไม่พบ medicine_list id=$medicineListId');
-        return false;
-      }
-
-      // 2. INSERT medicine_list ใหม่ (duplicate ทุก field จากของเดิม)
-      // ใช้ข้อมูลจาก medicine_list เดิมทั้งหมด เพื่อให้ยาตัวใหม่มี setting เหมือนเดิม
-      final duplicateData = <String, dynamic>{
-        'med_DB_id': originalItem.medDbId,
-        'resident_id': originalItem.residentId,
-        'take_tab': originalItem.takeTab,
-        'BLDB': originalItem.bldb,
-        'BeforeAfter': originalItem.beforeAfter,
-        if (originalItem.everyHr != null) 'every_hr': originalItem.everyHr,
-        if (originalItem.typeOfTime != null)
-          'typeOfTime': originalItem.typeOfTime,
-        if (originalItem.daysOfWeek != null &&
-            originalItem.daysOfWeek!.isNotEmpty)
-          'DaysOfWeek': originalItem.daysOfWeek,
-        'prn': originalItem.prn,
-        if (originalItem.underlyingDiseaseTag != null &&
-            originalItem.underlyingDiseaseTag!.isNotEmpty)
-          'underlying_disease_tag': originalItem.underlyingDiseaseTag,
-        // MedString ชี้ไปที่ medicine_list เดิม (สำหรับ grouping)
-        'MedString': originalItem.id,
-      };
-
-      final newMedicineResponse = await _supabase
-          .from('medicine_List')
-          .insert(duplicateData)
-          .select()
-          .single();
-
-      final newMedicineListId = newMedicineResponse['id'] as int;
-
-      // 3. INSERT med_history record ใหม่บน medicine_list ใหม่
+      // ⚠️ Refactored: ไม่สร้าง duplicate medicine_List row อีกแล้ว
+      // ตอนนี้ 1 row ต่อ (med_DB_id, resident_id) — ทุก event อยู่ใน med_history
+      // แค่ INSERT med_history (change_type='on') บน medicine_list_id เดิม
       final historyData = <String, dynamic>{
-        'med_list_id': newMedicineListId,
+        'med_list_id': medicineListId, // ใช้ ID เดิม!
         'on_date': _formatDate(startDate),
+        'change_type': 'on',
         if (offDate != null) 'off_date': _formatDate(offDate),
         if (note != null && note.isNotEmpty) 'note': note,
         if (newSetting != null && newSetting.isNotEmpty)
@@ -1483,13 +1470,76 @@ extension MedicineServiceOnOff on MedicineService {
 
       await _supabase.from('med_history').insert(historyData);
 
-      // Invalidate cache เพราะมียาใหม่
+      // Invalidate cache เพราะสถานะยาเปลี่ยน
       invalidateCache();
 
       return true;
     } catch (e) {
       debugPrint('[MedicineService] turnOnMedicine error: $e');
       return false;
+    }
+  }
+
+  /// อัพเดตสต็อกยา (restock)
+  ///
+  /// ไม่กระทบ status — medicine_summary VIEW คำนวณ status
+  /// จาก latest STATUS-CHANGING event (add/on/off) เท่านั้น
+  /// restock record มีแค่ reconcile + change_type = 'restock'
+  ///
+  /// [medicineListId] - id ของ medicine_list
+  /// [reconcile] - จำนวนยาคงเหลือใหม่ (คำนวณจาก smartMedCalculate แล้ว)
+  /// [note] - หมายเหตุ (optional)
+  /// [userId] - UUID ของ user ที่ทำรายการ
+  Future<bool> restockMedicine({
+    required int medicineListId,
+    required double reconcile,
+    String? note,
+    required String userId,
+    int? postId, // เชื่อม restock กับ board post (ถ้ามี) เพื่อ audit trail
+  }) async {
+    try {
+      // Insert เฉพาะ fields ที่จำเป็น — ไม่มี off_date, new_setting, on_date
+      // เพราะ restock ไม่ใช่ status event
+      final historyData = <String, dynamic>{
+        'med_list_id': medicineListId,
+        'reconcile': reconcile,
+        'user_id': userId,
+        'change_type': 'restock',
+        if (note != null && note.isNotEmpty) 'note': note,
+        if (postId != null) 'post_id': postId,
+      };
+
+      await _supabase.from('med_history').insert(historyData);
+
+      // Invalidate cache เพราะจำนวนยาเปลี่ยน
+      invalidateCache();
+
+      return true;
+    } catch (e) {
+      debugPrint('[MedicineService] restockMedicine error: $e');
+      return false;
+    }
+  }
+
+  // ============================================
+  // ดึง med_history ที่เชื่อมกับ post (สำหรับ PostDetailScreen)
+  // ============================================
+
+  /// ดึง med_history records ที่เชื่อมกับ post_id
+  /// JOIN medicine_List + med_DB เพื่อได้ชื่อยา + ความแรง
+  /// ใช้แสดง "ความเคลื่อนไหวยา" section ใน PostDetailScreen
+  Future<List<Map<String, dynamic>>> getMedHistoryByPostId(int postId) async {
+    try {
+      final response = await _supabase
+          .from('med_history')
+          .select(
+              'id, change_type, reconcile, new_setting, on_date, medicine_List!inner(id, med_DB!inner(generic_name, str, unit))')
+          .eq('post_id', postId)
+          .order('created_at');
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('[MedicineService] getMedHistoryByPostId error: $e');
+      return [];
     }
   }
 }

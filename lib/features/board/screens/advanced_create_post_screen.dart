@@ -28,6 +28,8 @@ import '../widgets/quiz_form_widget.dart';
 import '../widgets/ai_summary_widget.dart';
 import '../../../core/widgets/checkbox_tile.dart';
 import '../widgets/handover_toggle_widget.dart';
+import '../widgets/post_extras_section.dart';
+import '../../medicine/services/medicine_service.dart';
 import '../providers/tag_provider.dart';
 import '../../../core/widgets/success_popup.dart';
 import '../../../core/widgets/buttons.dart';
@@ -522,6 +524,23 @@ class _AdvancedCreatePostScreenState
       );
 
       if (postId != null) {
+        // === Link pending med_history (จากการสร้างยาใหม่ระหว่าง session) ===
+        // UPDATE med_history rows ที่สร้างไว้ก่อนหน้า ให้มี post_id
+        if (state.pendingMedHistoryIds.isNotEmpty) {
+          await _linkPendingMedHistory(postId, state.pendingMedHistoryIds);
+        }
+
+        // === INSERT restock records (ถ้ามี) ===
+        // เชื่อม med_history กับ post ผ่าน post_id เพื่อ audit trail
+        final enabledRestocks = state.restockItems
+            .where((i) => i.enabled && i.reconcile > 0)
+            .toList();
+        if (enabledRestocks.isNotEmpty) {
+          await _insertRestockRecords(postId, userId, enabledRestocks);
+          // Invalidate medicine cache เพื่อให้หน้ายาแสดงข้อมูลใหม่
+          MedicineService.instance.invalidateCache();
+        }
+
         // ถ้ามี taskLogId ให้ complete task ด้วย
         if (widget.taskLogId != null && mounted) {
           // === Optimistic Update - อัพเดต UI ทันทีก่อนรอ server ===
@@ -849,6 +868,40 @@ class _AdvancedCreatePostScreenState
                 _buildSendToFamilyToggle(state),
               ],
 
+              // แนบเพิ่มเติม: อัพเดตสต็อก, ใบนัด, อื่นๆ
+              // แสดงเมื่อเลือก resident แล้ว
+              if (state.selectedResidentId != null) ...[
+                AppSpacing.verticalGapSm,
+                PostExtrasSection(
+                  residentId: state.selectedResidentId!,
+                  residentName: state.selectedResidentName,
+                  restockItems: state.restockItems,
+                  onRestockItemsLoaded: (items) {
+                    ref.read(createPostProvider.notifier).setRestockItems(items);
+                  },
+                  onRestockItemToggled: (medListId, enabled) {
+                    ref
+                        .read(createPostProvider.notifier)
+                        .toggleRestockItem(medListId, enabled);
+                  },
+                  onRestockQuantityChanged: (medListId, inputDisplay, reconcile) {
+                    ref
+                        .read(createPostProvider.notifier)
+                        .updateRestockQuantity(
+                          medListId,
+                          inputDisplay: inputDisplay,
+                          reconcile: reconcile,
+                        );
+                  },
+                  // เมื่อสร้างยาใหม่สำเร็จ → เก็บ med_history ID ไว้ link กับ post ตอน submit
+                  onNewMedicineCreated: (medHistoryId) {
+                    ref
+                        .read(createPostProvider.notifier)
+                        .addPendingMedHistoryId(medHistoryId);
+                  },
+                ),
+              ],
+
               AppSpacing.verticalGapLg,
 
               // Image preview
@@ -1071,6 +1124,52 @@ class _AdvancedCreatePostScreenState
           : 'ส่งโพสต์นี้ให้ญาติของผู้สูงอายุ',
       isRequired: isFromTask,
     );
+  }
+
+  /// INSERT restock records ลง med_history พร้อม post_id
+  /// เรียกหลัง createPost สำเร็จ เพื่อเชื่อม restock กับ post
+  /// ถ้า INSERT ล้มเหลว → แสดง warning แต่ไม่ rollback post (post เป็น primary action)
+  Future<void> _insertRestockRecords(
+    int postId,
+    String userId,
+    List<RestockItem> items,
+  ) async {
+    try {
+      // สร้าง rows สำหรับ batch insert
+      final rows = items
+          .map((item) => {
+                'med_list_id': item.medicineListId,
+                'reconcile': item.reconcile,
+                'change_type': 'restock',
+                'post_id': postId,
+                'user_id': userId,
+              })
+          .toList();
+
+      await Supabase.instance.client.from('med_history').insert(rows);
+      debugPrint('[AdvancedCreatePost] restock ${rows.length} items OK');
+    } catch (e) {
+      debugPrint('[AdvancedCreatePost] restock insert error: $e');
+      if (mounted) {
+        AppToast.warning(context, 'สร้างโพสสำเร็จ แต่บันทึก restock ไม่สำเร็จ');
+      }
+    }
+  }
+
+  /// UPDATE med_history rows ที่สร้างระหว่าง session (สร้างยาใหม่) ให้มี post_id
+  /// เรียกหลัง createPost สำเร็จ เพื่อเชื่อม med_history กับ post
+  Future<void> _linkPendingMedHistory(int postId, List<int> medHistoryIds) async {
+    try {
+      await Supabase.instance.client
+          .from('med_history')
+          .update({'post_id': postId})
+          .inFilter('id', medHistoryIds);
+      debugPrint(
+          '[AdvancedCreatePost] linked ${medHistoryIds.length} pending med_history to post $postId');
+    } catch (e) {
+      debugPrint('[AdvancedCreatePost] link pending med_history error: $e');
+      // Warning only — ไม่ rollback post
+    }
   }
 
   /// สร้าง video preview รองรับ upload states

@@ -2552,6 +2552,18 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       return;
     }
 
+    // === iOS crash prevention: ปล่อย memory ก่อนเปิดกล้อง ===
+    // Clear image cache เพื่อปล่อย decoded images ออกจาก memory
+    // กล้อง iOS ใช้ memory สูง ถ้า cache รูปเยอะจะ crash (OOM kill)
+    PaintingBinding.instance.imageCache.clear();
+    PaintingBinding.instance.imageCache.clearLiveImages();
+
+    // ลด cache limit ชั่วคราวเป็น 0 ระหว่างเปิดกล้อง
+    final savedMaxSize = PaintingBinding.instance.imageCache.maximumSize;
+    final savedMaxBytes = PaintingBinding.instance.imageCache.maximumSizeBytes;
+    PaintingBinding.instance.imageCache.maximumSize = 0;
+    PaintingBinding.instance.imageCache.maximumSizeBytes = 0;
+
     File? file;
 
     // ถ้า task มีรูปตัวอย่าง → เปิดกล้อง split-screen เพื่อถ่ายเทียบรูป
@@ -2565,6 +2577,10 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       final cameraService = CameraService.instance;
       file = await cameraService.takePhoto();
     }
+
+    // คืนค่า cache limits ทันทีหลังกล้องปิด (ต้องคืนก่อน early return)
+    PaintingBinding.instance.imageCache.maximumSize = savedMaxSize;
+    PaintingBinding.instance.imageCache.maximumSizeBytes = savedMaxBytes;
 
     if (file == null) return;
 

@@ -76,6 +76,9 @@ class Post {
   // Handover flag
   final bool isHandover;
 
+  // Medicine activity count (enriched after fetch, ไม่ได้มาจาก view)
+  final int medHistoryCount;
+
   const Post({
     required this.id,
     required this.createdAt,
@@ -126,6 +129,7 @@ class Post {
     this.logLineStatus,
     this.logLineQueueId,
     this.isHandover = false,
+    this.medHistoryCount = 0,
   });
 
   /// Factory constructor from JSON (postwithuserinfo view)
@@ -226,6 +230,9 @@ class Post {
 
   /// Check if post is Calendar
   bool get isCalendar => tab == 'Calendar';
+
+  /// Check if post has linked medicine activity
+  bool get hasMedActivity => medHistoryCount > 0;
 
   /// Check if post has quiz
   bool get hasQuiz => qaId != null;
@@ -387,6 +394,7 @@ class Post {
     String? logLineStatus,
     int? logLineQueueId,
     bool? isHandover,
+    int? medHistoryCount,
   }) {
     return Post(
       id: id ?? this.id,
@@ -438,6 +446,7 @@ class Post {
       logLineStatus: logLineStatus ?? this.logLineStatus,
       logLineQueueId: logLineQueueId ?? this.logLineQueueId,
       isHandover: isHandover ?? this.isHandover,
+      medHistoryCount: medHistoryCount ?? this.medHistoryCount,
     );
   }
 

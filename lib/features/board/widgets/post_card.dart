@@ -334,6 +334,7 @@ class PostCard extends StatelessWidget {
           ),
         ),
         // Indicators
+        if (post.hasMedActivity) _buildMedActivityBadge(),
         if (post.hasQuiz) _buildQuizBadge(),
         if (post.hasImages) ...[
           AppSpacing.horizontalGapSm,
@@ -343,6 +344,33 @@ class PostCard extends StatelessWidget {
         // Like button
         _buildLikeButton(),
       ],
+    );
+  }
+
+  /// Badge แสดงว่าโพสนี้มีความเคลื่อนไหวยา (เพิ่มยาใหม่ / อัพเดตสต็อก)
+  Widget _buildMedActivityBadge() {
+    return Container(
+      margin: const EdgeInsets.only(right: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          HugeIcon(
+            icon: HugeIcons.strokeRoundedMedicine02,
+            size: AppIconSize.xs,
+            color: AppColors.primary,
+          ),
+          AppSpacing.horizontalGapXs,
+          Text(
+            'ยา ${post.medHistoryCount}',
+            style: AppTypography.caption.copyWith(color: AppColors.primary),
+          ),
+        ],
+      ),
     );
   }
 

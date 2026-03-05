@@ -19,7 +19,7 @@ final turnOnMedicineProvider = StateNotifierProvider.family<
 /// Flow:
 /// 1. User เลือกยาที่หยุดไปแล้วที่ต้องการกลับมาใช้
 /// 2. กรอกเหตุผล + จำนวนยาคงเหลือ + วันเริ่ม + ต่อเนื่องหรือกำหนดระยะ
-/// 3. Submit → INSERT medicine_list ใหม่ (duplicate) + INSERT med_history record
+/// 3. Submit → INSERT med_history (change_type='on') บน medicine_list_id เดิม
 class TurnOnMedicineNotifier
     extends StateNotifier<AsyncValue<TurnOnMedicineFormState>> {
   TurnOnMedicineNotifier(Ref ref, this.medicineListId)
@@ -80,10 +80,9 @@ class TurnOnMedicineNotifier
 
   /// บันทึกการกลับมาใช้ยา
   ///
-  /// Logic ตาม app เดิม:
+  /// Logic:
   /// 1. Validate form
-  /// 2. Duplicate medicine_list (สร้าง row ใหม่ copy ทุก field)
-  /// 3. INSERT med_history ใหม่บน medicine_list ใหม่
+  /// 2. INSERT med_history (change_type='on') บน medicine_list_id เดิม
   Future<bool> submit() async {
     final currentState = state.value;
     if (currentState == null) return false;

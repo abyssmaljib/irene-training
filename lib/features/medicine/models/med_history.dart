@@ -18,6 +18,15 @@ class MedHistory {
   // ข้อมูลเพิ่มเติม
   final String? note;       // หมายเหตุ
   final String? userId;     // UUID ของ user ที่บันทึก
+
+  // ประเภทการเปลี่ยนแปลงและการเชื่อมโยงกับ Post
+  // changeType บอกว่า history record นี้เกิดจากการกระทำอะไร
+  // เช่น 'add' = เพิ่มยาใหม่, 'restock' = เติมยา, 'on' = เปิดยา, 'off' = ปิดยา, 'edit' = แก้ไขข้อมูลยา
+  final String? changeType;
+  // postId เชื่อม med_history กับ Post table
+  // เมื่อมีการบันทึกยาผ่านโพส (เช่น โพสเติมยา) จะเก็บ post_id ไว้เพื่อ trace ย้อนกลับได้
+  final int? postId;
+
   final double? reconcile;  // จำนวนยาคงเหลือ (สำหรับคำนวณวันที่ยาจะหมด)
   final String? newSetting; // ข้อมูล setting ใหม่ (JSON string)
 
@@ -29,6 +38,8 @@ class MedHistory {
     this.offDate,
     this.note,
     this.userId,
+    this.changeType,
+    this.postId,
     this.reconcile,
     this.newSetting,
   });
@@ -43,6 +54,8 @@ class MedHistory {
       offDate: json['off_date'] != null ? _parseDate(json['off_date']) : null,
       note: json['note'] as String?,
       userId: json['user_id'] as String?,
+      changeType: json['change_type'] as String?,
+      postId: json['post_id'] as int?,
       reconcile: (json['reconcile'] as num?)?.toDouble(),
       newSetting: json['new_setting'] as String?,
     );
@@ -65,6 +78,8 @@ class MedHistory {
       if (offDate != null) 'off_date': _formatDate(offDate!),
       if (note != null) 'note': note,
       if (userId != null) 'user_id': userId,
+      if (changeType != null) 'change_type': changeType,
+      if (postId != null) 'post_id': postId,
       if (reconcile != null) 'reconcile': reconcile,
       if (newSetting != null) 'new_setting': newSetting,
     };
@@ -125,6 +140,8 @@ class MedHistory {
     DateTime? offDate,
     String? note,
     String? userId,
+    String? changeType,
+    int? postId,
     double? reconcile,
     String? newSetting,
   }) {
@@ -136,6 +153,8 @@ class MedHistory {
       offDate: offDate ?? this.offDate,
       note: note ?? this.note,
       userId: userId ?? this.userId,
+      changeType: changeType ?? this.changeType,
+      postId: postId ?? this.postId,
       reconcile: reconcile ?? this.reconcile,
       newSetting: newSetting ?? this.newSetting,
     );

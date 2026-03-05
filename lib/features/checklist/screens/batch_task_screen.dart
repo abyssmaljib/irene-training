@@ -635,11 +635,28 @@ class _ResidentTile extends ConsumerWidget {
       return;
     }
 
+    // === iOS crash prevention: ปล่อย memory ก่อนเปิดกล้อง ===
+    // Clear image cache เพื่อปล่อย decoded images ออกจาก memory
+    // กล้อง iOS ใช้ memory สูง ถ้า cache รูปเยอะจะ crash (OOM kill)
+    PaintingBinding.instance.imageCache.clear();
+    PaintingBinding.instance.imageCache.clearLiveImages();
+
+    // ลด cache limit ชั่วคราวเป็น 0 ระหว่างเปิดกล้อง
+    final savedMaxSize = PaintingBinding.instance.imageCache.maximumSize;
+    final savedMaxBytes = PaintingBinding.instance.imageCache.maximumSizeBytes;
+    PaintingBinding.instance.imageCache.maximumSize = 0;
+    PaintingBinding.instance.imageCache.maximumSizeBytes = 0;
+
     // 1. เปิดกล้อง — ถ้ามีรูปตัวอย่าง ใช้ split-screen เทียบรูป
     File? file;
     if (resident.task.hasSampleImage) {
       // Split-screen camera: ครึ่งบนรูปตัวอย่าง ครึ่งล่างกล้อง
-      if (!context.mounted) return;
+      if (!context.mounted) {
+        // คืนค่า cache limits ก่อน return
+        PaintingBinding.instance.imageCache.maximumSize = savedMaxSize;
+        PaintingBinding.instance.imageCache.maximumSizeBytes = savedMaxBytes;
+        return;
+      }
       file = await SplitScreenCameraScreen.show(
         context: context,
         sampleImageUrl: resident.task.sampleImageUrl!,
@@ -649,6 +666,11 @@ class _ResidentTile extends ConsumerWidget {
       final cameraService = CameraService.instance;
       file = await cameraService.takePhoto();
     }
+
+    // คืนค่า cache limits ทันทีหลังกล้องปิด (ต้องคืนก่อน early return)
+    PaintingBinding.instance.imageCache.maximumSize = savedMaxSize;
+    PaintingBinding.instance.imageCache.maximumSizeBytes = savedMaxBytes;
+
     if (file == null) return; // user ยกเลิก
 
     // 2. แสดง PhotoPreviewScreen (หมุนรูปได้)

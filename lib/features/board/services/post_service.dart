@@ -146,6 +146,9 @@ class PostService {
       // ใช้ RPC query เฉพาะ post IDs ที่ได้มา แทนการ scan ทั้งตาราง 112k+ rows
       posts = await _enrichWithLineStatus(posts);
 
+      // Enrich ด้วยจำนวน med_history ที่ link กับ post (สำหรับแสดง badge บน card)
+      posts = await _enrichWithMedHistoryCount(posts);
+
       // Apply filter type (client-side filtering for complex conditions)
       if (currentUserId != null) {
         switch (filter.filterType) {
@@ -410,6 +413,40 @@ class PostService {
     } catch (e) {
       // ถ้าดึง LINE status ไม่ได้ ให้แสดง posts ปกติ (ไม่มีสถานะ LINE)
       debugPrint('_enrichWithLineStatus error: $e');
+      return posts;
+    }
+  }
+
+  /// Enrich posts ด้วยจำนวน med_history ที่ link กับแต่ละ post
+  /// ใช้ single query สำหรับทุก posts → O(1) แทน O(N)
+  Future<List<Post>> _enrichWithMedHistoryCount(List<Post> posts) async {
+    if (posts.isEmpty) return posts;
+
+    try {
+      final postIds = posts.map((p) => p.id).toList();
+
+      // ดึง med_history count ต่อ post_id ด้วย select + group
+      // ใช้วิธี filter เฉพาะ post_id ที่ต้องการ
+      final response = await _supabase
+          .from('med_history')
+          .select('post_id')
+          .inFilter('post_id', postIds);
+
+      // นับจำนวนต่อ post_id
+      final countMap = <int, int>{};
+      for (final row in response as List) {
+        final postId = row['post_id'] as int;
+        countMap[postId] = (countMap[postId] ?? 0) + 1;
+      }
+
+      // merge count กลับเข้า posts
+      return posts.map((post) {
+        final count = countMap[post.id];
+        if (count == null) return post;
+        return post.copyWith(medHistoryCount: count);
+      }).toList();
+    } catch (e) {
+      debugPrint('_enrichWithMedHistoryCount error: $e');
       return posts;
     }
   }

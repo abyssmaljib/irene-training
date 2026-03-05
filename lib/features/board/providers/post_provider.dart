@@ -7,6 +7,7 @@ import '../models/post_tab.dart';
 import '../models/post_filter.dart';
 import '../services/post_service.dart';
 import '../services/post_action_service.dart';
+import '../../medicine/services/medicine_service.dart';
 import 'post_filter_provider.dart';
 
 // =============================================================================
@@ -346,4 +347,16 @@ final toggleLikeProvider =
   ref.invalidate(unreadCountsProvider);
 
   return result;
+});
+
+// ============================================
+// ดึง med_history ที่เชื่อมกับ post (สำหรับ PostDetailScreen)
+// ============================================
+
+/// Provider ดึง med_history records ที่เชื่อมกับ post
+/// ใช้แสดง section "ความเคลื่อนไหวยา" ใน PostDetailScreen
+final postMedHistoryProvider =
+    FutureProvider.family<List<Map<String, dynamic>>, int>(
+        (ref, postId) async {
+  return MedicineService.instance.getMedHistoryByPostId(postId);
 });
