@@ -18,6 +18,7 @@ import '../providers/incident_provider.dart';
 import '../services/incident_service.dart';
 import '../widgets/chat_message_bubble.dart';
 import '../widgets/pillar_progress_indicator.dart';
+import '../widgets/root_cause_depth_indicator.dart';
 import '../widgets/chat_input_bar.dart';
 import '../widgets/core_value_picker.dart';
 import '../widgets/reflection_summary_popup.dart';
@@ -370,6 +371,15 @@ class _IncidentChatScreenState extends ConsumerState<IncidentChatScreen> {
             progress: chatState.pillarsProgress,
             currentPillar: chatState.currentPillar,
           ),
+
+          // แสดง Root Cause Depth Indicator เมื่อกำลังวิเคราะห์สาเหตุ (Pillar 2)
+          // หรือเมื่อมี depth data อยู่แล้ว
+          if (chatState.rootCauseDepth != null)
+            RootCauseDepthIndicator(
+              currentDepth: chatState.rootCauseDepth,
+              exploredCategories: chatState.exploredCategories,
+              analysisQuality: chatState.analysisQuality,
+            ),
 
           // Chat messages พร้อม Core Value picker (ถ้ามี)
           Expanded(

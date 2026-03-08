@@ -1210,7 +1210,17 @@ extension MedicineServiceMedicineList on MedicineService {
       // Return ด้วย Dart record type — มีทั้ง medicine object และ medHistoryId
       return (medicine: newMedicine, medHistoryId: medHistoryId);
     } catch (e) {
-      return null;
+      // โยน error กลับไปพร้อมรายละเอียด เพื่อให้ UI แสดง hint ที่ชัดเจน
+      // แทนที่จะ return null ซึ่งทำให้ UI บอกแค่ "ไม่สามารถบันทึกยาได้"
+      final errorMsg = e.toString();
+      if (errorMsg.contains('duplicate') || errorMsg.contains('unique')) {
+        throw Exception('คนไข้มียานี้อยู่แล้ว กรุณาตรวจสอบรายการยาปัจจุบัน');
+      } else if (errorMsg.contains('permission') || errorMsg.contains('RLS')) {
+        throw Exception('ไม่มีสิทธิ์เพิ่มยา กรุณาติดต่อผู้ดูแลระบบ');
+      } else if (errorMsg.contains('network') || errorMsg.contains('SocketException')) {
+        throw Exception('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ กรุณาตรวจสอบอินเทอร์เน็ต');
+      }
+      throw Exception('บันทึกยาไม่สำเร็จ: $errorMsg');
     }
   }
 

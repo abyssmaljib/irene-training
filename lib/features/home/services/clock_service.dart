@@ -9,10 +9,20 @@ import '../models/shift_leader.dart';
 /// Service สำหรับจัดการ Clock In/Out
 class ClockService {
   static final ClockService instance = ClockService._();
-  ClockService._();
+  ClockService._()
+      : _supabase = Supabase.instance.client,
+        _userService = UserService();
 
-  final _supabase = Supabase.instance.client;
-  final _userService = UserService();
+  /// Constructor สำหรับ testing — inject dependencies แทน singleton
+  @visibleForTesting
+  ClockService.forTesting({
+    required SupabaseClient client,
+    required UserService userService,
+  })  : _supabase = client,
+        _userService = userService;
+
+  final SupabaseClient _supabase;
+  final UserService _userService;
 
   // Cache
   ClockInOut? _cachedCurrentShift;
@@ -65,7 +75,41 @@ class ClockService {
     }
   }
 
+  // ========================================
+  // Database Operations — แยกออกมาเป็น method ที่ override ได้ใน test
+  // ========================================
+
+  /// ค้นหา active shift (ยังไม่ clock out) ของ user
+  /// แยกออกมาเพื่อให้ test override ได้
+  @visibleForTesting
+  Future<Map<String, dynamic>?> queryActiveShift(
+      String userId, int nursinghomeId) async {
+    return await _supabase
+        .from('clock_in_out_ver2')
+        .select()
+        .eq('user_id', userId)
+        .eq('nursinghome_id', nursinghomeId)
+        .isFilter('clock_out_timestamp', null)
+        .order('clock_in_timestamp', ascending: false)
+        .limit(1)
+        .maybeSingle();
+  }
+
+  /// Insert clock-in record ใหม่
+  /// แยกออกมาเพื่อให้ test override ได้
+  @visibleForTesting
+  Future<Map<String, dynamic>> insertClockInRecord(
+      Map<String, dynamic> data) async {
+    return await _supabase
+        .from('clock_in_out_ver2')
+        .insert(data)
+        .select()
+        .single();
+  }
+
   /// ขึ้นเวร (Clock In)
+  /// ป้องกัน duplicate: เช็คว่ามี active shift อยู่แล้วหรือไม่ก่อน insert
+  /// ถ้ามีอยู่แล้ว → return record เดิมแทน ไม่ insert ซ้ำ
   Future<ClockInOut?> clockIn({
     required List<int> zoneIds,
     required List<int> residentIds,
@@ -77,13 +121,27 @@ class ClockService {
     if (userId == null || nursinghomeId == null) return null;
 
     try {
+      // ========================================
+      // ป้องกัน duplicate clock-in (ชั้นที่ 1: Flutter service)
+      // ========================================
+      // เช็คว่ามี active shift (ยังไม่ clock out) อยู่แล้วหรือไม่
+      // ถ้ามี → return record เดิมแทนการ insert ใหม่
+      final existing = await queryActiveShift(userId, nursinghomeId);
+
+      if (existing != null) {
+        debugPrint(
+            '[ClockService] มี active shift อยู่แล้ว (id: ${existing['id']}) → ไม่ insert ซ้ำ');
+        invalidateCache();
+        return ClockInOut.fromJson(existing);
+      }
+
       // กำหนด shift ตามเวลาปัจจุบัน
       // AM (00:00-11:59) = เวรเช้า, PM (12:00-23:59) = เวรดึก
       final now = DateTime.now();
       final hour = now.hour;
       final shift = hour < 12 ? 'เวรเช้า' : 'เวรดึก';
 
-      final response = await _supabase.from('clock_in_out_ver2').insert({
+      final response = await insertClockInRecord({
         'user_id': userId,
         'nursinghome_id': nursinghomeId,
         'isAuto': false,
@@ -93,12 +151,28 @@ class ClockService {
         'shift': shift,
         'selected_resident_id_list': residentIds,
         'selected_break_time': breakTimeIds,
-      }).select().single();
+      });
 
       // Clear cache
       invalidateCache();
 
       return ClockInOut.fromJson(response);
+    } on PostgrestException catch (e) {
+      // ========================================
+      // ป้องกัน duplicate clock-in (ชั้นที่ 3: Database unique constraint)
+      // ========================================
+      // ถ้า database reject เพราะ unique constraint (code 23505)
+      // แสดงว่ามี active shift อยู่แล้ว → ดึง record เดิมมา return แทน
+      if (e.code == '23505') {
+        debugPrint(
+            '[ClockService] Database ป้องกัน duplicate → ดึง active shift เดิม');
+        final fallback = await queryActiveShift(userId, nursinghomeId);
+        if (fallback != null) {
+          invalidateCache();
+          return ClockInOut.fromJson(fallback);
+        }
+      }
+      return null;
     } catch (e) {
       return null;
     }

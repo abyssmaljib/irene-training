@@ -56,6 +56,16 @@ class ChatState {
   /// เก็บไว้เพื่อให้ user กด "ส่งอีกครั้ง" ได้
   final String? failedMessage;
 
+  /// ระดับความลึกของสาเหตุ (1-5) จาก AI
+  /// 1=อาการ, 2=สาเหตุตรง, 3=ปัจจัยร่วม, 4=เชิงระบบ, 5=รากเหง้า
+  final int? rootCauseDepth;
+
+  /// หมวด Fishbone ที่สำรวจแล้ว เช่น ["คน", "กระบวนการ"]
+  final List<String> exploredCategories;
+
+  /// คุณภาพการวิเคราะห์: "shallow", "moderate", "deep"
+  final String? analysisQuality;
+
   const ChatState({
     this.messages = const [],
     this.isSending = false,
@@ -69,6 +79,9 @@ class ChatState {
     this.availableCoreValues = const [],
     this.currentPillar,
     this.failedMessage,
+    this.rootCauseDepth,
+    this.exploredCategories = const [],
+    this.analysisQuality,
   });
 
   /// สร้าง copy พร้อมเปลี่ยนค่าบางส่วน
@@ -89,6 +102,11 @@ class ChatState {
     bool clearCurrentPillar = false,
     String? failedMessage,
     bool clearFailedMessage = false,
+    int? rootCauseDepth,
+    bool clearRootCauseDepth = false,
+    List<String>? exploredCategories,
+    String? analysisQuality,
+    bool clearAnalysisQuality = false,
   }) {
     return ChatState(
       messages: messages ?? this.messages,
@@ -107,6 +125,11 @@ class ChatState {
           clearCurrentPillar ? null : (currentPillar ?? this.currentPillar),
       failedMessage:
           clearFailedMessage ? null : (failedMessage ?? this.failedMessage),
+      rootCauseDepth:
+          clearRootCauseDepth ? null : (rootCauseDepth ?? this.rootCauseDepth),
+      exploredCategories: exploredCategories ?? this.exploredCategories,
+      analysisQuality:
+          clearAnalysisQuality ? null : (analysisQuality ?? this.analysisQuality),
     );
   }
 }
@@ -264,6 +287,10 @@ class ChatNotifier extends StateNotifier<ChatState> {
           availableCoreValues: response.availableCoreValues,
           // อัพเดต current pillar ที่กำลังถามอยู่
           currentPillar: response.currentPillar,
+          // อัพเดต depth tracking (v24)
+          rootCauseDepth: response.rootCauseDepth,
+          exploredCategories: response.exploredCategories,
+          analysisQuality: response.analysisQuality,
         );
 
         // บันทึก chat history
@@ -340,6 +367,10 @@ class ChatNotifier extends StateNotifier<ChatState> {
           showCoreValuePicker: response.showCoreValuePicker,
           availableCoreValues: response.availableCoreValues,
           currentPillar: response.currentPillar,
+          // อัพเดต depth tracking (v24)
+          rootCauseDepth: response.rootCauseDepth,
+          exploredCategories: response.exploredCategories,
+          analysisQuality: response.analysisQuality,
         );
 
         // บันทึก chat history

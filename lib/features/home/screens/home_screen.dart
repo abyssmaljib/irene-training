@@ -412,6 +412,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Future<void> _handleClockIn() async {
+    // ========================================
+    // ป้องกัน duplicate clock-in (ชั้นที่ 2: UI guard)
+    // ========================================
+    // ถ้ากำลัง clock-in อยู่แล้ว หรือมี active shift อยู่แล้ว → ไม่ทำซ้ำ
+    if (_isClockingIn) return;
+    if (_currentShift != null) return;
+
     // Validation: ต้องเลือกครบทุก field
     if (_selectedZoneIds.isEmpty ||
         _selectedResidentIds.isEmpty ||

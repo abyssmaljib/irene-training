@@ -193,12 +193,18 @@ class _QuickActionSheet extends StatelessWidget {
   }
 
   void _handleAction(BuildContext context, String action) {
-    Navigator.pop(context);
+    // เก็บ reference ของ Navigator ก่อน pop
+    // เพราะหลัง pop แล้ว context จะ deactivated → หา Navigator ไม่เจอ
+    final navigator = Navigator.of(context);
+
+    // เก็บ overlay context สำหรับ toast (ใช้ context ของ navigator)
+    final overlayContext = navigator.context;
+
+    navigator.pop();
 
     switch (action) {
       case 'vital_sign':
-        Navigator.push(
-          context,
+        navigator.push(
           MaterialPageRoute(
             builder: (_) => CreateVitalSignScreen(
               residentId: residentId,
@@ -208,16 +214,16 @@ class _QuickActionSheet extends StatelessWidget {
         );
         return;
       case 'bowel_movement':
-        _showComingSoon(context, 'บันทึกการขับถ่าย');
+        _showComingSoon(overlayContext, 'บันทึกการขับถ่าย');
         break;
       case 'photo':
-        _showComingSoon(context, 'ถ่ายรูป');
+        _showComingSoon(overlayContext, 'ถ่ายรูป');
         break;
       case 'quick_note':
-        _showComingSoon(context, 'โน้ตด่วน');
+        _showComingSoon(overlayContext, 'โน้ตด่วน');
         break;
       default:
-        _showComingSoon(context, 'ฟีเจอร์นี้');
+        _showComingSoon(overlayContext, 'ฟีเจอร์นี้');
     }
   }
 

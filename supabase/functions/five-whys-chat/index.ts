@@ -1,7 +1,11 @@
-// Edge Function: five-whys-chat (Version 23)
+// Edge Function: five-whys-chat (Version 25)
 // ใช้ Google Gemini API สำหรับ 5 Whys Coaching AI
 // รับข้อความจาก user และตอบกลับพร้อมติดตาม progress ของ 4 pillars
 // AI ประเมิน progress และ extract content เอง แล้ว return ให้ Flutter บันทึกลง DB ทันที
+// v25: Dynamic model selection — LEVEL_3 (รุนแรง) ใช้ gemini-3-pro-preview, อื่นๆ ใช้ gemini-3-flash-preview
+// v24: Enhanced RCA — เพิ่ม root_cause_depth (1-5), explored_categories (Fishbone), analysis_quality
+//       ปรับ prompt ให้ลึกกว่าเดิมมาก (Fishbone, Swiss Cheese, probing techniques, defensive handling)
+//       เพิ่ม safety check: ห้าม mark root_cause complete ถ้า depth < 3
 // v15: รองรับ user_name parameter เพื่อให้ AI เรียกชื่อผู้ใช้ได้ถูกต้อง (จาก nickname หรือ full_name)
 // v16: แก้ไขการ clean response - ดึงเฉพาะ JSON object ออกจาก response ที่อาจมีข้อความปนมา
 // v17: ใช้ Gemini JSON mode (responseMimeType: "application/json") เพื่อบังคับให้ return valid JSON
@@ -25,23 +29,77 @@ const supabase = createClient(
 const genAI = new GoogleGenerativeAI(Deno.env.get('GEMINI_API_KEY')!)
 
 // Default System prompt (ใช้เมื่อไม่มีใน DB)
+// v24: Enhanced RCA prompt — เพิ่ม depth levels, Fishbone, Swiss Cheese, probing techniques, defensive handling
 const DEFAULT_SYSTEM_PROMPT = `คุณเป็น AI Coach ที่ช่วยพนักงาน Nursing Home ถอดบทเรียนจากเหตุการณ์ที่เกิดขึ้น
-ใช้เทคนิค 5 Whys เพื่อหาสาเหตุที่แท้จริง และช่วยวิเคราะห์ 4 ประเด็นสำคัญ:
+เป้าหมาย: ช่วยพนักงานค้นพบ **สาเหตุเชิงระบบ** (ไม่ใช่โทษตัวบุคคล) และวางแผนป้องกันที่เป็นรูปธรรม
 
-1. **ความสำคัญ (Why It Matters)**: ทำไมเรื่องนี้ถึงสำคัญ? ผลกระทบที่อาจเกิดขึ้นคืออะไร?
-2. **สาเหตุที่แท้จริง (Root Cause)**: ถามว่า "ทำไม?" ซ้ำๆ จนเจอสาเหตุที่แท้จริง
-3. **Core Values Analysis**: พฤติกรรมนี้ขัดแย้งกับค่านิยมหลักข้อใด?
-4. **แนวทางการป้องกัน (Prevention Plan)**: จะป้องกันไม่ให้เกิดซ้ำได้อย่างไร?
+## 4 ประเด็นที่ต้องครบ:
+1. **ความสำคัญ (Why It Matters)**: ผลกระทบต่อผู้สูงอายุ ครอบครัว ทีมงาน และองค์กร
+2. **สาเหตุที่แท้จริง (Root Cause)**: ใช้เทคนิค 5 Whys + Fishbone + Swiss Cheese หาสาเหตุเชิงระบบ
+3. **Core Values Analysis**: พฤติกรรมนี้เกี่ยวข้องกับค่านิยมหลักข้อใด
+4. **แนวทางการป้องกัน (Prevention Plan)**: แผนป้องกันที่เป็นรูปธรรม ทำได้จริง วัดผลได้
 
-แนวทางการสนทนา:
+## เทคนิคการหาสาเหตุ (สำคัญมาก — อ่านให้ละเอียด!):
+
+### ระดับความลึกของสาเหตุ (ต้องถึงอย่างน้อย Level 3-4 ก่อน mark root_cause complete):
+- **Level 1 SYMPTOM** (อาการ): สิ่งที่เกิดขึ้น เช่น "ผู้สูงอายุล้ม" "ให้ยาผิด"
+- **Level 2 DIRECT CAUSE** (สาเหตุตรง): สิ่งที่ทำให้เกิดโดยตรง เช่น "ไม่ได้จับราวจับ" "อ่านชื่อยาผิด"
+- **Level 3 CONTRIBUTING FACTORS** (ปัจจัยร่วม): ปัจจัยที่เอื้อให้เกิด เช่น "รีบไปทำอย่างอื่น" "ป้ายยาตัวเล็กอ่านยาก"
+- **Level 4 SYSTEMIC CAUSE** (สาเหตุเชิงระบบ): ปัญหาระดับองค์กร เช่น "พนักงานไม่พอทำให้ต้องรีบ" "ไม่มี double-check system"
+- **Level 5 ROOT CAUSE** (สาเหตุราก): ข้อบกพร่องของระบบ/นโยบาย เช่น "ระบบจัดเวรไม่คำนึงถึง peak hours" "SOP ไม่ได้อัปเดต 2 ปี"
+
+### ห้ามยอมรับคำตอบตื้นๆ!
+ถ้า user ตอบแค่ Level 1-2 ต้องถามต่อ ตัวอย่าง:
+- "เข้าใจค่ะ แต่อยากถามต่ออีกนิดนะคะ — ทำไม [สิ่งที่เขาตอบ] ถึงเกิดขึ้นล่ะคะ?"
+- "คุณพูดว่า 'รีบ' — รีบเพราะอะไรเหรอคะ? มีอะไรที่ทำให้ต้องรีบ?"
+- "ถ้ามองในมุมระบบ มีอะไรที่ควรจะช่วยป้องกันเรื่องนี้ได้ไหมคะ?"
+- "สมมุติว่ามีพนักงานใหม่มาเจอสถานการณ์เดียวกัน ระบบที่มีอยู่จะช่วยป้องกันได้ไหม?"
+
+### สำรวจหลายมิติ (Fishbone — ต้องสำรวจอย่างน้อย 2-3 หมวดก่อน mark root_cause complete):
+- **คน**: ทักษะ ความรู้ ความเหนื่อยล้า การสื่อสารระหว่างเวร ประสบการณ์
+- **กระบวนการ**: SOP มีชัดเจนไหม ขั้นตอนส่งต่อ checklist ระบบ double-check
+- **อุปกรณ์/วัสดุ**: ความพร้อม สภาพ ออกแบบเหมาะสมไหม ของเพียงพอไหม
+- **สภาพแวดล้อม**: ปริมาณงาน ช่วงเวลา (peak hours?) สถานที่ แสงสว่าง
+- **การบริหาร**: จำนวนคนเพียงพอไหม การกำกับดูแล ทรัพยากร การอบรม
+
+วิธีถาม Fishbone อย่างเป็นธรรมชาติ:
+- "นอกจากเรื่อง [สิ่งที่คุยแล้ว] มีเรื่องอุปกรณ์หรือสิ่งของที่เกี่ยวข้องไหมคะ?"
+- "ช่วงเวลาที่เกิดเหตุ มีอะไรพิเศษไหม? เป็นช่วงเปลี่ยนเวรหรือช่วงยุ่งหรือเปล่า?"
+- "ขั้นตอนการทำงาน มี SOP หรือ checklist ที่เกี่ยวกับเรื่องนี้ไหมคะ?"
+
+### ถามเรื่องด่านป้องกันที่พลาด (Swiss Cheese):
+- "ปกติมีขั้นตอนหรือด่านอะไรบ้างที่ควรจะจับเรื่องนี้ได้ก่อนที่จะเกิดเหตุ?"
+- "ด่านไหนที่พลาดไป? ทำไมถึงพลาด?"
+- "ถ้าด่านนั้นทำงานได้ปกติ เรื่องนี้จะเกิดขึ้นไหม?"
+
+## วิธีรับมือพนักงานที่ตอบสั้น/ตั้งรับ/โทษตัวเอง:
+
+### ตอบสั้นมาก (เช่น "ไม่รู้" "ก็แค่พลาด"):
+- Reflect back + ถามขยาย: "เข้าใจค่ะ เล่าให้ฟังเพิ่มอีกหน่อยได้ไหมคะว่าตอนนั้นสถานการณ์เป็นยังไง?"
+- ช่วยแตกประเด็น: "ลองนึกดูนะคะ ตอนนั้นเรื่อง**คน**เป็นยังไง? เรื่อง**อุปกรณ์**? เรื่อง**ขั้นตอนการทำงาน**?"
+- ถ้าตอบ "ไม่รู้" 2 ครั้งซ้อน: เปลี่ยนมุม เช่น "งั้นลองมองจากมุมนี้แทนนะคะ — ถ้าต้องอธิบายให้เพื่อนร่วมงานฟังว่าเกิดอะไรขึ้น จะเล่ายังไง?"
+
+### โทษตัวเอง (เช่น "ก็ผมผิดเอง" "ผมไม่รอบคอบ"):
+- Redirect ไปที่ระบบทันที: "เราไม่ได้มองหาว่าใครผิดนะคะ เราอยากรู้ว่า**ระบบ**จะช่วยป้องกันได้อย่างไรมากกว่า"
+- ถามเชิงระบบ: "ถ้าเป็นคนอื่นที่เจอสถานการณ์เดียวกัน มีโอกาสพลาดเหมือนกันไหม? ถ้ามี แปลว่าปัญหาอยู่ที่ระบบ ไม่ใช่ที่ตัวคุณ"
+
+### ตั้งรับ/ไม่อยากคุย:
+- ใช้สมมุติ: "สมมุติว่าเพื่อนร่วมงานเจอสถานการณ์แบบนี้ คุณจะแนะนำอะไร?"
+- Validate ก่อน: "เข้าใจนะคะว่าเรื่องแบบนี้อาจไม่สบายใจที่จะคุย แต่เป้าหมายของเราคือป้องกันไม่ให้เกิดซ้ำ ไม่ได้มาตำหนิใครเลยค่ะ"
+
+### ตอบตื้นซ้ำ 3 ครั้งในหัวข้อเดียว:
+- สรุปสิ่งที่ได้แล้วเดินหน้าต่อ: "จากที่คุยมา สาเหตุที่เราเจอคือ [สรุป] นะคะ งั้นเรามาดูเรื่อง [หัวข้อถัดไป] กันต่อนะคะ"
+
+## แนวทางการสนทนา:
 - ใช้ภาษาไทย เป็นมิตร ให้กำลังใจ ไม่ตำหนิ
 - ถามทีละคำถาม ไม่ถามหลายคำถามพร้อมกัน
-- ฟังอย่างตั้งใจ สรุปสิ่งที่ได้ยิน
+- **สรุปสิ่งที่ได้ยินก่อนถามต่อเสมอ** — แสดงว่าฟังจริง
 - ช่วยให้พนักงานค้นพบคำตอบด้วยตัวเอง ไม่ใช่บอกคำตอบ
-- เมื่อครบ 4 ประเด็น ให้สรุปและแสดงความชื่นชม
-- **ห้ามขอบคุณ user ทุกรอบ** - ไม่ต้องพูดว่า "ขอบคุณที่เล่าให้ฟัง" หรือ "ขอบคุณที่ตอบ" ทุกครั้ง ให้ตอบกลับและถามคำถามต่อทันที
+- **ห้ามขอบคุณ user ทุกรอบ** ให้ตอบกลับและถามคำถามต่อทันที
+- เมื่อครบ 4 ประเด็นด้วยความลึกเพียงพอ ให้สรุปและชื่นชม
+- **จำกัดการสนทนาไม่เกิน 15-20 ข้อความ** (ถามประมาณ 8-12 คำถาม)
 
-เริ่มต้นด้วยการทักทายและขอให้เล่าเหตุการณ์ในมุมมองของพนักงาน`
+เริ่มต้นด้วยการทักทาย{{USER_NAME}}และขอให้เล่าเหตุการณ์ในมุมมองของพนักงาน`
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -278,8 +336,13 @@ Deno.serve(async (req) => {
       .replace(/\{\{INCIDENT_DESCRIPTION\}\}/g, incident_description || incident?.description || 'ไม่ระบุ')
       .replace(/\{\{CORE_VALUES_LIST\}\}/g, coreValuesText)
 
-    // สร้าง Gemini model - ใช้ Gemini 3 Flash Preview (เร็วกว่า)
-    const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' })
+    // เลือก model ตาม severity:
+    // - LEVEL_3 (รุนแรง/ผิดวินัย) → ใช้ gemini-3-pro-preview (ฉลาดสุด, probe ลึก, reasoning ดีกว่า)
+    // - LEVEL_1, LEVEL_2 → ใช้ gemini-3-flash-preview (เร็ว, ถูก, ฉลาดเพียงพอ)
+    const isHighSeverity = incident?.severity === 'LEVEL_3'
+    const modelName = isHighSeverity ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview'
+    console.log(`Using model: ${modelName} (severity: ${incident?.severity || 'unknown'})`)
+    const model = genAI.getGenerativeModel({ model: modelName })
 
     // Build conversation history for Gemini
     const geminiHistory = chat_history.map(msg => ({
@@ -306,11 +369,15 @@ ${coreValuesText}
 3. "pillar_content": extract เนื้อหาที่ USER ตอบมาในแต่ละหัวข้อ (ถ้ามี)
 4. "is_complete": true เมื่อครบทั้ง 4 หัวข้อ
 5. "current_pillar": ตัวเลข 1-4 บอกว่าตอนนี้กำลังถามเรื่องอะไร (1=ความสำคัญ, 2=สาเหตุ, 3=Core Values, 4=การป้องกัน)
+6. "root_cause_depth": ตัวเลข 1-5 ประเมินระดับความลึกของสาเหตุที่ USER ตอบมา (1=อาการ, 2=สาเหตุตรง, 3=ปัจจัยร่วม, 4=เชิงระบบ, 5=รากเหง้า) ใส่ null ถ้ายังไม่ได้เริ่มถามสาเหตุ
+7. "explored_categories": array ของหมวด Fishbone ที่ได้สำรวจแล้ว เช่น ["คน", "กระบวนการ", "สภาพแวดล้อม"]
+8. "analysis_quality": ประเมินคุณภาพการวิเคราะห์โดยรวม — "shallow" (Level 1-2, สำรวจ 0-1 หมวด), "moderate" (Level 3, สำรวจ 2 หมวด), "deep" (Level 4-5, สำรวจ 3+ หมวด)
 
 ### กฎการประเมิน pillars_progress (สำคัญมาก!):
 - ตั้งค่าเป็น true เฉพาะเมื่อ **USER ตอบ** ข้อมูลในหัวข้อนั้นแล้วเท่านั้น
 - ห้าม! ตั้งค่าเป็น true ถ้า AI เป็นคนพูดถึงเรื่องนั้น - ต้องเป็น USER ที่ตอบเอง!
 - ถ้าเพิ่งเริ่มสนทนา หรือ AI เพิ่งถาม ทุกค่าต้องเป็น false
+- **สำหรับ root_cause**: ห้าม mark true ถ้า root_cause_depth ยังต่ำกว่า 3! ต้องถึงอย่างน้อย Level 3 (ปัจจัยร่วม) และสำรวจอย่างน้อย 2 หมวด Fishbone
 
 ### กฎการ extract pillar_content:
 - extract เฉพาะข้อมูลที่ USER พูดถึง (ไม่ใช่ที่ AI ถาม)
@@ -344,23 +411,30 @@ ${coreValuesText}
 - ai_message คือข้อความที่จะแสดงใน chat bubble โดยตรง - ต้องอ่านเข้าใจง่าย ไม่มี code ปน
 
 ### โครงสร้าง JSON Response:
-Response ต้องเป็น JSON object ที่มี 6 fields แยกกันชัดเจน:
+Response ต้องเป็น JSON object ที่มี 9 fields แยกกันชัดเจน:
 1. "ai_message": string - ข้อความสนทนาภาษาไทยเท่านั้น (ห้ามมี JSON ปน!)
 2. "pillars_progress": object - ประเมิน progress ของ 4 หัวข้อ
 3. "pillar_content": object - extract เนื้อหาจาก user
 4. "is_complete": boolean - สถานะเสร็จสิ้น
 5. "show_core_value_picker": boolean - true เมื่อต้องการให้ user เลือก Core Values
 6. "current_pillar": number|null - ตัวเลข 1-4 บอกว่ากำลังถามเรื่องอะไร (null ถ้าไม่ได้ถามเรื่องใดเฉพาะ)
+7. "root_cause_depth": number|null - ระดับความลึก 1-5 ของสาเหตุที่ USER ตอบ (null ถ้ายังไม่เริ่ม)
+8. "explored_categories": string[] - หมวด Fishbone ที่สำรวจแล้ว เช่น ["คน", "กระบวนการ"]
+9. "analysis_quality": string|null - "shallow" | "moderate" | "deep"
 
-### ตัวอย่างที่ถูกต้อง (ai_message เป็นข้อความสนทนาล้วนๆ):
-{"ai_message": "สวัสดีค่ะจิ๊บ ขอบคุณที่มาคุยกันนะคะ มาเริ่มถอดบทเรียนกันเลยค่ะ เล่าให้ฟังหน่อยได้ไหมคะว่าเหตุการณ์นี้ส่งผลกระทบอย่างไรบ้าง?", "pillars_progress": {"why_it_matters": false, "root_cause": false, "core_values": false, "prevention_plan": false}, "pillar_content": {"why_it_matters": null, "root_cause": null, "core_value_analysis": null, "violated_core_values": [], "prevention_plan": null}, "is_complete": false, "show_core_value_picker": false, "current_pillar": 1}
+### ตัวอย่างที่ถูกต้อง (เริ่มสนทนา):
+{"ai_message": "สวัสดีค่ะจิ๊บ มาเริ่มถอดบทเรียนกันเลยนะคะ เล่าให้ฟังหน่อยได้ไหมคะว่าเหตุการณ์นี้ส่งผลกระทบอย่างไรบ้าง?", "pillars_progress": {"why_it_matters": false, "root_cause": false, "core_values": false, "prevention_plan": false}, "pillar_content": {"why_it_matters": null, "root_cause": null, "core_value_analysis": null, "violated_core_values": [], "prevention_plan": null}, "is_complete": false, "show_core_value_picker": false, "current_pillar": 1, "root_cause_depth": null, "explored_categories": [], "analysis_quality": null}
 
-### ตัวอย่างเมื่อถึงขั้นตอน Core Values (show_core_value_picker = true, current_pillar = 3):
-{"ai_message": "จากที่คุยกันมา เรามาดูกันว่าเหตุการณ์นี้เกี่ยวข้องกับค่านิยมหลักข้อไหนบ้างนะคะ กรุณาเลือก Core Values ที่เกี่ยวข้องค่ะ", "pillars_progress": {"why_it_matters": true, "root_cause": true, "core_values": false, "prevention_plan": false}, "pillar_content": {...}, "is_complete": false, "show_core_value_picker": true, "current_pillar": 3}
+### ตัวอย่างกำลัง probe สาเหตุ (user ตอบตื้นอยู่ที่ Level 2 ต้องถามต่อ):
+{"ai_message": "เข้าใจค่ะ ที่บอกว่ารีบจนลืมเช็ค — รีบเพราะอะไรเหรอคะ? ช่วงนั้นปริมาณงานเป็นยังไงบ้าง?", "pillars_progress": {"why_it_matters": true, "root_cause": false, "core_values": false, "prevention_plan": false}, "pillar_content": {"why_it_matters": "ผู้สูงอายุได้รับยาผิด อาจเกิดผลข้างเคียงรุนแรง", "root_cause": "รีบทำงานจนลืมตรวจสอบชื่อยา", "core_value_analysis": null, "violated_core_values": [], "prevention_plan": null}, "is_complete": false, "show_core_value_picker": false, "current_pillar": 2, "root_cause_depth": 2, "explored_categories": ["คน"], "analysis_quality": "shallow"}
+
+### ตัวอย่างเมื่อถึง Core Values (show_core_value_picker = true):
+{"ai_message": "จากที่คุยกันมา เรามาดูกันว่าเหตุการณ์นี้เกี่ยวข้องกับค่านิยมหลักข้อไหนบ้างนะคะ กรุณาเลือก Core Values ที่เกี่ยวข้องค่ะ", "pillars_progress": {"why_it_matters": true, "root_cause": true, "core_values": false, "prevention_plan": false}, "pillar_content": {"why_it_matters": "...", "root_cause": "ระบบจัดเวรไม่คำนึงถึง peak hours ทำให้พนักงานมีภาระงานมากจนต้องรีบ", "core_value_analysis": null, "violated_core_values": [], "prevention_plan": null}, "is_complete": false, "show_core_value_picker": true, "current_pillar": 3, "root_cause_depth": 4, "explored_categories": ["คน", "กระบวนการ", "การบริหาร"], "analysis_quality": "deep"}
 
 ### ตัวอย่างที่ผิด (ห้ามทำแบบนี้!):
 {"ai_message": "สวัสดีค่ะ", "pillars_progress": {"why_it_matters": true}...} <-- ผิด! ai_message ต้องไม่มี JSON ต่อท้าย
-{"ai_message": "ขอบคุณค่ะ, \\"why_it_matters\\": true"} <-- ผิด! ห้ามมี JSON keys ใน ai_message`
+{"ai_message": "ขอบคุณค่ะ, \\"why_it_matters\\": true"} <-- ผิด! ห้ามมี JSON keys ใน ai_message
+root_cause = true แต่ root_cause_depth = 2 <-- ผิด! ต้องถึง Level 3+ ก่อน mark true`
 
     // เริ่ม chat session พร้อม JSON mode
     // ใช้ responseMimeType: "application/json" เพื่อบังคับให้ Gemini return valid JSON
@@ -372,7 +446,7 @@ Response ต้องเป็น JSON object ที่มี 6 fields แยก
         },
         {
           role: 'model',
-          parts: [{ text: '{"ai_message": "เข้าใจแล้วค่ะ ฉันพร้อมช่วยถอดบทเรียนและจะตอบเป็น JSON format", "pillars_progress": {"why_it_matters": false, "root_cause": false, "core_values": false, "prevention_plan": false}, "pillar_content": {"why_it_matters": null, "root_cause": null, "core_value_analysis": null, "violated_core_values": [], "prevention_plan": null}, "is_complete": false, "show_core_value_picker": false, "current_pillar": null}' }]
+          parts: [{ text: '{"ai_message": "เข้าใจแล้วค่ะ ฉันพร้อมช่วยถอดบทเรียนและจะตอบเป็น JSON format", "pillars_progress": {"why_it_matters": false, "root_cause": false, "core_values": false, "prevention_plan": false}, "pillar_content": {"why_it_matters": null, "root_cause": null, "core_value_analysis": null, "violated_core_values": [], "prevention_plan": null}, "is_complete": false, "show_core_value_picker": false, "current_pillar": null, "root_cause_depth": null, "explored_categories": [], "analysis_quality": null}' }]
         },
         ...geminiHistory
       ],
@@ -408,6 +482,10 @@ Response ต้องเป็น JSON object ที่มี 6 fields แยก
     let isComplete = false
     let showCoreValuePicker = false
     let currentPillar: number | null = null
+    // v24: new depth tracking fields
+    let rootCauseDepth: number | null = null
+    let exploredCategories: string[] = []
+    let analysisQuality: string | null = null
 
     try {
       // ดึงเฉพาะ JSON จาก response (ลบข้อความที่ AI อาจตอบมาปนนอก JSON)
@@ -449,6 +527,31 @@ Response ต้องเป็น JSON object ที่มี 6 fields แยก
       } else {
         currentPillar = null
       }
+
+      // v24: Parse depth tracking fields
+      // root_cause_depth: ระดับความลึก 1-5 ของสาเหตุ
+      const parsedDepth = parsed.root_cause_depth
+      if (typeof parsedDepth === 'number' && parsedDepth >= 1 && parsedDepth <= 5) {
+        rootCauseDepth = parsedDepth
+      }
+      // explored_categories: หมวด Fishbone ที่สำรวจแล้ว
+      const validCategories = ['คน', 'กระบวนการ', 'อุปกรณ์', 'สภาพแวดล้อม', 'การบริหาร']
+      if (Array.isArray(parsed.explored_categories)) {
+        exploredCategories = parsed.explored_categories
+          .filter((c: string) => typeof c === 'string' && validCategories.includes(c))
+      }
+      // analysis_quality: คุณภาพการวิเคราะห์
+      const validQualities = ['shallow', 'moderate', 'deep']
+      if (typeof parsed.analysis_quality === 'string' && validQualities.includes(parsed.analysis_quality)) {
+        analysisQuality = parsed.analysis_quality
+      }
+
+      // v24: Safety check — ห้าม mark root_cause complete ถ้า depth ยังต่ำกว่า 3
+      // เป็น safeguard กรณี AI ไม่ทำตาม prompt
+      if (pillarsProgress.root_cause && rootCauseDepth !== null && rootCauseDepth < 3) {
+        console.log(`Safety: root_cause marked true but depth is only ${rootCauseDepth}, reverting to false`)
+        pillarsProgress.root_cause = false
+      }
     } catch (parseError) {
       console.error('Error parsing AI response as JSON:', parseError)
       // ถ้า parse ไม่ได้ ใช้ response เดิมเป็น message
@@ -465,8 +568,9 @@ Response ต้องเป็น JSON object ที่มี 6 fields แยก
     console.log('Pillar content:', pillarContent)
     console.log('Show core value picker:', showCoreValuePicker)
     console.log('Current pillar:', currentPillar)
+    console.log('Root cause depth:', rootCauseDepth, '| Explored:', exploredCategories, '| Quality:', analysisQuality)
 
-    // สร้าง response object
+    // สร้าง response object (v24: เพิ่ม depth tracking fields)
     const responseData: Record<string, unknown> = {
       ai_message: aiMessage,
       pillars_progress: pillarsProgress,
@@ -474,6 +578,10 @@ Response ต้องเป็น JSON object ที่มี 6 fields แยก
       is_complete: isComplete,
       show_core_value_picker: showCoreValuePicker,
       current_pillar: currentPillar,
+      // v24: depth tracking — Flutter ใช้แสดง depth meter + quality badge
+      root_cause_depth: rootCauseDepth,
+      explored_categories: exploredCategories,
+      analysis_quality: analysisQuality,
     }
 
     // ถ้า showCoreValuePicker = true ให้ส่ง available_core_values กลับไปด้วย

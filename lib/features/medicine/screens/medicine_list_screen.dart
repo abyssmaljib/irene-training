@@ -203,7 +203,9 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
 
   /// Navigate ไปหน้าเพิ่มยาให้ Resident
   Future<void> _navigateToAddMedicine() async {
-    final result = await Navigator.push<bool>(
+    // ใช้ dynamic เพราะ AddMedicineToResidentScreen pop กลับมาเป็น
+    // medHistoryId (int) หรือ true (bool) — ทั้งคู่หมายถึง "บันทึกสำเร็จ"
+    final result = await Navigator.push<dynamic>(
       context,
       MaterialPageRoute(
         builder: (context) => AddMedicineToResidentScreen(
@@ -214,7 +216,8 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
     );
 
     // ถ้าเพิ่มยาสำเร็จ ให้ reload รายการยา
-    if (result == true) {
+    // result จะเป็น int (medHistoryId) หรือ true (fallback)
+    if (result != null) {
       _loadMedicines();
     }
   }

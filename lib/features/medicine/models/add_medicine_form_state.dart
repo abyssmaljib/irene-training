@@ -34,6 +34,9 @@ class AddMedicineFormState {
   // UI State
   final bool isLoading;
   final String? errorMessage;
+  /// ชื่อ field ที่มี validation error เพื่อให้ UI highlight ได้
+  /// ค่าที่เป็นไปได้: 'medicine', 'takeTab', 'bldb'
+  final String? errorField;
 
   // Search state
   final String searchQuery;
@@ -59,6 +62,7 @@ class AddMedicineFormState {
     this.note = '',
     this.isLoading = false,
     this.errorMessage,
+    this.errorField,
     this.searchQuery = '',
     this.searchResults = const [],
     this.isSearching = false,
@@ -81,15 +85,27 @@ class AddMedicineFormState {
     return true;
   }
 
-  /// Error message สำหรับ validation
-  String? get validationError {
-    if (selectedMedDbId == null) return 'กรุณาเลือกยา';
-    if (takeTab.isEmpty) return 'กรุณาระบุปริมาณยา';
+  /// Error message + field name สำหรับ validation
+  /// Return (message, fieldName) เพื่อให้ UI highlight field ที่ผิดได้
+  ({String message, String field})? get validationErrorWithField {
+    if (selectedMedDbId == null) {
+      return (message: 'กรุณาเลือกยาก่อน — ค้นหาชื่อยาในช่องด้านบน', field: 'medicine');
+    }
+    if (takeTab.isEmpty) {
+      return (message: 'กรุณาระบุปริมาณยา (จำนวนเม็ด/มล.)', field: 'takeTab');
+    }
     final dosage = double.tryParse(takeTab);
-    if (dosage == null || dosage <= 0) return 'ปริมาณยาต้องเป็นตัวเลขที่มากกว่า 0';
-    if (!prn && bldb.isEmpty) return 'กรุณาเลือกเวลาที่ให้ยาอย่างน้อย 1 เวลา';
+    if (dosage == null || dosage <= 0) {
+      return (message: 'ปริมาณยาต้องเป็นตัวเลขที่มากกว่า 0 เช่น 0.5, 1, 2', field: 'takeTab');
+    }
+    if (!prn && bldb.isEmpty) {
+      return (message: 'กรุณาเลือกเวลาที่ให้ยาอย่างน้อย 1 เวลา (เช้า/กลางวัน/เย็น/ก่อนนอน)', field: 'bldb');
+    }
     return null;
   }
+
+  /// Error message สำหรับ validation (backward compat)
+  String? get validationError => validationErrorWithField?.message;
 
   // ==========================================
   // copyWith
@@ -112,6 +128,7 @@ class AddMedicineFormState {
     String? note,
     bool? isLoading,
     String? errorMessage,
+    String? errorField,
     String? searchQuery,
     List<MedDB>? searchResults,
     bool? isSearching,
@@ -137,6 +154,7 @@ class AddMedicineFormState {
       note: note ?? this.note,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
+      errorField: clearErrorMessage ? null : (errorField ?? this.errorField),
       searchQuery: searchQuery ?? this.searchQuery,
       searchResults: searchResults ?? this.searchResults,
       isSearching: isSearching ?? this.isSearching,

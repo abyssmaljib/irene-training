@@ -325,11 +325,13 @@ class AddMedicineFormNotifier
     final currentState = state.value;
     if (currentState == null) return false;
 
-    // Validate
-    final validationError = currentState.validationError;
-    if (validationError != null) {
+    // Validate — ใช้ validationErrorWithField เพื่อได้ทั้ง message และ field name
+    // field name ใช้ให้ UI highlight ช่อง input ที่ต้องแก้ไข
+    final validation = currentState.validationErrorWithField;
+    if (validation != null) {
       state = AsyncValue.data(currentState.copyWith(
-        errorMessage: validationError,
+        errorMessage: validation.message,
+        errorField: validation.field,
       ));
       return false;
     }
@@ -396,22 +398,17 @@ class AddMedicineFormNotifier
         newSetting: newSetting,
       );
 
-      if (result != null) {
-        // เก็บ medHistoryId ไว้ให้ caller ดึงไปใช้ link กับ post
-        _lastMedHistoryId = result.medHistoryId;
-        state = AsyncValue.data(currentState.copyWith(isLoading: false));
-        return true;
-      } else {
-        state = AsyncValue.data(currentState.copyWith(
-          isLoading: false,
-          errorMessage: 'ไม่สามารถบันทึกยาได้ กรุณาลองใหม่',
-        ));
-        return false;
-      }
+      // เก็บ medHistoryId ไว้ให้ caller ดึงไปใช้ link กับ post
+      // result อาจเป็น null ได้ (type signature) แต่ปกติจะ throw แทน
+      _lastMedHistoryId = result?.medHistoryId;
+      state = AsyncValue.data(currentState.copyWith(isLoading: false));
+      return true;
     } catch (e) {
+      // แสดง error message ที่ชัดเจน (service จะ throw พร้อมรายละเอียดแล้ว)
+      final errorMsg = e.toString().replaceFirst('Exception: ', '');
       state = AsyncValue.data(currentState.copyWith(
         isLoading: false,
-        errorMessage: 'เกิดข้อผิดพลาด: $e',
+        errorMessage: errorMsg,
       ));
       return false;
     }

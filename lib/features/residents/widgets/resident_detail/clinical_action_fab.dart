@@ -180,13 +180,19 @@ class _ClinicalActionSheet extends StatelessWidget {
   }
 
   /// เปิดหน้าเพิ่มยา
+  ///
+  /// ต้องเก็บ Navigator ก่อน pop เพราะ context ของ bottom sheet
+  /// จะถูก deactivate หลังจาก pop → ใช้ context เดิมไม่ได้แล้ว
   void _handleAddMedicine(BuildContext context) {
-    // ปิด bottom sheet ก่อน
-    Navigator.pop(context);
+    // เก็บ reference ของ Navigator ก่อน pop
+    // เพราะหลัง pop แล้ว context จะ deactivated → หา Navigator ไม่เจอ
+    final navigator = Navigator.of(context);
 
-    // Navigate ไปหน้าเพิ่มยา
-    Navigator.push(
-      context,
+    // ปิด bottom sheet ก่อน
+    navigator.pop();
+
+    // Navigate ไปหน้าเพิ่มยา (ใช้ navigator ที่เก็บไว้แทน context)
+    navigator.push(
       MaterialPageRoute(
         builder: (_) => AddMedicineToResidentScreen(
           residentId: residentId,

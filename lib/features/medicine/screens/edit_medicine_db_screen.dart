@@ -210,7 +210,8 @@ class _EditMedicineDBScreenState extends ConsumerState<EditMedicineDBScreen> {
     if (result != null && mounted) {
       // สำเร็จ - แสดง popup แล้วกลับ
       await SuccessPopup.show(context, emoji: '💊', message: 'บันทึกสำเร็จ');
-      if (mounted) Navigator.pop(context, true);
+      // return MedDB object เพื่อให้หน้าเรียก auto-select ยาที่แก้ไขได้
+      if (mounted) Navigator.pop(context, result);
     }
   }
 

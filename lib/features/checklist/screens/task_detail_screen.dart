@@ -61,6 +61,9 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
   List<MedicineSummary>? _medicines;
   bool _isLoadingMedicines = false;
 
+  // สำหรับ expandable details ในหน้าจัดยา (default: ซ่อนไว้เพื่อให้เห็นรูปยาทันที)
+  bool _isDetailExpanded = false;
+
   // Realtime subscription
   RealtimeChannel? _taskChannel;
 
@@ -296,131 +299,191 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
             // App Bar
             _buildAppBar(),
 
-            // Content
-            Expanded(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.all(AppSpacing.md),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Unseen badge
-                    if (_showUnseenBadge) _buildUnseenBadge(),
-
-                    // Title
-                    _buildTitle(),
-
-                    // Creator info (ผู้สร้าง task) - อยู่ใต้ title
-                    if (_task.creatorNickname != null) ...[
-                      AppSpacing.verticalGapSm,
-                      _buildCreatorInfo(),
-                    ],
-                    AppSpacing.verticalGapMd,
-
-                    // Info badges
-                    _buildInfoBadges(),
-
-                    // Difficulty score badge (แยกบรรทัดเพราะ height ไม่เท่า badge อื่น)
-                    if (_shouldShowDifficultyBadge) ...[
-                      AppSpacing.verticalGapSm,
-                      _buildDifficultyBadge(_task.difficultyScore!),
-                    ],
-                    AppSpacing.verticalGapMd,
-
-                    // RecurNote (ถ้ามี)
-                    if (_task.recurNote != null &&
-                        _task.recurNote!.isNotEmpty) ...[
-                      _buildRecurNote(),
-                      AppSpacing.verticalGapMd,
-                    ],
-
-                    // Description section
-                    if (_task.description != null &&
-                        _task.description!.isNotEmpty) ...[
-                      _buildDescriptionSection(),
-                      AppSpacing.verticalGapMd,
-                    ],
-
-                    // Form URL (ถ้ามี) - ลิงก์เปิดแบบฟอร์มภายในแอป
-                    if (_task.formUrl != null &&
-                        _task.formUrl!.isNotEmpty) ...[
-                      _buildFormUrlSection(),
-                      AppSpacing.verticalGapMd,
-                    ],
-
-                    // Resident info (ถ้ามี)
-                    if (_task.residentId != null && _task.residentId! > 0) ...[
-                      _buildResidentCard(),
-                      AppSpacing.verticalGapMd,
-                    ],
-
-                    // Sample image OR Medicine grid
-                    if (_isJudYa)
-                      _buildMedicineGrid()
-                    else if (_task.hasSampleImage)
-                      _buildSampleImage(),
-
-                    // Confirm image (ถ้ามี) - ไม่แสดงสำหรับงานจัดยา เพราะรวมใน side-by-side แล้ว
-                    if (!_isJudYa &&
-                        (_task.confirmImage != null ||
-                            _uploadedImageUrl != null)) ...[
-                      AppSpacing.verticalGapMd,
-                      _buildConfirmImage(),
-                    ],
-
-                    // Confirm video (ถ้ามี)
-                    if (_task.hasConfirmVideo) ...[
-                      AppSpacing.verticalGapMd,
-                      _buildConfirmVideo(),
-                    ],
-
-                    // Post images (รูปจากโพสที่ complete task)
-                    if (_task.hasPostImages) ...[
-                      AppSpacing.verticalGapMd,
-                      _buildPostImages(),
-                    ],
-
-                    // Post video (วิดีโอจากโพสที่ complete task)
-                    if (_task.hasPostVideo) ...[
-                      AppSpacing.verticalGapMd,
-                      _buildPostVideo(),
-                    ],
-
-                    // Descript (หมายเหตุ) - ถ้า task มีปัญหาหรือมี problemType
-                    if ((_task.descript != null && _task.descript!.isNotEmpty) ||
-                        _task.problemType != null) ...[
-                      AppSpacing.verticalGapMd,
-                      _buildDescriptNote(),
-                    ],
-
-                    // Postpone info (ถ้าถูกเลื่อนมา)
-                    if (_task.postponeFrom != null) ...[
-                      AppSpacing.verticalGapMd,
-                      _buildPostponeInfo(),
-                    ],
-
-                    // Co-worker picker (แสดงเฉพาะ task ที่ยังไม่ done — ให้เลือกเพื่อนร่วมเวรเพื่อหาร point)
-                    if (!_task.isDone) ...[
-                      AppSpacing.verticalGapMd,
-                      CoWorkerPickerSection(
-                        initialSelection: _selectedCoWorkers,
-                        onChanged: (coWorkers) {
-                          _selectedCoWorkers = coWorkers;
-                        },
-                      ),
-                    ],
-
-                    // Bottom padding for action buttons
-                    const SizedBox(height: 100),
-                  ],
+            // ถ้าเป็นงานจัดยา: compact header อยู่บน (fixed) + grid ยาขยายเต็มพื้นที่ล่าง
+            // ถ้าเป็น task อื่น: layout เดิม (scroll ทั้งหน้า)
+            if (_isJudYa) ...[
+              // Compact header — ข้อมูล task แบบย่อ (fixed height, ไม่ scroll)
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  AppSpacing.md, AppSpacing.sm, AppSpacing.md, 0,
+                ),
+                child: _buildMedicineCompactHeader(),
+              ),
+              // Grid ยา + expandable details — ขยายเต็มพื้นที่ที่เหลือ
+              Expanded(
+                child: _buildMedicineContent(),
+              ),
+            ] else
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.all(AppSpacing.md),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: _buildDefaultLayout(),
+                  ),
                 ),
               ),
-            ),
           ],
         ),
       ),
       // Action buttons
       bottomNavigationBar: _buildActionButtons(),
     );
+  }
+
+  /// Content area สำหรับงานจัดยา — ใช้ LayoutBuilder เพื่อรู้พื้นที่จริง
+  /// แล้วคำนวณ aspect ratio ให้ grid ยาขยายเต็มพื้นที่ที่เหลือ
+  Widget _buildMedicineContent() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // constraints.maxHeight = พื้นที่จริงที่เหลือหลังหัก AppBar + compact header
+        // หักเฉพาะ element ใน scroll area: title ~32, gap 8, expandToggle ~48, gap 16
+        const otherElementsHeight = 104.0;
+        final gridAvailableHeight = constraints.maxHeight - otherElementsHeight;
+
+        return SingleChildScrollView(
+          padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AppSpacing.verticalGapSm,
+
+              // Medicine grid — ขยายเต็มพื้นที่ที่เหลือ
+              _buildMedicineGrid(gridAvailableHeight),
+              AppSpacing.verticalGapMd,
+
+              // ข้อมูลเพิ่มเติม (ซ่อนไว้ default — กดเปิดดูได้)
+              _buildMedicineExpandableDetails(),
+
+              // Co-worker picker (แสดงเฉพาะ task ที่ยังไม่ done)
+              if (!_task.isDone) ...[
+                AppSpacing.verticalGapMd,
+                CoWorkerPickerSection(
+                  initialSelection: _selectedCoWorkers,
+                  onChanged: (coWorkers) {
+                    _selectedCoWorkers = coWorkers;
+                  },
+                ),
+              ],
+
+              // Bottom padding for action buttons
+              const SizedBox(height: 100),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// Layout เดิมสำหรับ task ทั่วไป (ไม่ใช่จัดยา) — ไม่เปลี่ยนแปลง
+  List<Widget> _buildDefaultLayout() {
+    return [
+      // Unseen badge
+      if (_showUnseenBadge) _buildUnseenBadge(),
+
+      // Title
+      _buildTitle(),
+
+      // Creator info (ผู้สร้าง task) - อยู่ใต้ title
+      if (_task.creatorNickname != null) ...[
+        AppSpacing.verticalGapSm,
+        _buildCreatorInfo(),
+      ],
+      AppSpacing.verticalGapMd,
+
+      // Info badges
+      _buildInfoBadges(),
+
+      // Difficulty score badge (แยกบรรทัดเพราะ height ไม่เท่า badge อื่น)
+      if (_shouldShowDifficultyBadge) ...[
+        AppSpacing.verticalGapSm,
+        _buildDifficultyBadge(_task.difficultyScore!),
+      ],
+      AppSpacing.verticalGapMd,
+
+      // RecurNote (ถ้ามี)
+      if (_task.recurNote != null &&
+          _task.recurNote!.isNotEmpty) ...[
+        _buildRecurNote(),
+        AppSpacing.verticalGapMd,
+      ],
+
+      // Description section
+      if (_task.description != null &&
+          _task.description!.isNotEmpty) ...[
+        _buildDescriptionSection(),
+        AppSpacing.verticalGapMd,
+      ],
+
+      // Form URL (ถ้ามี) - ลิงก์เปิดแบบฟอร์มภายในแอป
+      if (_task.formUrl != null &&
+          _task.formUrl!.isNotEmpty) ...[
+        _buildFormUrlSection(),
+        AppSpacing.verticalGapMd,
+      ],
+
+      // Resident info (ถ้ามี)
+      if (_task.residentId != null && _task.residentId! > 0) ...[
+        _buildResidentCard(),
+        AppSpacing.verticalGapMd,
+      ],
+
+      // Sample image
+      if (_task.hasSampleImage)
+        _buildSampleImage(),
+
+      // Confirm image (ถ้ามี)
+      if (_task.confirmImage != null ||
+          _uploadedImageUrl != null) ...[
+        AppSpacing.verticalGapMd,
+        _buildConfirmImage(),
+      ],
+
+      // Confirm video (ถ้ามี)
+      if (_task.hasConfirmVideo) ...[
+        AppSpacing.verticalGapMd,
+        _buildConfirmVideo(),
+      ],
+
+      // Post images (รูปจากโพสที่ complete task)
+      if (_task.hasPostImages) ...[
+        AppSpacing.verticalGapMd,
+        _buildPostImages(),
+      ],
+
+      // Post video (วิดีโอจากโพสที่ complete task)
+      if (_task.hasPostVideo) ...[
+        AppSpacing.verticalGapMd,
+        _buildPostVideo(),
+      ],
+
+      // Descript (หมายเหตุ) - ถ้า task มีปัญหาหรือมี problemType
+      if ((_task.descript != null && _task.descript!.isNotEmpty) ||
+          _task.problemType != null) ...[
+        AppSpacing.verticalGapMd,
+        _buildDescriptNote(),
+      ],
+
+      // Postpone info (ถ้าถูกเลื่อนมา)
+      if (_task.postponeFrom != null) ...[
+        AppSpacing.verticalGapMd,
+        _buildPostponeInfo(),
+      ],
+
+      // Co-worker picker (แสดงเฉพาะ task ที่ยังไม่ done — ให้เลือกเพื่อนร่วมเวรเพื่อหาร point)
+      if (!_task.isDone) ...[
+        AppSpacing.verticalGapMd,
+        CoWorkerPickerSection(
+          initialSelection: _selectedCoWorkers,
+          onChanged: (coWorkers) {
+            _selectedCoWorkers = coWorkers;
+          },
+        ),
+      ],
+
+      // Bottom padding for action buttons
+      const SizedBox(height: 100),
+    ];
   }
 
   Widget _buildAppBar() {
@@ -977,7 +1040,206 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     );
   }
 
-  Widget _buildMedicineGrid() {
+  /// Compact header สำหรับงานจัดยา — แสดงแค่ title + ชื่อผู้สูงอายุ + ห้อง
+  /// เพื่อให้ user เห็นรูปยาทั้งหมดทันทีโดยไม่ต้อง scroll ผ่าน section อื่น
+  Widget _buildMedicineCompactHeader() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Title (เช่น "จัดยาเช้า (ก่อนอาหาร)")
+        Text(
+          _task.title ?? 'ไม่ระบุชื่องาน',
+          style: AppTypography.subtitle.copyWith(fontWeight: FontWeight.w600),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 4),
+        // ชื่อผู้สูงอายุ + ห้อง (ถ้ามี)
+        if (_task.residentId != null && _task.residentId! > 0)
+          Row(
+            children: [
+              // Avatar เล็ก (radius 12 = 24px diameter)
+              IreneNetworkAvatar(
+                imageUrl: _task.residentPictureUrl,
+                radius: 12,
+                backgroundColor: AppColors.accent1,
+                fallbackIcon: HugeIcon(
+                  icon: HugeIcons.strokeRoundedUser,
+                  size: 14,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  // รวมชื่อ + ห้อง เป็นบรรทัดเดียว
+                  [
+                    _task.residentName ?? 'ไม่ระบุ',
+                    if (_task.zoneName != null) _task.zoneName!,
+                  ].join(' · '),
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.secondaryText,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+      ],
+    );
+  }
+
+  /// Expandable section สำหรับข้อมูลเพิ่มเติมในหน้าจัดยา
+  /// ซ่อนไว้ default เพื่อให้รูปยาอยู่ใกล้หัวจอมากที่สุด
+  Widget _buildMedicineExpandableDetails() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Toggle button — กดเพื่อเปิด/ปิดข้อมูลเพิ่มเติม
+        GestureDetector(
+          onTap: () => setState(() => _isDetailExpanded = !_isDetailExpanded),
+          child: Container(
+            width: double.infinity,
+            padding: EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm,
+            ),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                HugeIcon(
+                  icon: _isDetailExpanded
+                      ? HugeIcons.strokeRoundedArrowUp01
+                      : HugeIcons.strokeRoundedArrowDown01,
+                  size: AppIconSize.sm,
+                  color: AppColors.secondaryText,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  _isDetailExpanded ? 'ซ่อนข้อมูลเพิ่มเติม' : 'ดูข้อมูลเพิ่มเติม',
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.secondaryText,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // เนื้อหาที่ซ่อนไว้ — แสดงเมื่อกดเปิด
+        if (_isDetailExpanded) ...[
+          AppSpacing.verticalGapMd,
+
+          // Creator info
+          if (_task.creatorNickname != null) ...[
+            _buildCreatorInfo(),
+            AppSpacing.verticalGapSm,
+          ],
+
+          // Info badges (time, type, zone, completed by)
+          _buildInfoBadges(),
+
+          // Difficulty score badge
+          if (_shouldShowDifficultyBadge) ...[
+            AppSpacing.verticalGapSm,
+            _buildDifficultyBadge(_task.difficultyScore!),
+          ],
+          AppSpacing.verticalGapMd,
+
+          // RecurNote (ถ้ามี)
+          if (_task.recurNote != null && _task.recurNote!.isNotEmpty) ...[
+            _buildRecurNote(),
+            AppSpacing.verticalGapMd,
+          ],
+
+          // Description
+          if (_task.description != null &&
+              _task.description!.isNotEmpty) ...[
+            _buildDescriptionSection(),
+            AppSpacing.verticalGapMd,
+          ],
+
+          // Form URL
+          if (_task.formUrl != null && _task.formUrl!.isNotEmpty) ...[
+            _buildFormUrlSection(),
+            AppSpacing.verticalGapMd,
+          ],
+
+          // Resident card (full version พร้อมโรคประจำตัว)
+          if (_task.residentId != null && _task.residentId! > 0) ...[
+            _buildResidentCard(),
+            AppSpacing.verticalGapMd,
+          ],
+
+          // Confirm video (ถ้ามี)
+          if (_task.hasConfirmVideo) ...[
+            _buildConfirmVideo(),
+            AppSpacing.verticalGapMd,
+          ],
+
+          // Post images
+          if (_task.hasPostImages) ...[
+            _buildPostImages(),
+            AppSpacing.verticalGapMd,
+          ],
+
+          // Post video
+          if (_task.hasPostVideo) ...[
+            _buildPostVideo(),
+            AppSpacing.verticalGapMd,
+          ],
+
+          // Problem notes
+          if ((_task.descript != null && _task.descript!.isNotEmpty) ||
+              _task.problemType != null) ...[
+            _buildDescriptNote(),
+            AppSpacing.verticalGapMd,
+          ],
+
+          // Postpone info
+          if (_task.postponeFrom != null) ...[
+            _buildPostponeInfo(),
+          ],
+        ],
+      ],
+    );
+  }
+
+  /// คำนวณ childAspectRatio แบบ dynamic ให้ยาทุกตัวอยู่ในจอเดียว
+  /// [gridAvailableHeight] = ความสูงที่ grid ใช้ได้จริง (LayoutBuilder หักส่วนอื่นแล้ว)
+  /// [gridWidth] = ความกว้างของ grid (เต็มจอ หรือ ครึ่งจอ ถ้า side-by-side)
+  /// [columns] = จำนวน column ของ grid
+  double _calcMedicineAspectRatio(
+    double gridAvailableHeight,
+    double gridWidth,
+    int columns,
+  ) {
+    if (_medicines == null || _medicines!.isEmpty) return 1.0;
+
+    // จำนวนแถวของ grid
+    final rows = (_medicines!.length / columns).ceil();
+    if (rows <= 0) return 1.0;
+
+    // คำนวณ: itemWidth / idealItemHeight
+    final itemWidth = gridWidth / columns;
+    final idealItemHeight = gridAvailableHeight / rows;
+
+    // clamp โดยใช้ minimum item height เป็นตัวกำหนดขอบเขต:
+    // - min 0.5 = ยาน้อย ไม่ให้สูงเกินไป (สูงกว่ากว้าง 2x)
+    // - max = itemWidth / 50 = ความสูงขั้นต่ำ 50px (ยาเยอะก็ยังเห็นรูปได้)
+    const minItemHeight = 50.0;
+    final maxAspectRatio = itemWidth / minItemHeight;
+    return (itemWidth / idealItemHeight).clamp(0.5, maxAspectRatio);
+  }
+
+  /// [gridAvailableHeight] = ความสูงที่ grid ใช้ได้ (จาก LayoutBuilder หักส่วนอื่นแล้ว)
+  Widget _buildMedicineGrid(double gridAvailableHeight) {
     if (_isLoadingMedicines) {
       return ShimmerWrapper(
         isLoading: true,
@@ -1018,9 +1280,19 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     final imageUrl = _uploadedImageUrl ?? _task.confirmImage;
     final hasImage = imageUrl != null && imageUrl.isNotEmpty;
 
+    // ความกว้างของ content area (หัก padding ซ้าย-ขวา)
+    final screenWidth = MediaQuery.of(context).size.width;
+    final contentWidth = screenWidth - (AppSpacing.md * 2);
+
     // ถ้ามีรูปยืนยัน → แสดง side-by-side (grid ซ้าย, รูปขวา)
     // ถ้ายังไม่มีรูป → แสดงแค่ grid ยา (ปุ่มถ่ายอยู่ด้านล่างเหมือนเดิม)
     if (hasImage) {
+      // side-by-side: grid ใช้ครึ่งจอ (Expanded ใน Row)
+      final gridWidth = contentWidth / 2;
+      final aspectRatio = _calcMedicineAspectRatio(
+        gridAvailableHeight, gridWidth, 2,
+      );
+
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1038,11 +1310,11 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                 child: GridView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
                     crossAxisSpacing: 0, // no spacing
                     mainAxisSpacing: 0, // no spacing
-                    childAspectRatio: 1.0, // 1:1 สำหรับ side-by-side
+                    childAspectRatio: aspectRatio, // dynamic ตามจำนวนยา
                   ),
                   itemCount: _medicines!.length,
                   itemBuilder: (context, index) {
@@ -1069,7 +1341,11 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       );
     }
 
-    // ยังไม่มีรูปยืนยัน → แสดงแค่ grid ยา (ปุ่มถ่ายอยู่ด้านล่างเหมือนเดิม)
+    // ยังไม่มีรูปยืนยัน → แสดงแค่ grid ยา เต็มจอ
+    final aspectRatio = _calcMedicineAspectRatio(
+      gridAvailableHeight, contentWidth, 2,
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1078,15 +1354,15 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           style: AppTypography.subtitle.copyWith(fontWeight: FontWeight.w600),
         ),
         AppSpacing.verticalGapSm,
-        // Grid รูปตัวอย่างยา (2 คอลัมน์, no spacing)
+        // Grid รูปตัวอย่างยา (2 คอลัมน์, no spacing, dynamic aspect ratio)
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
             crossAxisSpacing: 0, // no spacing
             mainAxisSpacing: 0, // no spacing
-            childAspectRatio: 1.0, // 1:1
+            childAspectRatio: aspectRatio, // dynamic ตามจำนวนยา
           ),
           itemCount: _medicines!.length,
           itemBuilder: (context, index) {

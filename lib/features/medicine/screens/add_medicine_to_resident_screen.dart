@@ -61,6 +61,11 @@ class _AddMedicineToResidentScreenState
   // Form key
   final _formKey = GlobalKey<FormState>();
 
+  // Keys สำหรับ scroll ไปยัง field ที่มี error
+  final _medicineFieldKey = GlobalKey();
+  final _takeTabFieldKey = GlobalKey();
+  final _bldbFieldKey = GlobalKey();
+
   // System role ของ user ปัจจุบัน (สำหรับตรวจสิทธิ์เพิ่มยาใหม่ลงฐานข้อมูล)
   // ต้องเป็นหัวหน้าเวรขึ้นไป (canQC) ถึงจะเห็นปุ่มเพิ่มยาใหม่
   SystemRole? _systemRole;
@@ -191,13 +196,44 @@ class _AddMedicineToResidentScreenState
 
     if (success && mounted) {
       await SuccessPopup.show(context, emoji: '💊', message: 'เพิ่มยาให้คนไข้สำเร็จ');
-      // ส่ง med_history ID กลับแทน true เพื่อให้ caller (เช่น RestockSectionContent)
-      // นำไป link กับ post ภายหลัง — ถ้าไม่มี ID (edge case) ก็ส่ง true แบบเดิม
-      // เพื่อ backward compatibility กับ callers อื่นที่ยังเช็ค result == true
-      final medHistoryId = ref
-          .read(addMedicineFormProvider(widget.residentId).notifier)
-          .lastMedHistoryId;
+      final medHistoryId = notifier.lastMedHistoryId;
+
+      // Reset form ก่อน pop เพื่อให้กลับมาหน้านี้ใหม่ได้สะอาด
+      // + reset controllers ให้ตรงกับ state
+      notifier.reset();
+      _takeTabController.text = '1';
+      _everyHrController.text = '1';
+      _reconcileController.clear();
+      _noteController.clear();
+
       if (mounted) Navigator.pop(context, medHistoryId ?? true);
+    } else if (mounted) {
+      // Scroll ไปยัง field ที่มี error เพื่อให้ user เห็นปัญหา
+      _scrollToErrorField();
+    }
+  }
+
+  /// Scroll ไปยัง field ที่มี validation error
+  void _scrollToErrorField() {
+    final errorField = ref.read(addMedicineFormProvider(widget.residentId)).value?.errorField;
+    if (errorField == null) return;
+
+    // หา GlobalKey ที่ตรงกับ errorField
+    final GlobalKey? targetKey = switch (errorField) {
+      'medicine' => _medicineFieldKey,
+      'takeTab' => _takeTabFieldKey,
+      'bldb' => _bldbFieldKey,
+      _ => null,
+    };
+
+    // Scroll ไปยัง widget นั้น
+    if (targetKey?.currentContext != null) {
+      Scrollable.ensureVisible(
+        targetKey!.currentContext!,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+        alignment: 0.3, // แสดง field ที่ 30% จากด้านบน
+      );
     }
   }
 
@@ -270,7 +306,16 @@ class _AddMedicineToResidentScreenState
 
                 // Medicine Search Dropdown
                 // ปุ่ม "เพิ่มยาใหม่ลงฐานข้อมูล" แสดงเฉพาะหัวหน้าเวรขึ้นไป
-                MedicineSearchDropdown(
+                // Wrap ด้วย Container เพื่อ highlight เมื่อมี error
+                Container(
+                  key: _medicineFieldKey,
+                  decoration: state.errorField == 'medicine'
+                      ? BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.error, width: 2),
+                        )
+                      : null,
+                  child: MedicineSearchDropdown(
                   onSearch: (query) => ref
                       .read(addMedicineFormProvider(widget.residentId).notifier)
                       .searchMedicines(query),
@@ -291,6 +336,7 @@ class _AddMedicineToResidentScreenState
                       : null,
                   // แสดงปุ่มเพิ่มยาใหม่เฉพาะหัวหน้าเวรขึ้นไป (canQC = level >= 30)
                   showAddNewButton: _systemRole?.canQC ?? false,
+                  ),
                 ),
 
                 const SizedBox(height: AppSpacing.lg),
@@ -306,7 +352,9 @@ class _AddMedicineToResidentScreenState
                 const SizedBox(height: AppSpacing.md),
 
                 // ปริมาณยา
-                _LabeledField(
+                Container(
+                  key: _takeTabFieldKey,
+                  child: _LabeledField(
                   label: 'ปริมาณที่ให้ (${state.selectedMedicine?.unit ?? 'เม็ด'})',
                   child: TextFormField(
                     controller: _takeTabController,
@@ -319,9 +367,13 @@ class _AddMedicineToResidentScreenState
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide.none,
                       ),
+                      // Highlight ขอบแดงเมื่อ field นี้มี error
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: AppColors.alternate, width: 1),
+                        borderSide: BorderSide(
+                          color: state.errorField == 'takeTab' ? AppColors.error : AppColors.alternate,
+                          width: state.errorField == 'takeTab' ? 2 : 1,
+                        ),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -339,6 +391,7 @@ class _AddMedicineToResidentScreenState
                       if (num == null || num <= 0) return 'ปริมาณต้องเป็นตัวเลขที่มากกว่า 0';
                       return null;
                     },
+                  ),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
@@ -359,19 +412,32 @@ class _AddMedicineToResidentScreenState
                 const SizedBox(height: AppSpacing.md),
 
                 // เวลาที่ให้ยา (BLDB)
-                _LabeledField(
-                  label: 'เวลาที่ให้ยา',
-                  child: TimeSlotChips(
-                    selectedTimes: state.bldb,
-                    onToggle: (time) => ref
-                        .read(addMedicineFormProvider(widget.residentId).notifier)
-                        .toggleBldb(time),
-                    // ปุ่มล้างจะแสดงเมื่อมีการเลือก
-                    onClearAll: () => ref
-                        .read(addMedicineFormProvider(widget.residentId).notifier)
-                        .clearAllBldb(),
-                    // ไม่แสดงปุ่ม "เลือกทั้งหมด"
-                    showSelectAll: false,
+                // Wrap ด้วย Container + key เพื่อ scroll-to-error + highlight
+                Container(
+                  key: _bldbFieldKey,
+                  padding: state.errorField == 'bldb'
+                      ? const EdgeInsets.all(4)
+                      : EdgeInsets.zero,
+                  decoration: state.errorField == 'bldb'
+                      ? BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.error, width: 2),
+                        )
+                      : null,
+                  child: _LabeledField(
+                    label: 'เวลาที่ให้ยา',
+                    child: TimeSlotChips(
+                      selectedTimes: state.bldb,
+                      onToggle: (time) => ref
+                          .read(addMedicineFormProvider(widget.residentId).notifier)
+                          .toggleBldb(time),
+                      // ปุ่มล้างจะแสดงเมื่อมีการเลือก
+                      onClearAll: () => ref
+                          .read(addMedicineFormProvider(widget.residentId).notifier)
+                          .clearAllBldb(),
+                      // ไม่แสดงปุ่ม "เลือกทั้งหมด"
+                      showSelectAll: false,
+                    ),
                   ),
                 ),
 

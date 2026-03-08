@@ -181,6 +181,18 @@ class AiChatResponse {
   /// null = ไม่ได้ถามเรื่องใดเฉพาะ (ทักทาย/ปิดสนทนา)
   final int? currentPillar;
 
+  /// ระดับความลึกของสาเหตุ (1-5)
+  /// 1=อาการ(Symptom), 2=สาเหตุตรง(Direct), 3=ปัจจัยร่วม(Contributing),
+  /// 4=เชิงระบบ(Systemic), 5=รากเหง้า(Root)
+  /// null = ยังไม่ได้เริ่มถามสาเหตุ
+  final int? rootCauseDepth;
+
+  /// หมวด Fishbone ที่สำรวจแล้ว เช่น ["คน", "กระบวนการ", "สภาพแวดล้อม"]
+  final List<String> exploredCategories;
+
+  /// คุณภาพการวิเคราะห์โดยรวม: "shallow", "moderate", "deep"
+  final String? analysisQuality;
+
   const AiChatResponse({
     required this.message,
     required this.pillarsProgress,
@@ -189,6 +201,9 @@ class AiChatResponse {
     this.showCoreValuePicker = false,
     this.availableCoreValues = const [],
     this.currentPillar,
+    this.rootCauseDepth,
+    this.exploredCategories = const [],
+    this.analysisQuality,
   });
 
   /// Parse จาก JSON response
@@ -221,6 +236,28 @@ class AiChatResponse {
       currentPillar = rawPillar;
     }
 
+    // Parse root_cause_depth (1-5 หรือ null) — ระดับความลึกของสาเหตุ
+    final rawDepth = json['root_cause_depth'];
+    int? rootCauseDepth;
+    if (rawDepth is int && rawDepth >= 1 && rawDepth <= 5) {
+      rootCauseDepth = rawDepth;
+    }
+
+    // Parse explored_categories — หมวด Fishbone ที่สำรวจแล้ว
+    final rawCategories = json['explored_categories'] as List<dynamic>?;
+    final exploredCategories = rawCategories
+            ?.map((e) => e.toString())
+            .toList() ??
+        <String>[];
+
+    // Parse analysis_quality — "shallow" | "moderate" | "deep"
+    final rawQuality = json['analysis_quality'] as String?;
+    final validQualities = ['shallow', 'moderate', 'deep'];
+    final analysisQuality =
+        rawQuality != null && validQualities.contains(rawQuality)
+            ? rawQuality
+            : null;
+
     return AiChatResponse(
       message: cleanedMessage,
       pillarsProgress: ReflectionPillars.fromJson(pillarsJson),
@@ -229,6 +266,9 @@ class AiChatResponse {
       showCoreValuePicker: json['show_core_value_picker'] as bool? ?? false,
       availableCoreValues: availableCoreValues,
       currentPillar: currentPillar,
+      rootCauseDepth: rootCauseDepth,
+      exploredCategories: exploredCategories,
+      analysisQuality: analysisQuality,
     );
   }
 }
