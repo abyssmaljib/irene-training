@@ -35,7 +35,6 @@ import '../../../core/widgets/confirm_dialog.dart';
 import '../../../core/widgets/network_image.dart';
 import '../../checklist/models/system_role.dart';
 import '../models/med_log.dart';
-import '../models/med_error_log.dart';
 import '../models/meal_photo_group.dart';
 import '../../../core/services/user_service.dart';
 import 'medicine_photo_item.dart';

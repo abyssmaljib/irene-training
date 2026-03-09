@@ -1,6 +1,5 @@
 import 'medicine_summary.dart';
 import 'med_log.dart';
-import 'med_error_log.dart';
 
 /// สถานะของมื้อยา
 enum MealPhotoStatus {

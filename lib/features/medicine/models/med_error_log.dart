@@ -1,3 +1,7 @@
+// NurseMarkStatus และ NurseMarkStatusExtension ย้ายไปอยู่ที่ med_log.dart แล้ว
+// re-export เพื่อ backward compatibility (ไฟล์ที่ import med_error_log.dart ยังใช้ได้)
+export 'med_log.dart' show NurseMarkStatus, NurseMarkStatusExtension;
+
 /// Model สำหรับ A_Med_error_log - บันทึกการตรวจสอบรูปยาโดยหัวหน้าเวร
 class MedErrorLog {
   final int id;
@@ -62,31 +66,5 @@ class MedErrorLog {
       reviewerFullName: userInfo?['full_name'] as String?,
       reviewerNickname: userInfo?['nickname'] as String?,
     );
-  }
-}
-
-/// สถานะการตรวจสอบรูปยา
-enum NurseMarkStatus {
-  correct, // รูปตรง
-  incorrect, // รูปไม่ตรง
-  noPhoto, // ไม่มีรูป
-  swapped, // ตำแหน่งสลับ
-  none, // ยังไม่ได้ตรวจสอบ
-}
-
-extension NurseMarkStatusExtension on NurseMarkStatus {
-  static NurseMarkStatus fromString(String? value) {
-    switch (value) {
-      case 'รูปตรง':
-        return NurseMarkStatus.correct;
-      case 'รูปไม่ตรง':
-        return NurseMarkStatus.incorrect;
-      case 'ไม่มีรูป':
-        return NurseMarkStatus.noPhoto;
-      case 'ตำแหน่งสลับ':
-        return NurseMarkStatus.swapped;
-      default:
-        return NurseMarkStatus.none;
-    }
   }
 }

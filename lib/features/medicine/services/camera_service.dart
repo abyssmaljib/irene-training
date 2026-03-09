@@ -5,6 +5,11 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/services/user_service.dart';
 import '../../checklist/services/task_service.dart';
 
+// AI verification ถูกย้ายไปเป็น Database Trigger แล้ว
+// ดู migration: 20260310010000_add_med_ai_trigger.sql
+// trigger จะเรียก Edge Function "verify-med-photo" อัตโนมัติ
+// เมื่อมีการ INSERT/UPDATE รูปใน A_Med_logs
+
 /// ตรวจสอบว่ารันบน desktop หรือไม่ (Windows, macOS, Linux)
 bool get _isDesktop {
   if (kIsWeb) return false;
@@ -137,10 +142,21 @@ class CameraService {
         debugPrint('CameraService: updated med_log $logId with $photoType photo');
       } else {
         // สร้าง log ใหม่
+        // Database trigger (tr_verify_med_photo) จะเรียก AI verification อัตโนมัติ
+
+        // ดึง nursinghome_id จาก residents เพื่อ denormalize ลง A_Med_logs
+        // ช่วยให้ query stats ตาม nursinghome ได้เร็วโดยไม่ต้อง JOIN residents
+        final residentData = await _supabase
+            .from('residents')
+            .select('nursinghome_id')
+            .eq('id', residentId)
+            .single();
+
         final insertData = <String, dynamic>{
           'resident_id': residentId,
           'meal': mealKey,
           'Created_Date': dateStr,
+          'nursinghome_id': residentData['nursinghome_id'],
         };
 
         if (photoType == '2C') {

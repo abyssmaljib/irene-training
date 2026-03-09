@@ -64,7 +64,7 @@ import '../../checklist/models/system_role.dart';
 import '../models/meal_photo_group.dart';
 import '../services/camera_service.dart';
 import '../services/medicine_service.dart';
-import '../services/med_error_log_service.dart';
+// med_error_log_service.dart ไม่ใช้แล้ว — QC เขียนตรงลง A_Med_logs ผ่าน medicine_service
 import '../../points/services/points_service.dart';
 import '../widgets/day_picker.dart';
 import '../widgets/meal_section_card.dart';
@@ -89,7 +89,7 @@ class MedicinePhotosScreen extends StatefulWidget {
 class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
   final _medicineService = MedicineService.instance;
   final _cameraService = CameraService.instance;
-  final _medErrorLogService = MedErrorLogService();
+  // QC เขียนตรงลง A_Med_logs ผ่าน MedicineService.saveQCMark/deleteQCMark
 
   DateTime _selectedDate = DateTime.now();
   bool _showFoiled = true; // true = แผง (2C), false = เม็ดยา (3C)
@@ -587,11 +587,11 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
       _showLoadingDialog(message: 'กำลังยกเลิก...');
 
       try {
-        final success = await _medErrorLogService.deleteErrorLog(
+        final success = await _medicineService.deleteQCMark(
           residentId: widget.residentId,
           date: _selectedDate,
-          meal: mealKey,
-          is2CPicture: is2C,
+          mealKey: mealKey,
+          is2C: is2C,
         );
 
         if (mounted) Navigator.pop(context);
@@ -623,12 +623,12 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
     _showLoadingDialog(message: 'กำลังบันทึก...');
 
     try {
-      final success = await _medErrorLogService.saveErrorLog(
+      final success = await _medicineService.saveQCMark(
         residentId: widget.residentId,
         date: _selectedDate,
-        meal: mealKey,
-        is2CPicture: is2C,
-        replyNurseMark: status,
+        mealKey: mealKey,
+        is2C: is2C,
+        nurseMark: status,
       );
 
       // ปิด loading dialog

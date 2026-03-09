@@ -39,6 +39,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/services/image_service.dart';
+import '../../../core/widgets/network_image.dart';
 import '../models/medicine_summary.dart';
 import 'overlay_med_widget.dart';
 
@@ -265,40 +266,38 @@ class MedicinePhotoItem extends StatelessWidget {
                 ),
               ),
 
-              // Image - ใช้ Supabase Image Transformation สำหรับรูปขยายด้วย
-              // ใช้ getLargeUrl (800px) แทน original เพื่อลด memory
+              // ใช้ IreneNetworkImage แทน Image.network เพื่อได้ timeout + retry mechanism
+              // useServerResize: false เพราะ ImageService.getLargeUrl resize จาก server แล้ว
               Flexible(
                 child: InteractiveViewer(
                   minScale: 0.5,
                   maxScale: 4.0,
-                  child: Image.network(
-                    ImageService.getLargeUrl(imageUrl),
+                  child: IreneNetworkImage(
+                    imageUrl: ImageService.getLargeUrl(imageUrl),
                     fit: BoxFit.contain,
-                    // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
-                    cacheWidth: 800,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        height: 200,
-                        alignment: Alignment.center,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            HugeIcon(
-                              icon: HugeIcons.strokeRoundedImage01,
-                              size: AppIconSize.xxxl,
+                    memCacheWidth: 800, // รูปขยายใช้ resolution สูงขึ้น
+                    useServerResize: false, // ใช้ getLargeUrl resize แล้ว ไม่ต้อง resize ซ้ำ
+                    errorPlaceholder: Container(
+                      height: 200,
+                      alignment: Alignment.center,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          HugeIcon(
+                            icon: HugeIcons.strokeRoundedImage01,
+                            size: AppIconSize.xxxl,
+                            color: AppColors.textSecondary,
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'ไม่สามารถโหลดรูปได้',
+                            style: AppTypography.body.copyWith(
                               color: AppColors.textSecondary,
                             ),
-                            SizedBox(height: 8),
-                            Text(
-                              'ไม่สามารถโหลดรูปได้',
-                              style: AppTypography.body.copyWith(
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),

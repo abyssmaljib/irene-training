@@ -1,8 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../core/services/user_service.dart';
 import '../models/medicine_summary.dart';
 import '../models/med_log.dart';
-import '../models/med_error_log.dart';
 import '../models/meal_photo_group.dart';
 import '../models/med_db.dart';
 import '../models/med_atc_level.dart';
@@ -116,8 +116,9 @@ class MedicineService {
 
       final stopwatch = Stopwatch()..start();
 
-      // Query ตรงจาก A_Med_logs พร้อม nested select สำหรับ nicknames
+      // Query ตรงจาก A_Med_logs พร้อม nested select สำหรับ nicknames + QC reviewer
       // ดึง 2C_completed_by และ 3C_Compleated_by เพื่อใช้ตรวจสอบสิทธิ์ลบรูป
+      // ดึง QC columns (qc_2c_mark, qc_3c_mark, etc.) ที่ merge มาจาก A_Med_Error_Log
       final response = await _supabase
           .from('A_Med_logs')
           .select('''
@@ -131,8 +132,17 @@ class MedicineService {
             3C_time_stamps,
             2C_completed_by,
             3C_Compleated_by,
+            nursinghome_id,
+            qc_2c_mark,
+            qc_2c_reviewer,
+            qc_2c_at,
+            qc_3c_mark,
+            qc_3c_reviewer,
+            qc_3c_at,
             user_2c:2C_completed_by(nickname),
-            user_3c:3C_Compleated_by(nickname)
+            user_3c:3C_Compleated_by(nickname),
+            qc_2c_reviewer_info:qc_2c_reviewer(nickname),
+            qc_3c_reviewer_info:qc_3c_reviewer(nickname)
           ''')
           .eq('resident_id', residentId)
           .eq('Created_Date', dateStr);
@@ -155,6 +165,17 @@ class MedicineService {
           // User IDs สำหรับตรวจสอบสิทธิ์ลบรูป
           '2C_completed_by': json['2C_completed_by'],
           '3C_Compleated_by': json['3C_Compleated_by'],
+          // QC columns (merged จาก A_Med_Error_Log)
+          'nursinghome_id': json['nursinghome_id'],
+          'qc_2c_mark': json['qc_2c_mark'],
+          'qc_2c_reviewer': json['qc_2c_reviewer'],
+          'qc_2c_at': json['qc_2c_at'],
+          'qc_3c_mark': json['qc_3c_mark'],
+          'qc_3c_reviewer': json['qc_3c_reviewer'],
+          'qc_3c_at': json['qc_3c_at'],
+          // QC reviewer nicknames (nested join)
+          'qc_2c_reviewer_info': json['qc_2c_reviewer_info'],
+          'qc_3c_reviewer_info': json['qc_3c_reviewer_info'],
         };
         return MedLog.fromJson(mapped);
       }).toList();
@@ -257,10 +278,7 @@ class MedicineService {
       // ดึง logs ของวันที่กำหนด
       final logs = await getMedLogsForDate(residentId, date);
 
-      // ดึง error logs (nurse mark) ของวันที่กำหนด
-      final errorLogs = await getMedErrorLogsForDate(residentId, date);
-
-      // สร้าง map ของ logs
+      // สร้าง map ของ logs (meal → MedLog)
       final logsMap = <String, MedLog>{};
       for (final log in logs) {
         logsMap[log.meal] = log;
@@ -285,28 +303,12 @@ class MedicineService {
           prn: filterPrn,
         );
 
-        // หา nurse mark สำหรับมื้อนี้
-        // A_Med_error_log meal format: "${beforeAfter}${bldb}" เช่น "ก่อนอาหารเช้า", "หลังอาหารกลางวัน"
-        // Database เก็บแบบมี "อาหาร" อยู่ เช่น "ก่อนอาหารเช้า" ไม่ใช่ "ก่อนเช้า"
-        final errorLogMealKey = beforeAfter.isEmpty ? bldb : '$beforeAfter$bldb';
-
-        NurseMarkStatus nurseMark2C = NurseMarkStatus.none;
-        NurseMarkStatus nurseMark3C = NurseMarkStatus.none;
-        String? reviewer2CName;
-        String? reviewer3CName;
-
-        for (final errorLog in errorLogs) {
-          if (errorLog.meal == errorLogMealKey) {
-            if (errorLog.field2CPicture == true && errorLog.replyNurseMark != null) {
-              nurseMark2C = NurseMarkStatusExtension.fromString(errorLog.replyNurseMark);
-              reviewer2CName = errorLog.reviewerDisplayName;
-            }
-            if (errorLog.field3CPicture == true && errorLog.replyNurseMark != null) {
-              nurseMark3C = NurseMarkStatusExtension.fromString(errorLog.replyNurseMark);
-              reviewer3CName = errorLog.reviewerDisplayName;
-            }
-          }
-        }
+        // อ่าน QC mark จาก MedLog โดยตรง (merged columns)
+        final matchedLog = logsMap[mealKey];
+        final nurseMark2C = matchedLog?.getQcStatus(is2C: true) ?? NurseMarkStatus.none;
+        final nurseMark3C = matchedLog?.getQcStatus(is2C: false) ?? NurseMarkStatus.none;
+        final reviewer2CName = matchedLog?.qc2cReviewerNickname;
+        final reviewer3CName = matchedLog?.qc3cReviewerNickname;
 
         result.add(MealPhotoGroup(
           mealKey: mealKey,
@@ -487,36 +489,6 @@ extension MedicineServiceResidentStatus on MedicineService {
     }
 
     return result;
-  }
-}
-
-/// Service สำหรับดึงข้อมูล error logs (nurse mark)
-extension MedicineServiceErrorLogs on MedicineService {
-  /// ดึง error logs ของวันที่กำหนด
-  /// ใช้สำหรับแสดง badge สถานะการตรวจสอบรูปยาโดยหัวหน้าเวร
-  Future<List<MedErrorLog>> getMedErrorLogsForDate(
-    int residentId,
-    DateTime date,
-  ) async {
-    try {
-      final dateStr =
-          '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-
-      // Table name is A_Med_Error_Log (with underscores and capital letters)
-      // Column name is CalendarDate (camelCase) in database
-      // Join กับ user_info เพื่อดึงชื่อผู้ตรวจสอบ
-      final response = await Supabase.instance.client
-          .from('A_Med_Error_Log')
-          .select('*, user_info:user_id(full_name, nickname)')
-          .eq('resident_id', residentId)
-          .eq('CalendarDate', dateStr);
-
-      return (response as List)
-          .map((json) => MedErrorLog.fromJson(json))
-          .toList();
-    } catch (e) {
-      return [];
-    }
   }
 }
 
@@ -963,6 +935,13 @@ extension MedicineServiceMedLogs on MedicineService {
         // 2. ไม่มี record → INSERT ใหม่
         debugPrint('[MedicineService] upsertMedLog3C: INSERT new record');
 
+        // ดึง nursinghome_id จาก residents เพื่อ denormalize ลง A_Med_logs
+        final residentData = await _supabase
+            .from('residents')
+            .select('nursinghome_id')
+            .eq('id', residentId)
+            .single();
+
         await _supabase.from('A_Med_logs').insert({
           'resident_id': residentId,
           'meal': meal,
@@ -971,6 +950,7 @@ extension MedicineServiceMedLogs on MedicineService {
           '3C_Compleated_by': userId,
           'ThirdCPictureUrl': pictureUrl,
           'task_id': taskLogId,
+          'nursinghome_id': residentData['nursinghome_id'],
         });
       } else {
         // 3. มี record อยู่แล้ว → UPDATE
@@ -1527,6 +1507,152 @@ extension MedicineServiceOnOff on MedicineService {
       return true;
     } catch (e) {
       debugPrint('[MedicineService] restockMedicine error: $e');
+      return false;
+    }
+  }
+
+  // ============================================
+  // QC Mark (ตรวจยา) — เขียนตรงลง A_Med_logs
+  // ============================================
+  // แทนที่ MedErrorLogService ที่เขียนไป A_Med_Error_Log
+  // ตอนนี้ QC columns อยู่บน A_Med_logs โดยตรง (merge จาก Phase 1)
+
+  /// แปลง mealKey (slot format) เป็น database format
+  /// เช่น 'morning_before' → 'ก่อนอาหารเช้า'
+  String _mealKeyToDbFormat(String mealKey) {
+    final (bldb, beforeAfter) = MealSlots.fromSlotKey(mealKey);
+    if (bldb.isNotEmpty) {
+      if (beforeAfter.isEmpty) return bldb; // ก่อนนอน
+      return '$beforeAfter$bldb';
+    }
+    return mealKey; // ถ้าเป็น Thai format อยู่แล้ว
+  }
+
+  /// Format date เป็น YYYY-MM-DD (local time)
+  String _formatDateLocal(DateTime date) {
+    final local = date.toLocal();
+    return '${local.year}-${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')}';
+  }
+
+  /// บันทึกผล QC ตรวจยาลง A_Med_logs (แทน A_Med_Error_Log)
+  /// [mealKey] - slot format (morning_before) หรือ Thai format (ก่อนอาหารเช้า)
+  /// [is2C] - true = ตรวจ 2C (จัดยา), false = ตรวจ 3C (เสิร์ฟยา)
+  /// [nurseMark] - ผลตรวจ: 'รูปตรง', 'รูปไม่ตรง', 'ไม่มีรูป', 'ตำแหน่งสลับ'
+  Future<bool> saveQCMark({
+    required int residentId,
+    required DateTime date,
+    required String mealKey,
+    required bool is2C,
+    required String nurseMark,
+  }) async {
+    try {
+      final userId = UserService().effectiveUserId;
+      if (userId == null) return false;
+
+      final dateStr = _formatDateLocal(date);
+      final dbMeal = _mealKeyToDbFormat(mealKey);
+      final now = DateTime.now().toUtc().toIso8601String();
+
+      debugPrint('[MedicineService] saveQCMark: mealKey=$mealKey -> dbMeal=$dbMeal, is2C=$is2C, mark=$nurseMark');
+
+      // ค้นหา A_Med_logs row ที่มีอยู่
+      final existing = await _supabase
+          .from('A_Med_logs')
+          .select('id')
+          .eq('resident_id', residentId)
+          .eq('meal', dbMeal)
+          .eq('Created_Date', dateStr)
+          .maybeSingle();
+
+      if (existing != null) {
+        // มี row อยู่แล้ว → UPDATE QC columns
+        final updateData = <String, dynamic>{};
+        if (is2C) {
+          updateData['qc_2c_mark'] = nurseMark;
+          updateData['qc_2c_reviewer'] = userId;
+          updateData['qc_2c_at'] = now;
+        } else {
+          updateData['qc_3c_mark'] = nurseMark;
+          updateData['qc_3c_reviewer'] = userId;
+          updateData['qc_3c_at'] = now;
+        }
+
+        await _supabase
+            .from('A_Med_logs')
+            .update(updateData)
+            .eq('id', existing['id']);
+      } else {
+        // ไม่มี row (เช่น QC "ไม่มีรูป") → INSERT minimal row + nursinghome_id
+        final residentData = await _supabase
+            .from('residents')
+            .select('nursinghome_id')
+            .eq('id', residentId)
+            .single();
+
+        final insertData = <String, dynamic>{
+          'resident_id': residentId,
+          'meal': dbMeal,
+          'Created_Date': dateStr,
+          'nursinghome_id': residentData['nursinghome_id'],
+        };
+
+        if (is2C) {
+          insertData['qc_2c_mark'] = nurseMark;
+          insertData['qc_2c_reviewer'] = userId;
+          insertData['qc_2c_at'] = now;
+        } else {
+          insertData['qc_3c_mark'] = nurseMark;
+          insertData['qc_3c_reviewer'] = userId;
+          insertData['qc_3c_at'] = now;
+        }
+
+        await _supabase.from('A_Med_logs').insert(insertData);
+      }
+
+      debugPrint('[MedicineService] saveQCMark: SUCCESS');
+      return true;
+    } catch (e) {
+      debugPrint('[MedicineService] saveQCMark error: $e');
+      return false;
+    }
+  }
+
+  /// ลบผล QC ตรวจยา (reset → SET NULL บน QC columns)
+  Future<bool> deleteQCMark({
+    required int residentId,
+    required DateTime date,
+    required String mealKey,
+    required bool is2C,
+  }) async {
+    try {
+      final dateStr = _formatDateLocal(date);
+      final dbMeal = _mealKeyToDbFormat(mealKey);
+
+      debugPrint('[MedicineService] deleteQCMark: mealKey=$mealKey -> dbMeal=$dbMeal, is2C=$is2C');
+
+      // UPDATE SET NULL บน QC columns (ไม่ลบ row เพราะอาจมีรูปถ่ายอยู่)
+      final updateData = <String, dynamic>{};
+      if (is2C) {
+        updateData['qc_2c_mark'] = null;
+        updateData['qc_2c_reviewer'] = null;
+        updateData['qc_2c_at'] = null;
+      } else {
+        updateData['qc_3c_mark'] = null;
+        updateData['qc_3c_reviewer'] = null;
+        updateData['qc_3c_at'] = null;
+      }
+
+      await _supabase
+          .from('A_Med_logs')
+          .update(updateData)
+          .eq('resident_id', residentId)
+          .eq('meal', dbMeal)
+          .eq('Created_Date', dateStr);
+
+      debugPrint('[MedicineService] deleteQCMark: SUCCESS');
+      return true;
+    } catch (e) {
+      debugPrint('[MedicineService] deleteQCMark error: $e');
       return false;
     }
   }
