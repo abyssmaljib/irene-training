@@ -10,6 +10,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/irene_app_bar.dart';
+// ใช้ IreneNetworkAvatar แทน Image.network เพื่อมี timeout, retry, และ memory optimization
+import '../../../core/widgets/network_image.dart';
 import '../models/badge.dart';
 import '../services/badge_service.dart';
 
@@ -443,22 +445,16 @@ class _BadgeCollectionScreenState extends State<BadgeCollectionScreen>
   /// สำหรับ emoji ใช้สีเทาโดยตรงแทน
   Widget _buildBadgeIcon(Badge badge, bool isEarned) {
     // กรณีมีรูปจาก URL
+    // ใช้ IreneNetworkAvatar แทน Image.network เพื่อมี timeout/retry/memory optimization
     if (badge.imageUrl != null) {
-      Widget imageWidget = ClipOval(
-        child: Image.network(
-          badge.imageUrl!,
-          width: 36,
-          height: 36,
-          fit: BoxFit.cover,
-          // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
-          cacheWidth: 100,
-          // ถ้าโหลดรูปไม่ได้ให้แสดง emoji แทน (สีเทาถ้ายังไม่ได้)
-          errorBuilder: (context, error, stackTrace) => Text(
-            badge.icon ?? badge.rarityEmoji,
-            style: TextStyle(
-              fontSize: 20,
-              color: isEarned ? null : Colors.grey,
-            ),
+      Widget imageWidget = IreneNetworkAvatar(
+        imageUrl: badge.imageUrl,
+        radius: 18,
+        fallbackIcon: Text(
+          badge.icon ?? badge.rarityEmoji,
+          style: TextStyle(
+            fontSize: 20,
+            color: isEarned ? null : Colors.grey,
           ),
         ),
       );

@@ -454,6 +454,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       verificationResult = await ClockInVerificationService().verify(nursinghomeId);
     } catch (e) {
       debugPrint('[HomeScreen] Clock-in verification error: $e');
+      // verify() ทั้งก้อน throw → block ไม่ให้ clock-in
+      // ป้องกันไม่ให้ bypass ด้วยการทำให้ service พัง
+      if (!mounted) return;
+      setState(() => _isClockingIn = false);
+      AppToast.error(context, 'ตรวจสอบเงื่อนไขขึ้นเวรไม่สำเร็จ กรุณาลองใหม่');
+      return;
     }
 
     if (!mounted) return;
@@ -462,23 +468,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     // ตรวจผลลัพธ์: ต้องผ่านทั้ง GPS AND WiFi
     // null = admin ไม่ได้ตั้งค่า → ข้ามเงื่อนไขนั้น (ถือว่าผ่าน)
-    if (verificationResult != null) {
-      final gps = verificationResult.gpsMatch;
-      final wifi = verificationResult.wifiMatch;
+    // false = ตรวจแล้วไม่ผ่าน หรือ ตรวจไม่ได้ (permission denied, error) → block
+    final gps = verificationResult.gpsMatch;
+    final wifi = verificationResult.wifiMatch;
 
-      // เช็คว่ามีเงื่อนไขที่ fail ไหม (เฉพาะ match == false เท่านั้นถือว่าไม่ผ่าน)
-      // error (เช่น ไม่ได้รับสิทธิ์, iOS ไม่มี entitlement) → แสดง warning แต่ไม่ block
-      // เพราะไม่ใช่ความผิดของ user ที่ระบบดึงข้อมูลไม่ได้
-      final gpsFailed = gps == false;
-      final wifiFailed = wifi == false;
+    final gpsFailed = gps == false;
+    final wifiFailed = wifi == false;
 
-      if (gpsFailed || wifiFailed) {
-        // มีเงื่อนไขไม่ผ่าน → แสดง dialog แจ้ง user
-        if (mounted) {
-          _showVerificationFailedDialog(verificationResult);
-        }
-        return;
+    if (gpsFailed || wifiFailed) {
+      // มีเงื่อนไขไม่ผ่าน → แสดง dialog แจ้ง user
+      if (mounted) {
+        _showVerificationFailedDialog(verificationResult);
       }
+      return;
     }
 
     // แสดงหน้าไพ่ทาโร่ก่อนขึ้นเวร
@@ -758,9 +760,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final dynamic statusIcon;
 
     if (error != null) {
-      // มี error (เช่น ไม่ได้รับสิทธิ์) → สีส้มเตือน
-      statusColor = Colors.orange;
-      statusText = 'ไม่ทราบ';
+      // มี error (เช่น ไม่ได้รับสิทธิ์, ปิด WiFi/GPS) → สีแดง block
+      // แสดงข้อความแนะนำให้ user แก้ไข (เปิด permission, เปิด WiFi ฯลฯ)
+      statusColor = AppColors.error;
+      statusText = 'ตรวจไม่ได้';
       statusIcon = HugeIcons.strokeRoundedAlert02;
     } else if (passed) {
       // ผ่าน → สีเขียว
@@ -807,7 +810,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     error ?? detail ?? '',
                     style: AppTypography.caption.copyWith(
                       color: error != null
-                          ? Colors.orange.shade700
+                          ? AppColors.error
                           : AppColors.secondaryText,
                     ),
                   ),

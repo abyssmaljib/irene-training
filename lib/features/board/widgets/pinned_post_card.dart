@@ -3,6 +3,7 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/network_image.dart';
 import '../models/post.dart';
 
 /// Card สำหรับ Pinned Critical Post (แสดงด้านบนสุด)
@@ -131,15 +132,12 @@ class PinnedPostCard extends StatelessWidget {
   Widget _buildFooter() {
     return Row(
       children: [
-        // Author
-        CircleAvatar(
+        // Avatar ผู้เขียน - ใช้ IreneNetworkAvatar พร้อม timeout/retry/memory optimization
+        IreneNetworkAvatar(
+          imageUrl: post.photoUrl,
           radius: 12,
           backgroundColor: AppColors.accent1,
-          backgroundImage:
-              post.photoUrl != null ? NetworkImage(post.photoUrl!) : null,
-          child: post.photoUrl == null
-              ? HugeIcon(icon: HugeIcons.strokeRoundedUser, size: AppIconSize.xs, color: AppColors.primary)
-              : null,
+          fallbackIcon: HugeIcon(icon: HugeIcons.strokeRoundedUser, size: AppIconSize.xs, color: AppColors.primary),
         ),
         AppSpacing.horizontalGapSm,
         Expanded(

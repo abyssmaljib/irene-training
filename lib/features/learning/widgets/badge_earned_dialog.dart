@@ -3,6 +3,8 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
+// ใช้ IreneNetworkAvatar แทน Image.network เพื่อมี timeout, retry, และ memory optimization
+import '../../../core/widgets/network_image.dart';
 import '../models/badge.dart';
 
 /// Dialog แสดงเมื่อ user ได้รับ badge ใหม่
@@ -276,17 +278,12 @@ class _BadgeEarnedDialogState extends State<BadgeEarnedDialog>
                       ),
                       child: Center(
                         child: badge.imageUrl != null
-                            ? ClipOval(
-                                child: Image.network(
-                                  badge.imageUrl!,
-                                  width: 80,
-                                  height: 80,
-                                  fit: BoxFit.cover,
-                                  // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
-                                  cacheWidth: 200,
-                                  errorBuilder: (context, error, stackTrace) =>
-                                      _buildIconFallback(badge, rarityColor),
-                                ),
+                            // ใช้ IreneNetworkAvatar แทน Image.network เพื่อมี timeout/retry/memory optimization
+                            ? IreneNetworkAvatar(
+                                imageUrl: badge.imageUrl,
+                                radius: 40,
+                                fallbackIcon:
+                                    _buildIconFallback(badge, rarityColor),
                               )
                             : _buildIconFallback(badge, rarityColor),
                       ),

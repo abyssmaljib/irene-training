@@ -9,6 +9,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../../../core/widgets/irene_app_bar.dart';
+import '../../../core/widgets/network_image.dart';
 import '../../../core/widgets/shimmer_loading.dart';
 import '../../settings/screens/settings_screen.dart';
 import '../models/post.dart';
@@ -1078,14 +1079,11 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
   Widget _buildAuthorInfo(Post post) {
     return Row(
       children: [
-        CircleAvatar(
+        // Avatar ผู้เขียน - ใช้ IreneNetworkAvatar พร้อม timeout/retry/memory optimization
+        IreneNetworkAvatar(
+          imageUrl: post.photoUrl,
           radius: 20,
           backgroundColor: AppColors.accent1,
-          backgroundImage:
-              post.photoUrl != null ? NetworkImage(post.photoUrl!) : null,
-          child: post.photoUrl == null
-              ? HugeIcon(icon: HugeIcons.strokeRoundedUser, color: AppColors.primary, size: AppIconSize.lg)
-              : null,
         ),
         SizedBox(width: 12),
         Column(
@@ -1287,16 +1285,11 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
           AppSpacing.verticalGapSm,
           Row(
             children: [
-              // Avatar
-              CircleAvatar(
+              // Avatar ผู้พักอาศัย - ใช้ IreneNetworkAvatar พร้อม timeout/retry/memory optimization
+              IreneNetworkAvatar(
+                imageUrl: post.residentPictureUrl,
                 radius: 22,
                 backgroundColor: AppColors.surface,
-                backgroundImage: post.residentPictureUrl != null
-                    ? NetworkImage(post.residentPictureUrl!)
-                    : null,
-                child: post.residentPictureUrl == null
-                    ? HugeIcon(icon: HugeIcons.strokeRoundedUser, color: AppColors.primary, size: AppIconSize.lg)
-                    : null,
               ),
               SizedBox(width: 8),
               Expanded(

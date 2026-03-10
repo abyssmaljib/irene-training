@@ -4,6 +4,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/cards.dart';
+// ใช้ IreneNetworkImage แทน Image.network เพื่อมี timeout, retry, และ memory optimization
+import '../../../core/widgets/network_image.dart';
 
 class ExplanationCard extends StatelessWidget {
   final bool isCorrect;
@@ -95,28 +97,16 @@ class ExplanationCard extends StatelessWidget {
           ],
 
           // Explanation image
+          // ใช้ IreneNetworkImage แทน Image.network เพื่อมี timeout/retry/memory optimization
           if (explanationImageUrl != null) ...[
             AppSpacing.verticalGapMd,
-            ClipRRect(
+            IreneNetworkImage(
+              imageUrl: explanationImageUrl!,
+              width: double.infinity,
+              fit: BoxFit.contain,
+              memCacheWidth: 600,
               borderRadius: AppRadius.smallRadius,
-              child: Image.network(
-                explanationImageUrl!,
-                width: double.infinity,
-                fit: BoxFit.contain,
-                // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
-                cacheWidth: 600,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return Container(
-                    height: 150,
-                    color: AppColors.primaryBackground,
-                    child: const Center(child: CircularProgressIndicator()),
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) {
-                  return const SizedBox.shrink();
-                },
-              ),
+              compact: true,
             ),
           ],
 

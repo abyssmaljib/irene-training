@@ -15,6 +15,7 @@ import '../../shift_summary/services/shift_summary_service.dart';
 import '../../dd_handover/services/dd_service.dart';
 import '../providers/task_provider.dart';
 import '../../../core/widgets/app_toast.dart';
+import '../../../core/widgets/network_image.dart';
 
 /// Provider สำหรับ all users (dev mode)
 final _allUsersProvider = FutureProvider<List<DevUserInfo>>((ref) async {
@@ -1157,39 +1158,24 @@ class _UserListTile extends StatelessWidget {
             // Avatar with clocked-in indicator
             Stack(
               children: [
+                // ใช้ IreneNetworkAvatar แทน Image.network
+                // เพื่อมี timeout/retry และจำกัด memory สำหรับรูปใน scrollable list
                 Container(
-                  width: 36,
-                  height: 36,
                   decoration: BoxDecoration(
-                    color: Colors.cyan.shade100,
                     shape: BoxShape.circle,
                     border: isSelected
                         ? Border.all(color: Colors.cyan, width: 2)
                         : null,
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(18),
-                    child: user.photoUrl != null && user.photoUrl!.isNotEmpty
-                        ? Image.network(
-                            user.photoUrl!,
-                            width: 36,
-                            height: 36,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) => Center(
-                              child: HugeIcon(
-                                icon: HugeIcons.strokeRoundedUser,
-                                size: AppIconSize.md,
-                                color: Colors.cyan.shade700,
-                              ),
-                            ),
-                          )
-                        : Center(
-                            child: HugeIcon(
-                              icon: HugeIcons.strokeRoundedUser,
-                              size: AppIconSize.md,
-                              color: Colors.cyan.shade700,
-                            ),
-                          ),
+                  child: IreneNetworkAvatar(
+                    imageUrl: user.photoUrl,
+                    radius: 18,
+                    backgroundColor: Colors.cyan.shade100,
+                    fallbackIcon: HugeIcon(
+                      icon: HugeIcons.strokeRoundedUser,
+                      size: AppIconSize.md,
+                      color: Colors.cyan.shade700,
+                    ),
                   ),
                 ),
                 // Clocked-in indicator (green dot)

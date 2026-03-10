@@ -7,6 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/irene_app_bar.dart';
+import '../../../core/widgets/network_image.dart';
 import '../../../core/widgets/shimmer_loading.dart';
 import '../models/post.dart';
 import '../providers/post_provider.dart';
@@ -329,14 +330,11 @@ class _RequiredPostsScreenState extends ConsumerState<RequiredPostsScreen> {
   Widget _buildAuthorInfo(Post post) {
     return Row(
       children: [
-        CircleAvatar(
+        // Avatar ผู้เขียน - ใช้ IreneNetworkAvatar พร้อม timeout/retry/memory optimization
+        IreneNetworkAvatar(
+          imageUrl: post.photoUrl,
           radius: 20,
           backgroundColor: AppColors.accent1,
-          backgroundImage:
-              post.photoUrl != null ? NetworkImage(post.photoUrl!) : null,
-          child: post.photoUrl == null
-              ? HugeIcon(icon: HugeIcons.strokeRoundedUser, color: AppColors.primary, size: AppIconSize.lg)
-              : null,
         ),
         SizedBox(width: 12),
         Column(
@@ -414,15 +412,11 @@ class _RequiredPostsScreenState extends ConsumerState<RequiredPostsScreen> {
           AppSpacing.verticalGapSm,
           Row(
             children: [
-              CircleAvatar(
+              // Avatar ผู้พักอาศัย - ใช้ IreneNetworkAvatar พร้อม timeout/retry/memory optimization
+              IreneNetworkAvatar(
+                imageUrl: post.residentPictureUrl,
                 radius: 22,
                 backgroundColor: AppColors.surface,
-                backgroundImage: post.residentPictureUrl != null
-                    ? NetworkImage(post.residentPictureUrl!)
-                    : null,
-                child: post.residentPictureUrl == null
-                    ? HugeIcon(icon: HugeIcons.strokeRoundedUser, color: AppColors.primary, size: AppIconSize.lg)
-                    : null,
               ),
               SizedBox(width: 8),
               Expanded(

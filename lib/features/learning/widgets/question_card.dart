@@ -3,6 +3,8 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+// ใช้ IreneNetworkImage แทน Image.network เพื่อมี timeout, retry, และ memory optimization
+import '../../../core/widgets/network_image.dart';
 import '../models/question.dart';
 import 'choice_button.dart';
 
@@ -58,35 +60,21 @@ class QuestionCard extends StatelessWidget {
           ),
 
           // Question image (if any)
+          // ใช้ IreneNetworkImage แทน Image.network เพื่อมี timeout/retry/memory optimization
           if (question.questionImageUrl != null) ...[
             AppSpacing.verticalGapMd,
-            ClipRRect(
+            IreneNetworkImage(
+              imageUrl: question.questionImageUrl!,
+              width: double.infinity,
+              fit: BoxFit.contain,
+              memCacheWidth: 600,
               borderRadius: AppRadius.mediumRadius,
-              child: Image.network(
-                question.questionImageUrl!,
-                width: double.infinity,
-                fit: BoxFit.contain,
-                // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
-                cacheWidth: 600,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return Container(
-                    height: 200,
-                    color: AppColors.primaryBackground,
-                    child: const Center(
-                      child: CircularProgressIndicator(),
-                    ),
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    height: 100,
-                    color: AppColors.primaryBackground,
-                    child: const Center(
-                      child: HugeIcon(icon: HugeIcons.strokeRoundedImageNotFound01, color: AppColors.secondaryText),
-                    ),
-                  );
-                },
+              errorPlaceholder: Container(
+                height: 100,
+                color: AppColors.primaryBackground,
+                child: const Center(
+                  child: HugeIcon(icon: HugeIcons.strokeRoundedImageNotFound01, color: AppColors.secondaryText),
+                ),
               ),
             ),
           ],

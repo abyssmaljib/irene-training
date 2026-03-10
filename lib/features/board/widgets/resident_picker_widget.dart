@@ -273,12 +273,21 @@ class _ResidentPickerSheetState extends ConsumerState<ResidentPickerSheet> {
                       );
                     }
 
+                    // === Group by zone ===
+                    // จัดกลุ่มตามโซน แสดง header แยกแต่ละกลุ่ม
+                    final groupedItems =
+                        _buildGroupedItems(filtered);
+
                     return ListView.builder(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: filtered.length,
+                      itemCount: groupedItems.length,
                       itemBuilder: (context, index) {
-                        final resident = filtered[index];
-                        return _buildResidentTile(resident);
+                        final item = groupedItems[index];
+                        // Zone header (String) หรือ Resident tile (ResidentOption)
+                        if (item is String) {
+                          return _buildZoneHeader(item);
+                        }
+                        return _buildResidentTile(item as ResidentOption);
                       },
                     );
                   },
@@ -312,6 +321,65 @@ class _ResidentPickerSheetState extends ConsumerState<ResidentPickerSheet> {
       return r.name.toLowerCase().contains(query) ||
           (r.zone?.toLowerCase().contains(query) ?? false);
     }).toList();
+  }
+
+  /// จัดกลุ่ม residents ตามโซน → return flat list ที่มีทั้ง zone header (String)
+  /// และ resident (ResidentOption) สลับกัน เพื่อใช้กับ ListView.builder
+  List<dynamic> _buildGroupedItems(List<ResidentOption> residents) {
+    // Group by zone name
+    final grouped = <String, List<ResidentOption>>{};
+    for (final r in residents) {
+      final zone = r.zone ?? 'ไม่ระบุโซน';
+      grouped.putIfAbsent(zone, () => []).add(r);
+    }
+
+    // Sort zones: ชื่อโซนจริงก่อน, 'ไม่ระบุโซน' อยู่ท้ายสุด
+    final sortedZones = grouped.keys.toList()
+      ..sort((a, b) {
+        if (a == 'ไม่ระบุโซน') return 1;
+        if (b == 'ไม่ระบุโซน') return -1;
+        return a.compareTo(b);
+      });
+
+    // Flatten: [zone header, resident, resident, zone header, resident, ...]
+    final items = <dynamic>[];
+    for (final zone in sortedZones) {
+      items.add(zone); // zone header (String)
+      items.addAll(grouped[zone]!); // residents ในโซนนั้น
+    }
+    return items;
+  }
+
+  /// Header แยกกลุ่มโซน
+  Widget _buildZoneHeader(String zoneName) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 12, bottom: 4),
+      child: Row(
+        children: [
+          HugeIcon(
+            icon: HugeIcons.strokeRoundedLocation01,
+            size: AppIconSize.sm,
+            color: AppColors.primary,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            zoneName,
+            style: AppTypography.bodySmall.copyWith(
+              color: AppColors.primary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(width: 8),
+          // เส้นแบ่ง
+          Expanded(
+            child: Divider(
+              color: AppColors.alternate,
+              height: 1,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildResidentTile(ResidentOption resident) {

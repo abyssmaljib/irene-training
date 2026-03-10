@@ -30,6 +30,7 @@ import '../../../core/widgets/checkbox_tile.dart';
 import '../widgets/handover_toggle_widget.dart';
 import '../widgets/post_extras_section.dart';
 import '../../medicine/services/medicine_service.dart';
+import '../services/ticket_service.dart';
 import '../providers/tag_provider.dart';
 import '../../../core/widgets/success_popup.dart';
 import '../../../core/widgets/buttons.dart';
@@ -501,11 +502,23 @@ class _AdvancedCreatePostScreenState
         tagTopics = [...?tagTopics, familyTag];
       }
 
+      // === สรุป restock ต่อท้ายข้อความ (เมื่อส่งให้ญาติ) ===
+      // ญาติจะได้เห็นว่ามียาอะไรถูกเติมบ้าง
+      // === สรุป restock ต่อท้ายข้อความเสมอ (ไม่ว่าจะส่งให้ญาติหรือไม่) ===
+      // เพื่อให้โพสมีบันทึกว่าเติมยาอะไรไปบ้าง
+      String finalText = text;
+      final restockSummary = _buildRestockSummaryText(state.restockItems);
+      if (restockSummary.isNotEmpty) {
+        finalText = text.isEmpty
+            ? restockSummary
+            : '$text\n\n$restockSummary';
+      }
+
       // Create post
       final postId = await PostActionService.instance.createPost(
         userId: userId,
         nursinghomeId: nursinghomeId,
-        text: text,
+        text: finalText,
         title: _titleController.text.trim().isEmpty
             ? null
             : _titleController.text.trim(),
@@ -539,6 +552,14 @@ class _AdvancedCreatePostScreenState
           await _insertRestockRecords(postId, userId, enabledRestocks);
           // Invalidate medicine cache เพื่อให้หน้ายาแสดงข้อมูลใหม่
           MedicineService.instance.invalidateCache();
+        }
+
+        // === Complete selected tickets (ถ้ามี) ===
+        // ปิด tickets ที่ user ติ๊ก "ปิด ticket นี้เมื่อสร้างโพส"
+        final ticketIdsToComplete = state.allTicketIdsToComplete;
+        if (ticketIdsToComplete.isNotEmpty) {
+          await TicketService.instance
+              .completeTickets(ticketIdsToComplete.toList());
         }
 
         // ถ้ามี taskLogId ให้ complete task ด้วย
@@ -840,7 +861,9 @@ class _AdvancedCreatePostScreenState
                 onHandoverChanged: (value) {
                   ref.read(createPostProvider.notifier).setHandover(value);
                 },
-                disabled: widget.isFromTask, // Lock เมื่อมาจาก task
+                // ล็อก resident + tag เมื่อมาจาก task หรือ DD
+                // เพื่อป้องกัน user ลบ resident ที่ discharge ไปแล้ว
+                disabled: widget.isFromTask || state.ddId != null,
                 isTagRequired: true, // บังคับเลือก tag
               ),
 
@@ -880,9 +903,19 @@ class _AdvancedCreatePostScreenState
                     ref.read(createPostProvider.notifier).setRestockItems(items);
                   },
                   onRestockItemToggled: (medListId, enabled) {
-                    ref
-                        .read(createPostProvider.notifier)
-                        .toggleRestockItem(medListId, enabled);
+                    final notifier = ref.read(createPostProvider.notifier);
+                    notifier.toggleRestockItem(medListId, enabled);
+
+                    // ถ้ามี restock item enabled อย่างน้อย 1 ตัว → auto-select tag "ยา"
+                    // overwrite tag ปัจจุบัน เพื่อให้โพสจัดหมวดหมู่ถูกต้อง
+                    if (enabled) {
+                      final currentState = ref.read(createPostProvider);
+                      final hasAnyEnabled =
+                          currentState.restockItems.any((i) => i.enabled);
+                      if (hasAnyEnabled) {
+                        _autoSelectTagByName('ยา');
+                      }
+                    }
                   },
                   onRestockQuantityChanged: (medListId, inputDisplay, reconcile) {
                     ref
@@ -1124,6 +1157,47 @@ class _AdvancedCreatePostScreenState
           : 'ส่งโพสต์นี้ให้ญาติของผู้สูงอายุ',
       isRequired: isFromTask,
     );
+  }
+
+  /// สร้างข้อความสรุป restock สำหรับแนบท้ายโพส (ส่งให้ญาติ)
+  /// เฉพาะ items ที่ enabled + reconcile > 0
+  /// ตัวอย่าง:
+  ///   📦 อัพเดตสต็อกยา
+  ///   • พาราเซตามอล เพิ่ม 30 เม็ด → คงเหลือ 90 เม็ด
+  ///   • อะม็อกซิซิลลิน เพิ่ม 10 แคปซูล → คงเหลือ 25 แคปซูล
+  String _buildRestockSummaryText(List<RestockItem> items) {
+    final enabled = items.where((i) => i.enabled && i.reconcile > 0).toList();
+    if (enabled.isEmpty) return '';
+
+    final lines = <String>['📦 อัพเดตสต็อกยา'];
+    for (final item in enabled) {
+      // ใช้ generic name ถ้ามี, ไม่งั้นใช้ medicineName
+      final name = item.medicineSummary?.genericName ?? item.medicineName;
+      final diff = item.reconcile - item.currentReconcile;
+      final diffStr = _formatNumber(diff.abs());
+      final reconcileStr = _formatNumber(item.reconcile);
+
+      // แสดง "เพิ่ม / ลด / ตั้งเป็น" ตามผลลัพธ์
+      final String action;
+      if (diff > 0) {
+        action = 'เพิ่ม $diffStr ${item.unit}';
+      } else if (diff < 0) {
+        action = 'ลด $diffStr ${item.unit}';
+      } else {
+        action = 'คงเดิม';
+      }
+
+      lines.add('• $name $action → คงเหลือ $reconcileStr ${item.unit}');
+    }
+    return lines.join('\n');
+  }
+
+  /// Format ตัวเลข: ถ้าเป็นจำนวนเต็มแสดงไม่มีทศนิยม
+  String _formatNumber(double value) {
+    if (value == value.roundToDouble()) {
+      return value.toInt().toString();
+    }
+    return value.toStringAsFixed(1);
   }
 
   /// INSERT restock records ลง med_history พร้อม post_id

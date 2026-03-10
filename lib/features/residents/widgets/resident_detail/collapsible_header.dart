@@ -3,6 +3,7 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../../core/widgets/network_image.dart';
 import '../../models/resident_detail.dart';
 
 /// Collapsible Header สำหรับ Resident Detail
@@ -87,9 +88,17 @@ class CollapsibleResidentHeader extends StatelessWidget {
               child: RepaintBoundary(
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(6),
+                  // ใช้ IreneNetworkImage แทน Image.network เพื่อได้ timeout + retry
                   child: resident.imageUrl != null && resident.imageUrl!.isNotEmpty
-                      // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
-                      ? Image.network(resident.imageUrl!, fit: BoxFit.cover, cacheWidth: 100, errorBuilder: (context, error, stackTrace) => _buildMiniAvatar())
+                      ? IreneNetworkImage(
+                          imageUrl: resident.imageUrl!,
+                          width: 32,
+                          height: 32,
+                          fit: BoxFit.cover,
+                          memCacheWidth: 64, // 2x ขนาดจริงสำหรับ high DPI
+                          compact: true, // รูปเล็กมาก แสดงแค่ icon เมื่อ error
+                          errorPlaceholder: _buildMiniAvatar(),
+                        )
                       : _buildMiniAvatar(),
                 ),
               ),
@@ -156,13 +165,16 @@ class CollapsibleResidentHeader extends StatelessWidget {
       child: RepaintBoundary(
         child: ClipRRect(
           borderRadius: BorderRadius.circular(14),
+          // ใช้ IreneNetworkImage แทน Image.network เพื่อได้ timeout, retry, memory optimization
           child: resident.imageUrl != null && resident.imageUrl!.isNotEmpty
-              ? Image.network(
-                  resident.imageUrl!,
+              ? IreneNetworkImage(
+                  imageUrl: resident.imageUrl!,
+                  width: 72,
+                  height: 72,
                   fit: BoxFit.cover,
-                  // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
-                  cacheWidth: 400,
-                  errorBuilder: (context, error, stackTrace) => _buildDefaultAvatar(),
+                  memCacheWidth: 144, // 2x ขนาดจริงสำหรับ high DPI
+                  compact: true, // แสดงแค่ icon เมื่อ error
+                  errorPlaceholder: _buildDefaultAvatar(),
                 )
               : _buildDefaultAvatar(),
         ),

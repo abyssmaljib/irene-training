@@ -5,6 +5,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/buttons.dart';
 import '../../../core/widgets/irene_app_bar.dart';
+import '../../../core/widgets/network_image.dart';
 import '../models/app_notification.dart';
 import '../services/notification_navigator.dart';
 
@@ -158,42 +159,19 @@ class NotificationDetailScreen extends StatelessWidget {
   }
 
   /// สร้างส่วนแสดงรูปภาพ (ถ้ามี)
+  /// ใช้ IreneNetworkImage แทน Image.network เพื่อได้ timeout, retry, memory optimization
   Widget _buildImage() {
     return Column(
       children: [
-        ClipRRect(
+        // IreneNetworkImage มี timeout 15 วินาที + retry mechanism ในตัว
+        // ไม่ต้องจัดการ loadingBuilder/errorBuilder เอง
+        IreneNetworkImage(
+          imageUrl: notification.imageUrl!,
+          width: double.infinity,
+          fit: BoxFit.cover,
+          memCacheWidth: 800, // รูปใหญ่สำหรับหน้า detail
           borderRadius: AppRadius.mediumRadius,
-          child: Image.network(
-            notification.imageUrl!,
-            width: double.infinity,
-            fit: BoxFit.cover,
-            // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
-            cacheWidth: 800,
-            errorBuilder: (context, error, stackTrace) {
-              // ถ้าโหลดรูปไม่ได้ ไม่แสดงอะไร
-              return SizedBox.shrink();
-            },
-            loadingBuilder: (context, child, loadingProgress) {
-              if (loadingProgress == null) return child;
-              // แสดง loading indicator ขณะโหลดรูป
-              return Container(
-                height: 200,
-                decoration: BoxDecoration(
-                  color: AppColors.alternate,
-                  borderRadius: AppRadius.mediumRadius,
-                ),
-                child: Center(
-                  child: CircularProgressIndicator(
-                    value: loadingProgress.expectedTotalBytes != null
-                        ? loadingProgress.cumulativeBytesLoaded /
-                            loadingProgress.expectedTotalBytes!
-                        : null,
-                    color: AppColors.primary,
-                  ),
-                ),
-              );
-            },
-          ),
+          errorPlaceholder: SizedBox.shrink(), // ถ้าโหลดไม่ได้ ไม่แสดงอะไร
         ),
         AppSpacing.verticalGapMd,
       ],

@@ -12,6 +12,7 @@ import '../../dd_handover/services/dd_service.dart';
 import '../models/clock_summary.dart';
 import '../models/shift_row_type.dart';
 import '../../../core/widgets/app_toast.dart';
+import '../../../core/widgets/network_image.dart';
 import 'sick_leave_claim_sheet.dart';
 
 /// Row แสดงรายละเอียดเวรแต่ละวัน
@@ -517,14 +518,15 @@ class _ShiftDetailRowState extends ConsumerState<ShiftDetailRow>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ใช้ IreneNetworkImage แทน Image.network
+            // เพื่อมี timeout 15 วิ + ปุ่มลองใหม่เมื่อโหลดไม่สำเร็จ
             if (clockSummary.sickEvident != null)
-              Image.network(
-                clockSummary.sickEvident!,
+              IreneNetworkImage(
+                imageUrl: clockSummary.sickEvident!,
                 height: 200,
                 fit: BoxFit.contain,
-                // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
-                cacheWidth: 600,
-                errorBuilder: (context, error, stack) => Container(
+                memCacheWidth: 600, // จำกัดขนาดใน memory เพื่อป้องกัน crash
+                errorPlaceholder: Container(
                   height: 100,
                   color: AppColors.background,
                   child: Center(

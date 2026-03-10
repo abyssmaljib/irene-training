@@ -7,7 +7,8 @@ import '../models/quiz_session.dart';
 
 /// Model สำหรับเก็บ stats ของ staff ในเวร
 /// ใช้สำหรับเปรียบเทียบและหา winners ของ shift badges
-class _ShiftStaffStats {
+/// @visibleForTesting — เปิดให้ test access ได้
+class ShiftStaffStats {
   final String staffId;
   final String staffName;
   final int problemCount;          // จำนวนงานที่ติ๊กปัญหา
@@ -19,7 +20,7 @@ class _ShiftStaffStats {
   final int masterScore;           // SUM(norm - user_diff) ที่เป็นบวก
   final DateTime? lastTaskTime;    // เวลา task สุดท้าย (สำหรับ tie breaker)
 
-  const _ShiftStaffStats({
+  const ShiftStaffStats({
     required this.staffId,
     required this.staffName,
     this.problemCount = 0,
@@ -550,7 +551,7 @@ class BadgeService {
       // 3. หา current user stats
       final myStats = staffStats.firstWhere(
         (s) => s.staffId == userId,
-        orElse: () => _ShiftStaffStats(staffId: userId, staffName: 'Unknown'),
+        orElse: () => ShiftStaffStats(staffId: userId, staffName: 'Unknown'),
       );
 
       // 4. ตรวจสอบและ award แต่ละ badge
@@ -561,7 +562,7 @@ class BadgeService {
         final requirementValue =
             badgeData['requirement_value'] as Map<String, dynamic>? ?? {};
 
-        final shouldAward = _checkShiftBadgeCondition(
+        final shouldAward = checkShiftBadgeCondition(
           requirementType: requirementType,
           requirementValue: requirementValue,
           myStats: myStats,
@@ -588,7 +589,7 @@ class BadgeService {
   }
 
   /// ดึง stats ของ staff ทั้งหมดในเวรเดียวกัน
-  Future<List<_ShiftStaffStats>> _getShiftStaffStats({
+  Future<List<ShiftStaffStats>> _getShiftStaffStats({
     required int nursinghomeId,
     required DateTime clockIn,
     required DateTime clockOut,
@@ -632,6 +633,41 @@ class BadgeService {
         staffList[currentUserId] = userInfo?['nickname'] as String? ?? 'Me';
       }
 
+      // ดึง clock_in_out_ver2 ของ staff ทุกคนในวันเดียวกัน
+      // เพื่อเอา selected_resident_id_list (assigned residents)
+      // และ clock_in/out_timestamp (เวลาจริงของแต่ละคน)
+      final staffClockData = await _client
+          .from('clock_in_out_ver2')
+          .select('user_id, selected_resident_id_list, clock_in_timestamp, clock_out_timestamp')
+          .eq('nursinghome_id', nursinghomeId)
+          .gte('clock_in_timestamp', '${dateStr}T00:00:00')
+          .lte('clock_in_timestamp', '${dateStr}T23:59:59');
+
+      // สร้าง map: staffId → assigned resident ids
+      final staffAssignedResidents = <String, List<int>>{};
+      // สร้าง map: staffId → (clockIn, clockOut) จริง
+      final staffClockTimes = <String, (DateTime, DateTime?)>{};
+
+      for (final row in staffClockData as List) {
+        final staffId = row['user_id'] as String;
+        // แปลง selected_resident_id_list (bigint[]) → List<int>
+        final rawList = row['selected_resident_id_list'] as List?;
+        if (rawList != null) {
+          staffAssignedResidents[staffId] =
+              rawList.map((e) => (e as num).toInt()).toList();
+        }
+        // เก็บ clock times
+        final clockInStr = row['clock_in_timestamp'] as String?;
+        final clockOutStr = row['clock_out_timestamp'] as String?;
+        if (clockInStr != null) {
+          final staffClockIn = DateTime.parse(clockInStr);
+          final staffClockOut = clockOutStr != null
+              ? DateTime.parse(clockOutStr)
+              : null;
+          staffClockTimes[staffId] = (staffClockIn, staffClockOut);
+        }
+      }
+
       // ดึง task logs ของวันนี้
       final taskLogs = await _client
           .from('v2_task_logs_with_details')
@@ -645,7 +681,7 @@ class BadgeService {
           .not('completed_by', 'is', null);
 
       // คำนวณ stats ของแต่ละ staff
-      final statsMap = <String, _ShiftStaffStats>{};
+      final statsMap = <String, ShiftStaffStats>{};
 
       for (final staffId in staffList.keys) {
         final staffName = staffList[staffId]!;
@@ -663,28 +699,32 @@ class BadgeService {
         final completedCount =
             staffTasks.where((t) => t['status'] == 'complete').length;
 
-        // นับ kindness (task ที่ resident ไม่ได้ assign ให้)
-        // ต้อง query assigned residents ของ staff นี้
-        final kindnessCount = _countKindnessTasks(
-          staffId: staffId,
+        // นับ kindness — ใช้ assigned residents ของ staff คนนั้นจริงๆ
+        // ถ้าไม่มีข้อมูลใน clock_in_out_ver2 → fallback ใช้ current user's list
+        final thisStaffResidents = staffAssignedResidents[staffId]
+            ?? (staffId == currentUserId ? assignedResidentIds : <int>[]);
+        final kindnessCount = countKindnessTasks(
           staffTasks: staffTasks,
-          currentUserId: currentUserId,
-          assignedResidentIds: assignedResidentIds,
+          assignedResidentIds: thisStaffResidents,
         );
 
         // คำนวณ avg timing diff
-        final timingDiff = _calculateAvgTimingDiff(staffTasks);
+        final timingDiff = calculateAvgTimingDiff(staffTasks);
 
-        // คำนวณ dead air (simplified - นับ gaps ระหว่าง tasks)
-        final deadAirMinutes = _calculateDeadAirMinutes(
+        // คำนวณ dead air — ใช้ clock times ของ staff คนนั้นจริงๆ
+        final clockTimes = staffClockTimes[staffId];
+        final staffClockIn = clockTimes?.$1 ?? clockIn;
+        // ถ้ายังไม่ได้ clock out → ใช้ current user's clockOut เป็น fallback
+        final staffClockOut = clockTimes?.$2 ?? clockOut;
+        final deadAirMinutes = calculateDeadAirMinutes(
           staffTasks: staffTasks,
-          clockIn: clockIn,
-          clockOut: clockOut,
+          clockIn: staffClockIn,
+          clockOut: staffClockOut,
         );
 
         // คำนวณ novice/master scores
         final (noviceScore, masterScore) =
-            _calculateDifficultyScores(staffTasks);
+            calculateDifficultyScores(staffTasks);
 
         // หา last task time
         DateTime? lastTaskTime;
@@ -698,7 +738,7 @@ class BadgeService {
           }
         }
 
-        statsMap[staffId] = _ShiftStaffStats(
+        statsMap[staffId] = ShiftStaffStats(
           staffId: staffId,
           staffName: staffName,
           problemCount: problemCount,
@@ -720,28 +760,25 @@ class BadgeService {
   }
 
   /// นับ kindness tasks (ช่วยคนไข้ที่ไม่ได้ assign ให้)
-  int _countKindnessTasks({
-    required String staffId,
+  /// ใช้ assigned residents ของ staff คนนั้นจริงๆ (ดึงจาก clock_in_out_ver2)
+  int countKindnessTasks({
     required List<dynamic> staffTasks,
-    required String currentUserId,
     required List<int> assignedResidentIds,
   }) {
-    // สำหรับ current user ใช้ assignedResidentIds
-    // สำหรับ staff อื่น ไม่มีข้อมูล assigned residents จึงไม่สามารถนับได้
-    // TODO: อาจต้อง query assigned residents ของ staff อื่นด้วย
-    if (staffId != currentUserId) {
-      return 0; // ไม่สามารถนับ kindness ของ staff อื่นได้
-    }
+    // ถ้าไม่มี assigned residents (ไม่ได้เลือกตอน clock in)
+    // → ถือว่าทุก task เป็น "ของตัวเอง" → kindness = 0
+    if (assignedResidentIds.isEmpty) return 0;
 
     return staffTasks.where((t) {
       final residentId = t['resident_id'] as int?;
       if (residentId == null) return false;
+      // task กับ resident ที่ไม่ได้อยู่ใน list ที่เลือกตอน clock in = kindness
       return !assignedResidentIds.contains(residentId);
     }).length;
   }
 
   /// คำนวณค่าเบี่ยงเบนเวลาเฉลี่ย (นาที)
-  double _calculateAvgTimingDiff(List<dynamic> tasks) {
+  double calculateAvgTimingDiff(List<dynamic> tasks) {
     if (tasks.isEmpty) return double.infinity;
 
     int totalDiff = 0;
@@ -766,7 +803,7 @@ class BadgeService {
   }
 
   /// คำนวณ dead air minutes (simplified)
-  int _calculateDeadAirMinutes({
+  int calculateDeadAirMinutes({
     required List<dynamic> staffTasks,
     required DateTime clockIn,
     required DateTime clockOut,
@@ -813,7 +850,7 @@ class BadgeService {
   }
 
   /// คำนวณ novice และ master scores
-  (int, int) _calculateDifficultyScores(List<dynamic> tasks) {
+  (int, int) calculateDifficultyScores(List<dynamic> tasks) {
     int noviceScore = 0;
     int masterScore = 0;
 
@@ -835,17 +872,19 @@ class BadgeService {
   }
 
   /// ตรวจเงื่อนไข shift badge
-  bool _checkShiftBadgeCondition({
+  /// @visibleForTesting — เปิดให้ test เรียกตรงได้
+  @visibleForTesting
+  bool checkShiftBadgeCondition({
     required String requirementType,
     required Map<String, dynamic> requirementValue,
-    required _ShiftStaffStats myStats,
-    required List<_ShiftStaffStats> allStats,
+    required ShiftStaffStats myStats,
+    required List<ShiftStaffStats> allStats,
   }) {
     switch (requirementType) {
       case 'shift_most_problems':
         // ติ๊กปัญหามากที่สุด (ต้องมีอย่างน้อย 1)
         if (myStats.problemCount == 0) return false;
-        return _isWinner(
+        return isWinner(
           myValue: myStats.problemCount,
           myTime: myStats.lastTaskTime,
           allStats: allStats,
@@ -857,7 +896,7 @@ class BadgeService {
       case 'shift_most_completed':
         // ทำงานเสร็จเยอะที่สุด (ต้องมีอย่างน้อย 1)
         if (myStats.completedCount == 0) return false;
-        return _isWinner(
+        return isWinner(
           myValue: myStats.completedCount,
           myTime: myStats.lastTaskTime,
           allStats: allStats,
@@ -869,7 +908,7 @@ class BadgeService {
       case 'shift_most_kindness':
         // ช่วยคนไข้คนอื่นมากที่สุด (ต้องมีอย่างน้อย 1)
         if (myStats.kindnessCount == 0) return false;
-        return _isWinner(
+        return isWinner(
           myValue: myStats.kindnessCount,
           myTime: myStats.lastTaskTime,
           allStats: allStats,
@@ -881,7 +920,7 @@ class BadgeService {
       case 'shift_best_timing':
         // ค่าเบี่ยงเบนเวลาต่ำสุด (ต้องมี tasks ที่มี expected time)
         if (myStats.avgTimingDiff == double.infinity) return false;
-        return _isWinnerDouble(
+        return isWinnerDouble(
           myValue: myStats.avgTimingDiff,
           myTime: myStats.lastTaskTime,
           allStats: allStats,
@@ -893,7 +932,7 @@ class BadgeService {
       case 'shift_most_dead_air':
         // Dead air มากที่สุด (ต้องมี dead air > 0)
         if (myStats.deadAirMinutes == 0) return false;
-        return _isWinner(
+        return isWinner(
           myValue: myStats.deadAirMinutes,
           myTime: myStats.lastTaskTime,
           allStats: allStats,
@@ -919,12 +958,12 @@ class BadgeService {
 
   /// ตรวจสอบว่าเป็น winner หรือไม่ (int value)
   /// Tie breaker: คนแรกที่ทำถึง (lastTaskTime เร็วกว่า)
-  bool _isWinner({
+  bool isWinner({
     required int myValue,
     required DateTime? myTime,
-    required List<_ShiftStaffStats> allStats,
-    required int Function(_ShiftStaffStats) getValue,
-    required DateTime? Function(_ShiftStaffStats) getTime,
+    required List<ShiftStaffStats> allStats,
+    required int Function(ShiftStaffStats) getValue,
+    required DateTime? Function(ShiftStaffStats) getTime,
     required bool higherIsBetter,
   }) {
     for (final other in allStats) {
@@ -950,12 +989,12 @@ class BadgeService {
   }
 
   /// ตรวจสอบว่าเป็น winner หรือไม่ (double value)
-  bool _isWinnerDouble({
+  bool isWinnerDouble({
     required double myValue,
     required DateTime? myTime,
-    required List<_ShiftStaffStats> allStats,
-    required double Function(_ShiftStaffStats) getValue,
-    required DateTime? Function(_ShiftStaffStats) getTime,
+    required List<ShiftStaffStats> allStats,
+    required double Function(ShiftStaffStats) getValue,
+    required DateTime? Function(ShiftStaffStats) getTime,
     required bool lowerIsBetter,
   }) {
     for (final other in allStats) {

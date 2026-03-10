@@ -255,7 +255,8 @@ class ActionChip extends StatelessWidget {
   final String text;
   final bool isSelected;
   final VoidCallback? onPressed;
-  final IconData? icon;
+  // ใช้ dynamic แทน IconData เพื่อรองรับทั้ง Material Icons และ HugeIcons
+  final dynamic icon;
   final double iconSize;
   final double height;
   final EdgeInsetsGeometry? padding;
@@ -278,7 +279,7 @@ class ActionChip extends StatelessWidget {
     required String text,
     bool isSelected = false,
     VoidCallback? onPressed,
-    IconData? icon,
+    dynamic icon,
   }) {
     return ActionChip(
       text: text,
@@ -299,7 +300,7 @@ class ActionChip extends StatelessWidget {
     required String text,
     bool isSelected = false,
     VoidCallback? onPressed,
-    IconData? icon,
+    dynamic icon,
   }) {
     return ActionChip(
       text: text,
@@ -320,7 +321,7 @@ class ActionChip extends StatelessWidget {
     required String text,
     bool isSelected = false,
     VoidCallback? onPressed,
-    IconData? icon,
+    dynamic icon,
   }) {
     return ActionChip(
       text: text,
@@ -358,8 +359,9 @@ class ActionChip extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (icon != null) ...[
-                Icon(
-                  icon,
+                // ใช้ HugeIcon แทน Icon เพื่อรองรับ HugeIcons
+                HugeIcon(
+                  icon: icon,
                   size: iconSize,
                   color: isSelected
                       ? AppColors.primaryText
@@ -436,7 +438,8 @@ class ActionChipGroup extends StatelessWidget {
 /// Data class for ActionChipGroup
 class ActionChipData {
   final String text;
-  final IconData? icon;
+  // ใช้ dynamic แทน IconData เพื่อรองรับทั้ง Material Icons และ HugeIcons
+  final dynamic icon;
 
   const ActionChipData({
     required this.text,

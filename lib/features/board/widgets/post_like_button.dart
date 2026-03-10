@@ -3,6 +3,7 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/network_image.dart';
 
 /// Like/Acknowledge button สำหรับ Post
 class PostLikeButton extends StatelessWidget {
@@ -146,18 +147,13 @@ class PostLikeInfo extends StatelessWidget {
       onTap: onTap,
       child: Row(
         children: [
-          // Avatar
-          if (lastLikerPhotoUrl != null)
-            CircleAvatar(
-              radius: 10,
-              backgroundImage: NetworkImage(lastLikerPhotoUrl!),
-            )
-          else
-            CircleAvatar(
-              radius: 10,
-              backgroundColor: AppColors.accent1,
-              child: HugeIcon(icon: HugeIcons.strokeRoundedUser, size: AppIconSize.xs, color: AppColors.primary),
-            ),
+          // Avatar คนที่ like ล่าสุด - ใช้ IreneNetworkAvatar พร้อม timeout/retry/memory optimization
+          IreneNetworkAvatar(
+            imageUrl: lastLikerPhotoUrl,
+            radius: 10,
+            backgroundColor: AppColors.accent1,
+            fallbackIcon: HugeIcon(icon: HugeIcons.strokeRoundedUser, size: AppIconSize.xs, color: AppColors.primary),
+          ),
           SizedBox(width: 6),
           // Text
           Expanded(

@@ -5,6 +5,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/filter_drawer_shell.dart';
 import '../../../core/widgets/input_fields.dart';
+import '../../../core/widgets/network_image.dart';
 import '../models/post_tab.dart';
 
 /// Filter drawer สำหรับกรอง posts (ตามชื่อคนไข้)
@@ -368,17 +369,13 @@ class _PostFilterDrawerState extends State<PostFilterDrawer> {
                   ),
                   child: Row(
                     children: [
-                      // Avatar
-                      CircleAvatar(
+                      // Avatar ผู้พักอาศัย - ใช้ IreneNetworkAvatar พร้อม timeout/retry/memory optimization
+                      IreneNetworkAvatar(
+                        imageUrl: resident.pictureUrl,
                         radius: 18,
                         backgroundColor: AppColors.accent1,
-                        backgroundImage: resident.pictureUrl != null
-                            ? NetworkImage(resident.pictureUrl!)
-                            : null,
-                        child: resident.pictureUrl == null
-                            ? HugeIcon(icon: HugeIcons.strokeRoundedUser,
-                                color: AppColors.primary, size: AppIconSize.md)
-                            : null,
+                        fallbackIcon: HugeIcon(icon: HugeIcons.strokeRoundedUser,
+                            color: AppColors.primary, size: AppIconSize.md),
                       ),
                       AppSpacing.horizontalGapMd,
                       // Name & Zone

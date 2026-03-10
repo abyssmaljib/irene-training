@@ -3,6 +3,7 @@ import 'package:hugeicons/hugeicons.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../../core/widgets/network_image.dart';
 import '../../models/resident_detail.dart';
 
 /// Header widget สำหรับแสดงข้อมูลหลักของ Resident
@@ -45,13 +46,18 @@ class ResidentHeader extends StatelessWidget {
           width: 2,
         ),
       ),
+      // ใช้ IreneNetworkImage แทน Image.network เพื่อได้ timeout, retry, memory optimization
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
         child: resident.imageUrl != null && resident.imageUrl!.isNotEmpty
-            ? Image.network(
-                resident.imageUrl!,
+            ? IreneNetworkImage(
+                imageUrl: resident.imageUrl!,
+                width: 64,
+                height: 64,
                 fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => _buildDefaultAvatar(),
+                memCacheWidth: 128, // 2x ขนาดจริงสำหรับ high DPI
+                compact: true, // รูปเล็ก แสดงแค่ icon เมื่อ error
+                errorPlaceholder: _buildDefaultAvatar(),
               )
             : _buildDefaultAvatar(),
       ),

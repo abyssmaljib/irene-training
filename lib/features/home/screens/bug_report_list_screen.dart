@@ -8,6 +8,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/irene_app_bar.dart';
+import '../../../core/widgets/network_image.dart';
 import '../models/bug_report.dart';
 import '../services/bug_report_service.dart';
 import '../widgets/bug_report_form.dart';
@@ -724,10 +725,16 @@ class _BugReportDetailSheet extends StatelessWidget {
                     color: AppColors.secondaryText,
                   ),
                 )
-              : Image.network(
-                  url,
+              // ใช้ IreneNetworkImage แทน Image.network เพื่อมี timeout/retry
+              // และจำกัด memory ด้วย memCacheWidth สำหรับ thumbnail ขนาด 80x80
+              : IreneNetworkImage(
+                  imageUrl: url,
+                  width: 80,
+                  height: 80,
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stack) => Center(
+                  memCacheWidth: 160, // 2x สำหรับ high DPI
+                  compact: true, // UI แบบ compact สำหรับรูปเล็ก
+                  errorPlaceholder: Center(
                     child: HugeIcon(
                       icon: HugeIcons.strokeRoundedImage01,
                       size: AppIconSize.lg,
@@ -749,7 +756,12 @@ class _BugReportDetailSheet extends StatelessWidget {
         child: GestureDetector(
           onTap: () => Navigator.pop(context),
           child: InteractiveViewer(
-            child: Image.network(url),
+            // ใช้ IreneNetworkImage พร้อม useServerResize: false
+            // เพื่อโหลดรูป full resolution สำหรับดูขยาย
+            child: IreneNetworkImage(
+              imageUrl: url,
+              useServerResize: false,
+            ),
           ),
         ),
       ),

@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/new_tag.dart';
+import '../services/ticket_service.dart';
 import '../../checklist/providers/task_provider.dart';
+import '../../medicine/models/medicine_summary.dart';
 
 // ============================================
 // RestockItem — รายการยาที่จะ restock ใน post
@@ -31,6 +33,18 @@ class RestockItem {
   /// คำนวณจาก smart input: "+30" → currentReconcile + 30
   final double reconcile;
 
+  /// Ticket ที่ยังเปิดอยู่สำหรับยาตัวนี้ (ดึงจาก B_Ticket ตอน fetch restock items)
+  /// แสดงใน UI ให้ user เห็นว่ามี ticket ค้างอยู่
+  final List<TicketSummary> openTickets;
+
+  /// ticket IDs ที่ user เลือกจะปิดเมื่อสร้าง restock post สำเร็จ
+  /// user toggle เลือก/ไม่เลือกผ่าน checkbox ใน UI
+  final Set<int> ticketIdsToComplete;
+
+  /// ข้อมูลยาฉบับเต็ม (จาก medicine_summary view)
+  /// ใช้แสดงรูปยา + ชื่อ brand + กดดูรายละเอียดยา
+  final MedicineSummary? medicineSummary;
+
   const RestockItem({
     required this.medicineListId,
     required this.medicineName,
@@ -39,6 +53,9 @@ class RestockItem {
     this.enabled = false,
     this.inputDisplay = '',
     this.reconcile = 0,
+    this.openTickets = const [],
+    this.ticketIdsToComplete = const {},
+    this.medicineSummary,
   });
 
   RestockItem copyWith({
@@ -49,6 +66,9 @@ class RestockItem {
     bool? enabled,
     String? inputDisplay,
     double? reconcile,
+    List<TicketSummary>? openTickets,
+    Set<int>? ticketIdsToComplete,
+    MedicineSummary? medicineSummary,
   }) {
     return RestockItem(
       medicineListId: medicineListId ?? this.medicineListId,
@@ -58,6 +78,9 @@ class RestockItem {
       enabled: enabled ?? this.enabled,
       inputDisplay: inputDisplay ?? this.inputDisplay,
       reconcile: reconcile ?? this.reconcile,
+      openTickets: openTickets ?? this.openTickets,
+      ticketIdsToComplete: ticketIdsToComplete ?? this.ticketIdsToComplete,
+      medicineSummary: medicineSummary ?? this.medicineSummary,
     );
   }
 }
@@ -190,6 +213,21 @@ class CreatePostState {
 
   /// จำนวน restock items ที่ enabled
   int get enabledRestockCount => restockItems.where((i) => i.enabled).length;
+
+  /// รวม ticket IDs ทั้งหมดที่จะปิดอัตโนมัติเมื่อสร้างโพส
+  /// Auto-complete tickets เมื่อ:
+  /// 1. restock item enabled (ติ๊กเลือกยาตัวนี้)
+  /// 2. มีตัวเลข input ที่ไม่ใช่ 0 (reconcile > 0 = มียาเข้ามาจริง)
+  Set<int> get allTicketIdsToComplete {
+    final ids = <int>{};
+    for (final item in restockItems) {
+      if (item.enabled && item.reconcile > 0) {
+        // ปิดทุก open ticket ของยาตัวนี้
+        ids.addAll(item.openTickets.map((t) => t.id));
+      }
+    }
+    return ids;
+  }
 
   bool get hasAiQuizPreview =>
       aiQuizQuestion != null && aiQuizQuestion!.trim().isNotEmpty;
@@ -729,6 +767,10 @@ class CreatePostNotifier extends StateNotifier<CreatePostState> {
     }).toList();
     state = state.copyWith(restockItems: updated);
   }
+
+  // toggleTicketComplete ถูกลบออกแล้ว —
+  // ticket จะถูกปิดอัตโนมัติเมื่อ restock item มี reconcile > 0
+  // ดู allTicketIdsToComplete getter
 
   /// Clear restock items ทั้งหมด (เมื่อเปลี่ยน/ยกเลิก resident)
   void clearRestockItems() {
