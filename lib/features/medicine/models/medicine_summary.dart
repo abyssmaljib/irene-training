@@ -182,9 +182,10 @@ class MedicineSummary {
 
     // ตรวจสอบ before/after
     if (beforeAfterValue.isEmpty) {
-      // ไม่ระบุ before/after = match ทั้งหมด
+      // ไม่ระบุ before/after filter = match ทั้งหมด
       return true;
     }
+    // ถ้ายาไม่ได้ระบุ before/after (ว่าง) → ไม่แสดง (ข้อมูลไม่สมบูรณ์)
     return beforeAfter.contains(beforeAfterValue);
   }
 
@@ -245,10 +246,13 @@ class MedicineSummary {
     String? filterBldb,
     bool? filterPrn,
   }) {
-    // ตรวจสอบ PRN
-    if (filterPrn != null && prn != filterPrn) {
-      return false;
-    }
+    // 1. PRN → ยาตามอาการไม่รวมใน checklist ปกติ (ตรงกับ webapp)
+    if (prn == true) return false;
+
+    // 2. ตรวจสอบ status → waiting = ยังไม่เริ่มใช้ → ไม่แสดง (ตรงกับ webapp)
+    // ไม่เช็ค 'off' เพราะ date range (firstMedHistoryOnDate → lastMedHistoryOffDate) จัดการเอง
+    // ทำให้ user ดูย้อนหลังเห็นยาที่เคย on ได้
+    if (status == 'waiting') return false;
 
     // แปลงเป็น local time ก่อนดึงวัน เพราะ DateTime จาก Supabase
     // อาจเป็น UTC (เช่น 06:45+07 → 23:45Z วันก่อน) ทำให้ .day ผิดวัน
@@ -287,6 +291,7 @@ class MedicineSummary {
     }
 
     // ตรวจสอบ beforeAfter
+    // ถ้ายาไม่ได้ระบุ before/after (ว่าง) → ไม่แสดงในมื้อใดเลย (ข้อมูลไม่สมบูรณ์)
     if (filterBeforeAfter != null && filterBeforeAfter.isNotEmpty) {
       if (!beforeAfter.contains(filterBeforeAfter)) {
         return false;
@@ -315,12 +320,8 @@ class MedicineSummary {
         return daysSinceStart % effectiveFrequency == 0;
 
       case 'สัปดาห์':
-        // ยาทุก X สัปดาห์ ตาม daysOfWeek
-        if (daysOfWeek.isEmpty) {
-          return true;
-        }
-
-        // แปลงวันในสัปดาห์เป็นภาษาอังกฤษ
+        // ยาทุก X สัปดาห์
+        // แปลงวันในสัปดาห์ไทย→อังกฤษ
         const dayMapping = {
           'จันทร์': 'Monday',
           'อังคาร': 'Tuesday',
@@ -331,21 +332,24 @@ class MedicineSummary {
           'อาทิตย์': 'Sunday',
         };
 
-        // หาชื่อวันของ selectedDate
         final dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
         final selectedDayName = dayNames[checkDate.weekday - 1];
 
-        // แปลง daysOfWeek เป็นภาษาอังกฤษ
-        final translatedDays = daysOfWeek
-            .map((day) => dayMapping[day] ?? day)
-            .toList();
-
-        // ตรวจสอบว่าตรงวันในสัปดาห์
-        if (!translatedDays.contains(selectedDayName)) {
-          return false;
+        if (daysOfWeek.isNotEmpty) {
+          // มีระบุวันในสัปดาห์ → ตรวจว่าตรงวันไหม
+          final translatedDays = daysOfWeek
+              .map((day) => dayMapping[day] ?? day)
+              .toList();
+          if (!translatedDays.contains(selectedDayName)) {
+            return false;
+          }
+        } else {
+          // ไม่ระบุวัน → ใช้วันของ startDate เป็นอ้างอิง (ตรงกับ webapp)
+          final startDayName = dayNames[startDate.weekday - 1];
+          if (selectedDayName != startDayName) return false;
         }
 
-        // ตรวจสอบว่าตรงสัปดาห์ที่ถูกต้อง
+        // ตรวจสอบว่าตรงสัปดาห์ที่ถูกต้อง (ทุก N สัปดาห์)
         final daysSinceStart = checkDate.difference(startDate).inDays;
         final weeksSinceStart = daysSinceStart ~/ 7;
         return weeksSinceStart % effectiveFrequency == 0;
