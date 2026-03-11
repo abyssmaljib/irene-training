@@ -359,7 +359,7 @@ function shouldTakeOnDate(
 async function claimQueueItems(
   // deno-lint-ignore no-explicit-any
   client: any,
-  limit = 5,
+  limit = 2,
 ): Promise<{ data: QueueItem[] | null; error: Error | null }> {
   const { data, error } = await client.rpc('claim_verification_queue', { batch_limit: limit })
   return { data, error }

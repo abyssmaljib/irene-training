@@ -213,7 +213,7 @@ END $$;
 
 SELECT cron.schedule(
   'process-med-verification-queue',   -- ชื่อ job (ใช้อ้างอิงตอน unschedule)
-  '*/2 * * * *',                      -- ทุก 2 นาที
+  '*/3 * * * *',                      -- ทุก 3 นาที (ให้ batch เสร็จก่อนรอบถัดไป)
   $$
   DO $body$
   DECLARE
