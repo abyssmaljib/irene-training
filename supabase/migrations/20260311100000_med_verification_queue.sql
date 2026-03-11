@@ -165,7 +165,13 @@ BEGIN
   UPDATE med_verification_queue
   SET
     status = 'processing',
-    started_at = NOW()
+    started_at = NOW(),
+    -- เพิ่ม retry_count เมื่อ re-claim จาก error/stale (ป้องกัน retry ไม่สิ้นสุด)
+    -- pending → 0 (ไม่เปลี่ยน), error/stale → +1
+    retry_count = CASE
+      WHEN med_verification_queue.status = 'pending' THEN med_verification_queue.retry_count
+      ELSE med_verification_queue.retry_count + 1
+    END
   WHERE id IN (
     SELECT id
     FROM med_verification_queue
@@ -198,10 +204,12 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- 3. ถ้ามี → ดึง service_role_key จาก vault → เรียก Edge Function batch
 
 -- ลบ cron job เดิมถ้ามี (กันซ้ำ)
-SELECT cron.unschedule('process-med-verification-queue')
-WHERE EXISTS (
-  SELECT 1 FROM cron.job WHERE jobname = 'process-med-verification-queue'
-);
+-- ใช้ DO block + EXCEPTION เพราะ cron.unschedule จะ error ถ้า job ไม่มี
+DO $$ BEGIN
+  PERFORM cron.unschedule('process-med-verification-queue');
+EXCEPTION WHEN OTHERS THEN
+  -- job ยังไม่มี → ไม่ต้องทำอะไร
+END $$;
 
 SELECT cron.schedule(
   'process-med-verification-queue',   -- ชื่อ job (ใช้อ้างอิงตอน unschedule)
@@ -285,6 +293,14 @@ WHERE
     FROM "A_Med_AI_Verification" av
     WHERE av.med_log_id = ml.id
       AND av.photo_type = '2C'
+  )
+  -- กัน duplicate กับ items ที่ trigger เพิ่งใส่เข้า queue
+  AND NOT EXISTS (
+    SELECT 1
+    FROM med_verification_queue q
+    WHERE q.med_log_id = ml.id
+      AND q.photo_type = '2C'
+      AND q.status IN ('pending', 'processing')
   );
 
 -- Backfill 3C photos
@@ -313,4 +329,12 @@ WHERE
     FROM "A_Med_AI_Verification" av
     WHERE av.med_log_id = ml.id
       AND av.photo_type = '3C'
+  )
+  -- กัน duplicate กับ items ที่ trigger เพิ่งใส่เข้า queue
+  AND NOT EXISTS (
+    SELECT 1
+    FROM med_verification_queue q
+    WHERE q.med_log_id = ml.id
+      AND q.photo_type = '3C'
+      AND q.status IN ('pending', 'processing')
   );
