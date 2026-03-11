@@ -253,7 +253,8 @@ SELECT cron.schedule(
         'Content-Type', 'application/json',
         'Authorization', 'Bearer ' || _service_role_key
       ),
-      body := '{}'::jsonb
+      body := '{}'::jsonb,
+      timeout_milliseconds := 120000  -- 2 นาที (default 5 วิ สั้นเกินไปสำหรับ batch Gemini calls)
     );
   END;
   $body$;
