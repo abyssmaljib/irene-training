@@ -527,7 +527,13 @@ async function processOneItem(
   if (referenceUrls.length === 0) {
     console.log(`[batch] Item ${item.id}: No reference images, skipping verification`)
 
-    await client.from('A_Med_AI_Verification').insert({
+    // กัน duplicate: ลบ record เก่าถ้ามี (กรณี retry)
+    await client.from('A_Med_AI_Verification')
+      .delete()
+      .eq('med_log_id', med_log_id)
+      .eq('photo_type', photo_type)
+
+    const { error: skipInsertError } = await client.from('A_Med_AI_Verification').insert({
       med_log_id,
       photo_type,
       resident_id,
@@ -540,6 +546,11 @@ async function processOneItem(
       processing_time_ms: Date.now() - startTime,
       error_message: 'ไม่มีรูปอ้างอิง (reference image) ในฐานข้อมูล',
     })
+
+    // ถ้า insert skipped record ไม่สำเร็จ → throw เพื่อให้ markError จับ
+    if (skipInsertError) {
+      throw new Error(`Failed to save skipped record: ${skipInsertError.message}`)
+    }
 
     return // จบ — ถือว่า "สำเร็จ" (skipped)
   }
@@ -659,6 +670,13 @@ async function processOneItem(
   // ============================================
   // Step 7: บันทึกผลลง A_Med_AI_Verification
   // ============================================
+  // กัน duplicate: ถ้า retry แล้วรอบก่อนเคย insert สำเร็จ → ลบของเก่าก่อน
+  // กรณี: item ถูก claim → insert สำเร็จ → crash ก่อน markDone → stale reset → retry → insert ซ้ำ
+  await client.from('A_Med_AI_Verification')
+    .delete()
+    .eq('med_log_id', med_log_id)
+    .eq('photo_type', photo_type)
+
   // Schema เหมือน verify-med-photo เป๊ะ
   const { error: insertError } = await client.from('A_Med_AI_Verification').insert({
     med_log_id,
