@@ -607,12 +607,13 @@ class BadgeService {
 
       // ดึง staff ที่ clock in ในวันเดียวกัน
       // ตัด shift leaders (Incharge = true) ออก เพราะลักษณะงานต่างกัน
+      // ใช้ clock_in_out_ver2 (ตารางจริงที่ app insert ตอน clock in)
       final clockRecords = await _client
-          .from('clock_record')
+          .from('clock_in_out_ver2')
           .select('user_id, user_info!inner(id, nickname)')
           .eq('nursinghome_id', nursinghomeId)
-          .gte('time_in', '${dateStr}T00:00:00')
-          .lte('time_in', '${dateStr}T23:59:59')
+          .gte('clock_in_timestamp', '${dateStr}T00:00:00')
+          .lte('clock_in_timestamp', '${dateStr}T23:59:59')
           .neq('Incharge', true);
 
       final staffList = <String, String>{};
@@ -887,6 +888,7 @@ class BadgeService {
         return isWinner(
           myValue: myStats.problemCount,
           myTime: myStats.lastTaskTime,
+          myStaffId: myStats.staffId,
           allStats: allStats,
           getValue: (s) => s.problemCount,
           getTime: (s) => s.lastTaskTime,
@@ -899,6 +901,7 @@ class BadgeService {
         return isWinner(
           myValue: myStats.completedCount,
           myTime: myStats.lastTaskTime,
+          myStaffId: myStats.staffId,
           allStats: allStats,
           getValue: (s) => s.completedCount,
           getTime: (s) => s.lastTaskTime,
@@ -911,6 +914,7 @@ class BadgeService {
         return isWinner(
           myValue: myStats.kindnessCount,
           myTime: myStats.lastTaskTime,
+          myStaffId: myStats.staffId,
           allStats: allStats,
           getValue: (s) => s.kindnessCount,
           getTime: (s) => s.lastTaskTime,
@@ -923,6 +927,7 @@ class BadgeService {
         return isWinnerDouble(
           myValue: myStats.avgTimingDiff,
           myTime: myStats.lastTaskTime,
+          myStaffId: myStats.staffId,
           allStats: allStats,
           getValue: (s) => s.avgTimingDiff,
           getTime: (s) => s.lastTaskTime,
@@ -935,6 +940,7 @@ class BadgeService {
         return isWinner(
           myValue: myStats.deadAirMinutes,
           myTime: myStats.lastTaskTime,
+          myStaffId: myStats.staffId,
           allStats: allStats,
           getValue: (s) => s.deadAirMinutes,
           getTime: (s) => s.lastTaskTime,
@@ -958,15 +964,20 @@ class BadgeService {
 
   /// ตรวจสอบว่าเป็น winner หรือไม่ (int value)
   /// Tie breaker: คนแรกที่ทำถึง (lastTaskTime เร็วกว่า)
+  /// [myStaffId] ใช้ skip ตัวเอง เพื่อไม่ให้เปรียบเทียบกับตัวเอง
   bool isWinner({
     required int myValue,
     required DateTime? myTime,
+    required String myStaffId,
     required List<ShiftStaffStats> allStats,
     required int Function(ShiftStaffStats) getValue,
     required DateTime? Function(ShiftStaffStats) getTime,
     required bool higherIsBetter,
   }) {
     for (final other in allStats) {
+      // ข้ามตัวเอง — ไม่งั้น tie-breaker จะเปรียบเทียบ myTime กับ myTime
+      if (other.staffId == myStaffId) continue;
+
       final otherValue = getValue(other);
       final otherTime = getTime(other);
 
@@ -989,15 +1000,20 @@ class BadgeService {
   }
 
   /// ตรวจสอบว่าเป็น winner หรือไม่ (double value)
+  /// [myStaffId] ใช้ skip ตัวเอง เพื่อไม่ให้เปรียบเทียบกับตัวเอง
   bool isWinnerDouble({
     required double myValue,
     required DateTime? myTime,
+    required String myStaffId,
     required List<ShiftStaffStats> allStats,
     required double Function(ShiftStaffStats) getValue,
     required DateTime? Function(ShiftStaffStats) getTime,
     required bool lowerIsBetter,
   }) {
     for (final other in allStats) {
+      // ข้ามตัวเอง
+      if (other.staffId == myStaffId) continue;
+
       final otherValue = getValue(other);
       final otherTime = getTime(other);
 
