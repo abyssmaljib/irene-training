@@ -8,10 +8,11 @@
 //
 // ใช้แสดงสถานะในหน้า Settings ของ Flutter app
 
+import 'dart:async'; // TimeoutException สำหรับ GPS timeout + Supabase fetch timeout
+
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:network_info_plus/network_info_plus.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 // ============================================
@@ -71,11 +72,6 @@ class ClockInVerificationService {
   // Platform wrappers — override ใน test เพื่อจำลอง permission/GPS
   // ============================================
 
-  /// ขอ location permission (WiFi ต้องใช้บน Android)
-  @visibleForTesting
-  Future<PermissionStatus> requestLocationPermission() =>
-      Permission.locationWhenInUse.request();
-
   /// ตรวจ GPS permission ปัจจุบัน
   @visibleForTesting
   Future<LocationPermission> geolocatorCheckPermission() =>
@@ -86,15 +82,22 @@ class ClockInVerificationService {
   Future<LocationPermission> geolocatorRequestPermission() =>
       Geolocator.requestPermission();
 
-  /// ดึงตำแหน่งปัจจุบัน (high accuracy, timeout 10 วินาที)
+  /// ดึงตำแหน่งปัจจุบัน (high accuracy, timeout 15 วินาที)
+  /// BUG 3: เพิ่มจาก 10s → 15s เพราะ iOS first fix ในตึกอาจใช้เวลา > 10s
   @visibleForTesting
   Future<Position> geolocatorGetCurrentPosition() =>
       Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 10),
+          timeLimit: Duration(seconds: 15),
         ),
       );
+
+  /// ตรวจว่า Location Services (GPS) เปิดอยู่ที่ระดับ system หรือไม่
+  /// (แยกจาก permission — user อาจอนุญาต app แต่ปิด Location Services ที่ตั้งค่าเครื่อง)
+  @visibleForTesting
+  Future<bool> geolocatorIsLocationServiceEnabled() =>
+      Geolocator.isLocationServiceEnabled();
 
   /// คำนวณระยะห่างระหว่าง 2 จุด (เมตร)
   @visibleForTesting
@@ -103,20 +106,48 @@ class ClockInVerificationService {
   ) => Geolocator.distanceBetween(startLat, startLng, endLat, endLng);
 
   // ============================================
-  // ตรวจสอบทั้ง GPS + WiFi พร้อมกัน
+  // ตรวจสอบทั้ง GPS + WiFi
   // ============================================
   // ดึงข้อมูลที่ admin ตั้งค่าจาก Supabase แล้วเปรียบเทียบกับเครื่องปัจจุบัน
   Future<ClockInVerificationResult> verify(int nursinghomeId) async {
-    // ดึงข้อมูลจาก Supabase พร้อมกัน (location + wifi)
-    final results = await Future.wait([
-      fetchLocationConfig(nursinghomeId),
-      fetchWifiConfig(nursinghomeId),
-    ]);
+    // ============================================
+    // Phase 1: ดึง config จาก Supabase (พร้อม timeout)
+    // ============================================
+    // BUG 1: ถ้า fetch ไม่ได้ (offline/DB error) → block clock-in
+    //   ป้องกัน bypass ด้วยการปิด internet (เดิม catch → null → ผ่าน)
+    // BUG 15: เพิ่ม timeout 15 วินาที ป้องกัน verify() ค้างตลอดกาล
+    Map<String, dynamic>? locationConfig;
+    List<Map<String, dynamic>> wifiConfigs;
+    try {
+      final results = await Future.wait([
+        fetchLocationConfig(nursinghomeId),
+        fetchWifiConfig(nursinghomeId),
+      ]).timeout(const Duration(seconds: 15));
+      locationConfig = results[0] as Map<String, dynamic>?;
+      wifiConfigs = results[1] as List<Map<String, dynamic>>;
+    } on TimeoutException {
+      // Supabase fetch ช้าเกินไป (DNS stuck, server down)
+      debugPrint('[ClockInVerification] Config fetch timeout');
+      return const ClockInVerificationResult(
+        gpsMatch: false,
+        gpsError: 'ตรวจสอบเงื่อนไขนานเกินไป กรุณาลองใหม่',
+        wifiMatch: false,
+        wifiError: 'ตรวจสอบเงื่อนไขนานเกินไป กรุณาลองใหม่',
+      );
+    } catch (e) {
+      // Network error / offline / DB error → block clock-in
+      debugPrint('[ClockInVerification] Config fetch error: $e');
+      return const ClockInVerificationResult(
+        gpsMatch: false,
+        gpsError: 'ไม่สามารถตรวจสอบเงื่อนไขได้ กรุณาตรวจสอบอินเทอร์เน็ต',
+        wifiMatch: false,
+        wifiError: 'ไม่สามารถตรวจสอบเงื่อนไขได้ กรุณาตรวจสอบอินเทอร์เน็ต',
+      );
+    }
 
-    final locationConfig = results[0] as Map<String, dynamic>?;
-    final wifiConfigs = results[1] as List<Map<String, dynamic>>;
-
-    // ตรวจสอบ GPS และ WiFi พร้อมกัน
+    // ============================================
+    // Phase 2: ตรวจสอบ GPS ก่อน แล้ว WiFi (sequential เพราะ share permission request)
+    // ============================================
     final gpsResult = await checkGps(locationConfig);
     final wifiResult = await checkWifi(wifiConfigs);
 
@@ -139,37 +170,34 @@ class ClockInVerificationService {
   // ============================================
   // ดึง location config จาก B_Nursinghome_Location
   // ============================================
+  // BUG 1: ลบ try/catch — ให้ throw ขึ้นไป verify() จัดการ
+  //   null = ไม่มี record (admin ไม่ได้ตั้งค่า), throw = error (offline/DB)
+  // BUG 19: เพิ่ม is_active filter ให้ consistent กับ fetchWifiConfig
+  //   ป้องกัน maybeSingle() throw เมื่อมี inactive + active config
   @visibleForTesting
   Future<Map<String, dynamic>?> fetchLocationConfig(int nursinghomeId) async {
-    try {
-      final response = await _supabase
-          .from('B_Nursinghome_Location')
-          .select('latitude, longitude, radius_meters, is_active, name')
-          .eq('nursinghome_id', nursinghomeId)
-          .maybeSingle();
-      return response;
-    } catch (e) {
-      debugPrint('[ClockInVerification] Error fetching location: $e');
-      return null;
-    }
+    final response = await _supabase
+        .from('B_Nursinghome_Location')
+        .select('latitude, longitude, radius_meters, name')
+        .eq('nursinghome_id', nursinghomeId)
+        .eq('is_active', true)
+        .maybeSingle();
+    return response;
   }
 
   // ============================================
   // ดึง WiFi config จาก B_Nursinghome_WiFi
   // ============================================
+  // BUG 1: ลบ try/catch — ให้ throw ขึ้นไป verify() จัดการ
+  //   [] = ไม่มี active WiFi (admin ไม่ได้ตั้งค่า), throw = error (offline/DB)
   @visibleForTesting
   Future<List<Map<String, dynamic>>> fetchWifiConfig(int nursinghomeId) async {
-    try {
-      final response = await _supabase
-          .from('B_Nursinghome_WiFi')
-          .select('ssid, is_active')
-          .eq('nursinghome_id', nursinghomeId)
-          .eq('is_active', true);
-      return List<Map<String, dynamic>>.from(response);
-    } catch (e) {
-      debugPrint('[ClockInVerification] Error fetching WiFi: $e');
-      return [];
-    }
+    final response = await _supabase
+        .from('B_Nursinghome_WiFi')
+        .select('ssid')
+        .eq('nursinghome_id', nursinghomeId)
+        .eq('is_active', true);
+    return List<Map<String, dynamic>>.from(response);
   }
 
   // ============================================
@@ -177,20 +205,31 @@ class ClockInVerificationService {
   // ============================================
   @visibleForTesting
   Future<Map<String, dynamic>> checkGps(Map<String, dynamic>? config) async {
-    // ถ้าไม่มี config หรือปิดใช้งาน → ไม่ตรวจ
-    if (config == null || config['is_active'] != true) {
+    // ถ้าไม่มี config → ไม่ตรวจ (admin ไม่ได้ตั้งค่า หรือปิดใช้งาน)
+    // หมายเหตุ: is_active ถูก filter แล้วที่ fetchLocationConfig()
+    if (config == null) {
       return {'match': null};
     }
 
     try {
+      // ตรวจว่า Location Services เปิดอยู่ที่ระดับ system หรือไม่
+      // (user อาจอนุญาต app แต่ปิด Location Services ที่ตั้งค่าเครื่อง)
+      final serviceEnabled = await geolocatorIsLocationServiceEnabled();
+      if (!serviceEnabled) {
+        return {
+          'match': false,
+          'error': 'กรุณาเปิดบริการตำแหน่งที่ตั้ง (Location Services) ในตั้งค่าเครื่อง',
+          'name': config['name'] as String?,
+          'radius': (config['radius_meters'] as num?)?.toDouble(),
+        };
+      }
+
       // ขอ permission (ใช้ wrapper method เพื่อให้ test override ได้)
       final permission = await geolocatorCheckPermission();
       if (permission == LocationPermission.denied) {
         final requested = await geolocatorRequestPermission();
         if (requested == LocationPermission.denied ||
             requested == LocationPermission.deniedForever) {
-          // admin ตั้งค่า GPS ไว้แล้ว แต่ user ไม่ให้ permission → block (false)
-          // ไม่ใช่ null เพราะ null หมายถึง "admin ไม่ได้ตั้งค่า"
           return {
             'match': false,
             'error': 'กรุณาอนุญาตสิทธิ์การเข้าถึงตำแหน่งเพื่อตรวจสอบ GPS',
@@ -198,16 +237,63 @@ class ClockInVerificationService {
             'radius': (config['radius_meters'] as num?)?.toDouble(),
           };
         }
+      } else if (permission == LocationPermission.deniedForever) {
+        // user เคยปฏิเสธถาวร → ต้องไปเปิดใน Settings เอง
+        return {
+          'match': false,
+          'error': 'สิทธิ์ตำแหน่งถูกปิดถาวร กรุณาเปิดในตั้งค่าแอป',
+          'name': config['name'] as String?,
+          'radius': (config['radius_meters'] as num?)?.toDouble(),
+        };
+      }
+
+      // BUG 6: ตรวจว่า lat/lng/radius มีค่าครบก่อน cast
+      // ป้องกัน crash ถ้า admin ตั้งค่าไม่ครบ (เช่น DB manipulation)
+      final lat = config['latitude'];
+      final lng = config['longitude'];
+      final radius = config['radius_meters'];
+      if (lat == null || lng == null || radius == null) {
+        return {'match': null}; // treat as "not configured properly"
+      }
+
+      final registeredLat = (lat as num).toDouble();
+      final registeredLng = (lng as num).toDouble();
+      final radiusMeters = (radius as num).toDouble();
+
+      // BUG 13: ตรวจว่า radius เป็นค่าที่ valid (> 0)
+      // Admin UI validates 10-500m แต่ direct DB manipulation อาจตั้งค่าผิด
+      if (radiusMeters <= 0) {
+        return {'match': null}; // treat as not configured properly
       }
 
       // ดึงตำแหน่งปัจจุบัน (ใช้ wrapper method)
       final position = await geolocatorGetCurrentPosition();
 
-      // คำนวณระยะห่างระหว่างตำแหน่งปัจจุบันกับตำแหน่งที่ลงทะเบียน
-      final registeredLat = (config['latitude'] as num).toDouble();
-      final registeredLng = (config['longitude'] as num).toDouble();
-      final radiusMeters = (config['radius_meters'] as num).toDouble();
+      // BUG 11: ตรวจจับ mock/fake location (Android only — iOS always returns false)
+      // ป้องกัน user ใช้แอพจำลอง GPS เพื่อ clock-in จากที่อื่น
+      if (position.isMocked) {
+        return {
+          'match': false,
+          'error': 'ตรวจพบการจำลองตำแหน่ง กรุณาปิดแอพจำลอง GPS แล้วลองใหม่',
+          'name': config['name'] as String?,
+          'radius': radiusMeters,
+        };
+      }
 
+      // BUG 8+9: ตรวจว่า accuracy เพียงพอสำหรับ radius ที่ตั้งไว้
+      // Android 12+ "Approximate Location" → accuracy 1-2km → ห่าง radius เกือบเสมอ
+      // iOS 14+ ปิด "Precise Location" → accuracy ~5km → GPS fail
+      // ถ้า accuracy > radius → ตำแหน่งไม่แม่นยำพอที่จะตัดสินได้
+      if (position.accuracy > radiusMeters) {
+        return {
+          'match': false,
+          'error': 'ตำแหน่งไม่แม่นยำพอ กรุณาเปิด "ตำแหน่งที่แม่นยำ" (Precise Location) ในตั้งค่า',
+          'name': config['name'] as String?,
+          'radius': radiusMeters,
+        };
+      }
+
+      // คำนวณระยะห่างระหว่างตำแหน่งปัจจุบันกับตำแหน่งที่ลงทะเบียน
       final distance = geolocatorDistanceBetween(
         position.latitude,
         position.longitude,
@@ -221,10 +307,19 @@ class ClockInVerificationService {
         'radius': radiusMeters,
         'name': config['name'] as String?,
       };
+    } on TimeoutException {
+      // BUG 5: แยก timeout error จาก error ทั่วไป
+      // Geolocator throws TimeoutException เมื่อ timeLimit หมด
+      // มักเกิดในตึกหรือเพิ่งเปิด GPS (iOS first fix ช้า)
+      return {
+        'match': false,
+        'error': 'หาตำแหน่งไม่ทันเวลา กรุณาออกจากในตึกแล้วลองใหม่',
+        'name': config['name'] as String?,
+        'radius': (config['radius_meters'] as num?)?.toDouble(),
+      };
     } catch (e) {
       debugPrint('[ClockInVerification] GPS error: $e');
       // admin ตั้งค่า GPS ไว้แล้ว แต่ตรวจไม่ได้ → block (false)
-      // ป้องกันไม่ให้ bypass ด้วยการทำให้เกิด error
       return {
         'match': false,
         'error': 'ตรวจสอบตำแหน่งไม่สำเร็จ กรุณาเปิด GPS แล้วลองใหม่',
@@ -245,14 +340,35 @@ class ClockInVerificationService {
     }
 
     try {
-      // ขอ permission สำหรับ WiFi info (ใช้ wrapper method เพื่อให้ test override ได้)
-      final status = await requestLocationPermission();
-      if (!status.isGranted) {
-        // admin ตั้งค่า WiFi ไว้แล้ว แต่ user ไม่ให้ permission → block (false)
-        // ไม่ใช่ null เพราะ null หมายถึง "admin ไม่ได้ตั้งค่า"
+      // ตรวจว่า Location Services เปิดอยู่ที่ระดับ system หรือไม่
+      // WiFi SSID บน iOS/Android ต้องใช้ Location Services จึงจะดึง SSID ได้
+      final serviceEnabled = await geolocatorIsLocationServiceEnabled();
+      if (!serviceEnabled) {
         return {
           'match': false,
-          'error': 'กรุณาอนุญาตสิทธิ์การเข้าถึงตำแหน่งเพื่อตรวจสอบ WiFi',
+          'error': 'กรุณาเปิดบริการตำแหน่งที่ตั้ง (Location Services) ในตั้งค่าเครื่อง',
+          'registeredCount': configs.length,
+        };
+      }
+
+      // ตรวจ permission ผ่าน Geolocator (ใช้ CLLocationManager ตัวเดียวกับ GPS)
+      // หลีกเลี่ยงใช้ permission_handler แยก เพราะ iOS อาจ conflict
+      // เมื่อมี CLLocationManager หลายตัวจาก package คนละตัว
+      final permission = await geolocatorCheckPermission();
+      if (permission == LocationPermission.denied) {
+        final requested = await geolocatorRequestPermission();
+        if (requested == LocationPermission.denied ||
+            requested == LocationPermission.deniedForever) {
+          return {
+            'match': false,
+            'error': 'กรุณาอนุญาตสิทธิ์การเข้าถึงตำแหน่งเพื่อตรวจสอบ WiFi',
+            'registeredCount': configs.length,
+          };
+        }
+      } else if (permission == LocationPermission.deniedForever) {
+        return {
+          'match': false,
+          'error': 'สิทธิ์ตำแหน่งถูกปิดถาวร กรุณาเปิดในตั้งค่าแอป',
           'registeredCount': configs.length,
         };
       }
@@ -260,15 +376,27 @@ class ClockInVerificationService {
       // ดึง SSID ของ WiFi ที่เชื่อมต่ออยู่
       String? currentSsid = await _networkInfo.getWifiName();
 
+      // BUG 2: strip quotes + trim whitespace
       // network_info_plus อาจคืนค่า SSID ที่ครอบด้วย quotes เช่น "MyWiFi"
-      // ต้อง strip ออก
+      // และอาจมี whitespace ที่ปลาย → trim ออก
       if (currentSsid != null) {
-        currentSsid = currentSsid.replaceAll('"', '');
+        currentSsid = currentSsid.replaceAll('"', '').trim();
       }
 
-      // เปรียบเทียบกับรายการที่ลงทะเบียน (case-sensitive)
+      // BUG 12: Android อาจ return "<unknown ssid>" เมื่อ permission ไม่สมบูรณ์
+      // treat เป็น null (ไม่ทราบ WiFi) แทนที่จะแสดง SSID ปลอม
+      if (currentSsid == null || currentSsid.isEmpty || currentSsid == '<unknown ssid>') {
+        currentSsid = null;
+      }
+
+      // BUG 4: เปรียบเทียบแบบ case-insensitive
+      // iOS/Android อาจ return SSID ตัวเล็ก/ใหญ่ต่างจากที่ admin ลงทะเบียน
       final registeredSsids = configs.map((c) => c['ssid'] as String).toList();
-      final matchedSsid = registeredSsids.contains(currentSsid) ? currentSsid : null;
+      final lowerSsid = currentSsid?.toLowerCase();
+      final matchedSsid = registeredSsids.cast<String?>().firstWhere(
+        (s) => s?.toLowerCase() == lowerSsid,
+        orElse: () => null,
+      );
 
       return {
         'match': matchedSsid != null,

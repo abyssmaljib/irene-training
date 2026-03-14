@@ -426,99 +426,130 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       return;
     }
 
-    // ตรวจสอบ occupied residents อีกครั้งก่อนขึ้นเวร (ป้องกัน race condition)
-    final latestOccupiedIds = await _clockService.getOccupiedResidentIds();
-    final conflictIds = _selectedResidentIds.intersection(latestOccupiedIds);
-    if (conflictIds.isNotEmpty) {
-      // มี resident ที่ถูกเลือกไปแล้ว → refresh และแจ้งเตือน
-      await _loadResidentsByZones();
-      await _loadOccupiedBreakTimes();
-      if (!mounted) return;
-      AppToast.warning(context, 'มีคนไข้ที่เพื่อนเลือกไปแล้ว กรุณาเลือกใหม่');
-      return;
-    }
-
-    // ============================================
-    // ตรวจสอบ GPS + WiFi ก่อนอนุญาตให้ขึ้นเวร
-    // ============================================
-    // ดึง nursinghomeId เพื่อใช้ query ค่า GPS/WiFi ที่ admin ตั้งไว้
-    final nursinghomeId = await _userService.getNursinghomeId();
-    if (nursinghomeId == null || !mounted) return;
-
-    // แสดง loading บนปุ่มขณะตรวจสอบ
+    // BUG 16: ตั้ง guard ก่อน async call แรก เพื่อป้องกัน double-tap race condition
+    // เดิมตั้งหลัง 3 async calls → second tap bypass guard ได้
+    // ใช้ try-finally ครอบทั้ง method เพื่อ reset guard ทุก exit path
     setState(() => _isClockingIn = true);
 
-    ClockInVerificationResult? verificationResult;
     try {
-      // เรียก service ตรวจ GPS + WiFi พร้อมกัน
-      verificationResult = await ClockInVerificationService().verify(nursinghomeId);
-    } catch (e) {
-      debugPrint('[HomeScreen] Clock-in verification error: $e');
-      // verify() ทั้งก้อน throw → block ไม่ให้ clock-in
-      // ป้องกันไม่ให้ bypass ด้วยการทำให้ service พัง
-      if (!mounted) return;
-      setState(() => _isClockingIn = false);
-      AppToast.error(context, 'ตรวจสอบเงื่อนไขขึ้นเวรไม่สำเร็จ กรุณาลองใหม่');
-      return;
-    }
-
-    if (!mounted) return;
-    // ปิด loading หลังตรวจเสร็จ (จะเปิดใหม่ตอน clock-in จริง)
-    setState(() => _isClockingIn = false);
-
-    // ตรวจผลลัพธ์: ต้องผ่านทั้ง GPS AND WiFi
-    // null = admin ไม่ได้ตั้งค่า → ข้ามเงื่อนไขนั้น (ถือว่าผ่าน)
-    // false = ตรวจแล้วไม่ผ่าน หรือ ตรวจไม่ได้ (permission denied, error) → block
-    final gps = verificationResult.gpsMatch;
-    final wifi = verificationResult.wifiMatch;
-
-    final gpsFailed = gps == false;
-    final wifiFailed = wifi == false;
-
-    if (gpsFailed || wifiFailed) {
-      // มีเงื่อนไขไม่ผ่าน → แสดง dialog แจ้ง user
-      if (mounted) {
-        _showVerificationFailedDialog(verificationResult);
+      // ตรวจสอบ occupied residents อีกครั้งก่อนขึ้นเวร (ป้องกัน race condition)
+      final latestOccupiedIds = await _clockService.getOccupiedResidentIds();
+      final conflictIds = _selectedResidentIds.intersection(latestOccupiedIds);
+      if (conflictIds.isNotEmpty) {
+        // มี resident ที่ถูกเลือกไปแล้ว → refresh และแจ้งเตือน
+        await _loadResidentsByZones();
+        await _loadOccupiedBreakTimes();
+        if (!mounted) return;
+        AppToast.warning(context, 'มีคนไข้ที่เพื่อนเลือกไปแล้ว กรุณาเลือกใหม่');
+        return;
       }
-      return;
-    }
 
-    // แสดงหน้าไพ่ทาโร่ก่อนขึ้นเวร
-    if (!mounted) return;
-    final selectedCard = await TarotCardScreen.show(context);
-    if (selectedCard == null || !mounted) return;
+      // ============================================
+      // ตรวจสอบ GPS + WiFi ก่อนอนุญาตให้ขึ้นเวร
+      // ============================================
+      // ดึง nursinghomeId เพื่อใช้ query ค่า GPS/WiFi ที่ admin ตั้งไว้
+      final nursinghomeId = await _userService.getNursinghomeId();
+      if (nursinghomeId == null || !mounted) return;
 
-    // เก็บไพ่ที่เลือกไว้แสดงระหว่างขึ้นเวร
-    setState(() => _selectedTarotCard = selectedCard);
+      ClockInVerificationResult? verificationResult;
+      try {
+        // เรียก service ตรวจ GPS + WiFi
+        verificationResult = await ClockInVerificationService().verify(nursinghomeId);
+      } catch (e) {
+        debugPrint('[HomeScreen] Clock-in verification error: $e');
+        // verify() ทั้งก้อน throw → block ไม่ให้ clock-in
+        if (!mounted) return;
+        AppToast.error(context, 'ตรวจสอบเงื่อนไขขึ้นเวรไม่สำเร็จ กรุณาลองใหม่');
+        return;
+      }
 
-    setState(() => _isClockingIn = true);
-    try {
-      // ไม่ต้อง set Incharge ตอน clock in แล้ว
+      if (!mounted) return;
+
+      // ตรวจผลลัพธ์: ต้องผ่านทั้ง GPS AND WiFi
+      // null = admin ไม่ได้ตั้งค่า → ข้ามเงื่อนไขนั้น (ถือว่าผ่าน)
+      // false = ตรวจแล้วไม่ผ่าน หรือ ตรวจไม่ได้ (permission denied, error) → block
+      final gps = verificationResult.gpsMatch;
+      final wifi = verificationResult.wifiMatch;
+
+      final gpsFailed = gps == false;
+      final wifiFailed = wifi == false;
+
+      if (gpsFailed || wifiFailed) {
+        // มีเงื่อนไขไม่ผ่าน → แสดง dialog แจ้ง user
+        if (mounted) {
+          _showVerificationFailedDialog(verificationResult);
+        }
+        return;
+      }
+
+      // ปิด loading ก่อนแสดงหน้าไพ่ทาโร่ (จะเปิดใหม่ตอน clock-in จริง)
+      // TarotCardScreen ใช้ opaque: false → ปุ่มยังเห็นอยู่ข้างหลัง
+      if (mounted) setState(() => _isClockingIn = false);
+
+      // แสดงหน้าไพ่ทาโร่ก่อนขึ้นเวร
+      if (!mounted) return;
+      final selectedCard = await TarotCardScreen.show(context);
+      if (selectedCard == null || !mounted) return;
+
+      // เก็บไพ่ที่เลือกไว้แสดงระหว่างขึ้นเวร + เปิด loading อีกครั้ง
+      setState(() {
+        _selectedTarotCard = selectedCard;
+        _isClockingIn = true;
+      });
+
+      // BUG 10: Re-verify หลัง TarotCardScreen
+      // ระหว่างดูไพ่ทาโร่ user อาจเดินออกจากรัศมี/WiFi disconnect
+      // ตรวจซ้ำเร็วๆ ก่อน submit จริง
+      final recheck = await ClockInVerificationService().verify(nursinghomeId);
+      if (!mounted) return;
+      final recheckGpsFailed = recheck.gpsMatch == false;
+      final recheckWifiFailed = recheck.wifiMatch == false;
+      if (recheckGpsFailed || recheckWifiFailed) {
+        _showVerificationFailedDialog(recheck);
+        return;
+      }
+
+      // BUG 18: เพิ่ม catch block สำหรับ clockIn() failure
+      // เดิมใช้ try-finally ไม่มี catch → exception uncaught → ไม่มี error message
+      // clockIn() returns null → เดิมเงียบไม่มี feedback
+      //
+      // หมายเหตุ: ไม่ต้อง set Incharge ตอน clock in
       // scheduled job (pg_cron) จะ assign Incharge ให้ตอน 08:00/20:00
       // เพื่อให้ทุกคนมีเวลาขึ้นเวรก่อน แล้วค่อยตัดสินใจว่าใครเป็น Incharge
-      final result = await _clockService.clockIn(
-        zoneIds: _selectedZoneIds.toList(),
-        residentIds: _selectedResidentIds.toList(),
-        breakTimeIds: _selectedBreakTimeIds.toList(),
-      );
+      try {
+        final result = await _clockService.clockIn(
+          zoneIds: _selectedZoneIds.toList(),
+          residentIds: _selectedResidentIds.toList(),
+          breakTimeIds: _selectedBreakTimeIds.toList(),
+        );
 
-      if (result != null && mounted) {
-        setState(() {
-          _currentShift = result;
-          // Reset form
-          _selectedZoneIds = {};
-          _selectedResidentIds = {};
-          _selectedBreakTimeIds = {};
-          _availableResidents = [];
-        });
-        // Reload all data after clock in
-        _clockService.invalidateCache();
-        _homeService.invalidateCache();
-        await Future.wait([
-          _loadCurrentShift(forceRefresh: true),
-          _loadDashboardStats(),
-          _loadMonthlySummary(),
-        ]);
+        if (result != null && mounted) {
+          setState(() {
+            _currentShift = result;
+            // Reset form
+            _selectedZoneIds = {};
+            _selectedResidentIds = {};
+            _selectedBreakTimeIds = {};
+            _availableResidents = [];
+          });
+          // Reload all data after clock in
+          _clockService.invalidateCache();
+          _homeService.invalidateCache();
+          await Future.wait([
+            _loadCurrentShift(forceRefresh: true),
+            _loadDashboardStats(),
+            _loadMonthlySummary(),
+          ]);
+        } else if (mounted) {
+          // clockIn() returned null → แจ้ง user
+          AppToast.error(context, 'ขึ้นเวรไม่สำเร็จ กรุณาลองใหม่');
+        }
+      } catch (e) {
+        // clockIn() threw unexpected exception → แจ้ง user
+        debugPrint('[HomeScreen] Clock-in error: $e');
+        if (mounted) {
+          AppToast.error(context, 'ขึ้นเวรไม่สำเร็จ กรุณาลองใหม่');
+        }
       }
     } finally {
       if (mounted) {
