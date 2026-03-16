@@ -115,6 +115,8 @@ class Badge {
         return 'ความเร็ว';
       case 'skill':
         return 'ทักษะ';
+      case 'shift':
+        return 'ลงเวร';
       default:
         return 'ทั่วไป';
     }
@@ -139,6 +141,8 @@ class Badge {
         return '⚡';
       case 'skill':
         return '🧠';
+      case 'shift':
+        return '💼';
       default:
         return '📌';
     }
@@ -184,6 +188,23 @@ class Badge {
         return 'ทำข้อสอบก่อน 6 โมงเช้า';
       case 'weekend_warrior':
         return 'ทำข้อสอบในวันหยุดสุดสัปดาห์';
+      // Shift badges — เหรียญจากการลงเวร
+      case 'shift_most_completed':
+        return 'ทำงานเสร็จมากที่สุดในเวร';
+      case 'shift_most_problems':
+        return 'พบปัญหามากที่สุดในเวร';
+      case 'shift_most_kindness':
+        return 'ช่วยดูแลผู้รับบริการคนอื่นมากที่สุด';
+      case 'shift_best_timing':
+        return 'ทำงานตรงเวลาที่สุดในเวร';
+      case 'shift_most_dead_air':
+        return 'ว่างมากที่สุดในเวร';
+      case 'shift_novice_rating':
+        final threshold = value['min_diff_sum'] ?? 10;
+        return 'ประเมินความยากสูงกว่าค่าเฉลี่ย (≥$threshold)';
+      case 'shift_master_rating':
+        final threshold = value['min_diff_sum'] ?? 10;
+        return 'ประเมินความยากต่ำกว่าค่าเฉลี่ย (≥$threshold)';
       default:
         return description ?? 'เงื่อนไขพิเศษ';
     }

@@ -483,282 +483,82 @@ class BadgeService {
   }
 
   // =========================================================================
-  // SHIFT BADGES - ตรวจสอบและ award badges หลังลงเวร
-  // Badge เหล่านี้รับซ้ำได้ทุกเวร (ไม่ check unique)
+  // UNSEEN BADGE CHECK — เช็ค badge ใหม่ตอนเปิด app
   // =========================================================================
 
-  /// ตรวจสอบและ award shift badges หลังลงเวร
-  /// เปรียบเทียบกับ staff คนอื่นในเวรเดียวกัน
-  /// - shift_most_problems: ติ๊กปัญหามากที่สุด
-  /// - shift_most_completed: ทำงานเสร็จเยอะที่สุด
-  /// - shift_most_kindness: ช่วยคนไข้คนอื่นมากที่สุด
-  /// - shift_best_timing: ค่าเบี่ยงเบนเวลาน้อยที่สุด
-  /// - shift_most_dead_air: Dead air มากที่สุด
-  /// - shift_novice_rating: ประเมินยากกว่า norm (threshold)
-  /// - shift_master_rating: ประเมินง่ายกว่า norm (threshold)
-  Future<List<Badge>> checkAndAwardShiftBadges({
-    required int clockRecordId,
-    required int nursinghomeId,
-    required DateTime clockIn,
-    required DateTime clockOut,
-    required List<int> assignedResidentIds,
+  /// ดึง shift badges ที่ user ได้รับแล้ว แต่ยังไม่เคยเห็น (หลัง lastCheck)
+  /// ใช้ตอน app resume เพื่อแสดง BadgeEarnedDialog
+  ///
+  /// Query: training_user_badges JOIN training_badges
+  ///   WHERE user_id = current user
+  ///   AND category = 'shift'
+  ///   AND created_at > lastCheck
+  Future<List<Badge>> getUnseenShiftBadges({
+    required DateTime lastCheck,
   }) async {
     try {
       final userId = UserService().effectiveUserId;
-      if (userId == null) {
-        debugPrint('BadgeService.checkAndAwardShiftBadges: No user');
-        return [];
-      }
+      if (userId == null) return [];
 
-      debugPrint('=== Checking Shift Badges ===');
-      debugPrint('User: $userId, ClockRecord: $clockRecordId');
-      debugPrint('ClockIn: $clockIn, ClockOut: $clockOut');
-
-      // 1. ดึง shift badges ที่ active
-      final shiftBadges = await _client
-          .from('training_badges')
-          .select()
-          .eq('is_active', true)
-          .eq('category', 'shift');
-
-      if ((shiftBadges as List).isEmpty) {
-        debugPrint('No shift badges found');
-        return [];
-      }
-
-      // 2. ดึง staff ทั้งหมดที่ทำงานในเวรเดียวกัน
-      final staffStats = await _getShiftStaffStats(
-        nursinghomeId: nursinghomeId,
-        clockIn: clockIn,
-        clockOut: clockOut,
-        currentUserId: userId,
-        assignedResidentIds: assignedResidentIds,
-      );
-
-      if (staffStats.isEmpty) {
-        debugPrint('No staff stats found');
-        return [];
-      }
-
-      debugPrint('Found ${staffStats.length} staff in shift');
-      for (final s in staffStats) {
-        debugPrint(
-            '  ${s.staffName}: completed=${s.completedCount}, problems=${s.problemCount}, '
-            'kindness=${s.kindnessCount}, timing=${s.avgTimingDiff.toStringAsFixed(1)}, '
-            'deadAir=${s.deadAirMinutes}, novice=${s.noviceScore}, master=${s.masterScore}');
-      }
-
-      // 3. หา current user stats
-      final myStats = staffStats.firstWhere(
-        (s) => s.staffId == userId,
-        orElse: () => ShiftStaffStats(staffId: userId, staffName: 'Unknown'),
-      );
-
-      // 4. ตรวจสอบและ award แต่ละ badge
-      final awardedBadges = <Badge>[];
-
-      for (final badgeData in shiftBadges) {
-        final requirementType = badgeData['requirement_type'] as String;
-        final requirementValue =
-            badgeData['requirement_value'] as Map<String, dynamic>? ?? {};
-
-        final shouldAward = checkShiftBadgeCondition(
-          requirementType: requirementType,
-          requirementValue: requirementValue,
-          myStats: myStats,
-          allStats: staffStats,
-        );
-
-        if (shouldAward) {
-          final badge = await _awardShiftBadge(
-            userId: userId,
-            badgeData: badgeData,
-          );
-          if (badge != null) {
-            awardedBadges.add(badge);
-          }
-        }
-      }
-
-      debugPrint('Awarded ${awardedBadges.length} shift badges');
-      return awardedBadges;
-    } catch (e) {
-      debugPrint('BadgeService.checkAndAwardShiftBadges error: $e');
-      return [];
-    }
-  }
-
-  /// ดึง stats ของ staff ทั้งหมดในเวรเดียวกัน
-  Future<List<ShiftStaffStats>> _getShiftStaffStats({
-    required int nursinghomeId,
-    required DateTime clockIn,
-    required DateTime clockOut,
-    required String currentUserId,
-    required List<int> assignedResidentIds,
-  }) async {
-    try {
-      // คำนวณ adjust_date จาก clockIn
-      final localClockIn = clockIn.toLocal();
-      final adjustDate = localClockIn.hour < 7
-          ? DateTime(localClockIn.year, localClockIn.month, localClockIn.day - 1)
-          : DateTime(localClockIn.year, localClockIn.month, localClockIn.day);
-      final dateStr =
-          '${adjustDate.year}-${adjustDate.month.toString().padLeft(2, '0')}-${adjustDate.day.toString().padLeft(2, '0')}';
-
-      // ดึง staff ที่ clock in ในวันเดียวกัน
-      // ตัด shift leaders (Incharge = true) ออก เพราะลักษณะงานต่างกัน
-      // ใช้ clock_in_out_ver2 (ตารางจริงที่ app insert ตอน clock in)
-      final clockRecords = await _client
-          .from('clock_in_out_ver2')
-          .select('user_id, user_info!inner(id, nickname)')
-          .eq('nursinghome_id', nursinghomeId)
-          .gte('clock_in_timestamp', '${dateStr}T00:00:00')
-          .lte('clock_in_timestamp', '${dateStr}T23:59:59')
-          .neq('Incharge', true);
-
-      final staffList = <String, String>{};
-      for (final record in clockRecords as List) {
-        final staffId = record['user_id'] as String;
-        final userInfo = record['user_info'] as Map<String, dynamic>?;
-        final nickname = userInfo?['nickname'] as String? ?? 'Unknown';
-        staffList[staffId] = nickname;
-      }
-
-      if (staffList.isEmpty) {
-        // ถ้าไม่มี staff อื่น ให้ใช้ current user
-        final userInfo = await _client
-            .from('user_info')
-            .select('nickname')
-            .eq('id', currentUserId)
-            .maybeSingle();
-        staffList[currentUserId] = userInfo?['nickname'] as String? ?? 'Me';
-      }
-
-      // ดึง clock_in_out_ver2 ของ staff ทุกคนในวันเดียวกัน
-      // เพื่อเอา selected_resident_id_list (assigned residents)
-      // และ clock_in/out_timestamp (เวลาจริงของแต่ละคน)
-      final staffClockData = await _client
-          .from('clock_in_out_ver2')
-          .select('user_id, selected_resident_id_list, clock_in_timestamp, clock_out_timestamp')
-          .eq('nursinghome_id', nursinghomeId)
-          .gte('clock_in_timestamp', '${dateStr}T00:00:00')
-          .lte('clock_in_timestamp', '${dateStr}T23:59:59');
-
-      // สร้าง map: staffId → assigned resident ids
-      final staffAssignedResidents = <String, List<int>>{};
-      // สร้าง map: staffId → (clockIn, clockOut) จริง
-      final staffClockTimes = <String, (DateTime, DateTime?)>{};
-
-      for (final row in staffClockData as List) {
-        final staffId = row['user_id'] as String;
-        // แปลง selected_resident_id_list (bigint[]) → List<int>
-        final rawList = row['selected_resident_id_list'] as List?;
-        if (rawList != null) {
-          staffAssignedResidents[staffId] =
-              rawList.map((e) => (e as num).toInt()).toList();
-        }
-        // เก็บ clock times
-        final clockInStr = row['clock_in_timestamp'] as String?;
-        final clockOutStr = row['clock_out_timestamp'] as String?;
-        if (clockInStr != null) {
-          final staffClockIn = DateTime.parse(clockInStr);
-          final staffClockOut = clockOutStr != null
-              ? DateTime.parse(clockOutStr)
-              : null;
-          staffClockTimes[staffId] = (staffClockIn, staffClockOut);
-        }
-      }
-
-      // ดึง task logs ของวันนี้
-      final taskLogs = await _client
-          .from('v2_task_logs_with_details')
+      // ดึง badges ที่ได้รับหลัง lastCheck
+      // training_user_badges.created_at = เวลาที่ cron award badge
+      final response = await _client
+          .from('training_user_badges')
           .select('''
-            log_id, completed_by, status, problem_type, resident_id,
-            log_completed_at, ExpectedDateTime,
-            difficulty_score, avg_difficulty_score_30d
+            id, created_at, badge_id,
+            training_badges!inner(
+              id, name, description, icon, image_url,
+              category, points, rarity,
+              requirement_type, requirement_value
+            )
           ''')
-          .eq('nursinghome_id', nursinghomeId)
-          .eq('adjust_date', dateStr)
-          .not('completed_by', 'is', null);
+          .eq('user_id', userId)
+          // [BUG-TZ FIX] ใช้ UTC เพื่อให้ตรงกับ timestamptz ใน Supabase
+          .gt('created_at', lastCheck.toUtc().toIso8601String())
+          .order('created_at', ascending: false);
 
-      // คำนวณ stats ของแต่ละ staff
-      final statsMap = <String, ShiftStaffStats>{};
+      final badges = <Badge>[];
+      for (final row in response as List) {
+        final badgeData = row['training_badges'] as Map<String, dynamic>?;
+        if (badgeData == null) continue;
 
-      for (final staffId in staffList.keys) {
-        final staffName = staffList[staffId]!;
-        final staffTasks = (taskLogs as List)
-            .where((t) => t['completed_by'] == staffId)
-            .toList();
+        // [BUG-FILTER FIX] filter category='shift' ฝั่ง Dart
+        // เพราะ .eq() กับ joined table อาจไม่ work ใน PostgREST ทุก version
+        final category = badgeData['category'] as String? ?? '';
+        if (category != 'shift') continue;
 
-        // นับ problems
-        final problemCount = staffTasks
-            .where((t) =>
-                t['status'] == 'problem' || t['problem_type'] != null)
-            .length;
-
-        // นับ completed
-        final completedCount =
-            staffTasks.where((t) => t['status'] == 'complete').length;
-
-        // นับ kindness — ใช้ assigned residents ของ staff คนนั้นจริงๆ
-        // ถ้าไม่มีข้อมูลใน clock_in_out_ver2 → fallback ใช้ current user's list
-        final thisStaffResidents = staffAssignedResidents[staffId]
-            ?? (staffId == currentUserId ? assignedResidentIds : <int>[]);
-        final kindnessCount = countKindnessTasks(
-          staffTasks: staffTasks,
-          assignedResidentIds: thisStaffResidents,
-        );
-
-        // คำนวณ avg timing diff
-        final timingDiff = calculateAvgTimingDiff(staffTasks);
-
-        // คำนวณ dead air — ใช้ clock times ของ staff คนนั้นจริงๆ
-        final clockTimes = staffClockTimes[staffId];
-        final staffClockIn = clockTimes?.$1 ?? clockIn;
-        // ถ้ายังไม่ได้ clock out → ใช้ current user's clockOut เป็น fallback
-        final staffClockOut = clockTimes?.$2 ?? clockOut;
-        final deadAirMinutes = calculateDeadAirMinutes(
-          staffTasks: staffTasks,
-          clockIn: staffClockIn,
-          clockOut: staffClockOut,
-        );
-
-        // คำนวณ novice/master scores
-        final (noviceScore, masterScore) =
-            calculateDifficultyScores(staffTasks);
-
-        // หา last task time
-        DateTime? lastTaskTime;
-        for (final task in staffTasks) {
-          final completedAt = task['log_completed_at'] as String?;
-          if (completedAt != null) {
-            final dt = DateTime.tryParse(completedAt);
-            if (dt != null && (lastTaskTime == null || dt.isAfter(lastTaskTime))) {
-              lastTaskTime = dt;
-            }
-          }
-        }
-
-        statsMap[staffId] = ShiftStaffStats(
-          staffId: staffId,
-          staffName: staffName,
-          problemCount: problemCount,
-          completedCount: completedCount,
-          kindnessCount: kindnessCount,
-          avgTimingDiff: timingDiff,
-          deadAirMinutes: deadAirMinutes,
-          noviceScore: noviceScore,
-          masterScore: masterScore,
-          lastTaskTime: lastTaskTime,
-        );
+        badges.add(Badge(
+          id: badgeData['id'] as String,
+          name: badgeData['name'] as String,
+          description: badgeData['description'] as String?,
+          icon: badgeData['icon'] as String?,
+          imageUrl: badgeData['image_url'] as String?,
+          category: category,
+          points: badgeData['points'] as int? ?? 0,
+          rarity: badgeData['rarity'] as String? ?? 'common',
+          requirementType: badgeData['requirement_type'] as String,
+          requirementValue:
+              badgeData['requirement_value'] as Map<String, dynamic>?,
+          isEarned: true,
+          earnedAt: row['created_at'] != null
+              ? DateTime.tryParse(row['created_at'] as String)
+              : DateTime.now(),
+        ));
       }
 
-      return statsMap.values.toList();
+      return badges;
     } catch (e) {
-      debugPrint('_getShiftStaffStats error: $e');
+      debugPrint('getUnseenShiftBadges error: $e');
       return [];
     }
   }
+
+  // =========================================================================
+  // SHIFT BADGES
+  // Badge เหล่านี้รับซ้ำได้ทุกเวร
+  // ระบบ Hybrid: App คำนวณ stats → save JSONB → Cron เทียบ + award
+  // =========================================================================
+
 
   /// นับ kindness tasks (ช่วยคนไข้ที่ไม่ได้ assign ให้)
   /// ใช้ assigned residents ของ staff คนนั้นจริงๆ (ดึงจาก clock_in_out_ver2)
@@ -1035,41 +835,275 @@ class BadgeService {
     return true;
   }
 
-  /// Award shift badge (ไม่ check unique - รับซ้ำได้)
-  Future<Badge?> _awardShiftBadge({
-    required String userId,
-    required Map<String, dynamic> badgeData,
+
+  /// คำนวณ stats ของ current user สำหรับเวรนี้ แล้ว save เป็น JSONB
+  /// ลง column shift_badge_stats ใน clock_in_out_ver2
+  ///
+  /// Cron job จะอ่าน JSONB นี้ → เทียบกับ staff คนอื่น → award badges
+  ///
+  /// Stats ที่คำนวณ:
+  /// - completed_count: จำนวน tasks ที่เสร็จ
+  /// - problem_count: จำนวน tasks ที่เจอปัญหา
+  /// - kindness_count: จำนวน tasks ที่ช่วยดูแล resident คนอื่น
+  /// - avg_timing_diff: ค่าเบี่ยงเบนเวลาเฉลี่ย (นาที)
+  /// - difficulty_diff_sum: ผลรวม (user_rating - norm) เฉพาะที่ > 0
+  /// - norm_difficulty_sum: ผลรวม (norm - user_rating) เฉพาะที่ > 0
+  /// - last_task_time: ISO 8601 ของ task สุดท้าย (tie-break)
+  /// - total_tasks: จำนวน tasks ทั้งหมด
+  /// - adjust_date: วันที่ปรับ (local, hour<7 shift back 1 day)
+  Future<void> computeAndSaveShiftStats({
+    required int clockRecordId,
+    required int nursinghomeId,
+    required DateTime clockIn,
+    required DateTime clockOut,
+    required List<int> assignedResidentIds,
   }) async {
     try {
-      final badgeId = badgeData['id'] as String;
-      final badgeName = badgeData['name'] as String? ?? 'Badge';
-      final badgePoints = badgeData['points'] as int? ?? 0;
-
-      // Insert badge (ไม่ check existing - รับซ้ำได้)
-      await _client.from('training_user_badges').insert({
-        'user_id': userId,
-        'badge_id': badgeId,
-        'season_id': null, // Shift badges ไม่เกี่ยวกับ season
-      });
-
-      debugPrint('Awarded shift badge: $badgeName');
-
-      // บันทึก points (ถ้ามี)
-      if (badgePoints > 0) {
-        await PointsService().recordBadgeEarned(
-          userId: userId,
-          badgeId: badgeId,
-          badgePoints: badgePoints,
-          badgeName: badgeName,
-        );
-        debugPrint('Recorded $badgePoints points for badge');
+      final userId = UserService().effectiveUserId;
+      if (userId == null) {
+        debugPrint('computeAndSaveShiftStats: No user');
+        return;
       }
 
-      return Badge.fromBadgeTable(badgeData);
-    } catch (e) {
-      debugPrint('_awardShiftBadge error: $e');
-      return null;
+      // ดึง task logs จาก raw table (ไม่ใช่ view)
+      // FIX ROOT CAUSE: v2_task_logs_with_details ไม่มี difficulty_score
+      // ต้อง query A_Task_logs_ver2 ตรง + JOIN task_difficulty_cache
+      //
+      // ใช้ completed_at ในช่วง clock_in → clock_out ของ current user
+      // เพื่อ scope tasks ให้ตรงกับเวร (BUG-72: cross-midnight fix)
+      final taskLogs = await _client
+          .from('A_Task_logs_ver2')
+          .select('''
+            id, completed_by, status,
+            completed_at, "ExpectedDateTime",
+            difficulty_score, task_id, c_task_id
+          ''')
+          .eq('completed_by', userId)
+          // [BUG-TZ FIX] ใช้ UTC เพื่อให้ตรงกับ timestamptz ใน Supabase
+          // ไม่งั้น local time (ICT +7) จะถูกตีความเป็น UTC → เลื่อน 7 ชม.
+          .gte('completed_at', clockIn.toUtc().toIso8601String())
+          .lte('completed_at', clockOut.toUtc().toIso8601String());
+
+      final tasks = taskLogs as List;
+
+      // ดึง task_difficulty_cache สำหรับ tasks ที่มี difficulty_score
+      // เพื่อคำนวณ novice/master scores
+      final taskIds = <int>{};
+      for (final t in tasks) {
+        final taskId = t['task_id'] as int?;
+        final cTaskId = t['c_task_id'] as int?;
+        // task_difficulty_cache ใช้ COALESCE(task_id, c_task_id) เป็น key
+        final cacheKey = taskId ?? cTaskId;
+        if (cacheKey != null) taskIds.add(cacheKey);
+      }
+
+      // ดึง avg difficulty norms จาก cache
+      // ใช้คำนวณ novice/master scores (user_rating vs norm)
+      final normMap = <int, double>{};
+      if (taskIds.isNotEmpty) {
+        final norms = await _client
+            .from('task_difficulty_cache')
+            .select('task_id, avg_score')
+            .inFilter('task_id', taskIds.toList());
+
+        for (final n in norms as List) {
+          final id = n['task_id'] as int;
+          final score = (n['avg_score'] as num?)?.toDouble();
+          if (score != null) normMap[id] = score;
+        }
+      }
+
+      // [BUG-8 FIX] Warning ถ้า normMap ว่าง แต่มี tasks ที่มี difficulty_score
+      // → novice/master badges จะไม่ถูก award เพราะ scores = 0
+      if (normMap.isEmpty && taskIds.isNotEmpty) {
+        debugPrint(
+          'WARNING: task_difficulty_cache empty for ${taskIds.length} tasks '
+          '→ novice/master scores will be 0'
+        );
+      }
+
+      // ดึง resident_id mapping สำหรับ kindness calculation
+      final residentMap = <int, int?>{};
+      if (assignedResidentIds.isNotEmpty) {
+        final taskIdList =
+            tasks.map((t) => t['task_id'] as int?).whereType<int>().toList();
+        final cTaskIdList =
+            tasks.map((t) => t['c_task_id'] as int?).whereType<int>().toList();
+
+        // ดึง resident_id จาก A_Tasks (repeated tasks)
+        if (taskIdList.isNotEmpty) {
+          final aTasks = await _client
+              .from('A_Tasks')
+              .select('id, resident_id')
+              .inFilter('id', taskIdList);
+          for (final at in aTasks as List) {
+            residentMap[at['id'] as int] = at['resident_id'] as int?;
+          }
+        }
+
+        // ดึง resident_id จาก C_Tasks (calendar tasks)
+        if (cTaskIdList.isNotEmpty) {
+          final cTasks = await _client
+              .from('C_Tasks')
+              .select('id, resident_id')
+              .inFilter('id', cTaskIdList);
+          for (final ct in cTasks as List) {
+            residentMap[ct['id'] as int] = ct['resident_id'] as int?;
+          }
+        }
+      }
+
+      // [BUG-15 FIX] Warning ถ้า residentMap ว่างแต่มี assignedResidentIds
+      // → kindness_count จะเป็น 0 ทุกคน เพราะหา resident ไม่ได้
+      if (residentMap.isEmpty && assignedResidentIds.isNotEmpty) {
+        debugPrint(
+          'WARNING: residentMap empty but ${assignedResidentIds.length} '
+          'assigned residents → kindness_count will be 0',
+        );
+      }
+
+      // === คำนวณ stats ด้วย pure function (testable) ===
+      final stats = buildStatsJson(
+        taskLogs: tasks.cast<Map<String, dynamic>>(),
+        normMap: normMap,
+        residentMap: residentMap,
+        assignedResidentIds: assignedResidentIds,
+        clockIn: clockIn,
+      );
+
+      // === Save JSONB ลง clock_in_out_ver2 ===
+      await _client
+          .from('clock_in_out_ver2')
+          .update({'shift_badge_stats': stats})
+          .eq('id', clockRecordId);
+
+      debugPrint('=== Shift Badge Stats Saved ===');
+      debugPrint('ClockRecord: $clockRecordId');
+      debugPrint('Stats: $stats');
+    } catch (e, stackTrace) {
+      // Stats save failure ไม่ block clock-out flow
+      // Cron จะ skip record ที่ไม่มี stats (JSONB = NULL)
+      // [BUG-9 FIX] Log ทั้ง error + stackTrace เพื่อ debug ได้ง่ายขึ้น
+      debugPrint('computeAndSaveShiftStats ERROR: $e');
+      debugPrint('StackTrace: $stackTrace');
     }
+  }
+
+  /// Pure function สำหรับคำนวณ shift badge stats จาก raw data
+  /// แยกออกจาก computeAndSaveShiftStats() เพื่อให้ test ได้
+  ///
+  /// Parameters:
+  /// - [taskLogs]: task logs จาก A_Task_logs_ver2 (status, completed_at, etc.)
+  /// - [normMap]: task_id → avg difficulty score จาก cache
+  /// - [residentMap]: task_id/c_task_id → resident_id จาก A_Tasks/C_Tasks
+  /// - [assignedResidentIds]: resident IDs ที่ staff ถูก assign ตอน clock-in
+  /// - [clockIn]: เวลา clock-in (ใช้คำนวณ adjust_date)
+  @visibleForTesting
+  static Map<String, dynamic> buildStatsJson({
+    required List<Map<String, dynamic>> taskLogs,
+    required Map<int, double> normMap,
+    required Map<int, int?> residentMap,
+    required List<int> assignedResidentIds,
+    required DateTime clockIn,
+  }) {
+    // 1. completed_count
+    final completedCount =
+        taskLogs.where((t) => t['status'] == 'complete').length;
+
+    // 2. problem_count (ใช้ status เท่านั้น เพราะ problem_type ไม่มีใน raw table)
+    final problemCount =
+        taskLogs.where((t) => t['status'] == 'problem').length;
+
+    // 3. kindness_count — tasks ที่ดูแล resident ที่ไม่ใช่ของตัวเอง
+    int kindnessCount = 0;
+    if (assignedResidentIds.isNotEmpty) {
+      for (final t in taskLogs) {
+        final taskId = t['task_id'] as int?;
+        final cTaskId = t['c_task_id'] as int?;
+        final residentId = residentMap[taskId] ?? residentMap[cTaskId];
+        if (residentId != null &&
+            !assignedResidentIds.contains(residentId)) {
+          kindnessCount++;
+        }
+      }
+    }
+
+    // 4. avg_timing_diff — ค่าเบี่ยงเบนเวลาเฉลี่ย (นาที)
+    int totalDiff = 0;
+    int timingCount = 0;
+    for (final t in taskLogs) {
+      final completedStr = t['completed_at'] as String?;
+      final expectedStr = t['ExpectedDateTime'] as String?;
+      if (completedStr != null && expectedStr != null) {
+        final completed = DateTime.tryParse(completedStr);
+        final expected = DateTime.tryParse(expectedStr);
+        if (completed != null && expected != null) {
+          totalDiff += completed.difference(expected).inMinutes.abs();
+          timingCount++;
+        }
+      }
+    }
+    // ใช้ 999999 แทน infinity (JSONB ไม่รองรับ infinity)
+    final avgTimingDiff =
+        timingCount > 0 ? (totalDiff / timingCount).toDouble() : 999999.0;
+
+    // 5. difficulty scores — novice/master
+    int difficultyDiffSum = 0; // novice: user rated harder than norm
+    int normDifficultySum = 0; // master: user rated easier than norm
+    for (final t in taskLogs) {
+      final userDiff = t['difficulty_score'] as int?;
+      if (userDiff == null) continue;
+
+      final taskId = t['task_id'] as int?;
+      final cTaskId = t['c_task_id'] as int?;
+      final cacheKey = taskId ?? cTaskId;
+      final normDiff = cacheKey != null ? normMap[cacheKey]?.toInt() : null;
+      if (normDiff == null) continue;
+
+      final diff = userDiff - normDiff;
+      if (diff > 0) {
+        difficultyDiffSum += diff;
+      } else if (diff < 0) {
+        normDifficultySum += diff.abs();
+      }
+    }
+
+    // 6. last_task_time — เวลา task สุดท้าย (สำหรับ tie-break)
+    DateTime? lastTaskTime;
+    for (final t in taskLogs) {
+      final completedStr = t['completed_at'] as String?;
+      if (completedStr != null) {
+        final dt = DateTime.tryParse(completedStr);
+        if (dt != null &&
+            (lastTaskTime == null || dt.isAfter(lastTaskTime))) {
+          lastTaskTime = dt;
+        }
+      }
+    }
+
+    // 7. adjust_date — คำนวณจาก local clock-in time
+    //    hour < 7 = เวรดึก → shift back 1 day
+    final localClockIn = clockIn.toLocal();
+    final adjustDate = localClockIn.hour < 7
+        ? DateTime(
+            localClockIn.year, localClockIn.month, localClockIn.day - 1)
+        : DateTime(
+            localClockIn.year, localClockIn.month, localClockIn.day);
+    final dateStr =
+        '${adjustDate.year}-${adjustDate.month.toString().padLeft(2, '0')}-${adjustDate.day.toString().padLeft(2, '0')}';
+
+    return {
+      'completed_count': completedCount,
+      'problem_count': problemCount,
+      'kindness_count': kindnessCount,
+      'avg_timing_diff': avgTimingDiff,
+      'difficulty_diff_sum': difficultyDiffSum,
+      'norm_difficulty_sum': normDifficultySum,
+      'last_task_time': lastTaskTime?.toIso8601String(),
+      'total_tasks': taskLogs.length,
+      'adjust_date': dateStr,
+      'version': 1,
+    };
   }
 
   /// มอบ badge "The Perfect Starter" สำหรับ user ที่กรอกข้อมูลครบตั้งแต่ onboarding

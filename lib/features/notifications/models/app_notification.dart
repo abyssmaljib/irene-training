@@ -8,7 +8,9 @@ class AppNotification {
   final bool isRead;
   final DateTime createdAt;
   final NotificationType type;
-  final int? referenceId;
+  // reference_id เป็น text ใน DB — รองรับทั้ง integer IDs (post, task)
+  // และ UUID (badge) ใช้ referenceIdAsInt เมื่อต้องการ int
+  final String? referenceId;
   final String? referenceTable;
   final String? imageUrl;
   final String? actionUrl;
@@ -36,7 +38,8 @@ class AppNotification {
       isRead: json['is_read'] as bool? ?? false,
       createdAt: DateTime.parse(json['created_at'] as String),
       type: NotificationType.fromString(json['type'] as String?),
-      referenceId: json['reference_id'] as int?,
+      // reference_id เป็น text ใน DB — อาจมาเป็น int (เก่า) หรือ String (ใหม่)
+      referenceId: json['reference_id']?.toString(),
       referenceTable: json['reference_table'] as String?,
       imageUrl: json['image_url'] as String?,
       actionUrl: json['action_url'] as String?,
@@ -67,7 +70,7 @@ class AppNotification {
     bool? isRead,
     DateTime? createdAt,
     NotificationType? type,
-    int? referenceId,
+    String? referenceId,
     String? referenceTable,
     String? imageUrl,
     String? actionUrl,
@@ -86,6 +89,12 @@ class AppNotification {
       actionUrl: actionUrl ?? this.actionUrl,
     );
   }
+
+  /// แปลง referenceId (text) เป็น int สำหรับ code ที่ต้องการ int
+  /// (เช่น PostDetailScreen, TaskService, IncidentService)
+  int? get referenceIdAsInt => referenceId != null
+      ? int.tryParse(referenceId!)
+      : null;
 
   /// Get relative time string (e.g., "5 นาทีที่แล้ว")
   String get relativeTime {

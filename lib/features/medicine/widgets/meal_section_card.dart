@@ -1440,6 +1440,8 @@ class _LogPhotoNetworkImageState extends State<_LogPhotoNetworkImage> {
   bool _timedOut = false;
   Timer? _timeoutTimer;
   int _retryCount = 0;
+  // fallback: ถ้า transformed URL fail → ลองโหลด original URL แทน
+  bool _useFallback = false;
 
   @override
   void initState() {
@@ -1472,6 +1474,8 @@ class _LogPhotoNetworkImageState extends State<_LogPhotoNetworkImage> {
       _isLoading = true;
       _hasError = false;
       _timedOut = false;
+      // reset fallback ตอน retry ด้วยมือ เพื่อลอง transformed URL ใหม่อีกครั้ง
+      _useFallback = false;
     });
     _startTimeoutTimer();
   }
@@ -1483,15 +1487,18 @@ class _LogPhotoNetworkImageState extends State<_LogPhotoNetworkImage> {
 
     // ใช้ Supabase Image Transformation เพื่อโหลดรูปขนาดเล็กจาก server
     // ลดจาก ~1.5MB → ~100KB ช่วยแก้ปัญหา crash บน iOS
-    final mediumUrl = ImageService.getMediumUrl(widget.imageUrl);
+    // ถ้า transformed URL fail (_useFallback = true) → ลองโหลด original URL แทน
+    final loadUrl = _useFallback
+        ? widget.imageUrl
+        : ImageService.getMediumUrl(widget.imageUrl);
 
     // ใช้ CachedNetworkImage แทน Image.network เพื่อ:
     // 1. Cache รูปไว้ใน disk ไม่ต้องโหลดซ้ำทุกครั้ง
     // 2. จัดการ memory ได้ดีกว่า
     // 3. ลด network request ซ้ำซ้อน
     return CachedNetworkImage(
-      key: ValueKey('${widget.imageUrl}_$_retryCount'),
-      imageUrl: mediumUrl,
+      key: ValueKey('${widget.imageUrl}_${_retryCount}_$_useFallback'),
+      imageUrl: loadUrl,
       fit: widget.fit,
       fadeInDuration: const Duration(milliseconds: 150),
       // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
@@ -1505,9 +1512,20 @@ class _LogPhotoNetworkImageState extends State<_LogPhotoNetworkImage> {
       ),
       // errorWidget เรียกเมื่อโหลดไม่สำเร็จ
       errorWidget: (context, url, error) {
-        // เรียก setState หลัง build เสร็จ
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && !_hasError) {
+          if (!mounted) return;
+          if (!_useFallback) {
+            // ครั้งแรก: transformed URL fail → ลอง original URL แทน (silent fallback)
+            setState(() {
+              _useFallback = true;
+              _retryCount++;
+              _isLoading = true;
+              _hasError = false;
+              _timedOut = false;
+            });
+            _startTimeoutTimer();
+          } else if (!_hasError) {
+            // fallback URL ก็ fail ด้วย → แสดง error จริงๆ
             setState(() {
               _hasError = true;
               _isLoading = false;

@@ -21,6 +21,9 @@ import 'core/services/app_version_service.dart';
 import 'core/services/force_update_service.dart';
 import 'core/services/onesignal_service.dart';
 import 'core/widgets/force_update_dialog.dart';
+import 'features/learning/services/badge_service.dart';
+import 'features/learning/screens/badge_collection_screen.dart';
+import 'features/learning/widgets/badge_earned_dialog.dart';
 import 'features/auth/screens/invitation_screen.dart';
 import 'features/auth/screens/welcome_screen.dart';
 import 'features/navigation/screens/main_navigation_screen.dart';
@@ -194,6 +197,13 @@ class _AuthWrapperState extends State<AuthWrapper>
   // Flag กัน dialog ซ้อน — ถ้า dialog แสดงอยู่แล้วไม่ต้องเช็คอีก
   bool _isForceUpdateDialogShowing = false;
 
+  // Badge check: cooldown 10 นาที เพื่อไม่ query ถี่เกินไป
+  DateTime? _lastBadgeCheck;
+  static const _badgeCheckCooldown = Duration(minutes: 10);
+  bool _isBadgeDialogShowing = false;
+  // [BUG-RACE FIX] ป้องกัน 2 calls ทำงานพร้อมกัน (login + resume)
+  bool _badgeCheckInProgress = false;
+
   @override
   void initState() {
     super.initState();
@@ -228,14 +238,17 @@ class _AuthWrapperState extends State<AuthWrapper>
           // เพื่อให้ admin ดูได้ว่า user ใช้ version อะไร
           AppVersionService.instance.updateVersionInfo();
 
-          // เช็ค force update หลัง login
+          // เช็ค force update + unseen badges หลัง login
           _checkForceUpdate();
+          _checkUnseenBadges();
         } else {
           // Logout from OneSignal
           OneSignalService.instance.clearToken();
           // Reset เมื่อ logout เพื่อให้เช็คทันทีตอน login ครั้งหน้า
           _lastForceUpdateCheck = null;
           _isForceUpdateDialogShowing = false;
+          _lastBadgeCheck = null;
+          _isBadgeDialogShowing = false;
         }
       }
     });
@@ -248,8 +261,9 @@ class _AuthWrapperState extends State<AuthWrapper>
 
     // เช็คเฉพาะตอนกลับเข้าแอป (resumed) และ user ยัง login อยู่
     if (state == AppLifecycleState.resumed && _session != null) {
-      debugPrint('🔍 Lifecycle: App resumed → เช็ค force update');
+      debugPrint('🔍 Lifecycle: App resumed → เช็ค force update + badge');
       _checkForceUpdate();
+      _checkUnseenBadges();
     }
   }
 
@@ -290,6 +304,93 @@ class _AuthWrapperState extends State<AuthWrapper>
       }
     } catch (e) {
       debugPrint('🔍 _checkForceUpdate: ❌ ERROR: $e');
+    }
+  }
+
+  /// เช็ค shift badges ใหม่ที่ cron award ไว้ แล้วแสดง BadgeEarnedDialog
+  /// ใช้ SharedPreferences เก็บ timestamp ของการเช็คครั้งล่าสุด
+  Future<void> _checkUnseenBadges() async {
+    // [BUG-RACE FIX] ถ้ากำลัง check อยู่ หรือ dialog แสดงอยู่ → ข้าม
+    if (_badgeCheckInProgress || _isBadgeDialogShowing ||
+        _isForceUpdateDialogShowing) {
+      return;
+    }
+
+    // [UX FIX] ถ้าเพิ่งกด notification มาภายใน 10 วินาที → ข้าม popup
+    // เพราะ user กำลังจะเห็น NotificationDetailScreen อยู่แล้ว
+    // ป้องกัน popup ซ้อนทับ notification detail
+    final lastClick = OneSignalService.instance.lastNotificationClickTime;
+    if (lastClick != null &&
+        DateTime.now().difference(lastClick).inSeconds < 10) {
+      debugPrint('🏅 Skip badge popup — just opened from notification');
+      return;
+    }
+
+    // Cooldown 10 นาที
+    final now = DateTime.now();
+    if (_lastBadgeCheck != null &&
+        now.difference(_lastBadgeCheck!) < _badgeCheckCooldown) {
+      return;
+    }
+    _lastBadgeCheck = now;
+    _badgeCheckInProgress = true;
+
+    try {
+      final userId = UserService().effectiveUserId;
+      if (userId == null) return;
+
+      // อ่าน timestamp ครั้งล่าสุดจาก SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'last_badge_check_$userId';
+      final lastCheckStr = prefs.getString(key);
+
+      // ถ้าไม่เคยเช็ค → ใช้ 24 ชม. ที่แล้วเป็น default
+      // (ไม่ดึงทั้งหมดเพราะ user เก่าจะเห็น badge เก่าๆ ทั้งหมด)
+      // [BUG-TZ FIX] ใช้ UTC ทั้งหมดเพื่อ consistency กับ Supabase timestamptz
+      final lastCheck = lastCheckStr != null
+          ? DateTime.parse(lastCheckStr)
+          : now.toUtc().subtract(const Duration(hours: 24));
+
+      // ดึง badges ใหม่ที่ยังไม่เคยเห็น
+      final badgeService = BadgeService();
+      final newBadges = await badgeService.getUnseenShiftBadges(
+        lastCheck: lastCheck,
+      );
+
+      // อัพเดท timestamp ทันที (ไม่ว่าจะมี badge ใหม่หรือไม่)
+      // [BUG-TZ FIX] save เป็น UTC เพื่อ consistency
+      await prefs.setString(key, now.toUtc().toIso8601String());
+
+      // แสดง dialog ถ้ามี badge ใหม่
+      if (newBadges.isNotEmpty && mounted) {
+        debugPrint('🏅 Found ${newBadges.length} unseen shift badges!');
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && navigatorKey.currentContext != null) {
+            _isBadgeDialogShowing = true;
+            BadgeEarnedDialog.show(
+              navigatorKey.currentContext!,
+              newBadges,
+              // [UX FIX] พา user ไป BadgeCollectionScreen หลังปิด popup
+              navigateToBadges: () {
+                final ctx = navigatorKey.currentContext;
+                if (ctx != null) {
+                  Navigator.of(ctx).push(
+                    MaterialPageRoute(
+                      builder: (_) => const BadgeCollectionScreen(),
+                    ),
+                  );
+                }
+              },
+            ).then((_) {
+              _isBadgeDialogShowing = false;
+            });
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('_checkUnseenBadges error: $e');
+    } finally {
+      _badgeCheckInProgress = false;
     }
   }
 

@@ -19,15 +19,25 @@ class BadgeEarnedDialog extends StatefulWidget {
   });
 
   /// แสดง dialog
-  static Future<void> show(BuildContext context, List<Badge> badges) async {
+  /// [navigateToBadges] — ถ้าส่งมา จะเรียกหลังปิด dialog
+  /// เพื่อพา user ไปหน้า BadgeCollectionScreen
+  static Future<void> show(
+    BuildContext context,
+    List<Badge> badges, {
+    VoidCallback? navigateToBadges,
+  }) async {
     if (badges.isEmpty) return;
 
     return showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => BadgeEarnedDialog(
+      builder: (dialogContext) => BadgeEarnedDialog(
         badges: badges,
-        onDismiss: () => Navigator.of(context).pop(),
+        onDismiss: () {
+          Navigator.of(dialogContext).pop();
+          // พา user ไป badge collection หลังปิด dialog
+          navigateToBadges?.call();
+        },
       ),
     );
   }

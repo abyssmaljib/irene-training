@@ -37,8 +37,10 @@ class CameraService {
       final XFile? photo = await _picker.pickImage(
         source: source,
         imageQuality: 85, // ลดขนาดเพื่อ upload เร็วขึ้น
-        maxWidth: 1920,
-        maxHeight: 1920,
+        // ลดจาก 1920 → 1280 เพื่อลด memory ระหว่าง compress บน Android สเปคต่ำ
+        // ยังได้ความละเอียดดีพอสำหรับรูปยา (~800KB แทน ~1.5MB)
+        maxWidth: 1280,
+        maxHeight: 1280,
       );
 
       if (photo == null) return null;

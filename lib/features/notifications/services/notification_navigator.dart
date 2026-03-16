@@ -37,7 +37,9 @@ class NotificationNavigator {
     BuildContext context,
     AppNotification notification,
   ) async {
-    final referenceId = notification.referenceId;
+    // ใช้ referenceIdAsInt สำหรับ types ที่ต้องการ int (post, task, etc.)
+    // badge/points/calendar ไม่ใช้ referenceId จึงไม่ affected
+    final referenceId = notification.referenceIdAsInt;
 
     switch (notification.type) {
       // --- ประเภทที่ใช้แค่ ID (ไม่ต้อง fetch) ---

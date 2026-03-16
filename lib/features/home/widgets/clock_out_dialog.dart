@@ -251,24 +251,31 @@ class _ClockOutDialogState extends State<ClockOutDialog> {
     );
 
     if (mounted && success) {
-      // 3. ตรวจสอบและ award shift badges
-      List<learning.Badge> awardedBadges = [];
+      // จับเวลา clock-out ไว้ตัวเดียว เพื่อให้ stats กับ summary ใช้เวลาเดียวกัน
+      // (IMP-BUG-2 fix: ป้องกัน DateTime.now() ถูกเรียก 2 ครั้งต่างเวลา)
+      final clockOutTime = DateTime.now();
+
+      // 3. คำนวณ shift badge stats แล้ว save JSONB
+      //    (Cron job จะเทียบและ award badges ทีหลัง — Hybrid approach)
+      //    ไม่ award badge ทันทีตอน clock-out อีกแล้ว
       if (widget.clockInTime != null) {
-        awardedBadges = await _badgeService.checkAndAwardShiftBadges(
+        await _badgeService.computeAndSaveShiftStats(
           clockRecordId: widget.clockRecordId,
           nursinghomeId: widget.nursinghomeId,
           clockIn: widget.clockInTime!,
-          clockOut: DateTime.now(),
+          clockOut: clockOutTime,
           assignedResidentIds: widget.residentIds,
         );
       }
+      // ส่ง empty list — badges จะมาทาง notification ภายหลัง
+      final List<learning.Badge> awardedBadges = [];
 
       // 4. Query shift summary (ส่ง awardedBadges ไปด้วย)
       final summary = await _shiftSummaryService.getShiftSummary(
         userId: widget.userId,
         nursinghomeId: widget.nursinghomeId,
-        clockInTime: widget.clockInTime ?? DateTime.now(),
-        clockOutTime: DateTime.now(),
+        clockInTime: widget.clockInTime ?? clockOutTime,
+        clockOutTime: clockOutTime,
         deadAirMinutes: deadAirMinutes,
         awardedBadges: awardedBadges, // ส่ง badges ที่ได้ไปแสดงโดยตรง
       );

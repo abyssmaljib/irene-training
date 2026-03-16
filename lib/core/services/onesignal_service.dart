@@ -14,6 +14,11 @@ class OneSignalService {
   OneSignalService._();
   static final OneSignalService instance = OneSignalService._();
 
+  /// เวลาที่ user กด notification ล่าสุด
+  /// ใช้ให้ _checkUnseenBadges() skip popup ถ้าเพิ่งกด notification มา
+  /// (ป้องกัน popup ซ้อน notification detail screen)
+  DateTime? lastNotificationClickTime;
+
   /// Initialize OneSignal service (Login/Setup)
   Future<void> initialize() async {
     if (kIsWeb) return; // Skip on web
@@ -51,6 +56,9 @@ class OneSignalService {
   /// ถ้า action_url เป็น irene://notifications/{id} ให้ navigate ไปหน้า notification detail
   void _handleNotificationClick(OSNotificationClickEvent event) async {
     debugPrint('OneSignal: Notification Clicked: ${event.notification.jsonRepresentation()}');
+
+    // บันทึกเวลา click เพื่อให้ _checkUnseenBadges() skip popup
+    lastNotificationClickTime = DateTime.now();
 
     // ดึง additional data จาก notification
     final additionalData = event.notification.additionalData;
@@ -176,6 +184,8 @@ class OneSignalService {
 
   /// Logout from OneSignal
   Future<void> clearToken() async {
+    // Reset notification click timestamp เพื่อไม่ให้ session ใหม่ skip popup ผิด
+    lastNotificationClickTime = null;
     try {
       await OneSignal.logout();
       debugPrint('OneSignal: Logged out');
