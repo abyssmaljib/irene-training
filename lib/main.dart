@@ -238,9 +238,9 @@ class _AuthWrapperState extends State<AuthWrapper>
           // เพื่อให้ admin ดูได้ว่า user ใช้ version อะไร
           AppVersionService.instance.updateVersionInfo();
 
-          // เช็ค force update + unseen badges หลัง login
-          _checkForceUpdate();
-          _checkUnseenBadges();
+          // เช็ค force update ก่อน แล้วค่อย badge
+          // ต้อง await force update เพื่อให้ flag ถูก set ก่อน badge check
+          _postLoginChecks();
         } else {
           // Logout from OneSignal
           OneSignalService.instance.clearToken();
@@ -262,9 +262,15 @@ class _AuthWrapperState extends State<AuthWrapper>
     // เช็คเฉพาะตอนกลับเข้าแอป (resumed) และ user ยัง login อยู่
     if (state == AppLifecycleState.resumed && _session != null) {
       debugPrint('🔍 Lifecycle: App resumed → เช็ค force update + badge');
-      _checkForceUpdate();
-      _checkUnseenBadges();
+      _postLoginChecks();
     }
+  }
+
+  /// เช็ค force update ก่อน แล้วค่อยเช็ค badge
+  /// ต้อง await force update เพื่อให้ flag _isForceUpdateDialogShowing ถูก set ก่อน badge check
+  Future<void> _postLoginChecks() async {
+    await _checkForceUpdate();
+    _checkUnseenBadges();
   }
 
   /// ตรวจสอบว่าต้อง force update หรือไม่
@@ -298,7 +304,12 @@ class _AuthWrapperState extends State<AuthWrapper>
           if (mounted && navigatorKey.currentContext != null) {
             debugPrint('🔍 _checkForceUpdate: 🎉 แสดง ForceUpdateDialog!');
             _isForceUpdateDialogShowing = true;
-            ForceUpdateDialog.show(navigatorKey.currentContext!);
+            // reset flag เมื่อ dialog ถูก pop ไม่ว่าจะด้วยเหตุผลอะไร
+            // (เช่น Navigator replaced, auth state change, etc.)
+            ForceUpdateDialog.show(navigatorKey.currentContext!).then((_) {
+              _isForceUpdateDialogShowing = false;
+              debugPrint('🔍 _checkForceUpdate: dialog dismissed → reset flag');
+            });
           }
         });
       }
