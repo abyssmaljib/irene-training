@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'user_service.dart';
 
 /// Service สำหรับตรวจสอบและบังคับ update app
 ///
@@ -36,6 +35,13 @@ class ForceUpdateService {
   /// - ถ้า buildNumber < app_version → ต้อง update
   Future<bool> isUpdateRequired() async {
     try {
+      // Web และ Desktop ไม่ต้องเช็ค force update เพราะไม่มี store ให้ update
+      // ถ้าบังคับจะทำให้ user ติด dialog ปิดไม่ได้
+      if (kIsWeb) {
+        debugPrint('🔍 ForceUpdate: ❌ SKIP - Web platform ไม่ต้อง force update');
+        return false;
+      }
+
       // 0. ดึง version ปัจจุบัน และยกเว้น 1.0.0 (dev/debug build)
       final packageInfo = await PackageInfo.fromPlatform();
       debugPrint('🔍 ForceUpdate: version=${packageInfo.version}, buildNumber=${packageInfo.buildNumber}');
@@ -46,8 +52,22 @@ class ForceUpdateService {
       }
 
       // 1. ดึง nursinghome_id ของ user
-      final nursinghomeId = await UserService().getNursinghomeId();
-      debugPrint('🔍 ForceUpdate: nursinghomeId=$nursinghomeId');
+      // ใช้ real user ID เสมอ (ไม่ใช่ impersonated) เพราะ force update
+      // ต้องเช็คจาก nursing home ของ user จริง
+      final realUserId = Supabase.instance.client.auth.currentUser?.id;
+      if (realUserId == null) {
+        debugPrint('🔍 ForceUpdate: ❌ SKIP - ไม่มี user login');
+        return false;
+      }
+
+      final userResponse = await Supabase.instance.client
+          .from('user_info')
+          .select('nursinghome_id')
+          .eq('id', realUserId)
+          .maybeSingle();
+
+      final nursinghomeId = userResponse?['nursinghome_id'] as int?;
+      debugPrint('🔍 ForceUpdate: nursinghomeId=$nursinghomeId (realUserId=$realUserId)');
 
       if (nursinghomeId == null) {
         debugPrint('🔍 ForceUpdate: ❌ SKIP - nursinghomeId เป็น null');
