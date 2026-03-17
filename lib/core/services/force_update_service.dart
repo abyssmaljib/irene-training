@@ -83,8 +83,14 @@ class ForceUpdateService {
 
       debugPrint('🔍 ForceUpdate: DB response=$response');
 
-      final minBuildNumber = response?['app_version'] as int?;
-      debugPrint('🔍 ForceUpdate: app_version จาก DB=$minBuildNumber');
+      // app_version column เป็น text ใน DB แต่เก็บค่าเป็นตัวเลข
+      // PostgREST return เป็น JSON string เช่น "50" ไม่ใช่ integer 50
+      // ต้องใช้ toString() + int.tryParse() เพื่อรองรับทั้ง text และ int type
+      final rawAppVersion = response?['app_version'];
+      final minBuildNumber = rawAppVersion != null
+          ? int.tryParse(rawAppVersion.toString())
+          : null;
+      debugPrint('🔍 ForceUpdate: app_version จาก DB=$minBuildNumber (raw=$rawAppVersion)');
 
       if (minBuildNumber == null || minBuildNumber == 0) {
         debugPrint('🔍 ForceUpdate: ❌ SKIP - app_version เป็น null หรือ 0 (ไม่บังคับ update)');

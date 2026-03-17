@@ -15,13 +15,14 @@ import 'buttons.dart';
 /// - ไม่สามารถปิดได้ด้วยปุ่ม back หรือกดนอก dialog
 /// - แสดง version ปัจจุบัน
 /// - ปุ่มอัปเดตจะเปิด Play Store หรือ App Store ตาม device
-class ForceUpdateDialog extends StatelessWidget {
+/// - ปุ่มถูก disable ระหว่างกำลังเปิด store (กัน double-tap)
+class ForceUpdateDialog extends StatefulWidget {
   const ForceUpdateDialog({super.key});
 
   /// แสดง dialog บังคับ update
   ///
   /// ใช้ barrierDismissible: false เพื่อไม่ให้ปิด dialog ได้
-  /// ใช้ WillPopScope เพื่อไม่ให้กดปุ่ม back ปิดได้
+  /// ใช้ PopScope เพื่อไม่ให้กดปุ่ม back ปิดได้
   static Future<void> show(BuildContext context) {
     return showDialog(
       context: context,
@@ -32,9 +33,17 @@ class ForceUpdateDialog extends StatelessWidget {
   }
 
   @override
+  State<ForceUpdateDialog> createState() => _ForceUpdateDialogState();
+}
+
+class _ForceUpdateDialogState extends State<ForceUpdateDialog> {
+  // กัน double-tap ปุ่มอัปเดต
+  bool _isOpening = false;
+
+  @override
   Widget build(BuildContext context) {
     // PopScope แทน WillPopScope (deprecated)
-    // onPopInvokedWithResult return false เพื่อไม่ให้กด back ปิดได้
+    // canPop: false เพื่อไม่ให้กด back ปิดได้
     return PopScope(
       canPop: false, // ไม่ให้ pop ออกจาก dialog
       child: Dialog(
@@ -104,11 +113,11 @@ class ForceUpdateDialog extends StatelessWidget {
 
               SizedBox(height: AppSpacing.lg),
 
-              // Update button - ใช้ PrimaryButton จาก design system
+              // Update button - disable ระหว่างเปิด store กัน double-tap
               PrimaryButton(
-                text: 'อัปเดตเลย',
+                text: _isOpening ? 'กำลังเปิด...' : 'อัปเดตเลย',
                 icon: HugeIcons.strokeRoundedDownload04,
-                onPressed: () => _handleUpdate(context),
+                onPressed: _isOpening ? null : _handleUpdate,
                 width: double.infinity,
               ),
             ],
@@ -119,17 +128,35 @@ class ForceUpdateDialog extends StatelessWidget {
   }
 
   /// เปิด Store เมื่อกดปุ่มอัปเดต
-  void _handleUpdate(BuildContext context) async {
-    final success = await ForceUpdateService.instance.openStore();
+  /// disable ปุ่มระหว่าง loading กัน double-tap
+  Future<void> _handleUpdate() async {
+    setState(() => _isOpening = true);
 
-    if (!success && context.mounted) {
-      // ถ้าเปิด store ไม่ได้ แสดง snackbar แจ้ง
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('ไม่สามารถเปิด Store ได้ กรุณาอัปเดตด้วยตนเอง'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+    try {
+      final success = await ForceUpdateService.instance.openStore();
+
+      if (!success && mounted) {
+        // ถ้าเปิด store ไม่ได้ แสดง SnackBar แจ้ง
+        // ใช้ try-catch เพราะ ScaffoldMessenger อาจหา Scaffold ไม่เจอ
+        // (dialog อยู่บน overlay ไม่มี Scaffold ancestor)
+        try {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content:
+                  Text('ไม่สามารถเปิด Store ได้ กรุณาอัปเดตด้วยตนเอง'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        } catch (_) {
+          // ถ้าไม่มี ScaffoldMessenger → ไม่แสดง snackbar (ไม่ crash)
+          debugPrint('ForceUpdateDialog: ScaffoldMessenger not found');
+        }
+      }
+    } finally {
+      // enable ปุ่มกลับหลังเปิด store (ให้ user กดได้อีกถ้ากลับมา)
+      if (mounted) {
+        setState(() => _isOpening = false);
+      }
     }
   }
 }

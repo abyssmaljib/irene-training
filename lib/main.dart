@@ -203,6 +203,8 @@ class _AuthWrapperState extends State<AuthWrapper>
   bool _isBadgeDialogShowing = false;
   // [BUG-RACE FIX] ป้องกัน 2 calls ทำงานพร้อมกัน (login + resume)
   bool _badgeCheckInProgress = false;
+  // กัน concurrent force update check (login + resume เรียกพร้อมกัน)
+  bool _forceUpdateCheckInProgress = false;
 
   @override
   void initState() {
@@ -276,9 +278,9 @@ class _AuthWrapperState extends State<AuthWrapper>
   /// ตรวจสอบว่าต้อง force update หรือไม่
   /// เช็คได้ทุกครั้งที่เรียก แต่มี cooldown 5 นาทีกัน query DB ถี่เกินไป
   Future<void> _checkForceUpdate() async {
-    // ถ้า dialog แสดงอยู่แล้ว ไม่ต้องเช็คซ้ำ
-    if (_isForceUpdateDialogShowing) {
-      debugPrint('🔍 _checkForceUpdate: SKIP - dialog แสดงอยู่แล้ว');
+    // ถ้า dialog แสดงอยู่แล้ว หรือกำลัง check อยู่ → ไม่ต้องเช็คซ้ำ
+    if (_isForceUpdateDialogShowing || _forceUpdateCheckInProgress) {
+      debugPrint('🔍 _checkForceUpdate: SKIP - ${_isForceUpdateDialogShowing ? "dialog แสดงอยู่" : "กำลัง check อยู่"}');
       return;
     }
 
@@ -291,6 +293,7 @@ class _AuthWrapperState extends State<AuthWrapper>
       return;
     }
     _lastForceUpdateCheck = now;
+    _forceUpdateCheckInProgress = true;
 
     try {
       final isUpdateRequired =
@@ -315,6 +318,8 @@ class _AuthWrapperState extends State<AuthWrapper>
       }
     } catch (e) {
       debugPrint('🔍 _checkForceUpdate: ❌ ERROR: $e');
+    } finally {
+      _forceUpdateCheckInProgress = false;
     }
   }
 
