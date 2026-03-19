@@ -350,6 +350,8 @@ class NotificationDetailScreen extends StatelessWidget {
         return HugeIcons.strokeRoundedAlert02;
       case NotificationType.points:
         return HugeIcons.strokeRoundedCoins01;
+      case NotificationType.ticket:
+        return HugeIcons.strokeRoundedTicket02;
     }
   }
 
@@ -377,6 +379,8 @@ class NotificationDetailScreen extends StatelessWidget {
         return AppColors.error;
       case NotificationType.points:
         return AppColors.pastelYellow;
+      case NotificationType.ticket:
+        return AppColors.pastelDarkGreen1;
     }
   }
 

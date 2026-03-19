@@ -130,12 +130,19 @@ enum NotificationType {
   review('review'),
   assignment('assignment'),  // การมอบหมายผู้รับบริการ
   incident('incident'),      // เหตุการณ์/อุบัติเหตุ
-  points('points');           // คะแนน (ได้รับ/ถูกหัก)
+  points('points'),           // คะแนน (ได้รับ/ถูกหัก)
+  ticket('ticket');           // ตั๋วงาน (mention, comment, status_change, assigned)
 
   final String value;
   const NotificationType(this.value);
 
+  /// แปลง string จาก DB เป็น NotificationType
+  /// ticket_mention, ticket_comment, ticket_status_change, ticket_assigned
+  /// → ทั้งหมด map เป็น ticket (ขึ้นต้นด้วย 'ticket')
   static NotificationType fromString(String? value) {
+    if (value != null && value.startsWith('ticket')) {
+      return NotificationType.ticket;
+    }
     return NotificationType.values.firstWhere(
       (e) => e.value == value,
       orElse: () => NotificationType.system,
@@ -165,6 +172,8 @@ enum NotificationType {
         return 'เหตุการณ์';
       case NotificationType.points:
         return 'คะแนน';
+      case NotificationType.ticket:
+        return 'ตั๋ว';
     }
   }
 }

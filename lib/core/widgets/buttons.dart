@@ -213,6 +213,99 @@ class _SecondaryButtonState extends State<SecondaryButton> {
   }
 }
 
+/// Danger Outlined Button - Outlined red button for destructive actions
+/// เหมือน SecondaryButton แต่ใช้สีแดง (error) แทน teal (primary)
+/// ใช้สำหรับ action ที่อันตรายแต่ไม่ต้องเด่นมาก เช่น ยกเลิกการรับทราบ
+class DangerOutlinedButton extends StatefulWidget {
+  final String text;
+  final VoidCallback? onPressed;
+  final bool isLoading;
+  final bool isDisabled;
+  final dynamic icon;
+  final double? width;
+
+  const DangerOutlinedButton({
+    super.key,
+    required this.text,
+    this.onPressed,
+    this.isLoading = false,
+    this.isDisabled = false,
+    this.icon,
+    this.width,
+  });
+
+  @override
+  State<DangerOutlinedButton> createState() => _DangerOutlinedButtonState();
+}
+
+class _DangerOutlinedButtonState extends State<DangerOutlinedButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isEnabled =
+        !widget.isDisabled && !widget.isLoading && widget.onPressed != null;
+
+    // สีหลัก: แดงเมื่อ enabled, จางลงเมื่อ disabled
+    final color = isEnabled
+        ? (_isHovered ? AppColors.error.withValues(alpha: 0.8) : AppColors.error)
+        : AppColors.error.withValues(alpha: 0.4);
+
+    return Semantics(
+      button: true,
+      enabled: isEnabled,
+      label: widget.isLoading ? '${widget.text} กำลังโหลด' : widget.text,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() => _isHovered = false),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          width: widget.width,
+          height: AppSpacing.buttonHeight,
+          child: OutlinedButton(
+            onPressed: isEnabled ? widget.onPressed : null,
+            style: OutlinedButton.styleFrom(
+              minimumSize: Size(0, AppSpacing.buttonHeight),
+              padding: AppSpacing.buttonPadding,
+              side: BorderSide(color: color, width: 1),
+              shape: RoundedRectangleBorder(
+                borderRadius: AppRadius.smallRadius,
+              ),
+              backgroundColor: _isHovered && isEnabled
+                  ? AppColors.error.withValues(alpha: 0.05)
+                  : Colors.transparent,
+            ),
+            child: widget.isLoading
+                ? SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(color),
+                    ),
+                  )
+                : Row(
+                    mainAxisSize:
+                        widget.width != null ? MainAxisSize.max : MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (widget.icon != null) ...[
+                        HugeIcon(icon: widget.icon, size: AppIconSize.lg, color: color),
+                        AppSpacing.horizontalGapSm,
+                      ],
+                      Text(
+                        widget.text,
+                        style: AppTypography.button.copyWith(color: color),
+                      ),
+                    ],
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Danger Button - Red/Warning button for destructive actions
 class DangerButton extends StatefulWidget {
   final String text;

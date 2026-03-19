@@ -9,6 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/buttons.dart';
 import '../../../core/widgets/confirm_dialog.dart';
 import '../../../core/widgets/irene_app_bar.dart';
 import '../../../core/widgets/network_image.dart';
@@ -249,6 +250,23 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     final regex = RegExp(r'(เช้า|กลางวัน|เย็น|ก่อนนอน)');
     final match = regex.firstMatch(input);
     return match?.group(0);
+  }
+
+  /// ตรวจสอบสิทธิ์การยกเลิก task
+  /// อนุญาตเฉพาะ: คนที่ทำ task, หัวหน้าเวรขึ้นไป (level >= 30), แพทย์ (role 6)
+  bool get _canCancelTask {
+    final userId = ref.read(currentUserIdProvider);
+    final systemRole = ref.read(currentUserSystemRoleProvider).valueOrNull;
+
+    // 1. คนที่ complete/postpone/problem task นี้
+    if (_task.completedByUid != null && _task.completedByUid == userId) {
+      return true;
+    }
+
+    // 2. หัวหน้าเวรขึ้นไป (level >= 30) หรือ แพทย์ (role 6)
+    if (systemRole != null && systemRole.canCancelTask) return true;
+
+    return false;
   }
 
   /// Visibility helpers
@@ -2139,12 +2157,12 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         ],
       ),
       child: SafeArea(
-        child:
-            _task.isDone ||
+        child: _task.isDone ||
                 _task.isPostponed ||
                 _task.isReferred ||
                 _task.isProblem
-            ? _buildCancelButton()
+            // task ที่ทำแล้ว → แสดงปุ่มยกเลิก (enabled ถ้ามีสิทธิ์, disabled ถ้าไม่มี)
+            ? _buildCancelButton(enabled: _canCancelTask)
             : _isOptionOpen
             ? _buildOptionsRow()
             : _buildMainActionsRow(),
@@ -2409,33 +2427,14 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     );
   }
 
-  Widget _buildCancelButton() {
-    return SizedBox(
+  Widget _buildCancelButton({bool enabled = true}) {
+    return DangerOutlinedButton(
+      text: 'ยกเลิกการรับทราบ',
+      icon: HugeIcons.strokeRoundedCancelCircle,
+      isDisabled: !enabled,
+      isLoading: _isLoading,
+      onPressed: _handleCancel,
       width: double.infinity,
-      height: 48,
-      child: OutlinedButton.icon(
-        onPressed: _isLoading ? null : _handleCancel,
-        style: OutlinedButton.styleFrom(
-          side: BorderSide(color: AppColors.error),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-        icon: _isLoading
-            ? SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation(AppColors.error),
-                ),
-              )
-            : HugeIcon(icon: HugeIcons.strokeRoundedCancelCircle, color: AppColors.error),
-        label: Text(
-          'ยกเลิกการรับทราบ',
-          style: AppTypography.button.copyWith(color: AppColors.error),
-        ),
-      ),
     );
   }
 

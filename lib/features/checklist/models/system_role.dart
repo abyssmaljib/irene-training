@@ -104,4 +104,12 @@ class SystemRole {
 
   /// Check if this role can be incharge (หัวหน้าเวร หรือ หัวหน้าเวรสำรอง)
   bool get canBeIncharge => isShiftLeader || isBackupShiftLeader;
+
+  /// Check if this role is doctor (แพทย์ - role 6)
+  bool get isDoctor => id == 6;
+
+  /// Check if this role can cancel a task
+  /// อนุญาตให้: หัวหน้าเวรขึ้นไป (level >= 30), แพทย์ (id == 6)
+  /// หมายเหตุ: ต้อง check ร่วมกับ completedByUid == currentUserId ที่ UI ด้วย
+  bool get canCancelTask => canQC || isDoctor;
 }

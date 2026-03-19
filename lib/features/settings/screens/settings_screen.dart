@@ -34,6 +34,7 @@ import '../../profile_setup/screens/unified_profile_setup_screen.dart';
 import '../../profile_setup/providers/profile_setup_provider.dart';
 import '../../points/points.dart';
 import '../../home/screens/bug_report_list_screen.dart';
+import '../../tickets/screens/ticket_list_screen.dart';
 import '../services/clockin_verification_service.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -47,7 +48,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   UserProfile? _userProfile;
   UserRole? _userRole;
   SystemRole? _systemRole;
-  List<SystemRole> _allSystemRoles = [];
   List<DevUserInfo> _allUsers = [];
   String? _userEmail;
   // ใช้ TextEditingController แทน String _userSearchQuery
@@ -168,15 +168,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _loadSystemRole() async {
     try {
       final userService = UserService();
-      final results = await Future.wait([
-        userService.getSystemRole(forceRefresh: true),
-        userService.getAllSystemRoles(),
-      ]);
+      // โหลดเฉพาะ system role ของ user ปัจจุบัน (ใช้แสดงในโปรไฟล์)
+      final role = await userService.getSystemRole(forceRefresh: true);
 
       if (mounted) {
         setState(() {
-          _systemRole = results[0] as SystemRole?;
-          _allSystemRoles = results[1] as List<SystemRole>;
+          _systemRole = role;
         });
       }
     } catch (e) {
@@ -479,8 +476,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               AppSpacing.verticalGapMd,
               _buildDevRoleSelector(),
               AppSpacing.verticalGapMd,
-              _buildDevSystemRoleSelector(),
-              AppSpacing.verticalGapMd,
+              // _buildDevSystemRoleSelector() ถูกลบแล้ว
+              // เปลี่ยน role ต้องทำผ่าน admin web เท่านั้น (RLS lock role_id)
             ],
             AppSpacing.verticalGapMd,
             // Log Out Button
@@ -813,6 +810,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             _buildShiftMenuItem(),
             _buildDDMenuItem(),
             _buildIncidentReflectionMenuItem(),
+            _buildTicketMenuItem(),
           ],
         ),
 
@@ -924,6 +922,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const IncidentListScreen()),
+        );
+      },
+    );
+  }
+
+  /// Build ticket menu item — เข้าถึงได้เฉพาะ shift_leader ขึ้นไป (canQC, level >= 30)
+  Widget _buildTicketMenuItem() {
+    // Gate: ซ่อนเมนูถ้า user ไม่มีสิทธิ์ QC (level < 30)
+    if (_systemRole == null || !_systemRole!.canQC) {
+      return const SizedBox.shrink();
+    }
+
+    return _buildMenuItem(
+      icon: HugeIcons.strokeRoundedTicket02,
+      label: 'ตั๋วงาน',
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const TicketListScreen()),
         );
       },
     );
@@ -1827,159 +1844,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
-  Widget _buildDevSystemRoleSelector() {
-    return Container(
-      width: double.infinity,
-      padding: AppSpacing.paddingMd,
-      decoration: BoxDecoration(
-        color: Colors.teal.shade50,
-        borderRadius: AppRadius.mediumRadius,
-        border: Border.all(color: Colors.teal.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              HugeIcon(icon: HugeIcons.strokeRoundedUserAccount, size: AppIconSize.sm, color: Colors.teal.shade700),
-              AppSpacing.horizontalGapSm,
-              Text(
-                'Dev Mode - เลือก System Role (ตำแหน่ง)',
-                style: AppTypography.label.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: Colors.teal.shade700,
-                ),
-              ),
-            ],
-          ),
-          AppSpacing.verticalGapSm,
-          Text(
-            'ตำแหน่งปัจจุบัน: ${_systemRole?.name ?? "ไม่ระบุ"}',
-            style: AppTypography.bodySmall.copyWith(
-              color: Colors.teal.shade900,
-            ),
-          ),
-          AppSpacing.verticalGapMd,
-          if (_allSystemRoles.isEmpty)
-            Column(
-              children: [
-                Image.asset(
-                  'assets/images/not_found.webp',
-                  width: 80,
-                  height: 80,
-                ),
-                AppSpacing.verticalGapSm,
-                Text(
-                  'ไม่พบ system roles ในระบบ',
-                  style: AppTypography.bodySmall.copyWith(
-                    color: Colors.teal.shade600,
-                  ),
-                ),
-              ],
-            )
-          else
-            Wrap(
-              spacing: AppSpacing.sm,
-              runSpacing: AppSpacing.sm,
-              children: [
-                // Option: ไม่มี role
-                _buildSystemRoleChip(
-                  id: null,
-                  name: 'ไม่ระบุ',
-                  isSelected: _systemRole == null,
-                ),
-                // All available roles
-                ..._allSystemRoles.map((role) => _buildSystemRoleChip(
-                      id: role.id,
-                      name: role.name,
-                      isSelected: _systemRole?.id == role.id,
-                    )),
-              ],
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSystemRoleChip({
-    required int? id,
-    required String name,
-    required bool isSelected,
-  }) {
-    return InkWell(
-      onTap: () => _changeSystemRole(id),
-      borderRadius: AppRadius.smallRadius,
-      child: Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.sm,
-        ),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? Colors.teal.withValues(alpha: 0.2)
-              : Colors.teal.withValues(alpha: 0.05),
-          borderRadius: AppRadius.smallRadius,
-          border: Border.all(
-            color: isSelected
-                ? Colors.teal
-                : Colors.teal.withValues(alpha: 0.3),
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (isSelected) ...[
-              HugeIcon(
-                icon: HugeIcons.strokeRoundedCheckmarkCircle02,
-                size: AppIconSize.sm,
-                color: Colors.teal,
-              ),
-              SizedBox(width: 4),
-            ],
-            Text(
-              name,
-              style: AppTypography.bodySmall.copyWith(
-                color: Colors.teal.shade700,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _changeSystemRole(int? roleId) async {
-    try {
-      final userId = UserService().effectiveUserId;
-      if (userId == null) return;
-
-      await Supabase.instance.client
-          .from('user_info')
-          .update({'role_id': roleId})
-          .eq('id', userId);
-
-      // Clear cached role in UserService
-      UserService().clearCache();
-
-      // Invalidate Riverpod providers to refresh role in other screens
-      ref.invalidate(currentUserSystemRoleProvider);
-      ref.invalidate(effectiveRoleFilterProvider);
-
-      // Reload system role for local state
-      await _loadSystemRole();
-      if (!mounted) return;
-
-      final roleName = roleId == null
-          ? 'ไม่ระบุ'
-          : _allSystemRoles.firstWhere((r) => r.id == roleId).name;
-
-      AppToast.success(context, 'เปลี่ยนตำแหน่งเป็น: $roleName');
-    } catch (e) {
-      if (!mounted) return;
-      AppToast.error(context, 'ไม่สามารถเปลี่ยนตำแหน่งได้');
-    }
-  }
+  // _buildDevSystemRoleSelector(), _buildSystemRoleChip(), _changeSystemRole()
+  // ถูกลบแล้ว — เปลี่ยน role ต้องทำผ่าน admin web เท่านั้น
+  // (RLS policy update_own_profile ล็อค role_id ไม่ให้ user เปลี่ยนเองแล้ว)
 
 }

@@ -228,6 +228,8 @@ class NotificationItem extends StatelessWidget {
         return HugeIcons.strokeRoundedAlert02;
       case NotificationType.points:
         return HugeIcons.strokeRoundedCoins01;
+      case NotificationType.ticket:
+        return HugeIcons.strokeRoundedTicket02;
     }
   }
 
@@ -253,6 +255,8 @@ class NotificationItem extends StatelessWidget {
         return AppColors.error; // Red for incidents
       case NotificationType.points:
         return AppColors.pastelYellow; // Yellow for points
+      case NotificationType.ticket:
+        return AppColors.pastelDarkGreen1; // Teal for tickets
     }
   }
 }

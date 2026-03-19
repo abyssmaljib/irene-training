@@ -13,6 +13,8 @@ import '../../navigation/screens/main_navigation_screen.dart';
 import '../../points/screens/leaderboard_screen.dart';
 import '../../residents/screens/resident_detail_screen.dart';
 import '../../checklist/screens/task_detail_screen.dart';
+import '../../tickets/screens/ticket_detail_screen.dart';
+import '../../tickets/services/ticket_feature_service.dart';
 import '../models/app_notification.dart';
 
 /// Utility class สำหรับ navigate จาก notification ไปหน้าที่เกี่ยวข้อง
@@ -129,6 +131,24 @@ class NotificationNavigator {
           },
         );
 
+      case NotificationType.ticket:
+        // ตั๋วงาน — ต้อง fetch ticket ก่อน navigate
+        if (referenceId == null) {
+          _showError(context, 'ไม่พบข้อมูลตั๋ว');
+          return;
+        }
+        await _navigateWithLoading(
+          context,
+          fetchData: () => TicketFeatureService.instance.getTicketById(referenceId),
+          onSuccess: (ticket) {
+            if (ticket == null) {
+              _showError(context, 'ไม่พบข้อมูลตั๋วนี้แล้ว');
+              return;
+            }
+            _push(context, TicketDetailScreen(ticket: ticket));
+          },
+        );
+
       case NotificationType.system:
         // system type ไม่มีหน้าเป้าหมาย → ไม่ทำอะไร
         break;
@@ -156,6 +176,7 @@ class NotificationNavigator {
       case NotificationType.review:
       case NotificationType.assignment:
       case NotificationType.incident:
+      case NotificationType.ticket:
         return notification.referenceId != null;
     }
   }
@@ -182,6 +203,8 @@ class NotificationNavigator {
         return 'ไปถอดบทเรียนกันเลย!';
       case NotificationType.points:
         return 'ไปดูรายละเอียดคะแนน';
+      case NotificationType.ticket:
+        return 'ไปดูรายละเอียดตั๋ว';
       case NotificationType.system:
         return '';
     }
