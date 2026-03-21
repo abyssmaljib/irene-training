@@ -162,26 +162,30 @@ class _LoginScreenState extends State<LoginScreen> {
       // ปิด resizeToAvoidBottomInset เพื่อป้องกัน Scaffold resize body ทุกเฟรม
       // ระหว่าง keyboard animation → ทำให้เนื้อหาไม่กระตุก
       resizeToAvoidBottomInset: false,
-      body: SingleChildScrollView(
-        // เพิ่ม padding ล่างตาม viewInsets เพื่อให้ scroll ผ่านคีย์บอร์ดได้
-        // ใช้ viewInsetsOf แทน .of().viewInsets เพื่อ subscribe เฉพาะ viewInsets ไม่ใช่ทุก MediaQuery change
+      body: AnimatedPadding(
+        // ใช้ AnimatedPadding เพื่อให้ scroll area ขยับขึ้น smooth เมื่อ keyboard แสดง
+        // แทน raw padding ที่ snap ทุกเฟรม → กระตุก
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOut,
         padding: EdgeInsets.only(
           bottom: MediaQuery.viewInsetsOf(context).bottom,
         ),
-        child: Column(
-          children: [
-            // Header with gradient
-            _buildHeader(),
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              // Header with gradient
+              _buildHeader(),
 
-            // Login form card
-            Transform.translate(
-              offset: const Offset(0, -40),
-              child: _buildLoginCard(),
-            ),
+              // Login form card
+              Transform.translate(
+                offset: const Offset(0, -40),
+                child: _buildLoginCard(),
+              ),
 
-            // Footer
-            _buildFooter(),
-          ],
+              // Footer
+              _buildFooter(),
+            ],
+          ),
         ),
       ),
     );

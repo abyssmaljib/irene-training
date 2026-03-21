@@ -13,51 +13,44 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/app_toast.dart';
-import '../../../core/widgets/network_image.dart';
 
-/// SplitScreenCameraScreen — หน้ากล้อง split-screen สำหรับถ่ายรูป task เทียบกับรูปตัวอย่าง
+/// SquareCameraScreen — หน้ากล้อง 1:1 เต็มจอ สำหรับ task ที่ไม่มีรูปตัวอย่าง
 ///
 /// Layout:
 /// ┌─────────────────────────┐
-/// │   รูปตัวอย่าง (zoom ได้)  │  ← ครึ่งบน
-/// ├─────────────────────────┤
-/// │   Live Camera Preview   │  ← ครึ่งล่าง
-/// ├─────────────────────────┤
+/// │  ← ถ่ายรูป               │  ← Top bar
+/// │                         │
+/// │   ┌─────────────────┐   │
+/// │   │                 │   │
+/// │   │  Live Camera    │   │
+/// │   │  Preview (1:1)  │   │
+/// │   │                 │   │
+/// │   └─────────────────┘   │
+/// │                         │
 /// │  ⚡  [◉ ถ่ายรูป]  🔄    │  ← Controls
 /// └─────────────────────────┘
 ///
-/// ใช้เฉพาะ task ที่มี sampleImageUrl เท่านั้น
-/// ถ้าไม่มี → ใช้กล้อง native ปกติ (image_picker)
-class SplitScreenCameraScreen extends StatefulWidget {
-  final String sampleImageUrl;
+/// User เห็น preview 1:1 ตั้งแต่ตอนถ่าย — ไม่ต้อง crop ทีหลัง
+/// (เบื้องหลัง sensor ถ่าย 4:3 แล้ว crop ให้ตรงกับที่ user เห็น)
+class SquareCameraScreen extends StatefulWidget {
+  const SquareCameraScreen({super.key});
 
-  const SplitScreenCameraScreen({
-    super.key,
-    required this.sampleImageUrl,
-  });
-
-  /// เปิดหน้ากล้อง split-screen
-  /// Returns File ที่ถ่ายได้ หรือ null ถ้ายกเลิก
-  static Future<File?> show({
-    required BuildContext context,
-    required String sampleImageUrl,
-  }) async {
+  /// เปิดหน้ากล้อง 1:1
+  /// Returns File ที่ถ่ายได้ (crop 1:1 แล้ว) หรือ null ถ้ายกเลิก
+  static Future<File?> show({required BuildContext context}) async {
     return Navigator.push<File?>(
       context,
       MaterialPageRoute(
-        builder: (context) => SplitScreenCameraScreen(
-          sampleImageUrl: sampleImageUrl,
-        ),
+        builder: (context) => const SquareCameraScreen(),
       ),
     );
   }
 
   @override
-  State<SplitScreenCameraScreen> createState() =>
-      _SplitScreenCameraScreenState();
+  State<SquareCameraScreen> createState() => _SquareCameraScreenState();
 }
 
-class _SplitScreenCameraScreenState extends State<SplitScreenCameraScreen>
+class _SquareCameraScreenState extends State<SquareCameraScreen>
     with WidgetsBindingObserver {
   // กล้อง
   CameraController? _controller;
@@ -73,9 +66,6 @@ class _SplitScreenCameraScreenState extends State<SplitScreenCameraScreen>
   // Flash mode: cycle auto → on → off
   FlashMode _flashMode = FlashMode.auto;
 
-  // บังคับ 1:1 เสมอ — ทุกรูปใน task detail ใช้อัตราส่วนสี่เหลี่ยมจัตุรัส
-  final double _sampleAspectRatio = 1.0;
-
   @override
   void initState() {
     super.initState();
@@ -85,7 +75,6 @@ class _SplitScreenCameraScreenState extends State<SplitScreenCameraScreen>
     PaintingBinding.instance.imageCache.clear();
     PaintingBinding.instance.imageCache.clearLiveImages();
 
-    // ไม่ต้อง detect ratio อีกแล้ว — บังคับ 1:1 เสมอ
     _initCamera();
   }
 
@@ -195,7 +184,7 @@ class _SplitScreenCameraScreenState extends State<SplitScreenCameraScreen>
     _showError(message);
   }
 
-  /// แสดง error state — กลับไปหน้าเดิมพร้อมแสดงข้อความ
+  /// แสดง error state
   void _showError(String message) {
     if (mounted) {
       setState(() {
@@ -209,7 +198,8 @@ class _SplitScreenCameraScreenState extends State<SplitScreenCameraScreen>
   // ACTIONS
   // ==========================
 
-  /// ถ่ายรูป → crop เป็น 1:1 (สี่เหลี่ยมจัตุรัส) → return File
+  /// ถ่ายรูป → crop เป็น 1:1 → return File
+  /// sensor ถ่ายได้ 4:3 → crop ตรงกลางให้เป็น 1:1 ตรงกับที่ user เห็นใน preview
   Future<void> _capturePhoto() async {
     final controller = _controller;
     if (controller == null || !_isInitialized || _isCapturing) return;
@@ -221,30 +211,27 @@ class _SplitScreenCameraScreenState extends State<SplitScreenCameraScreen>
       final bytes = await File(xfile.path).readAsBytes();
 
       // Crop รูปเป็น 1:1 สี่เหลี่ยมจัตุรัส (รันใน isolate ไม่ block UI)
-      final croppedBytes = await compute(
-        _cropToAspectRatio,
-        _CropParams(bytes: bytes, targetAspectRatio: _sampleAspectRatio),
-      );
+      final croppedBytes = await compute(_cropToSquare, bytes);
 
       // บันทึกรูปที่ crop แล้ว
       final dir = await getTemporaryDirectory();
       final croppedFile = File(
-        '${dir.path}/split_cam_${DateTime.now().millisecondsSinceEpoch}.jpg',
+        '${dir.path}/square_cam_${DateTime.now().millisecondsSinceEpoch}.jpg',
       );
       await croppedFile.writeAsBytes(croppedBytes);
 
       if (mounted) {
-        // คืน File กลับไป → _handleTakePhoto จะส่งต่อไป PhotoPreviewScreen
+        // คืน File กลับไป → task_detail จะส่งต่อไป PhotoPreviewScreen
         Navigator.pop(context, croppedFile);
       }
     } on CameraException catch (e) {
-      debugPrint('SplitScreenCamera: capture error: $e');
+      debugPrint('SquareCamera: capture error: $e');
       if (mounted) {
         AppToast.error(context, 'ถ่ายรูปไม่สำเร็จ กรุณาลองใหม่');
         setState(() => _isCapturing = false);
       }
     } catch (e) {
-      debugPrint('SplitScreenCamera: crop error: $e');
+      debugPrint('SquareCamera: crop error: $e');
       if (mounted) {
         AppToast.error(context, 'ประมวลผลรูปไม่สำเร็จ กรุณาลองใหม่');
         setState(() => _isCapturing = false);
@@ -257,7 +244,6 @@ class _SplitScreenCameraScreenState extends State<SplitScreenCameraScreen>
     final controller = _controller;
     if (controller == null || !_isInitialized) return;
 
-    // Cycle: auto → on → off
     FlashMode nextMode;
     switch (_flashMode) {
       case FlashMode.auto:
@@ -274,17 +260,16 @@ class _SplitScreenCameraScreenState extends State<SplitScreenCameraScreen>
       await controller.setFlashMode(nextMode);
       setState(() => _flashMode = nextMode);
     } on CameraException catch (e) {
-      debugPrint('SplitScreenCamera: flash error: $e');
+      debugPrint('SquareCamera: flash error: $e');
     }
   }
 
   /// สลับกล้องหน้า/หลัง
   Future<void> _flipCamera() async {
-    if (_cameras.length < 2) return; // ถ้ามีกล้องเดียว ไม่ต้อง flip
+    if (_cameras.length < 2) return;
 
     setState(() => _isInitialized = false);
 
-    // หากล้องอีกฝั่ง (front ↔ back)
     final currentDirection = _cameras[_currentCameraIndex].lensDirection;
     final targetDirection = currentDirection == CameraLensDirection.back
         ? CameraLensDirection.front
@@ -338,7 +323,6 @@ class _SplitScreenCameraScreenState extends State<SplitScreenCameraScreen>
 
   @override
   Widget build(BuildContext context) {
-    // ถ้า error ร้ายแรง → แสดงหน้า error พร้อมปุ่มกลับ
     if (_hasError) {
       return _buildErrorScreen();
     }
@@ -348,22 +332,14 @@ class _SplitScreenCameraScreenState extends State<SplitScreenCameraScreen>
       body: SafeArea(
         child: Column(
           children: [
-            // AppBar แบบ custom (เพื่อไม่ให้ใช้พื้นที่มากเกินไป)
+            // Top bar — ปุ่มกลับ + title
             _buildTopBar(),
 
-            // ===== ครึ่งบน: รูปตัวอย่าง =====
+            // ===== กล้อง Live Preview 1:1 อยู่ตรงกลาง =====
             Expanded(
-              flex: 1,
-              child: _buildSampleImageSection(),
-            ),
-
-            // เส้นแบ่ง
-            Container(height: 1, color: Colors.white24),
-
-            // ===== ครึ่งล่าง: กล้อง Live Preview =====
-            Expanded(
-              flex: 1,
-              child: _buildCameraPreviewSection(),
+              child: Center(
+                child: _buildCameraPreview(),
+              ),
             ),
 
             // ===== Controls Bar =====
@@ -384,7 +360,6 @@ class _SplitScreenCameraScreenState extends State<SplitScreenCameraScreen>
       color: Colors.black,
       child: Row(
         children: [
-          // ปุ่มกลับ
           IconButton(
             onPressed: () => Navigator.pop(context, null),
             icon: HugeIcon(
@@ -394,10 +369,9 @@ class _SplitScreenCameraScreenState extends State<SplitScreenCameraScreen>
             ),
           ),
           const SizedBox(width: AppSpacing.xs),
-          // Title
           Expanded(
             child: Text(
-              'ถ่ายรูปเทียบตัวอย่าง',
+              'ถ่ายรูป',
               style: AppTypography.body.copyWith(
                 color: Colors.white,
                 fontWeight: FontWeight.w600,
@@ -409,53 +383,9 @@ class _SplitScreenCameraScreenState extends State<SplitScreenCameraScreen>
     );
   }
 
-  /// ครึ่งบน — รูปตัวอย่าง 1:1 (zoom ได้ด้วย InteractiveViewer)
-  Widget _buildSampleImageSection() {
-    return Stack(
-      children: [
-        // รูปตัวอย่าง 1:1 — InteractiveViewer ให้ user ซูมดูรายละเอียดได้
-        Center(
-          child: AspectRatio(
-            aspectRatio: 1, // 1:1 สี่เหลี่ยมจัตุรัส
-            child: ClipRect(
-              child: InteractiveViewer(
-                minScale: 1.0,
-                maxScale: 3.0, // ซูมได้สูงสุด 3 เท่า
-                child: IreneNetworkImage(
-                  imageUrl: widget.sampleImageUrl,
-                  fit: BoxFit.cover, // cover เพื่อเติมเต็ม 1:1
-                  memCacheWidth: 800, // จำกัด memory ไม่ให้โหลดรูปใหญ่เกินไป
-                ),
-              ),
-            ),
-          ),
-        ),
-
-        // Label "รูปตัวอย่าง" มุมบนซ้าย
-        Positioned(
-          top: AppSpacing.sm,
-          left: AppSpacing.sm,
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.sm,
-              vertical: AppSpacing.xs,
-            ),
-            decoration: BoxDecoration(
-              color: Colors.black54,
-              borderRadius: BorderRadius.circular(AppSpacing.sm),
-            ),
-            child: Text(
-              'รูปตัวอย่าง',
-              style: AppTypography.caption.copyWith(color: Colors.white),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// ครึ่งล่าง — Live camera preview (แสดงเป็น 1:1 สี่เหลี่ยมจัตุรัส)
-  Widget _buildCameraPreviewSection() {
+  /// Camera preview — แสดงเป็น 1:1 ตรงกลางจอ
+  /// User เห็นกรอบสี่เหลี่ยมจัตุรัส → รู้ว่าจะได้รูป 1:1
+  Widget _buildCameraPreview() {
     final controller = _controller;
 
     // ยังไม่พร้อม → แสดง loading
@@ -465,22 +395,20 @@ class _SplitScreenCameraScreenState extends State<SplitScreenCameraScreen>
       );
     }
 
-    // แสดง camera preview เป็น 1:1 (สี่เหลี่ยมจัตุรัส)
-    // ใช้ AspectRatio + ClipRect + FittedBox.cover เพื่อ crop ส่วนที่เกินออก
-    return Center(
-      child: AspectRatio(
-        aspectRatio: _sampleAspectRatio, // 1:1 สี่เหลี่ยมจัตุรัส
-        child: ClipRect(
-          child: OverflowBox(
-            alignment: Alignment.center,
-            child: FittedBox(
-              fit: BoxFit.cover,
-              child: SizedBox(
-                // ใช้ขนาดจริงของกล้อง เพื่อไม่ให้ภาพบิด
-                width: controller.value.previewSize?.height ?? 1,
-                height: controller.value.previewSize?.width ?? 1,
-                child: CameraPreview(controller),
-              ),
+    // แสดง camera preview เป็น 1:1
+    // sensor ถ่าย 4:3 → ใช้ ClipRect + FittedBox.cover crop ให้เหลือ 1:1
+    return AspectRatio(
+      aspectRatio: 1, // 1:1 สี่เหลี่ยมจัตุรัส
+      child: ClipRect(
+        child: OverflowBox(
+          alignment: Alignment.center,
+          child: FittedBox(
+            fit: BoxFit.cover,
+            child: SizedBox(
+              // ใช้ขนาดจริงของกล้อง เพื่อไม่ให้ภาพบิด
+              width: controller.value.previewSize?.height ?? 1,
+              height: controller.value.previewSize?.width ?? 1,
+              child: CameraPreview(controller),
             ),
           ),
         ),
@@ -567,7 +495,6 @@ class _SplitScreenCameraScreenState extends State<SplitScreenCameraScreen>
         ),
         child: Center(
           child: _isCapturing
-              // กำลังถ่ายอยู่ → แสดง loading
               ? const SizedBox(
                   width: 24,
                   height: 24,
@@ -576,7 +503,6 @@ class _SplitScreenCameraScreenState extends State<SplitScreenCameraScreen>
                     strokeWidth: 2,
                   ),
                 )
-              // ปกติ → แสดงวงกลมขาวเต็ม
               : Container(
                   width: 56,
                   height: 56,
@@ -613,7 +539,6 @@ class _SplitScreenCameraScreenState extends State<SplitScreenCameraScreen>
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: AppSpacing.lg),
-                // ปุ่มกลับ
                 TextButton.icon(
                   onPressed: () => Navigator.pop(context, null),
                   icon: HugeIcon(
@@ -641,52 +566,30 @@ class _SplitScreenCameraScreenState extends State<SplitScreenCameraScreen>
 // ISOLATE FUNCTIONS (top-level เพราะ compute() ต้องการ top-level function)
 // ==========================
 
-/// Parameters สำหรับส่งเข้า isolate (ต้อง serializable)
-class _CropParams {
-  final Uint8List bytes;
-  final double targetAspectRatio; // width / height
-
-  _CropParams({required this.bytes, required this.targetAspectRatio});
-}
-
 /// Crop รูปเป็น 1:1 สี่เหลี่ยมจัตุรัส (รันใน isolate ไม่ block UI)
-/// ตัดจากตรงกลางของรูป เพื่อให้ได้ส่วนที่สำคัญที่สุด
-Uint8List _cropToAspectRatio(_CropParams params) {
-  final original = img.decodeImage(params.bytes);
-  if (original == null) return params.bytes; // decode ไม่ได้ → คืนรูปเดิม
+/// sensor กล้องถ่ายได้ 4:3 → ตัดจากตรงกลางให้เหลือ 1:1 ตรงกับที่ user เห็นใน preview
+Uint8List _cropToSquare(Uint8List bytes) {
+  final original = img.decodeImage(bytes);
+  if (original == null) return bytes; // decode ไม่ได้ → คืนรูปเดิม
 
   final origW = original.width;
   final origH = original.height;
-  final origRatio = origW / origH;
-  final targetRatio = params.targetAspectRatio;
 
-  // ถ้า ratio ใกล้เคียงกันอยู่แล้ว (ต่างไม่เกิน 5%) → ไม่ต้อง crop
-  if ((origRatio - targetRatio).abs() / targetRatio < 0.05) {
-    // แค่ resize ถ้าใหญ่เกินไป แล้วคืนเลย
+  // ถ้าเป็น 1:1 อยู่แล้ว (ต่างไม่เกิน 5%) → แค่ resize ถ้าจำเป็น
+  if ((origW - origH).abs() / origW.toDouble() < 0.05) {
     final resized = origW > 1920
         ? img.copyResize(original, width: 1920)
         : original;
     return Uint8List.fromList(img.encodeJpg(resized, quality: 85));
   }
 
-  // คำนวณขนาด crop area ตรงกลาง
-  int cropW, cropH;
-  if (origRatio > targetRatio) {
-    // รูปกว้างเกินไป → ตัดซ้าย-ขวา
-    cropH = origH;
-    cropW = (origH * targetRatio).round();
-  } else {
-    // รูปสูงเกินไป → ตัดบน-ล่าง
-    cropW = origW;
-    cropH = (origW / targetRatio).round();
-  }
+  // ตัดจากตรงกลาง — เอาด้านที่สั้นกว่าเป็นขนาดของสี่เหลี่ยมจัตุรัส
+  final side = origW < origH ? origW : origH;
+  final x = ((origW - side) / 2).round();
+  final y = ((origH - side) / 2).round();
+  var cropped = img.copyCrop(original, x: x, y: y, width: side, height: side);
 
-  // Crop จากตรงกลาง
-  final x = ((origW - cropW) / 2).round();
-  final y = ((origH - cropH) / 2).round();
-  var cropped = img.copyCrop(original, x: x, y: y, width: cropW, height: cropH);
-
-  // Resize ถ้าใหญ่เกินไป (จำกัด 1920px)
+  // Resize ถ้าใหญ่เกินไป (จำกัด 1920px เพื่อประหยัด memory + storage)
   if (cropped.width > 1920) {
     cropped = img.copyResize(cropped, width: 1920);
   }

@@ -23,6 +23,8 @@ class LoginBottomSheet extends StatefulWidget {
       isScrollControlled: true, // ให้ bottom sheet ขยายตาม content
       backgroundColor: Colors.transparent,
       barrierColor: Colors.transparent, // ไม่ให้พื้นหลังมืดลง
+      // useSafeArea ป้องกัน bottom sheet ล้นขอบจอ
+      useSafeArea: true,
       builder: (context) => const LoginBottomSheet(),
     );
   }
@@ -165,8 +167,11 @@ class _LoginBottomSheetState extends State<LoginBottomSheet> {
     // ใช้ viewInsetsOf แทน .of().viewInsets เพื่อลดการ rebuild ตอน keyboard animation
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
 
-    return Container(
-      // ใช้ AnimatedPadding เพื่อให้ขยับขึ้นเมื่อ keyboard แสดง
+    return AnimatedPadding(
+      // ใช้ AnimatedPadding เพื่อให้ขยับขึ้น smooth เมื่อ keyboard แสดง
+      // แทน raw padding ที่ snap ทุกเฟรม → กระตุก
+      duration: const Duration(milliseconds: 150),
+      curve: Curves.easeOut,
       padding: EdgeInsets.only(bottom: bottomInset),
       child: Container(
         decoration: BoxDecoration(

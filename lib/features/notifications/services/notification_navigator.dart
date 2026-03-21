@@ -12,6 +12,7 @@ import '../../learning/screens/badge_collection_screen.dart';
 import '../../navigation/screens/main_navigation_screen.dart';
 import '../../points/screens/leaderboard_screen.dart';
 import '../../residents/screens/resident_detail_screen.dart';
+import '../../residents/screens/vital_sign_log_screen.dart';
 import '../../checklist/screens/task_detail_screen.dart';
 import '../../tickets/screens/ticket_detail_screen.dart';
 import '../../tickets/services/ticket_feature_service.dart';
@@ -150,7 +151,24 @@ class NotificationNavigator {
         );
 
       case NotificationType.system:
-        // system type ไม่มีหน้าเป้าหมาย → ไม่ทำอะไร
+        // system type ปกติไม่มีหน้าเป้าหมาย
+        // แต่ถ้าเป็น vitalsign_sent_queue → ไปหน้ารายงานคนไข้
+        if (notification.referenceTable == 'vitalsign_sent_queue' && referenceId != null) {
+          await _navigateWithLoading(
+            context,
+            fetchData: () => _fetchResidentFromQueue(referenceId),
+            onSuccess: (result) {
+              if (result == null) {
+                _showError(context, 'ไม่พบข้อมูลรายงาน');
+                return;
+              }
+              _push(context, VitalSignLogScreen(
+                residentId: result['resident_id'] as int,
+                residentName: result['resident_name'] as String,
+              ));
+            },
+          );
+        }
         break;
     }
   }
@@ -159,9 +177,10 @@ class NotificationNavigator {
   /// ใช้สำหรับแสดง/ซ่อนปุ่ม "ดูเพิ่มเติม"
   static bool hasNavigableTarget(AppNotification notification) {
     switch (notification.type) {
-      // system ไม่มีหน้าเป้าหมาย
+      // system — ปกติไม่มีหน้าเป้าหมาย ยกเว้น vitalsign_sent_queue
       case NotificationType.system:
-        return false;
+        return notification.referenceTable == 'vitalsign_sent_queue'
+            && notification.referenceId != null;
 
       // types ที่ไม่ต้องใช้ referenceId
       case NotificationType.badge:
@@ -206,6 +225,9 @@ class NotificationNavigator {
       case NotificationType.ticket:
         return 'ไปดูรายละเอียดตั๋ว';
       case NotificationType.system:
+        if (notification.referenceTable == 'vitalsign_sent_queue') {
+          return 'ไปดูรายงานสัญญาณชีพ';
+        }
         return '';
     }
   }
@@ -261,6 +283,47 @@ class NotificationNavigator {
       return TopicWithProgress.fromJson(response);
     } catch (e) {
       debugPrint('NotificationNavigator: fetchTopicById error: $e');
+      return null;
+    }
+  }
+
+  /// Fetch resident_id + resident_name จาก vitalsign_sent_queue → vitalSign → residents
+  /// ใช้สำหรับ notification ค่าผิดปกติ — deep link ไปหน้า VitalSignLogScreen
+  static Future<Map<String, dynamic>?> _fetchResidentFromQueue(int queueId) async {
+    try {
+      // ดึง vitalsign_id จาก queue
+      final queueRow = await Supabase.instance.client
+          .from('vitalsign_sent_queue')
+          .select('vitalsign_id')
+          .eq('id', queueId)
+          .maybeSingle();
+      if (queueRow == null) return null;
+
+      final vitalsignId = queueRow['vitalsign_id'] as int;
+
+      // ดึง resident_id จาก vitalSign
+      final vitalRow = await Supabase.instance.client
+          .from('vitalSign')
+          .select('resident_id')
+          .eq('id', vitalsignId)
+          .maybeSingle();
+      if (vitalRow == null) return null;
+
+      final residentId = vitalRow['resident_id'] as int;
+
+      // ดึงชื่อ resident
+      final residentRow = await Supabase.instance.client
+          .from('residents')
+          .select('i_Name_Surname')
+          .eq('id', residentId)
+          .maybeSingle();
+
+      return {
+        'resident_id': residentId,
+        'resident_name': residentRow?['i_Name_Surname'] ?? 'ผู้รับบริการ',
+      };
+    } catch (e) {
+      debugPrint('NotificationNavigator: fetchResidentFromQueue error: $e');
       return null;
     }
   }

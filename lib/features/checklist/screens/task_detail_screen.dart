@@ -15,7 +15,6 @@ import '../../../core/widgets/irene_app_bar.dart';
 import '../../../core/widgets/network_image.dart';
 import '../../medicine/models/medicine_summary.dart';
 import '../../medicine/screens/photo_preview_screen.dart';
-import '../../medicine/services/camera_service.dart';
 import '../../medicine/services/medicine_service.dart';
 import '../../medicine/widgets/medicine_photo_item.dart';
 import '../models/task_log.dart';
@@ -32,6 +31,7 @@ import '../../../core/widgets/webview_screen.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../../../core/widgets/shimmer_loading.dart';
 import 'split_screen_camera_screen.dart';
+import 'square_camera_screen.dart';
 import '../../points/services/points_service.dart';
 import '../providers/batch_task_provider.dart';
 import '../widgets/co_worker_picker.dart';
@@ -1479,16 +1479,20 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           style: AppTypography.subtitle.copyWith(fontWeight: FontWeight.w600),
         ),
         AppSpacing.verticalGapSm,
-        // รูปตัวอย่าง - ใช้ Center ครอบให้ frame รัดรูปพอดี + อยู่กลาง
+        // รูปตัวอย่าง - บังคับ 1:1 เพื่อความสม่ำเสมอของ layout
         Center(
           child: GestureDetector(
             onTap: () => _showExpandedImage(_task.sampleImageUrl!),
-            child: IreneNetworkImage(
-              imageUrl: _task.sampleImageUrl!,
-              height: 300,
-              fit: BoxFit.contain,
-              memCacheWidth: 800,
-              borderRadius: BorderRadius.circular(12),
+            child: AspectRatio(
+              aspectRatio: 1, // 1:1 สี่เหลี่ยมจัตุรัส
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: IreneNetworkImage(
+                  imageUrl: _task.sampleImageUrl!,
+                  fit: BoxFit.cover, // cover เพื่อเติมเต็มพื้นที่ 1:1
+                  memCacheWidth: 800,
+                ),
+              ),
             ),
           ),
         ),
@@ -1680,12 +1684,15 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     // 3. task complete แล้ว (มี confirmImage จาก DB)
     // 4. task มี taskRepeatId
     final systemRole = ref.watch(currentUserSystemRoleProvider).valueOrNull;
+    // เพิ่มเงื่อนไข: ซ่อนปุ่มถ้า confirm image ตรงกับ sample image แล้ว
+    // (หมายความว่าเคยกดแทนที่แล้ว — ปุ่มจะหายไปทันทีหลัง optimistic update)
     final canReplaceSample = !_isJudYa &&
         systemRole != null &&
         systemRole.canQC &&
         _task.isDone &&
         _task.confirmImage != null &&
-        _task.taskRepeatId != null;
+        _task.taskRepeatId != null &&
+        _task.confirmImage != _task.sampleImageUrl;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1711,16 +1718,20 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           ],
         ),
         AppSpacing.verticalGapSm,
-        // รูปยืนยัน - ใช้ Center ครอบให้ frame รัดรูปพอดี + อยู่กลาง
+        // รูปยืนยัน - บังคับ 1:1 ให้ตรงกับรูปตัวอย่าง
         Center(
           child: GestureDetector(
             onTap: () => _showExpandedImage(imageUrl),
-            child: IreneNetworkImage(
-              imageUrl: imageUrl,
-              height: 300,
-              fit: BoxFit.contain,
-              memCacheWidth: 800,
-              borderRadius: BorderRadius.circular(12),
+            child: AspectRatio(
+              aspectRatio: 1, // 1:1 สี่เหลี่ยมจัตุรัส
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: IreneNetworkImage(
+                  imageUrl: imageUrl,
+                  fit: BoxFit.cover, // cover เพื่อเติมเต็มพื้นที่ 1:1
+                  memCacheWidth: 800,
+                ),
+              ),
             ),
           ),
         ),
@@ -1892,16 +1903,20 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           ),
         ),
         AppSpacing.verticalGapSm,
-        // ถ้ามี 1 รูป แสดงเต็มความกว้าง - ใช้ IreneNetworkImage ที่มี timeout และ retry
+        // ถ้ามี 1 รูป แสดง 1:1 เต็มความกว้าง
         if (images.length == 1)
           GestureDetector(
             onTap: () => _showExpandedImage(images.first),
-            child: IreneNetworkImage(
-              imageUrl: images.first,
-              height: 200,
-              fit: BoxFit.contain,
-              memCacheWidth: 800,
-              borderRadius: BorderRadius.circular(12),
+            child: AspectRatio(
+              aspectRatio: 1, // 1:1 สี่เหลี่ยมจัตุรัส
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: IreneNetworkImage(
+                  imageUrl: images.first,
+                  fit: BoxFit.cover, // cover เพื่อเติมเต็ม 1:1
+                  memCacheWidth: 800,
+                ),
+              ),
             ),
           )
         // ถ้ามีหลายรูป แสดงเป็น grid - ใช้ IreneNetworkImage ที่มี timeout และ retry
@@ -2848,9 +2863,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         sampleImageUrl: _task.sampleImageUrl!,
       );
     } else {
-      // ใช้กล้อง native ปกติ (image_picker)
-      final cameraService = CameraService.instance;
-      file = await cameraService.takePhoto();
+      // ใช้กล้อง 1:1 ของเรา — user เห็น preview เป็น 1:1 ตั้งแต่ตอนถ่าย
+      file = await SquareCameraScreen.show(context: context);
     }
 
     // คืนค่า cache limits ทันทีหลังกล้องปิด (ต้องคืนก่อน early return)

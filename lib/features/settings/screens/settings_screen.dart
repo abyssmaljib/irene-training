@@ -80,31 +80,40 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _loadData() async {
-    // โหลด version แยกต่างหาก (ไม่ต้องรอ)
-    _loadAppVersion();
-
-    await Future.wait([
-      _loadUserProfile(),
-      _loadUserRole(),
-      _loadSystemRole(),
-      _loadAllUsers(),
+    // โหลดทุกอย่างพร้อมกัน แล้ว setState ครั้งเดียว
+    // เพื่อลด rebuild จาก 8-10 ครั้งเหลือ 1 ครั้ง
+    final results = await Future.wait([
+      _loadUserProfileData(),
+      _loadUserRoleData(),
+      _loadSystemRoleData(),
+      _loadAllUsersData(),
+      _loadAppVersionData(),
     ]);
+
+    if (!mounted) return;
+
+    // setState ครั้งเดียวรวมทุก data
+    setState(() {
+      _userProfile = results[0] as UserProfile?;
+      _userRole = results[1] as UserRole?;
+      _systemRole = results[2] as SystemRole?;
+      _allUsers = results[3] as List<DevUserInfo>? ?? [];
+      _appVersion = results[4] as String? ?? '';
+      _isLoading = false;
+    });
 
     // โหลดสถานะ Clock-In หลังจากได้ user profile (ต้องใช้ nursinghomeId)
     _loadClockInVerification();
   }
 
-  /// โหลด version ของแอปจาก package_info_plus
-  Future<void> _loadAppVersion() async {
+  /// โหลด version ของแอปจาก package_info_plus (return data ไม่ setState)
+  Future<String?> _loadAppVersionData() async {
     try {
       final packageInfo = await PackageInfo.fromPlatform();
-      if (mounted) {
-        setState(() {
-          _appVersion = 'v${packageInfo.version}';
-        });
-      }
+      return 'v${packageInfo.version}';
     } catch (e) {
       debugPrint('Load app version error: $e');
+      return null;
     }
   }
 
@@ -136,61 +145,50 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
-  Future<void> _loadAllUsers() async {
+  /// โหลด all users (return data ไม่ setState)
+  Future<List<DevUserInfo>?> _loadAllUsersData() async {
     try {
-      final users = await UserService().getAllUsers();
-      if (mounted) {
-        setState(() {
-          _allUsers = users;
-        });
-      }
+      return await UserService().getAllUsers();
     } catch (e) {
       debugPrint('Load all users error: $e');
+      return null;
     }
   }
 
-  Future<void> _loadUserRole() async {
+  /// โหลด user role (return data ไม่ setState)
+  Future<UserRole?> _loadUserRoleData() async {
     try {
       final user = Supabase.instance.client.auth.currentUser;
       _userEmail = user?.email; // email ดึงจาก auth user จริงเท่านั้น (ไม่ใช้ impersonate)
-
-      final role = await UserService().getRole(forceRefresh: true);
-      if (mounted) {
-        setState(() {
-          _userRole = role;
-        });
-      }
+      return await UserService().getRole(forceRefresh: true);
     } catch (e) {
       debugPrint('Load user role error: $e');
+      return null;
     }
   }
 
-  Future<void> _loadSystemRole() async {
+  /// โหลด system role (return data ไม่ setState)
+  Future<SystemRole?> _loadSystemRoleData() async {
     try {
-      final userService = UserService();
-      // โหลดเฉพาะ system role ของ user ปัจจุบัน (ใช้แสดงในโปรไฟล์)
-      final role = await userService.getSystemRole(forceRefresh: true);
-
-      if (mounted) {
-        setState(() {
-          _systemRole = role;
-        });
-      }
+      return await UserService().getSystemRole(forceRefresh: true);
     } catch (e) {
       debugPrint('Load system role error: $e');
+      return null;
     }
   }
 
-  Future<void> _loadUserProfile() async {
+  /// โหลด user profile (return data ไม่ setState)
+  Future<UserProfile?> _loadUserProfileData() async {
     try {
-      // Use effectiveUserId to support dev mode impersonation
       final userId = UserService().effectiveUserId;
       if (userId == null) {
-        setState(() {
-          _error = 'กรุณาเข้าสู่ระบบก่อน';
-          _isLoading = false;
-        });
-        return;
+        if (mounted) {
+          setState(() {
+            _error = 'กรุณาเข้าสู่ระบบก่อน';
+            _isLoading = false;
+          });
+        }
+        return null;
       }
 
       // เพิ่ม employment_type เพื่อแสดงสถานะการทำงานใน profile
@@ -200,16 +198,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           .eq('id', userId)
           .maybeSingle();
 
-      if (mounted) {
-        setState(() {
-          if (response != null) {
-            _userProfile = UserProfile.fromJson(response);
-          } else {
-            // Fallback with just user id
-            _userProfile = UserProfile(id: userId);
-          }
-          _isLoading = false;
-        });
+      if (response != null) {
+        return UserProfile.fromJson(response);
+      } else {
+        return UserProfile(id: userId);
       }
     } catch (e) {
       if (mounted) {
@@ -218,6 +210,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _isLoading = false;
         });
       }
+      return null;
     }
   }
 
@@ -250,13 +243,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     ref.invalidate(profileCompletionStatusProvider);
     ref.invalidate(pendingAbsenceCountProvider);
 
-    // โหลดข้อมูล profile, role, system role, all users ใหม่
-    await Future.wait([
-      _loadUserProfile(),
-      _loadUserRole(),
-      _loadSystemRole(),
-      _loadAllUsers(),
+    // โหลดข้อมูลทั้งหมดใหม่ + setState ครั้งเดียว
+    final results = await Future.wait([
+      _loadUserProfileData(),
+      _loadUserRoleData(),
+      _loadSystemRoleData(),
+      _loadAllUsersData(),
     ]);
+
+    if (!mounted) return;
+
+    setState(() {
+      _userProfile = results[0] as UserProfile?;
+      _userRole = results[1] as UserRole?;
+      _systemRole = results[2] as SystemRole?;
+      _allUsers = results[3] as List<DevUserInfo>? ?? [];
+    });
 
     // โหลดสถานะ Clock-In ใหม่
     _loadClockInVerification();
@@ -320,7 +322,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   _isLoading = true;
                   _error = null;
                 });
-                _loadUserProfile();
+                _loadData();
               },
               child: const Text('ลองใหม่'),
             ),
@@ -802,8 +804,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ===== Section 1: งานของฉัน =====
-        // เมนูที่ใช้บ่อยที่สุด - เกี่ยวกับการทำงานประจำวัน
+        // ===== Section 1: บัญชีของฉัน =====
+        // เมนูเกี่ยวกับ account และ profile — ไว้บนสุดเพราะใช้บ่อย
+        _buildSettingsSection(
+          title: 'บัญชีของฉัน',
+          children: [
+            _buildNotificationMenuItem(),
+            _buildProfileMenuItem(),
+          ],
+        ),
+
+        // ===== Section 2: งานของฉัน =====
+        // เมนูเกี่ยวกับการทำงานประจำวัน
         _buildSettingsSection(
           title: 'งานของฉัน',
           children: [
@@ -814,7 +826,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ],
         ),
 
-        // ===== Section 2: พัฒนาตัวเอง =====
+        // ===== Section 3: พัฒนาตัวเอง =====
         // เมนูเกี่ยวกับการเรียนรู้และ gamification
         _buildSettingsSection(
           title: 'พัฒนาตัวเอง',
@@ -831,16 +843,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             _buildPointsMenuItem(),
             _buildBadgesMenuItem(),
-          ],
-        ),
-
-        // ===== Section 3: บัญชีของฉัน =====
-        // เมนูเกี่ยวกับ account และ profile
-        _buildSettingsSection(
-          title: 'บัญชีของฉัน',
-          children: [
-            _buildProfileMenuItem(),
-            _buildNotificationMenuItem(),
           ],
         ),
 
@@ -1835,7 +1837,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     if (success) {
       // Reload role
-      await _loadUserRole();
+      final newRole = await _loadUserRoleData();
+      if (!mounted) return;
+      setState(() => _userRole = newRole);
       if (!mounted) return;
 
       AppToast.success(context, 'เปลี่ยน role เป็น: ${roleName ?? "พนักงาน"}');

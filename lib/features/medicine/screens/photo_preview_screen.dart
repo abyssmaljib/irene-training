@@ -260,19 +260,25 @@ class _PhotoPreviewScreenState extends State<PhotoPreviewScreen> {
           children: [
             // ถ้ามีรูปตัวอย่าง → แสดง split-screen (ตัวอย่างบน / รูปที่ถ่ายล่าง)
             if (widget.sampleImageUrl != null) ...[
-              // ===== ครึ่งบน: รูปตัวอย่าง =====
+              // ===== ครึ่งบน: รูปตัวอย่าง (1:1) =====
               Expanded(
                 flex: 1,
                 child: Stack(
                   children: [
-                    Positioned.fill(
-                      child: InteractiveViewer(
-                        minScale: 1.0,
-                        maxScale: 3.0,
-                        child: IreneNetworkImage(
-                          imageUrl: widget.sampleImageUrl!,
-                          fit: BoxFit.contain,
-                          memCacheWidth: 800,
+                    // แสดงรูปตัวอย่างเป็น 1:1 ตรงกลาง + zoom ได้
+                    Center(
+                      child: AspectRatio(
+                        aspectRatio: 1, // 1:1 สี่เหลี่ยมจัตุรัส
+                        child: ClipRect(
+                          child: InteractiveViewer(
+                            minScale: 1.0,
+                            maxScale: 3.0,
+                            child: IreneNetworkImage(
+                              imageUrl: widget.sampleImageUrl!,
+                              fit: BoxFit.cover, // cover เพื่อเติมเต็ม 1:1
+                              memCacheWidth: 800,
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -301,23 +307,35 @@ class _PhotoPreviewScreenState extends State<PhotoPreviewScreen> {
               ),
               // เส้นแบ่ง
               Container(height: 1, color: Colors.white24),
-              // ===== ครึ่งล่าง: รูปที่ถ่าย =====
+              // ===== ครึ่งล่าง: รูปที่ถ่าย (1:1) =====
               Expanded(
                 flex: 1,
                 child: Center(
+                  // Transform.rotate ต้องอยู่นอก ClipRect
+                  // เพื่อไม่ให้มุมรูปถูก clip เมื่อหมุน 90/270 องศา
                   child: Transform.rotate(
                     angle: _rotationAngle * 3.14159265358979 / 180,
-                    child: _buildImageWidget(),
+                    child: AspectRatio(
+                      aspectRatio: 1, // 1:1 สี่เหลี่ยมจัตุรัส
+                      child: ClipRect(
+                        child: _buildImageWidget(),
+                      ),
+                    ),
                   ),
                 ),
               ),
             ] else ...[
-              // ไม่มีรูปตัวอย่าง → แสดงแค่รูปที่ถ่ายเต็มจอ (แบบเดิม)
+              // ไม่มีรูปตัวอย่าง → แสดงรูปที่ถ่ายเป็น 1:1 ตรงกลาง
               Expanded(
                 child: Center(
                   child: Transform.rotate(
                     angle: _rotationAngle * 3.14159265358979 / 180,
-                    child: _buildImageWidget(),
+                    child: AspectRatio(
+                      aspectRatio: 1, // 1:1 สี่เหลี่ยมจัตุรัส
+                      child: ClipRect(
+                        child: _buildImageWidget(),
+                      ),
+                    ),
                   ),
                 ),
               ),
