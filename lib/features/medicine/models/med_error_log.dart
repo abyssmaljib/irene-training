@@ -3,6 +3,11 @@
 export 'med_log.dart' show NurseMarkStatus, NurseMarkStatusExtension;
 
 /// Model สำหรับ A_Med_error_log - บันทึกการตรวจสอบรูปยาโดยหัวหน้าเวร
+///
+/// **Deprecated:** ใช้ [MedLog] model แทน
+/// QC data ถูก merge เข้า A_Med_logs.qc_* columns แล้ว
+/// class นี้เก็บไว้เพื่อ backward compatibility
+@Deprecated('Use MedLog model instead. QC data is now in A_Med_logs.qc_* columns.')
 class MedErrorLog {
   final int id;
   final int? residentId;

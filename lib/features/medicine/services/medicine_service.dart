@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/services/user_service.dart';
 import '../models/medicine_summary.dart';
+import '../models/medicine_warning.dart';
 import '../models/med_log.dart';
 import '../models/meal_photo_group.dart';
 import '../models/med_db.dart';
@@ -35,10 +36,15 @@ class MedicineService {
     return DateTime.now().difference(_cacheTime!) < _cacheMaxAge;
   }
 
-  /// ล้าง cache (เรียกเมื่อมีการอัพเดตข้อมูลยา)
+  /// ล้าง cache ทั้งหมด (เรียกเมื่อมีการอัพเดตข้อมูลยา)
+  /// ล้างทั้ง medicines cache และ warnings cache
   void invalidateCache() {
     _cachedMedicines = null;
     _cacheTime = null;
+    // ล้าง warnings cache ด้วย เพราะ add/remove/toggle ยาอาจสร้าง/resolve warnings
+    _cachedWarnings = null;
+    _warningsCacheTime = null;
+    _cachedWarningsResidentId = null;
   }
 
   /// 7 มื้อที่ต้องตรวจสอบ
@@ -103,6 +109,113 @@ class MedicineService {
       forceRefresh: forceRefresh,
     );
     return allMedicines.where((m) => m.isActive).toList();
+  }
+
+  // ============================================
+  // Reconciliation Warnings — ดึงประเด็นยาของ resident
+  // ============================================
+
+  // Cache warnings แยก (per resident)
+  int? _cachedWarningsResidentId;
+  List<MedicineWarning>? _cachedWarnings;
+  DateTime? _warningsCacheTime;
+
+  /// ดึง reconciliation warnings ของ resident
+  /// ใช้แสดง badge เตือนบน MedicineCard (ยาซ้ำ, กลุ่มเดียวกัน, ยาอันตรายสูง)
+  /// แสดงทุก status (pending, acknowledged, resolved) เพื่อเตือนไว้เสมอ
+  Future<List<MedicineWarning>> getWarningsForResident(
+    int residentId, {
+    bool forceRefresh = false,
+  }) async {
+    // ใช้ cache ถ้ายังใช้ได้
+    if (!forceRefresh &&
+        _cachedWarningsResidentId == residentId &&
+        _cachedWarnings != null &&
+        _warningsCacheTime != null &&
+        DateTime.now().difference(_warningsCacheTime!) < _cacheMaxAge) {
+      return _cachedWarnings!;
+    }
+
+    try {
+      // Query med_reconciliation_warnings พร้อม join med_DB สำหรับชื่อยา
+      final response = await _supabase
+          .from('med_reconciliation_warnings')
+          .select('''
+            *,
+            trigger_med:med_DB!med_reconciliation_warnings_trigger_med_db_id_fkey (
+              brand_name, generic_name
+            ),
+            conflict_med:med_DB!med_reconciliation_warnings_conflicting_med_db_id_fkey (
+              brand_name, generic_name
+            )
+          ''')
+          .eq('resident_id', residentId)
+          .order('created_at', ascending: false);
+
+      final warnings = (response as List)
+          .map((json) => MedicineWarning.fromJson(json))
+          .toList();
+
+      // Update cache
+      _cachedWarningsResidentId = residentId;
+      _cachedWarnings = warnings;
+      _warningsCacheTime = DateTime.now();
+
+      return warnings;
+    } catch (e) {
+      debugPrint('[MedicineService] getWarningsForResident error: $e');
+      // Return cached data if available
+      if (_cachedWarningsResidentId == residentId && _cachedWarnings != null) {
+        return _cachedWarnings!;
+      }
+      return [];
+    }
+  }
+
+  /// สร้าง Map จาก medDbId ไปยัง List ของ MedicineWarning
+  /// สะดวกสำหรับ MedicineCard lookup ว่ายาตัวนี้มี warning อะไรบ้าง
+  Future<Map<int, List<MedicineWarning>>> getWarningsByMedDbId(
+    int residentId, {
+    bool forceRefresh = false,
+  }) async {
+    final warnings = await getWarningsForResident(residentId, forceRefresh: forceRefresh);
+    final map = <int, List<MedicineWarning>>{};
+
+    for (final w in warnings) {
+      // เก็บ warning ทั้ง trigger และ conflict side
+      // เพื่อให้ยาทั้ง 2 ฝั่งแสดง badge
+      for (final id in [w.triggerMedDbId, w.conflictingMedDbId]) {
+        if (id != null) {
+          map.putIfAbsent(id, () => []);
+          // ไม่ซ้ำ (เช็คจาก id)
+          if (!map[id]!.any((existing) => existing.id == w.id)) {
+            map[id]!.add(w);
+          }
+        }
+      }
+    }
+    return map;
+  }
+
+  /// เรียก RPC check_medicine_safety_preview — ตรวจสอบก่อนเพิ่มยา
+  /// ใช้ใน AddMedicineForm เพื่อแสดง warning ก่อน submit
+  Future<List<Map<String, dynamic>>> checkMedicineSafetyPreview(
+    int medDbId,
+    int residentId,
+  ) async {
+    try {
+      final response = await _supabase.rpc(
+        'check_medicine_safety_preview',
+        params: {'p_med_db_id': medDbId, 'p_resident_id': residentId},
+      );
+      if (response is List) {
+        return response.cast<Map<String, dynamic>>();
+      }
+      return [];
+    } catch (e) {
+      debugPrint('[MedicineService] checkMedicineSafetyPreview error: $e');
+      return [];
+    }
   }
 
   /// ดึง med logs ของวันที่กำหนด

@@ -11,6 +11,7 @@ import '../../../core/widgets/toggle_switch.dart';
 import '../../../core/services/user_service.dart';
 import '../../checklist/models/system_role.dart';
 import '../models/medicine_summary.dart';
+import '../models/medicine_warning.dart';
 import '../services/medicine_service.dart';
 import '../widgets/medicine_card.dart';
 import '../widgets/turn_off_medicine_sheet.dart';
@@ -68,6 +69,10 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
   // ต้องเป็นหัวหน้าเวรขึ้นไป (canQC) ถึงจะเห็นปุ่มเพิ่มยา
   SystemRole? _systemRole;
 
+  // Reconciliation warnings — Map จาก medDbId → warnings
+  // ใช้แสดง badge เตือนบน MedicineCard
+  Map<int, List<MedicineWarning>> _warningsByMedDbId = {};
+
   @override
   void initState() {
     super.initState();
@@ -89,12 +94,23 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
     super.dispose();
   }
 
-  Future<void> _loadMedicines() async {
+  Future<void> _loadMedicines({bool forceRefresh = false}) async {
     setState(() => _isLoading = true);
 
     try {
-      final medicines =
-          await _medicineService.getMedicinesByResident(widget.residentId);
+      // Fetch ยา + warnings พร้อมกัน (parallel)
+      // forceRefresh = true เมื่อเรียกหลัง add/edit/toggle ยา เพื่อให้ได้ข้อมูลล่าสุด
+      // ใช้ await แยก + catchError สำหรับ warnings เพื่อไม่ให้ warning fail ทำทั้งหน้าพัง
+      // (ยังไม่มี table med_reconciliation_warnings ใน production อาจ error ได้)
+      late final List<MedicineSummary> medicines;
+      late final Map<int, List<MedicineWarning>> warningsMap;
+      final results = await Future.wait([
+        _medicineService.getMedicinesByResident(widget.residentId, forceRefresh: forceRefresh),
+        _medicineService.getWarningsByMedDbId(widget.residentId, forceRefresh: forceRefresh)
+            .catchError((_) => <int, List<MedicineWarning>>{}),
+      ]);
+      medicines = results[0] as List<MedicineSummary>;
+      warningsMap = results[1] as Map<int, List<MedicineWarning>>;
 
       // Extract groups with active/total counts
       final groupStats = <String, Map<String, int>>{};
@@ -130,6 +146,7 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
       setState(() {
         _allMedicines = medicines;
         _availableGroups = groupList;
+        _warningsByMedDbId = warningsMap;
         _isLoading = false;
       });
 
@@ -215,10 +232,10 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
       ),
     );
 
-    // ถ้าเพิ่มยาสำเร็จ ให้ reload รายการยา
+    // ถ้าเพิ่มยาสำเร็จ ให้ reload รายการยา (forceRefresh เพื่อดึงข้อมูลล่าสุด + warnings ใหม่)
     // result จะเป็น int (medHistoryId) หรือ true (fallback)
     if (result != null) {
-      _loadMedicines();
+      _loadMedicines(forceRefresh: true);
     }
   }
 
@@ -242,9 +259,9 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
       );
     }
 
-    // ถ้าทำสำเร็จ → reload รายการยา
+    // ถ้าทำสำเร็จ → reload รายการยา (forceRefresh เพื่อดึง warnings ใหม่)
     if (result == true) {
-      _loadMedicines();
+      _loadMedicines(forceRefresh: true);
     }
   }
 
@@ -267,9 +284,9 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
       ),
     );
 
-    // ถ้าแก้ไขสำเร็จ ให้ reload รายการยา
+    // ถ้าแก้ไขสำเร็จ ให้ reload รายการยา (forceRefresh เพื่อดึง warnings ใหม่)
     if (result == true) {
-      _loadMedicines();
+      _loadMedicines(forceRefresh: true);
     }
   }
 
@@ -462,7 +479,7 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
           // Medicine list
           Expanded(
             child: RefreshIndicator(
-              onRefresh: _loadMedicines,
+              onRefresh: () => _loadMedicines(forceRefresh: true),
               color: AppColors.primary,
               child: _buildMedicineList(),
             ),
@@ -601,6 +618,10 @@ class _MedicineListScreenState extends State<MedicineListScreen> {
                   padding: EdgeInsets.only(bottom: AppSpacing.sm),
                   child: MedicineCard(
                     medicine: med,
+                    // ดึง warnings ของยาตัวนี้จาก map (ถ้ามี)
+                    warnings: med.medDbId != null
+                        ? _warningsByMedDbId[med.medDbId] ?? const []
+                        : const [],
                     onTap: () => _navigateToEditMedicine(med),
                     onLongPress: (_systemRole?.canQC ?? false)
                         ? () => _showToggleSheet(med)

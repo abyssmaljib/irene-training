@@ -5,6 +5,13 @@ import '../models/med_error_log.dart';
 import '../models/meal_photo_group.dart';
 
 /// Service สำหรับจัดการ A_Med_Error_Log (การตรวจสอบรูปยาโดยหัวหน้าเวร)
+///
+/// **Deprecated:** ใช้ [MedicineService.saveQCMark] แทน
+/// QC data ถูก merge เข้า A_Med_logs.qc_* columns แล้ว
+/// class นี้เก็บไว้เพื่อ backward compatibility กับ Flutter versions เก่า
+/// sync triggers จะ forward ข้อมูลจาก A_Med_Error_Log → A_Med_logs อัตโนมัติ
+@Deprecated('Use MedicineService.saveQCMark() instead. '
+    'QC data is now stored in A_Med_logs.qc_* columns directly.')
 class MedErrorLogService {
   final _supabase = Supabase.instance.client;
 

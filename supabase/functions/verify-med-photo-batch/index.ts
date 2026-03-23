@@ -12,14 +12,13 @@
 //
 // เหตุผลที่ใช้ batch แทน trigger-per-row:
 //   - ลดจำนวน cold starts (เดิม trigger ทุก row → boot 546 ครั้ง → error)
-//   - pg_cron เรียกทุก 2 นาที → batch ละ 5 items → ประหยัด resources
+//   - pg_cron เรียกทุก 2 นาที → batch ละ 2 items (~40 วินาที รวม < 120s limit)
 //   - FOR UPDATE SKIP LOCKED ป้องกัน race condition ถ้ามี worker หลายตัว
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
-import { GoogleGenerativeAI } from 'npm:@google/generative-ai'
 
 // ============================================
-// Supabase + Gemini clients
+// Supabase client + Gemini API key
 // ============================================
 // สร้าง client ด้วย service role key เพราะ edge function ไม่มี user session
 const supabase = createClient(
@@ -27,8 +26,9 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 )
 
-// Gemini AI client สำหรับ Vision API
-const genAI = new GoogleGenerativeAI(Deno.env.get('GEMINI_API_KEY')!)
+// Gemini API — ใช้ fetch API โดยตรง (ไม่ import @google/generative-ai)
+// เพราะ npm package ใหญ่เกินทำให้ boot timeout (HTTP 546) บน Supabase free plan
+const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')!
 
 // ============================================
 // Types
@@ -366,6 +366,7 @@ async function claimQueueItems(
 }
 
 // อัพเดท queue item เป็น 'done' พร้อมเวลาที่เสร็จ
+// throw error ถ้า update ไม่สำเร็จ — เพื่อไม่ให้ item ค้างใน 'processing' ตลอดไป
 async function markDone(
   // deno-lint-ignore no-explicit-any
   client: any,
@@ -377,11 +378,16 @@ async function markDone(
     .eq('id', queueId)
 
   if (error) {
+    // throw เพื่อให้ caller (main loop) จับ error ได้
+    // ถ้า markDone fail → item จะค้างใน 'processing' → claim_verification_queue
+    // จะปล่อยให้ item กลับมา retry ได้เมื่อ lock timeout หมดอายุ
     console.error(`[batch] Failed to mark item ${queueId} as done:`, error.message)
+    throw new Error(`markDone failed for queue ${queueId}: ${error.message}`)
   }
 }
 
 // อัพเดท queue item เป็น 'error' พร้อม error message
+// throw error ถ้า update ไม่สำเร็จ — เพื่อให้ caller รู้ว่า status ไม่ได้ถูกอัพเดท
 async function markError(
   // deno-lint-ignore no-explicit-any
   client: any,
@@ -398,7 +404,9 @@ async function markError(
     .eq('id', queueId)
 
   if (error) {
+    // throw เพื่อไม่ให้ error ถูกกลืน — caller จะจับใน catch block ได้
     console.error(`[batch] Failed to mark item ${queueId} as error:`, error.message)
+    throw new Error(`markError failed for queue ${queueId}: ${error.message}`)
   }
 }
 
@@ -411,8 +419,6 @@ async function markError(
 async function processOneItem(
   // deno-lint-ignore no-explicit-any
   client: any,
-  // deno-lint-ignore no-explicit-any
-  ai: any,
   item: QueueItem,
 ): Promise<void> {
   const startTime = Date.now()
@@ -527,13 +533,9 @@ async function processOneItem(
   if (referenceUrls.length === 0) {
     console.log(`[batch] Item ${item.id}: No reference images, skipping verification`)
 
-    // กัน duplicate: ลบ record เก่าถ้ามี (กรณี retry)
-    await client.from('A_Med_AI_Verification')
-      .delete()
-      .eq('med_log_id', med_log_id)
-      .eq('photo_type', photo_type)
-
-    const { error: skipInsertError } = await client.from('A_Med_AI_Verification').insert({
+    // Upsert: อัพเดท pending record → skipped (trigger สร้าง pending record ไว้แล้ว)
+    // ใช้ ON CONFLICT (med_log_id, photo_type) unique constraint
+    const { error: skipInsertError } = await client.from('A_Med_AI_Verification').upsert({
       med_log_id,
       photo_type,
       resident_id,
@@ -545,9 +547,8 @@ async function processOneItem(
       ai_model: null,
       processing_time_ms: Date.now() - startTime,
       error_message: 'ไม่มีรูปอ้างอิง (reference image) ในฐานข้อมูล',
-    })
+    }, { onConflict: 'med_log_id,photo_type' })
 
-    // ถ้า insert skipped record ไม่สำเร็จ → throw เพื่อให้ markError จับ
     if (skipInsertError) {
       throw new Error(`Failed to save skipped record: ${skipInsertError.message}`)
     }
@@ -586,18 +587,12 @@ async function processOneItem(
   // Step 5: ส่ง Gemini Vision เปรียบเทียบรูป
   // ============================================
   // ใช้ gemini-2.5-flash — เร็วและถูกกว่า pro แต่ accuracy ดีพอสำหรับ verification
-  const model = ai.getGenerativeModel({
-    model: 'gemini-2.5-flash',
-    generationConfig: {
-      responseMimeType: 'application/json', // บังคับให้ตอบเป็น JSON
-      temperature: 0.2, // ต่ำเพื่อผลที่เสถียร (ไม่ creative เกินไป)
-    },
-  })
+  // เรียก Gemini API ด้วย fetch โดยตรง (ไม่ใช้ npm SDK เพราะทำให้ boot timeout)
 
   // สร้าง prompt จาก medicines ที่กรองแล้ว
   const prompt = buildPrompt(filteredMeds, photo_type)
 
-  // สร้าง content parts: prompt + reference images (พร้อม label) + staff photo
+  // สร้าง content parts สำหรับ Gemini API: prompt + reference images + staff photo
   // deno-lint-ignore no-explicit-any
   const parts: any[] = [
     { text: prompt },
@@ -628,9 +623,33 @@ async function processOneItem(
 
   console.log(`[batch] Item ${item.id}: Sending to Gemini (${validRefPairs.length} refs + 1 staff)...`)
 
-  // เรียก Gemini Vision API
-  const result = await model.generateContent(parts)
-  const responseText = result.response.text()
+  // เรียก Gemini Vision API ด้วย fetch โดยตรง (ลด boot time จาก npm import)
+  const geminiRes = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts }],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          temperature: 0.2,
+        },
+      }),
+    },
+  )
+
+  if (!geminiRes.ok) {
+    const errText = await geminiRes.text()
+    throw new Error(`Gemini API error ${geminiRes.status}: ${errText.substring(0, 300)}`)
+  }
+
+  const geminiJson = await geminiRes.json()
+  const responseText = geminiJson?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || ''
+
+  if (!responseText) {
+    throw new Error('Gemini returned empty response')
+  }
 
   console.log(`[batch] Item ${item.id}: Gemini response: ${responseText.substring(0, 200)}...`)
 
@@ -670,15 +689,9 @@ async function processOneItem(
   // ============================================
   // Step 7: บันทึกผลลง A_Med_AI_Verification
   // ============================================
-  // กัน duplicate: ถ้า retry แล้วรอบก่อนเคย insert สำเร็จ → ลบของเก่าก่อน
-  // กรณี: item ถูก claim → insert สำเร็จ → crash ก่อน markDone → stale reset → retry → insert ซ้ำ
-  await client.from('A_Med_AI_Verification')
-    .delete()
-    .eq('med_log_id', med_log_id)
-    .eq('photo_type', photo_type)
-
-  // Schema เหมือน verify-med-photo เป๊ะ
-  const { error: insertError } = await client.from('A_Med_AI_Verification').insert({
+  // Upsert: อัพเดท pending record → pass/flag (trigger สร้าง pending record ไว้แล้ว)
+  // ใช้ ON CONFLICT (med_log_id, photo_type) unique constraint
+  const { error: insertError } = await client.from('A_Med_AI_Verification').upsert({
     med_log_id,
     photo_type,
     resident_id,
@@ -700,7 +713,7 @@ async function processOneItem(
     staff_image_url: photo_url,
     ai_model: 'gemini-2.5-flash',
     processing_time_ms: processingTime,
-  })
+  }, { onConflict: 'med_log_id,photo_type' })
 
   if (insertError) {
     throw new Error(`Failed to save result: ${insertError.message}`)
@@ -735,7 +748,9 @@ Deno.serve(async (req) => {
     // ============================================
     // claim_verification_queue RPC ใช้ FOR UPDATE SKIP LOCKED
     // → ถ้ามี worker อื่นกำลัง process items อยู่ จะข้ามไป (ไม่ซ้ำกัน)
-    const { data: items, error: claimError } = await claimQueueItems(supabase, 5)
+    // batch_limit = 2 — แต่ละ item ใช้เวลา ~20 วินาที (download + Gemini)
+    // 2 items = ~40 วินาที ซึ่ง Supabase edge function limit คือ 120 วินาที
+    const { data: items, error: claimError } = await claimQueueItems(supabase, 2)
 
     if (claimError) {
       throw claimError
@@ -759,7 +774,7 @@ Deno.serve(async (req) => {
     for (const item of items) {
       try {
         // Process: ดึงยา → กรอง → ดาวน์โหลดรูป → Gemini → บันทึก
-        await processOneItem(supabase, genAI, item)
+        await processOneItem(supabase, item)
 
         // สำเร็จ → อัพเดท queue status เป็น 'done'
         await markDone(supabase, item.id)
@@ -770,7 +785,14 @@ Deno.serve(async (req) => {
 
         // ล้มเหลว → อัพเดท queue status เป็น 'error' พร้อม error message
         // pg_cron จะ retry items ที่ error (ถ้า retry_count < 3)
-        await markError(supabase, item.id, errorMessage)
+        // ถ้า markError เองก็ fail → catch ด้านนอกจะจับ (item ค้าง processing → lock timeout จะปล่อย)
+        try {
+          await markError(supabase, item.id, errorMessage)
+        } catch (markErr: unknown) {
+          // markError fail — log แต่ไม่ throw ซ้ำ เพื่อให้ items ถัดไปยัง process ต่อได้
+          console.error(`[batch] CRITICAL: markError also failed for item ${item.id}:`,
+            markErr instanceof Error ? markErr.message : String(markErr))
+        }
         errors++
       }
       processed++

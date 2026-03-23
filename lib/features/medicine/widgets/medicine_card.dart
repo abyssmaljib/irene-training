@@ -4,6 +4,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../models/medicine_summary.dart';
+import '../models/medicine_warning.dart';
+import 'medicine_warning_badge.dart';
 
 /// Medicine Card - แสดงข้อมูลยาแต่ละตัว
 class MedicineCard extends StatelessWidget {
@@ -14,20 +16,38 @@ class MedicineCard extends StatelessWidget {
   /// ส่งมาเฉพาะ user ที่มีสิทธิ์ (canQC)
   final VoidCallback? onLongPress;
 
+  /// Reconciliation warnings ของยาตัวนี้ (ถ้ามี)
+  /// ใช้แสดง badge เตือน + highlight border
+  final List<MedicineWarning> warnings;
+
   const MedicineCard({
     super.key,
     required this.medicine,
     this.onTap,
     this.onLongPress,
+    this.warnings = const [],
   });
 
   @override
   Widget build(BuildContext context) {
+    // ตรวจว่ายาตัวนี้มี warning หรือไม่ → ถ้ามี highlight border
+    final hasWarning = warnings.isNotEmpty;
+    final isCritical = warnings.any((w) => w.severity == 'critical');
+
     return Container(
       decoration: BoxDecoration(
         color: AppColors.secondaryBackground,
         borderRadius: AppRadius.smallRadius,
         boxShadow: AppShadows.cardShadow,
+        // Highlight border เมื่อมี warning
+        border: hasWarning
+            ? Border.all(
+                color: isCritical
+                    ? AppColors.error.withValues(alpha: 0.4)
+                    : AppColors.warning.withValues(alpha: 0.4),
+                width: 1.5,
+              )
+            : null,
       ),
       child: Material(
         color: Colors.transparent,
@@ -48,11 +68,22 @@ class MedicineCard extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            medicine.displayName,
-                            style: AppTypography.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
+                          // ชื่อยา + warning badge (ถ้ามี)
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  medicine.displayName,
+                                  style: AppTypography.title,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (hasWarning) ...[
+                                const SizedBox(width: 4),
+                                MedicineWarningBadge(warnings: warnings),
+                              ],
+                            ],
                           ),
                           if (medicine.brandName != null &&
                               medicine.brandName != medicine.genericName) ...[

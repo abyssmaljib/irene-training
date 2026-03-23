@@ -192,7 +192,7 @@ class Badge {
       case 'shift_most_completed':
         return 'ทำงานเสร็จมากที่สุดในเวร';
       case 'shift_most_problems':
-        return 'พบปัญหามากที่สุดในเวร';
+        return 'ติ๊กติดปัญหามากที่สุดในเวร';
       case 'shift_most_kindness':
         return 'ช่วยดูแลผู้รับบริการคนอื่นมากที่สุด';
       case 'shift_best_timing':

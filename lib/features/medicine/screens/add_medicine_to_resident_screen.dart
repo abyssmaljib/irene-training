@@ -181,6 +181,148 @@ class _AddMedicineToResidentScreenState
     }
   }
 
+  /// เช็คว่าวันที่เป็นวันนี้หรือไม่
+  /// ใช้ตรวจสอบ onDate ก่อนแสดง popup เตือนเสิร์ฟยา
+  /// ต้อง .toLocal() ก่อนดึง .day เพราะ DateTime จาก Supabase อาจเป็น UTC
+  /// (ซ้ำรอยบั๊ก shouldTakeOnDate — ดู medicine_timezone_fix.md)
+  bool _isToday(DateTime date) {
+    final localDate = date.toLocal();
+    final now = DateTime.now();
+    return localDate.year == now.year && localDate.month == now.month && localDate.day == now.day;
+  }
+
+  /// แสดง popup เตือนหัวหน้าเวรว่าต้องเสิร์ฟยาด้วยตัวเอง
+  /// ไม่ระบุมื้อเฉพาะเจาะจง เพราะ resident บางคนมี program feed เวลาต่างกัน
+  Future<void> _showMedicineServingWarning({
+    required String medName,
+  }) async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false, // ห้ามปิดโดยกด backdrop — ต้องกด "รับทราบ"
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: AppRadius.largeRadius,
+        ),
+        backgroundColor: AppColors.surface,
+        contentPadding: EdgeInsets.zero,
+        content: Container(
+          constraints: const BoxConstraints(maxWidth: 320),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(height: AppSpacing.lg),
+
+              // Warning icon (amber) — ใช้ pattern เดียวกับ ConfirmDialog
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.tagPendingBg,
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: HugeIcon(
+                    icon: HugeIcons.strokeRoundedAlert02,
+                    color: const Color(0xFFF59E0B), // amber
+                    size: AppIconSize.lg,
+                  ),
+                ),
+              ),
+
+              SizedBox(height: AppSpacing.sm),
+
+              // Title
+              Text(
+                'แจ้งเตือนการเสิร์ฟยา',
+                style: AppTypography.title.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+                textAlign: TextAlign.center,
+              ),
+
+              SizedBox(height: AppSpacing.xs),
+
+              // Cat image
+              Image.asset(
+                'assets/images/confirm_cat.webp',
+                width: 100,
+                height: 100,
+                fit: BoxFit.contain,
+              ),
+
+              SizedBox(height: AppSpacing.xs),
+
+              // ชื่อยาที่เพิ่ม
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                child: Text(
+                  medName,
+                  style: AppTypography.body.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+
+              SizedBox(height: AppSpacing.xs),
+
+              // ข้อความเตือน
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                child: Text(
+                  'หัวหน้าเวรต้องเสิร์ฟยาด้วยตัวเอง',
+                  style: AppTypography.body.copyWith(
+                    color: const Color(0xFFB45309), // amber-700
+                    fontWeight: FontWeight.w500,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+
+              SizedBox(height: AppSpacing.sm),
+
+              // คำอธิบาย — ไม่ระบุมื้อเฉพาะ เพราะ program feed อาจต่างกัน
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                child: Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.all(AppSpacing.sm),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFFBEB), // amber-50
+                    borderRadius: AppRadius.mediumRadius,
+                  ),
+                  child: Text(
+                    'เนื่องจากมีการเปลี่ยนแปลงยา\nหัวหน้าเวรต้องเสิร์ฟยาเองตั้งแต่มื้อถัดไปจนหมดวัน',
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.secondaryText,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+
+              SizedBox(height: AppSpacing.md),
+
+              // ปุ่ม "รับทราบ" — ปุ่มเดียว ไม่มี cancel
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  AppSpacing.lg, 0, AppSpacing.lg, AppSpacing.lg,
+                ),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: PrimaryButton(
+                    text: 'รับทราบ',
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   /// บันทึก
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
@@ -195,7 +337,25 @@ class _AddMedicineToResidentScreenState
     final success = await notifier.submit();
 
     if (success && mounted) {
+      // อ่าน state ก่อน SuccessPopup เพื่อป้องกัน provider reset ระหว่าง await
+      // เงื่อนไข: ไม่ใช่ PRN + มีมื้อยา + เริ่มยาวันนี้
+      // (ไม่ระบุมื้อเฉพาะเจาะจง เพราะ resident บางคนมี program feed เวลาต่างกัน)
+      final formState = ref.read(addMedicineFormProvider(widget.residentId)).value;
+      final shouldShowWarning = formState != null &&
+          !formState.prn &&
+          formState.bldb.isNotEmpty &&
+          _isToday(formState.onDate);
+      final medName = formState?.selectedMedicine?.genericName
+          ?? formState?.selectedMedicine?.brandName
+          ?? 'ยาที่เพิ่ม';
+
       await SuccessPopup.show(context, emoji: '💊', message: 'เพิ่มยาให้คนไข้สำเร็จ');
+
+      // แสดง warning เสิร์ฟยาหลัง SuccessPopup ปิดแล้ว (ไม่ซ้อน dialog)
+      if (shouldShowWarning && mounted) {
+        await _showMedicineServingWarning(medName: medName);
+      }
+
       final medHistoryId = notifier.lastMedHistoryId;
 
       // Reset form ก่อน pop เพื่อให้กลับมาหน้านี้ใหม่ได้สะอาด

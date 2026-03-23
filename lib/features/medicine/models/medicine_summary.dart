@@ -35,6 +35,10 @@ class MedicineSummary {
   final String? atcLevel2Code;
   final String? atcLevel2NameTh;
 
+  // ยาอันตรายสูง (High Alert Drug) — ดึงจาก med_DB.is_high_alert
+  // ถ้า true = ยาที่ต้องระวังเป็นพิเศษ (เช่น warfarin, insulin, opioids)
+  final bool isHighAlert;
+
   // รูปยา (จาก med_DB)
   final String? frontFoiled; // รูปแผง ด้านหน้า → ใช้ตอน 2C
   final String? backFoiled; // รูปแผง ด้านหลัง
@@ -71,6 +75,7 @@ class MedicineSummary {
     this.lastMedHistoryReconcile,
     this.lastMedHistoryNote,
     this.lastMedHistoryNewSetting,
+    this.isHighAlert = false,
     this.frontFoiled,
     this.backFoiled,
     this.frontNude,
@@ -108,6 +113,7 @@ class MedicineSummary {
       atcLevel1NameTh: json['atc_level1_name_th'],
       atcLevel2Code: json['atc_level2_code'],
       atcLevel2NameTh: json['atc_level2_name_th'],
+      isHighAlert: json['is_high_alert'] == true,
       frontFoiled: json['Front-Foiled'] ?? json['front_foiled'] ?? json['frontFoiled'],
       backFoiled: json['Back-Foiled'] ?? json['back_foiled'] ?? json['backFoiled'],
       frontNude: json['Front-Nude'] ?? json['front_nude'] ?? json['frontNude'],
