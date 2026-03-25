@@ -577,8 +577,8 @@ Uint8List _cropToSquare(Uint8List bytes) {
 
   // ถ้าเป็น 1:1 อยู่แล้ว (ต่างไม่เกิน 5%) → แค่ resize ถ้าจำเป็น
   if ((origW - origH).abs() / origW.toDouble() < 0.05) {
-    final resized = origW > 1920
-        ? img.copyResize(original, width: 1920)
+    final resized = origW > 1280
+        ? img.copyResize(original, width: 1280)
         : original;
     return Uint8List.fromList(img.encodeJpg(resized, quality: 85));
   }
@@ -589,9 +589,9 @@ Uint8List _cropToSquare(Uint8List bytes) {
   final y = ((origH - side) / 2).round();
   var cropped = img.copyCrop(original, x: x, y: y, width: side, height: side);
 
-  // Resize ถ้าใหญ่เกินไป (จำกัด 1920px เพื่อประหยัด memory + storage)
-  if (cropped.width > 1920) {
-    cropped = img.copyResize(cropped, width: 1920);
+  // Resize ถ้าใหญ่เกินไป (จำกัด 1280px เพื่อประหยัด memory + storage)
+  if (cropped.width > 1280) {
+    cropped = img.copyResize(cropped, width: 1280);
   }
 
   return Uint8List.fromList(img.encodeJpg(cropped, quality: 85));

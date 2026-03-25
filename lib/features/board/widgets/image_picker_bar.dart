@@ -106,8 +106,8 @@ class ImagePickerHelper {
       final XFile? image = await _picker.pickImage(
         source: ImageSource.camera,
         imageQuality: 80,
-        maxWidth: 1920,
-        maxHeight: 1920,
+        maxWidth: 1280,
+        maxHeight: 1280,
       );
       if (image != null) {
         return File(image.path);
@@ -123,8 +123,8 @@ class ImagePickerHelper {
     try {
       final List<XFile> images = await _picker.pickMultiImage(
         imageQuality: 80,
-        maxWidth: 1920,
-        maxHeight: 1920,
+        maxWidth: 1280,
+        maxHeight: 1280,
       );
 
       // Limit number of images
@@ -142,8 +142,8 @@ class ImagePickerHelper {
       final XFile? image = await _picker.pickImage(
         source: ImageSource.gallery,
         imageQuality: 80,
-        maxWidth: 1920,
-        maxHeight: 1920,
+        maxWidth: 1280,
+        maxHeight: 1280,
       );
       if (image != null) {
         return File(image.path);

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:onesignal_flutter/onesignal_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../main.dart';
 import '../../features/notifications/models/app_notification.dart';
 import '../../features/notifications/screens/notification_center_screen.dart';
@@ -103,6 +104,10 @@ class OneSignalService {
         debugPrint('OneSignal: No notification ID, opening notification center');
         await _navigateToNotificationCenter();
       }
+    } else if (uri.scheme == 'https' || uri.scheme == 'http') {
+      // External URL (เช่น App Store / Play Store link) → เปิดใน browser ภายนอก
+      debugPrint('OneSignal: Opening external URL: $actionUrl');
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     } else {
       debugPrint('OneSignal: Unknown action_url scheme/host: ${uri.scheme}://${uri.host}');
     }

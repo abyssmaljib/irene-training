@@ -118,10 +118,12 @@ class _EditMedicineDBScreenState extends ConsumerState<EditMedicineDBScreen> {
     if (source == null) return;
 
     try {
+      // ใช้ 1600px q85 สำหรับรูปตัวอย่างยา — ต้องชัดพอซูมดูชื่อยา/ลักษณะเม็ดยา
+      // ให้ตรงกับ Next.js admin ที่ใช้ resizeImageForUpload(1600, 0.85)
       final pickedFile = await _imagePicker.pickImage(
         source: source,
-        maxWidth: 1024,
-        maxHeight: 1024,
+        maxWidth: 1600,
+        maxHeight: 1600,
         imageQuality: 85,
       );
 

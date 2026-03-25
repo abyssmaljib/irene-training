@@ -208,13 +208,13 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
       }
 
       // Preload แบบ background (ไม่ block UI)
-      // ใช้ Supabase Image Transformation เพื่อโหลดรูปขนาดเล็ก (200px)
-      // ลดจาก ~1.5MB → ~50KB ช่วยแก้ปัญหา crash บน iOS
+      // ใช้ static thumbnail (_thumb file) สำหรับทุก bucket
+      // ทั้งรูปตัวอย่างยา (nursingcare) และรูปจัดยา 2C/3C (med-photos)
+      // ลดค่าใช้จ่าย Supabase Image Transform $125/เดือน → $0
       for (final url in urls.toSet()) {
         if (!mounted) return;
         try {
-          // Transform URL ให้โหลดรูปขนาดเล็กจาก server
-          final thumbnailUrl = ImageService.getThumbnailUrl(url);
+          final thumbnailUrl = ImageService.getStaticThumbnailUrl(url);
           await precacheImage(
             CachedNetworkImageProvider(thumbnailUrl, maxWidth: 200),
             context,

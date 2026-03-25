@@ -267,16 +267,17 @@ class MedicinePhotoItem extends StatelessWidget {
               ),
 
               // ใช้ IreneNetworkImage แทน Image.network เพื่อได้ timeout + retry mechanism
-              // useServerResize: false เพราะ ImageService.getLargeUrl resize จาก server แล้ว
+              // ใช้ URL ต้นฉบับโดยตรง (ไม่ผ่าน server transform)
+              // เพราะรูปตัวอย่างยาต้นฉบับ ~1024px พอสำหรับ zoom ดูรายละเอียด
               Flexible(
                 child: InteractiveViewer(
                   minScale: 0.5,
                   maxScale: 4.0,
                   child: IreneNetworkImage(
-                    imageUrl: ImageService.getLargeUrl(imageUrl),
+                    imageUrl: imageUrl, // URL ต้นฉบับ — ไม่ใช้ server transform
                     fit: BoxFit.contain,
                     memCacheWidth: 800, // รูปขยายใช้ resolution สูงขึ้น
-                    useServerResize: false, // ใช้ getLargeUrl resize แล้ว ไม่ต้อง resize ซ้ำ
+                    useServerResize: false, // ไม่ต้อง server resize
                     errorPlaceholder: Container(
                       height: 200,
                       alignment: Alignment.center,
@@ -669,10 +670,11 @@ class _MedicineNetworkImageState extends State<_MedicineNetworkImage> {
     // ถ้า error แสดง UI สำหรับ error
     if (_hasError) return _buildErrorWidget();
 
-    // ใช้ Supabase Image Transformation เพื่อโหลดรูปขนาดเล็กจาก server
-    // แทนที่จะโหลดรูปเต็ม 1.5MB แล้ว resize ฝั่ง client
-    // ลดจาก ~1.5MB → ~50KB (ลด 96%) ช่วยแก้ปัญหา crash บน iOS
-    final thumbnailUrl = ImageService.getThumbnailUrl(widget.imageUrl);
+    // ใช้ static thumbnail (_thumb file) แทน Supabase Image Transform
+    // ทั้งรูปตัวอย่างยา (nursingcare) และรูปจัดยา 2C/3C (med-photos)
+    // ลดค่าใช้จ่าย $125/เดือน — thumb ~15KB vs ต้นฉบับ ~400KB
+    // ถ้า _thumb ไม่มี → errorWidget จะ trigger retry ด้วย URL เดิม
+    final thumbnailUrl = ImageService.getStaticThumbnailUrl(widget.imageUrl);
 
     // ใช้ CachedNetworkImage พร้อม key ที่เปลี่ยนเมื่อ retry
     // เพื่อบังคับให้โหลดใหม่

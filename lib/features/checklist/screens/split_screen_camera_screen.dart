@@ -663,8 +663,8 @@ Uint8List _cropToAspectRatio(_CropParams params) {
   // ถ้า ratio ใกล้เคียงกันอยู่แล้ว (ต่างไม่เกิน 5%) → ไม่ต้อง crop
   if ((origRatio - targetRatio).abs() / targetRatio < 0.05) {
     // แค่ resize ถ้าใหญ่เกินไป แล้วคืนเลย
-    final resized = origW > 1920
-        ? img.copyResize(original, width: 1920)
+    final resized = origW > 1280
+        ? img.copyResize(original, width: 1280)
         : original;
     return Uint8List.fromList(img.encodeJpg(resized, quality: 85));
   }
@@ -686,9 +686,9 @@ Uint8List _cropToAspectRatio(_CropParams params) {
   final y = ((origH - cropH) / 2).round();
   var cropped = img.copyCrop(original, x: x, y: y, width: cropW, height: cropH);
 
-  // Resize ถ้าใหญ่เกินไป (จำกัด 1920px)
-  if (cropped.width > 1920) {
-    cropped = img.copyResize(cropped, width: 1920);
+  // Resize ถ้าใหญ่เกินไป (จำกัด 1280px เพื่อประหยัด storage)
+  if (cropped.width > 1280) {
+    cropped = img.copyResize(cropped, width: 1280);
   }
 
   return Uint8List.fromList(img.encodeJpg(cropped, quality: 85));

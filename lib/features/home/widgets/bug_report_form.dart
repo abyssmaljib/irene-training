@@ -157,7 +157,13 @@ class _BugReportFormState extends State<BugReportForm> {
 
     try {
       if (type == 'image') {
-        final image = await picker.pickImage(source: ImageSource.gallery);
+        // จำกัดขนาดรูป 1280px เพื่อลด storage usage
+        final image = await picker.pickImage(
+          source: ImageSource.gallery,
+          maxWidth: 1280,
+          maxHeight: 1280,
+          imageQuality: 80,
+        );
         if (image != null) {
           setState(() {
             _attachments.add(File(image.path));
@@ -171,7 +177,12 @@ class _BugReportFormState extends State<BugReportForm> {
           });
         }
       } else if (type == 'multi') {
-        final images = await picker.pickMultiImage();
+        // จำกัดขนาดรูป 1280px เพื่อลด storage usage
+        final images = await picker.pickMultiImage(
+          maxWidth: 1280,
+          maxHeight: 1280,
+          imageQuality: 80,
+        );
         if (images.isNotEmpty) {
           setState(() {
             _attachments.addAll(images.map((img) => File(img.path)));

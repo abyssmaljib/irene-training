@@ -66,4 +66,26 @@ class ImageService {
   static String getLargeUrl(String url) {
     return getResizedUrl(url, width: 800, quality: 80);
   }
+
+  /// แปลง URL ต้นฉบับเป็น URL ของ static thumbnail (_thumb)
+  /// ใช้สำหรับรูปที่มี pre-generated thumbnail อยู่ใน Storage แล้ว
+  /// (เช่น รูปตัวอย่างยาใน nursingcare bucket)
+  ///
+  /// แทรก '_thumb' ก่อน extension:
+  /// .../front-foiled.jpg → .../front-foiled_thumb.jpg
+  ///
+  /// ถ้า URL ว่างหรือไม่มี extension → return URL เดิม
+  static String getStaticThumbnailUrl(String url) {
+    if (url.isEmpty) return url;
+
+    // หา '.' ตัวสุดท้ายเพื่อแทรก _thumb ก่อน extension
+    final lastDot = url.lastIndexOf('.');
+    if (lastDot == -1) return url;
+
+    // ตรวจว่า '.' อยู่หลัง '/' ตัวสุดท้าย (เป็น extension จริง ไม่ใช่ dot ใน domain)
+    final lastSlash = url.lastIndexOf('/');
+    if (lastDot < lastSlash) return url;
+
+    return '${url.substring(0, lastDot)}_thumb${url.substring(lastDot)}';
+  }
 }

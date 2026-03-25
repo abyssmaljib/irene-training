@@ -1485,12 +1485,12 @@ class _LogPhotoNetworkImageState extends State<_LogPhotoNetworkImage> {
     if (_timedOut) return _buildTimeoutWidget();
     if (_hasError) return _buildErrorWidget();
 
-    // ใช้ Supabase Image Transformation เพื่อโหลดรูปขนาดเล็กจาก server
-    // ลดจาก ~1.5MB → ~100KB ช่วยแก้ปัญหา crash บน iOS
-    // ถ้า transformed URL fail (_useFallback = true) → ลองโหลด original URL แทน
+    // ใช้ static thumbnail (_thumb file) แทน Supabase Image Transform
+    // ลดค่าใช้จ่าย $125/เดือน — thumb สร้างตอน upload (15KB vs 400KB)
+    // ถ้า _thumb ไม่มี (รูปเก่าที่ยังไม่มี thumb) → fallback ไปโหลด URL เดิม
     final loadUrl = _useFallback
         ? widget.imageUrl
-        : ImageService.getMediumUrl(widget.imageUrl);
+        : ImageService.getStaticThumbnailUrl(widget.imageUrl);
 
     // ใช้ CachedNetworkImage แทน Image.network เพื่อ:
     // 1. Cache รูปไว้ใน disk ไม่ต้องโหลดซ้ำทุกครั้ง

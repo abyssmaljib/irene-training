@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:image/image.dart' as img;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/services/user_service.dart';
 import '../models/medicine_summary.dart';
@@ -950,10 +951,14 @@ extension MedicineServiceMedDB on MedicineService {
     }
   }
 
-  /// Upload รูปยาขึ้น Supabase Storage
+  /// Upload รูปยาขึ้น Supabase Storage พร้อมสร้าง thumbnail (_thumb)
   /// [file] ไฟล์รูปที่ต้องการ upload (dart:io File)
   /// [imageType] ประเภทรูป: 'frontFoiled', 'backFoiled', 'frontNude', 'backNude'
   /// Returns URL ของรูปที่ upload หรือ null ถ้า error
+  ///
+  /// จะ upload 2 ไฟล์:
+  /// - ต้นฉบับ: medicine_images/medicine_{type}_{timestamp}.jpg
+  /// - thumbnail: medicine_images/medicine_{type}_{timestamp}_thumb.jpg (400px, q70)
   Future<String?> uploadMedicineImage(
     dynamic file,
     String imageType,
@@ -965,21 +970,44 @@ extension MedicineServiceMedDB on MedicineService {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final fileName = 'medicine_${imageType}_$timestamp.jpg';
       final filePath = 'medicine_images/$fileName';
+      final thumbPath = 'medicine_images/medicine_${imageType}_${timestamp}_thumb.jpg';
 
       // อ่าน bytes จาก file (file ต้องมี method readAsBytes)
       final bytes = await file.readAsBytes();
       debugPrint('[MedicineService] File bytes read: ${bytes.length} bytes');
 
-      // Upload file ไป Supabase Storage (bucket: 'nursingcare')
+      // Upload ต้นฉบับไป Supabase Storage (bucket: 'nursingcare')
       await _supabase.storage
           .from('nursingcare')
           .uploadBinary(filePath, bytes, fileOptions: const FileOptions(
             contentType: 'image/jpeg',
             upsert: true,
           ));
-      debugPrint('[MedicineService] Upload successful');
+      debugPrint('[MedicineService] Original upload successful');
 
-      // สร้าง public URL
+      // สร้าง thumbnail (400px, quality 70%) แล้ว upload คู่กัน
+      // ใช้ image package ที่มีอยู่แล้ว
+      try {
+        final originalImage = img.decodeImage(bytes);
+        if (originalImage != null && originalImage.width > 400) {
+          // Resize เป็น 400px width (รักษา aspect ratio)
+          final thumbImage = img.copyResize(originalImage, width: 400);
+          final thumbBytes = img.encodeJpg(thumbImage, quality: 70);
+
+          await _supabase.storage
+              .from('nursingcare')
+              .uploadBinary(thumbPath, thumbBytes, fileOptions: const FileOptions(
+                contentType: 'image/jpeg',
+                upsert: true,
+              ));
+          debugPrint('[MedicineService] Thumbnail upload successful');
+        }
+      } catch (thumbErr) {
+        // ถ้าสร้าง thumbnail ไม่ได้ก็ไม่ block — consumer มี fallback อยู่แล้ว
+        debugPrint('[MedicineService] Thumbnail creation failed: $thumbErr');
+      }
+
+      // สร้าง public URL (ของต้นฉบับ — thumb derive จาก URL นี้ได้)
       final url = _supabase.storage
           .from('nursingcare')
           .getPublicUrl(filePath);

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/services/user_service.dart';
@@ -37,10 +38,10 @@ class CameraService {
       final XFile? photo = await _picker.pickImage(
         source: source,
         imageQuality: 85, // ลดขนาดเพื่อ upload เร็วขึ้น
-        // ลดจาก 1920 → 1280 เพื่อลด memory ระหว่าง compress บน Android สเปคต่ำ
-        // ยังได้ความละเอียดดีพอสำหรับรูปยา (~800KB แทน ~1.5MB)
-        maxWidth: 1280,
-        maxHeight: 1280,
+        // ใช้ 1600px เพื่อให้ซูมดูเม็ดยาได้ชัด ทั้งใน Flutter และ Next.js review
+        // ให้ตรงกับ med DB reference photos (1600px q85)
+        maxWidth: 1600,
+        maxHeight: 1600,
       );
 
       if (photo == null) return null;
@@ -72,15 +73,45 @@ class CameraService {
       final safeMealKey = _sanitizeFileName(mealKey);
       final fileName = '${residentId}_${dateStr}_${safeMealKey}_${photoType}_$timestamp.jpg';
       final filePath = 'residents/$residentId/$fileName';
+      // Thumbnail path: แทรก _thumb ก่อน .jpg
+      final thumbFileName = '${residentId}_${dateStr}_${safeMealKey}_${photoType}_${timestamp}_thumb.jpg';
+      final thumbPath = 'residents/$residentId/$thumbFileName';
 
       debugPrint('CameraService: uploading $filePath');
 
-      // Upload ไป Supabase Storage
+      // อ่าน bytes จากไฟล์
+      final bytes = await file.readAsBytes();
+
+      // Upload ต้นฉบับไป Supabase Storage
       await _supabase.storage
           .from(_bucketName)
-          .upload(filePath, file);
+          .uploadBinary(filePath, bytes, fileOptions: const FileOptions(
+            contentType: 'image/jpeg',
+            upsert: true,
+          ));
 
-      // ดึง public URL
+      // สร้าง thumbnail (400px, quality 70%) แล้ว upload คู่กัน
+      // ใช้สำหรับ list view → โหลดเร็ว ไม่ต้องใช้ Supabase Image Transform ($125/เดือน)
+      try {
+        final originalImage = img.decodeImage(bytes);
+        if (originalImage != null && originalImage.width > 400) {
+          final thumbImage = img.copyResize(originalImage, width: 400);
+          final thumbBytes = img.encodeJpg(thumbImage, quality: 70);
+
+          await _supabase.storage
+              .from(_bucketName)
+              .uploadBinary(thumbPath, thumbBytes, fileOptions: const FileOptions(
+                contentType: 'image/jpeg',
+                upsert: true,
+              ));
+          debugPrint('CameraService: thumbnail uploaded');
+        }
+      } catch (thumbErr) {
+        // ถ้าสร้าง thumbnail ไม่ได้ก็ไม่ block — consumer มี fallback
+        debugPrint('CameraService: thumbnail failed: $thumbErr');
+      }
+
+      // ดึง public URL (ของต้นฉบับ)
       final url = _supabase.storage
           .from(_bucketName)
           .getPublicUrl(filePath);

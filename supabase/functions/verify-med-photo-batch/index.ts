@@ -748,8 +748,8 @@ Deno.serve(async (req) => {
     // ============================================
     // claim_verification_queue RPC ใช้ FOR UPDATE SKIP LOCKED
     // → ถ้ามี worker อื่นกำลัง process items อยู่ จะข้ามไป (ไม่ซ้ำกัน)
-    // batch_limit = 2 — แต่ละ item ใช้เวลา ~20 วินาที (download + Gemini)
-    // 2 items = ~40 วินาที ซึ่ง Supabase edge function limit คือ 120 วินาที
+    // batch_limit = 2 — แต่ละ item ~12 วินาที → 2 items ~24 วินาที
+    // ลดจาก 5 เพราะ script size 920KB ทำให้ boot ช้า + WORKER_LIMIT
     const { data: items, error: claimError } = await claimQueueItems(supabase, 2)
 
     if (claimError) {
