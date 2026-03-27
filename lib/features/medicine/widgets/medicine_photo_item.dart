@@ -231,7 +231,7 @@ class MedicinePhotoItem extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Header
+              // Header — ชื่อยา + ปุ่มปิด
               Container(
                 padding: EdgeInsets.symmetric(
                   horizontal: AppSpacing.md,
@@ -266,47 +266,223 @@ class MedicinePhotoItem extends StatelessWidget {
                 ),
               ),
 
-              // ใช้ IreneNetworkImage แทน Image.network เพื่อได้ timeout + retry mechanism
-              // ใช้ URL ต้นฉบับโดยตรง (ไม่ผ่าน server transform)
-              // เพราะรูปตัวอย่างยาต้นฉบับ ~1024px พอสำหรับ zoom ดูรายละเอียด
+              // รูปยาทั้ง 4 แบ่ง 2 กลุ่ม: แผง (2C) + เม็ด (3C)
+              // แต่ละกลุ่มมี ด้านหน้า + ด้านหลัง เหมือน Next.js admin
               Flexible(
-                child: InteractiveViewer(
-                  minScale: 0.5,
-                  maxScale: 4.0,
-                  child: IreneNetworkImage(
-                    imageUrl: imageUrl, // URL ต้นฉบับ — ไม่ใช้ server transform
-                    fit: BoxFit.contain,
-                    memCacheWidth: 800, // รูปขยายใช้ resolution สูงขึ้น
-                    useServerResize: false, // ไม่ต้อง server resize
-                    errorPlaceholder: Container(
-                      height: 200,
-                      alignment: Alignment.center,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.all(AppSpacing.sm),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // กลุ่ม 1: 2C จัดยา (แผง) — frontFoiled + backFoiled
+                      _buildPhotoGroupLabel('2C จัดยา (แผง)'),
+                      SizedBox(height: 4),
+                      Row(
                         children: [
-                          HugeIcon(
-                            icon: HugeIcons.strokeRoundedImage01,
-                            size: AppIconSize.xxxl,
-                            color: AppColors.textSecondary,
+                          Expanded(
+                            child: _buildPhotoCard(
+                              context,
+                              label: 'ด้านหน้า',
+                              photoUrl: medicine.frontFoiled,
+                            ),
                           ),
-                          SizedBox(height: 8),
-                          Text(
-                            'ไม่สามารถโหลดรูปได้',
-                            style: AppTypography.body.copyWith(
-                              color: AppColors.textSecondary,
+                          SizedBox(width: AppSpacing.xs),
+                          Expanded(
+                            child: _buildPhotoCard(
+                              context,
+                              label: 'ด้านหลัง',
+                              photoUrl: medicine.backFoiled,
                             ),
                           ),
                         ],
                       ),
-                    ),
+
+                      SizedBox(height: AppSpacing.md),
+
+                      // กลุ่ม 2: 3C เสิร์ฟยา (เม็ด) — frontNude + backNude
+                      _buildPhotoGroupLabel('3C เสิร์ฟยา (เม็ด)'),
+                      SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildPhotoCard(
+                              context,
+                              label: 'ด้านหน้า',
+                              photoUrl: medicine.frontNude,
+                            ),
+                          ),
+                          SizedBox(width: AppSpacing.xs),
+                          Expanded(
+                            child: _buildPhotoCard(
+                              context,
+                              label: 'ด้านหลัง',
+                              photoUrl: medicine.backNude,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ),
 
-              // Medicine Detail Card
+              // Medicine Detail Card — ข้อมูลยาด้านล่าง
               _buildMedicineDetailCard(),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  /// Label หัวข้อกลุ่มรูป เช่น "2C จัดยา (แผง)"
+  Widget _buildPhotoGroupLabel(String label) {
+    return Text(
+      label,
+      style: AppTypography.caption.copyWith(
+        fontWeight: FontWeight.w700,
+        color: AppColors.textSecondary,
+        fontSize: 11,
+      ),
+    );
+  }
+
+  /// Card แสดงรูปยา 1 รูป พร้อม label + กดขยายดูเต็มจอ
+  Widget _buildPhotoCard(
+    BuildContext context, {
+    required String label,
+    required String? photoUrl,
+  }) {
+    final hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
+
+    return GestureDetector(
+      onTap: hasPhoto ? () => _showSinglePhoto(context, photoUrl, label) : null,
+      child: AspectRatio(
+        aspectRatio: 4 / 3,
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.background,
+            borderRadius: AppRadius.smallRadius,
+            border: Border.all(color: AppColors.inputBorder),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // รูปยา หรือ placeholder
+              hasPhoto
+                  ? IreneNetworkImage(
+                      imageUrl: photoUrl,
+                      fit: BoxFit.cover,
+                      memCacheWidth: 400,
+                      useServerResize: false,
+                      errorPlaceholder: _buildSmallPlaceholder(),
+                    )
+                  : _buildSmallPlaceholder(),
+
+              // Label ซ้อนด้านล่าง
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                      colors: [
+                        Colors.black.withValues(alpha: 0.6),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                  child: Text(
+                    label,
+                    style: AppTypography.caption.copyWith(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Placeholder สำหรับรูปเล็กใน grid (ไม่มีรูป หรือ error)
+  Widget _buildSmallPlaceholder() {
+    return Container(
+      color: AppColors.background,
+      child: Center(
+        child: HugeIcon(
+          icon: HugeIcons.strokeRoundedImage01,
+          size: AppIconSize.xl,
+          color: AppColors.textSecondary.withValues(alpha: 0.3),
+        ),
+      ),
+    );
+  }
+
+  /// แสดงรูปเดี่ยวเต็มจอเมื่อกดที่ card (zoom ได้)
+  void _showSinglePhoto(BuildContext context, String imageUrl, String label) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: EdgeInsets.zero,
+        child: Stack(
+          children: [
+            // รูปเต็มจอ zoom ได้
+            Center(
+              child: InteractiveViewer(
+                minScale: 0.5,
+                maxScale: 5.0,
+                child: IreneNetworkImage(
+                  imageUrl: imageUrl,
+                  fit: BoxFit.contain,
+                  memCacheWidth: 800,
+                  useServerResize: false,
+                ),
+              ),
+            ),
+            // ปุ่มปิดมุมขวาบน
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 8,
+              right: 8,
+              child: IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: HugeIcon(
+                  icon: HugeIcons.strokeRoundedCancelCircle,
+                  color: Colors.white,
+                  size: 28,
+                ),
+              ),
+            ),
+            // Label มุมซ้ายบน
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 16,
+              left: 16,
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.6),
+                  borderRadius: AppRadius.fullRadius,
+                ),
+                child: Text(
+                  label,
+                  style: AppTypography.body.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -670,17 +846,24 @@ class _MedicineNetworkImageState extends State<_MedicineNetworkImage> {
     // ถ้า error แสดง UI สำหรับ error
     if (_hasError) return _buildErrorWidget();
 
-    // ใช้ static thumbnail (_thumb file) แทน Supabase Image Transform
-    // ทั้งรูปตัวอย่างยา (nursingcare) และรูปจัดยา 2C/3C (med-photos)
-    // ลดค่าใช้จ่าย $125/เดือน — thumb ~15KB vs ต้นฉบับ ~400KB
-    // ถ้า _thumb ไม่มี → errorWidget จะ trigger retry ด้วย URL เดิม
-    final thumbnailUrl = ImageService.getStaticThumbnailUrl(widget.imageUrl);
+    // Fallback chain: _thumb → server transform → URL เดิม
+    // retry 0: ลอง _thumb ก่อน (เร็วสุด ไม่เสีย quota)
+    // retry 1: fallback ไป server transform (สำรอง ถ้า _thumb ยังไม่มี)
+    // retry 2+: ใช้ URL เดิม (รูปเต็ม)
+    final String loadUrl;
+    if (_retryCount == 0) {
+      loadUrl = ImageService.getStaticThumbnailUrl(widget.imageUrl);
+    } else if (_retryCount == 1) {
+      loadUrl = ImageService.getThumbnailUrl(widget.imageUrl);
+    } else {
+      loadUrl = widget.imageUrl;
+    }
 
     // ใช้ CachedNetworkImage พร้อม key ที่เปลี่ยนเมื่อ retry
     // เพื่อบังคับให้โหลดใหม่
     return CachedNetworkImage(
       key: ValueKey('${widget.imageUrl}_$_retryCount'),
-      imageUrl: thumbnailUrl,
+      imageUrl: loadUrl,
       fit: widget.fit,
       fadeInDuration: const Duration(milliseconds: 150),
       // memCacheWidth ยังคงใช้เพื่อจำกัด memory cache

@@ -5,12 +5,15 @@ import '../services/profile_setup_service.dart';
 
 /// State สำหรับ Profile Setup Form (หน้า 1)
 /// เก็บข้อมูลที่ user กรอก และสถานะของ form
+///
+/// ⚠️ Legacy — ปัจจุบัน UnifiedProfileSetupScreen จัดการ state เอง ไม่ใช้ provider นี้
 @immutable
 class ProfileSetupState {
   // ข้อมูล form
   final String? prefix;
   final String fullName;
   final String nickname;
+  final String nationalId;
   final String? photoUrl;
   final File? selectedPhoto; // รูปที่เลือกแต่ยังไม่ upload
 
@@ -24,6 +27,7 @@ class ProfileSetupState {
     this.prefix,
     this.fullName = '',
     this.nickname = '',
+    this.nationalId = '',
     this.photoUrl,
     this.selectedPhoto,
     this.isLoading = false,
@@ -33,8 +37,11 @@ class ProfileSetupState {
   });
 
   /// ตรวจสอบว่า form valid หรือไม่ (กรอกข้อมูลครบ)
+  /// ต้องมี: ชื่อจริง + ชื่อเล่น + เลขบัตรประชาชน
   bool get isValid =>
-      fullName.trim().isNotEmpty && nickname.trim().isNotEmpty;
+      fullName.trim().isNotEmpty &&
+      nickname.trim().isNotEmpty &&
+      nationalId.trim().isNotEmpty;
 
   /// ตรวจสอบว่ามีรูปหรือไม่ (เลือกใหม่หรือมี URL เดิม)
   bool get hasPhoto => selectedPhoto != null || photoUrl != null;
@@ -43,6 +50,7 @@ class ProfileSetupState {
     String? prefix,
     String? fullName,
     String? nickname,
+    String? nationalId,
     String? photoUrl,
     File? selectedPhoto,
     bool? isLoading,
@@ -56,6 +64,7 @@ class ProfileSetupState {
       prefix: prefix ?? this.prefix,
       fullName: fullName ?? this.fullName,
       nickname: nickname ?? this.nickname,
+      nationalId: nationalId ?? this.nationalId,
       photoUrl: photoUrl ?? this.photoUrl,
       selectedPhoto: clearSelectedPhoto ? null : (selectedPhoto ?? this.selectedPhoto),
       isLoading: isLoading ?? this.isLoading,
@@ -264,7 +273,7 @@ class ProfileSetupFormNotifier extends StateNotifier<ProfileSetupState> {
     // ตรวจสอบ validation
     if (!state.isValid) {
       state = state.copyWith(
-        errorMessage: 'กรุณากรอกชื่อ-สกุล และชื่อเล่น',
+        errorMessage: 'กรุณากรอกชื่อ-สกุล ชื่อเล่น และเลขบัตรประชาชน',
       );
       return false;
     }
@@ -285,6 +294,7 @@ class ProfileSetupFormNotifier extends StateNotifier<ProfileSetupState> {
       await _service.saveRequiredProfile(
         fullName: state.fullName,
         nickname: state.nickname,
+        nationalId: state.nationalId,
         prefix: state.prefix,
         photoUrl: photoUrl,
       );

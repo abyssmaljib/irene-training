@@ -59,9 +59,12 @@ class TaskLog {
 
   // Recurrence fields
   final int? recurrenceInterval; // ทุกกี่ (วัน/สัปดาห์/เดือน)
-  final String? recurrenceType; // 'วัน', 'สัปดาห์', 'เดือน'
+  final String? recurrenceType; // 'วัน', 'สัปดาห์', 'เดือน', 'once'
   final List<String> daysOfWeek; // ['จันทร์', 'อังคาร', ...]
   final List<int> recurringDates; // [1, 15, 28] วันที่ในเดือน
+
+  // One-time task flag (สั่งงานครั้งเดียว — สร้างจาก admin, ไม่เกิดซ้ำ)
+  final bool isOneTime;
 
   // History seen users (รายชื่อ user ที่เคยเห็น task นี้แล้ว)
   final List<String> historySeenUsers;
@@ -140,6 +143,7 @@ class TaskLog {
     this.recurrenceType,
     this.daysOfWeek = const [],
     this.recurringDates = const [],
+    this.isOneTime = false,
     this.historySeenUsers = const [],
     this.residentSpecialStatus,
     this.residentUnderlyingDiseaseList,
@@ -206,6 +210,7 @@ class TaskLog {
       recurrenceType: json['recurrenceType'] as String?,
       daysOfWeek: _parseStringList(json['daysOfWeek']),
       recurringDates: _parseIntList(json['recurring_dates']),
+      isOneTime: json['is_one_time'] == true,
       historySeenUsers: _parseStringList(json['history_seen_users']),
       residentSpecialStatus: json['s_special_status'] as String?,
       residentUnderlyingDiseaseList: _parseUnderlyingDiseaseList(json['resident_underlying_disease_list']),
@@ -415,6 +420,7 @@ class TaskLog {
     String? recurrenceType,
     List<String>? daysOfWeek,
     List<int>? recurringDates,
+    bool? isOneTime,
     List<String>? historySeenUsers,
     String? residentSpecialStatus,
     String? residentUnderlyingDiseaseList,
@@ -486,6 +492,7 @@ class TaskLog {
       recurrenceType: recurrenceType ?? this.recurrenceType,
       daysOfWeek: daysOfWeek ?? this.daysOfWeek,
       recurringDates: recurringDates ?? this.recurringDates,
+      isOneTime: isOneTime ?? this.isOneTime,
       historySeenUsers: historySeenUsers ?? this.historySeenUsers,
       residentSpecialStatus: residentSpecialStatus ?? this.residentSpecialStatus,
       residentUnderlyingDiseaseList: residentUnderlyingDiseaseList ?? this.residentUnderlyingDiseaseList,

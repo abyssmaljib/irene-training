@@ -1485,12 +1485,18 @@ class _LogPhotoNetworkImageState extends State<_LogPhotoNetworkImage> {
     if (_timedOut) return _buildTimeoutWidget();
     if (_hasError) return _buildErrorWidget();
 
-    // ใช้ static thumbnail (_thumb file) แทน Supabase Image Transform
-    // ลดค่าใช้จ่าย $125/เดือน — thumb สร้างตอน upload (15KB vs 400KB)
-    // ถ้า _thumb ไม่มี (รูปเก่าที่ยังไม่มี thumb) → fallback ไปโหลด URL เดิม
-    final loadUrl = _useFallback
-        ? widget.imageUrl
-        : ImageService.getStaticThumbnailUrl(widget.imageUrl);
+    // Fallback chain: _thumb → server transform → URL เดิม
+    // retry 0: ลอง _thumb ก่อน (เร็วสุด ไม่เสีย quota)
+    // retry 1: fallback ไป server transform (สำรอง ถ้า _thumb ยังไม่มี)
+    // retry 2+: ใช้ URL เดิม (รูปเต็ม)
+    final String loadUrl;
+    if (_retryCount == 0 && !_useFallback) {
+      loadUrl = ImageService.getStaticThumbnailUrl(widget.imageUrl);
+    } else if (_retryCount == 1 || (_retryCount == 0 && _useFallback)) {
+      loadUrl = ImageService.getMediumUrl(widget.imageUrl);
+    } else {
+      loadUrl = widget.imageUrl;
+    }
 
     // ใช้ CachedNetworkImage แทน Image.network เพื่อ:
     // 1. Cache รูปไว้ใน disk ไม่ต้องโหลดซ้ำทุกครั้ง

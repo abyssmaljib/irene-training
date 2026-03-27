@@ -46,11 +46,15 @@ class ProfileSetupService {
     }
   }
 
-  /// บันทึกข้อมูล profile หน้า 1 (บังคับ)
+  /// บันทึกข้อมูล profile ขั้นต่ำ (บังคับ)
   /// และ mark profile_setup_completed = true
+  ///
+  /// ⚠️ Legacy method — ปัจจุบัน UnifiedProfileSetupScreen ใช้ saveFullProfile() แทน
+  /// เก็บไว้เพื่อ backward compat แต่ต้องมี nationalId เพราะใช้เป็น key sync ไป Google Sheet
   Future<void> saveRequiredProfile({
     required String fullName,
     required String nickname,
+    required String nationalId,
     String? prefix,
     String? photoUrl,
   }) async {
@@ -63,6 +67,7 @@ class ProfileSetupService {
       await _supabase.from('user_info').update({
         'full_name': fullName.trim(),
         'nickname': nickname.trim(),
+        'national_ID_staff': nationalId.trim(),
         'prefix': prefix,
         'photo_url': photoUrl,
         'profile_setup_completed': true,

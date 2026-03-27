@@ -27,14 +27,14 @@ import '../widgets/skills_multi_select.dart';
 /// โครงสร้าง:
 /// - Header: รูปโปรไฟล์ + ข้อความต้อนรับ (onboarding mode)
 /// - Section 1: ข้อมูลพื้นฐาน (ชื่อจริง+ชื่อเล่น บังคับ, อื่นๆ optional)
-/// - Section 2: ข้อมูลติดต่อ (optional)
+/// - Section 2: ข้อมูลติดต่อ (เลขบัตรประชาชน บังคับ, อื่นๆ optional)
 /// - Section 3: วุฒิการศึกษาและทักษะ (optional)
 /// - Section 4: การเงิน (optional)
 /// - Section 5: เอกสาร (optional)
 /// - Section 6: ข้อมูลเพิ่มเติม (optional)
-/// - ปุ่ม: บันทึก (enabled เมื่อกรอกชื่อจริง+ชื่อเล่น)
+/// - ปุ่ม: บันทึก (enabled เมื่อกรอกชื่อจริง+ชื่อเล่น+เลขบัตรประชาชน)
 ///
-/// หมายเหตุ: User สามารถกรอกแค่ชื่อจริง+ชื่อเล่นแล้วเข้าใช้งานก่อนได้
+/// หมายเหตุ: User สามารถกรอกแค่ชื่อจริง+ชื่อเล่น+เลขบัตรประชาชน แล้วเข้าใช้งานก่อนได้
 /// ส่วนที่เหลือจะแสดงเป็น progress ให้กรอกเพิ่มในภายหลัง
 class UnifiedProfileSetupScreen extends ConsumerStatefulWidget {
   /// Callback เมื่อกรอกเสร็จ (ใช้ใน onboarding mode)
@@ -71,8 +71,9 @@ class _UnifiedProfileSetupScreenState
   final _englishNameController = TextEditingController();
   final _nicknameController = TextEditingController();
 
-  // FocusNode สำหรับตรวจจับเมื่อออกจาก field ชื่อเล่น
+  // FocusNode สำหรับตรวจจับเมื่อออกจาก field ชื่อเล่น และเลขบัตรประชาชน
   final _nicknameFocusNode = FocusNode();
+  final _nationalIdFocusNode = FocusNode();
   String? _selectedGender;
   DateTime? _selectedDob;
   final _weightController = TextEditingController();
@@ -112,9 +113,9 @@ class _UnifiedProfileSetupScreenState
   final _diseaseController = TextEditingController();
   final _aboutMeController = TextEditingController();
 
-  // ExpansionTile states
+  // ExpansionTile states — Section 2 เปิดด้วยเพราะเลขบัตรประชาชนเป็น required
   bool _section1Expanded = true;
-  bool _section2Expanded = false;
+  bool _section2Expanded = true;
   bool _section3Expanded = false;
   bool _section4Expanded = false;
   bool _section5Expanded = false;
@@ -124,7 +125,7 @@ class _UnifiedProfileSetupScreenState
   int _secretTapCount = 0;
   DateTime? _lastTapTime;
 
-  // Track popup state - แสดง popup เมื่อ user กรอกชื่อจริง+ชื่อเล่นครบครั้งแรก
+  // Track popup state - แสดง popup เมื่อ user กรอกชื่อจริง+ชื่อเล่น+เลขบัตรประชาชนครบครั้งแรก
   bool _hasShownMinimumFieldsPopup = false;
 
   @override
@@ -132,23 +133,26 @@ class _UnifiedProfileSetupScreenState
     super.initState();
     _loadCurrentProfile();
 
-    // ฟัง focus change ของ field ชื่อเล่น
+    // ฟัง focus change ของ field ชื่อเล่น และเลขบัตรประชาชน
     // เมื่อออกจาก field (unfocus) และกรอกครบ ให้แสดง popup
-    _nicknameFocusNode.addListener(_onNicknameFocusChange);
+    _nicknameFocusNode.addListener(_onMinimumFieldFocusChange);
+    _nationalIdFocusNode.addListener(_onMinimumFieldFocusChange);
   }
 
-  /// เมื่อ focus ของ nickname field เปลี่ยน
-  void _onNicknameFocusChange() {
+  /// เมื่อ focus ของ minimum required fields เปลี่ยน (ชื่อเล่น หรือ เลขบัตรประชาชน)
+  void _onMinimumFieldFocusChange() {
     // ถ้าออกจาก field (unfocus) ให้เช็คว่าครบหรือยัง
-    if (!_nicknameFocusNode.hasFocus) {
+    if (!_nicknameFocusNode.hasFocus && !_nationalIdFocusNode.hasFocus) {
       _checkMinimumFieldsAndShowPopup();
     }
   }
 
   @override
   void dispose() {
-    _nicknameFocusNode.removeListener(_onNicknameFocusChange);
+    _nicknameFocusNode.removeListener(_onMinimumFieldFocusChange);
     _nicknameFocusNode.dispose();
+    _nationalIdFocusNode.removeListener(_onMinimumFieldFocusChange);
+    _nationalIdFocusNode.dispose();
     _fullNameController.dispose();
     _englishNameController.dispose();
     _nicknameController.dispose();
@@ -240,11 +244,13 @@ class _UnifiedProfileSetupScreenState
 
   // ========== Validation ==========
 
-  /// ข้อมูลขั้นต่ำที่ต้องกรอก: ชื่อจริง + ชื่อเล่น
+  /// ข้อมูลขั้นต่ำที่ต้องกรอก: ชื่อจริง + ชื่อเล่น + เลขบัตรประชาชน
+  /// เลขบัตรประชาชนจำเป็นเพราะใช้เป็น key สำหรับ sync ข้อมูลไป Google Sheet
   /// User สามารถเข้าใช้งานได้ทันทีหลังกรอกแค่นี้
   bool get _isMinimumValid =>
       _fullNameController.text.trim().isNotEmpty &&
-      _nicknameController.text.trim().isNotEmpty;
+      _nicknameController.text.trim().isNotEmpty &&
+      _nationalIdController.text.trim().isNotEmpty;
 
   /// ตรวจสอบว่า section 1 ครบหรือยัง (สำหรับแสดง progress)
   bool get _isSection1Valid =>
@@ -296,7 +302,7 @@ class _UnifiedProfileSetupScreenState
 
   // ========== Popup Logic ==========
 
-  /// ตรวจสอบว่ากรอก ชื่อจริง+ชื่อเล่น ครบแล้วหรือยัง
+  /// ตรวจสอบว่ากรอก ชื่อจริง+ชื่อเล่น+เลขบัตรประชาชน ครบแล้วหรือยัง
   /// ถ้าครบแล้วและยังไม่เคยแสดง popup ให้แสดง popup ถามว่าจะเข้าใช้งานเลยหรือกรอกต่อ
   void _checkMinimumFieldsAndShowPopup() {
     setState(() {});
@@ -355,7 +361,7 @@ class _UnifiedProfileSetupScreenState
 
               // คำอธิบาย
               Text(
-                'คุณสามารถเข้าใช้งานแอปได้เลยตอนนี้\n'
+                'ข้อมูลเบื้องต้นครบแล้ว คุณสามารถเข้าใช้งานแอปได้เลยตอนนี้\n'
                 'ส่วนข้อมูลที่เหลือ สามารถกลับมากรอกเพิ่มได้ภายหลังที่หน้า "ตั้งค่า"',
                 style: AppTypography.body.copyWith(
                   color: AppColors.secondaryText,
@@ -662,11 +668,12 @@ class _UnifiedProfileSetupScreenState
         setState(() => _section2Expanded = expanded);
       },
       children: [
-        // เลขบัตรประชาชน (บังคับ)
+        // เลขบัตรประชาชน (บังคับ — ใช้เป็น key สำหรับ sync ข้อมูลไป Google Sheet)
         AppTextField(
           label: 'เลขบัตรประชาชน *',
           hintText: 'ไม่ต้องใส่ - หรือเว้นวรรค',
           controller: _nationalIdController,
+          focusNode: _nationalIdFocusNode,
           keyboardType: TextInputType.number,
           prefixIcon: HugeIcons.strokeRoundedId,
           fillColor: AppColors.primaryBackground,
@@ -1370,7 +1377,7 @@ class _UnifiedProfileSetupScreenState
               SizedBox(height: AppSpacing.sm),
             ],
 
-            // ปุ่มบันทึก - enabled เมื่อกรอกชื่อจริง+ชื่อเล่น (ขั้นต่ำ)
+            // ปุ่มบันทึก - enabled เมื่อกรอกชื่อจริง+ชื่อเล่น+เลขบัตรประชาชน (ขั้นต่ำ)
             // ถ้ากรอกครบทุก section แสดง "บันทึกข้อมูล" แทน "เริ่มใช้งาน!!"
             PrimaryButton(
               text: widget.showAsOnboarding
