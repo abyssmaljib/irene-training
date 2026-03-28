@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:hugeicons/hugeicons.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
@@ -35,6 +36,17 @@ class AppTextField extends StatefulWidget {
   /// Default is AppColors.background (gray)
   /// Use AppColors.surface (white) for gray backgrounds
   final Color? fillColor;
+  /// ข้อความ suffix แสดงหลัง input (เช่น หน่วย "kg", "cm")
+  final String? suffixText;
+  /// TextStyle สำหรับ suffixText
+  final TextStyle? suffixTextStyle;
+  /// Input formatters สำหรับ restrict input (เช่น ตัวเลขเท่านั้น)
+  final List<TextInputFormatter>? inputFormatters;
+  /// Text alignment ภายใน input (default: start)
+  final TextAlign textAlign;
+  /// Custom text style แทน default AppTypography.body
+  /// ใช้เมื่อต้องการ font ใหญ่กว่าปกติ (เช่น measurement input)
+  final TextStyle? textStyle;
 
   const AppTextField({
     super.key,
@@ -57,6 +69,11 @@ class AppTextField extends StatefulWidget {
     this.isDense = false,
     this.autofocus = false,
     this.fillColor,
+    this.suffixText,
+    this.suffixTextStyle,
+    this.inputFormatters,
+    this.textAlign = TextAlign.start,
+    this.textStyle,
   });
 
   @override
@@ -126,14 +143,20 @@ class _AppTextFieldState extends State<AppTextField> {
           textInputAction: widget.textInputAction,
           onSubmitted: widget.onSubmitted,
           autofocus: widget.autofocus,
-          style: AppTypography.body.copyWith(
+          inputFormatters: widget.inputFormatters,
+          textAlign: widget.textAlign,
+          style: (widget.textStyle ?? AppTypography.body).copyWith(
             color: widget.enabled ? AppColors.textPrimary : AppColors.textSecondary,
           ),
           decoration: InputDecoration(
             hintText: widget.hintText,
-            hintStyle: AppTypography.body.copyWith(
+            hintStyle: (widget.textStyle ?? AppTypography.body).copyWith(
               color: AppColors.textSecondary.withValues(alpha: 0.6),
+              fontWeight: FontWeight.w400,
             ),
+            suffixText: widget.suffixText,
+            suffixStyle: widget.suffixTextStyle ??
+                AppTypography.body.copyWith(color: AppColors.textSecondary),
             prefixIcon: widget.prefixIcon != null
                 ? Padding(
                     padding: const EdgeInsets.only(left: 12, right: 8),

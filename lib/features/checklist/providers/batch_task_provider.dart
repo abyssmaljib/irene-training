@@ -3,7 +3,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../points/services/points_service.dart';
+import '../models/measurement_config.dart';
 import '../models/task_log.dart';
+import '../services/measurement_service.dart';
+import '../widgets/measurement_input_dialog.dart';
 import 'task_provider.dart';
 
 // ============================================================
@@ -200,6 +203,8 @@ class BatchTaskNotifier extends StateNotifier<BatchState> {
     required int residentIndex,
     required File imageFile,
     required int? difficultyScore,
+    MeasurementResult? measurementResult,
+    MeasurementConfig? measurementConfig,
   }) async {
     final resident = state.residents[residentIndex];
     final task = resident.task;
@@ -285,6 +290,30 @@ class BatchTaskNotifier extends StateNotifier<BatchState> {
         } catch (e) {
           // ไม่ให้ error จาก points กระทบ task completion
           debugPrint('Batch points error: $e');
+        }
+      }
+
+      // 7. บันทึกค่า measurement (ถ้าเป็น measurement task)
+      if (measurementResult != null &&
+          measurementConfig != null &&
+          task.residentId != null) {
+        final nursinghomeId =
+            await _ref.read(nursinghomeIdProvider.future) ?? 0;
+        final measSuccess =
+            await MeasurementService.instance.insertMeasurement(
+          residentId: task.residentId!,
+          nursinghomeId: nursinghomeId,
+          recordedBy: userId,
+          measurementType: measurementConfig.measurementType,
+          numericValue: measurementResult.value,
+          unit: measurementConfig.unit,
+          taskLogId: task.logId,
+          photoUrl: measurementResult.photoUrl,
+        );
+        if (!measSuccess) {
+          // Measurement fail → revert task กลับ pending บน server
+          await service.unmarkTask(task.logId);
+          throw Exception('insertMeasurement failed');
         }
       }
 

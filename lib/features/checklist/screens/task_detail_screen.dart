@@ -35,6 +35,9 @@ import 'square_camera_screen.dart';
 import '../../points/services/points_service.dart';
 import '../providers/batch_task_provider.dart';
 import '../widgets/co_worker_picker.dart';
+import '../models/measurement_config.dart';
+import '../widgets/measurement_input_dialog.dart';
+import '../services/measurement_service.dart';
 
 /// หน้ารายละเอียด Task แบบ Full Page
 class TaskDetailScreen extends ConsumerStatefulWidget {
@@ -65,6 +68,13 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
   // สำหรับ expandable details ในหน้าจัดยา (default: ซ่อนไว้เพื่อให้เห็นรูปยาทันที)
   bool _isDetailExpanded = false;
 
+  // สำหรับ measurement task (ชั่งน้ำหนัก, วัดส่วนสูง)
+  // ค่าจาก inline section — ใช้ตอน _handleComplete
+  MeasurementConfig? _measurementConfig;
+  final _measurementController = TextEditingController();
+  String? _measurementPhotoUrl;
+  bool _hasMeasurementValue = false; // true เมื่อ user กรอกค่าแล้ว
+
   // Realtime subscription
   RealtimeChannel? _taskChannel;
 
@@ -85,10 +95,14 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     if (_task.taskType == 'จัดยา' && _task.residentId != null) {
       _loadMedicines();
     }
+
+    // ตรวจว่าเป็น measurement task หรือไม่ (เช่น ชั่งน้ำหนัก, วัดส่วนสูง)
+    _measurementConfig = getMeasurementConfig(_task.taskType);
   }
 
   @override
   void dispose() {
+    _measurementController.dispose();
     _unsubscribeFromTaskUpdates();
     super.dispose();
   }
@@ -486,6 +500,29 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       if (_task.postponeFrom != null) ...[
         AppSpacing.verticalGapMd,
         _buildPostponeInfo(),
+      ],
+
+      // Measurement input section (ชั่งน้ำหนัก/วัดส่วนสูง)
+      // อยู่ล่างสุดก่อน co-worker picker — ใกล้ปุ่ม action เพื่อ UX ที่ดี
+      if (_measurementConfig != null && !_task.isDone) ...[
+        MeasurementInputSection(
+          config: _measurementConfig!,
+          controller: _measurementController,
+          taskLogId: _task.logId,
+          isCompleted: _task.isDone,
+          initialPhotoUrl: _measurementPhotoUrl,
+          onValueChanged: (text) {
+            final parsed = double.tryParse(text.trim());
+            final hasValue = parsed != null && parsed > 0;
+            if (hasValue != _hasMeasurementValue) {
+              setState(() => _hasMeasurementValue = hasValue);
+            }
+          },
+          onPhotoChanged: (url) {
+            _measurementPhotoUrl = url;
+          },
+        ),
+        AppSpacing.verticalGapMd,
       ],
 
       // Co-worker picker (แสดงเฉพาะ task ที่ยังไม่ done — ให้เลือกเพื่อนร่วมเวรเพื่อหาร point)
@@ -2317,15 +2354,22 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
               ),
 
             // Complete button (แสดงเมื่อไม่ต้องถ่ายรูป หรือถ่ายรูปแล้ว)
+            // ถ้าเป็น measurement task → disabled ถ้ายังไม่กรอกค่า + เปลี่ยน label
             if (_showCompleteButton)
               Expanded(
                 child: SizedBox(
                   height: 48,
                   child: ElevatedButton.icon(
-                    onPressed: _isLoading ? null : _handleComplete,
+                    onPressed: _isLoading
+                        ? null
+                        : (_measurementConfig != null && !_hasMeasurementValue)
+                            ? null // disabled ถ้ายังไม่กรอกค่า measurement
+                            : _handleComplete,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
+                      disabledBackgroundColor: AppColors.primaryDisabled,
+                      disabledForegroundColor: Colors.white70,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -2339,8 +2383,17 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                               valueColor: AlwaysStoppedAnimation(Colors.white),
                             ),
                           )
-                        : HugeIcon(icon: HugeIcons.strokeRoundedCheckmarkCircle02),
-                    label: Text('เรียบร้อย', style: AppTypography.button),
+                        : HugeIcon(
+                            icon: _measurementConfig != null
+                                ? HugeIcons.strokeRoundedFloppyDisk
+                                : HugeIcons.strokeRoundedCheckmarkCircle02,
+                          ),
+                    label: Text(
+                      _measurementConfig != null
+                          ? 'บันทึก${_measurementConfig!.label}'
+                          : 'เรียบร้อย',
+                      style: AppTypography.button,
+                    ),
                   ),
                 ),
               ),
@@ -2455,11 +2508,33 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
 
   // Action handlers
   Future<void> _handleComplete() async {
+    // Guard double-tap — ป้องกันเรียกซ้ำก่อน difficulty dialog แสดง
+    if (_isLoading) return;
+
     final service = ref.read(taskServiceProvider);
     final userId = ref.read(currentUserIdProvider);
     final userNickname = ref.read(currentUserNicknameProvider).valueOrNull;
 
     if (userId == null) return;
+
+    // === ดึงค่า measurement จาก inline section (ถ้าเป็น measurement task) ===
+    // ค่ามาจาก _measurementController ที่ user กรอกไว้ก่อนกด complete
+    final measurementConfig = _measurementConfig;
+    MeasurementResult? measurementResult;
+
+    if (measurementConfig != null) {
+      final text = _measurementController.text.trim();
+      final value = double.tryParse(text);
+      if (value == null || value <= 0) {
+        // ไม่ควรเกิด เพราะปุ่ม disabled ถ้ายังไม่กรอก — แต่ guard ไว้
+        AppToast.warning(context, 'กรุณากรอกค่า${measurementConfig.label}');
+        return;
+      }
+      measurementResult = MeasurementResult(
+        value: value,
+        photoUrl: _measurementPhotoUrl,
+      );
+    }
 
     // === แสดง Dialog ให้ประเมินความยากของงาน ===
     // ถ้า user ปิด dialog (กด back) จะได้ null → ยกเลิก completion
@@ -2564,6 +2639,44 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
             pictureUrl: capturedImageUrl,
             taskLogId: capturedLogId,
           );
+        }
+      }
+
+      // === บันทึกค่า measurement (ถ้าเป็น measurement task) ===
+      // Insert เข้า resident_measurements หลัง markTaskComplete สำเร็จ
+      // ถ้า insert fail → revert task กลับ pending + แจ้ง error
+      if (measurementResult != null &&
+          measurementConfig != null &&
+          capturedResidentId != null) {
+        final nursinghomeId =
+            await ref.read(nursinghomeIdProvider.future) ?? 0;
+        final measurementSuccess =
+            await MeasurementService.instance.insertMeasurement(
+          residentId: capturedResidentId,
+          nursinghomeId: nursinghomeId,
+          recordedBy: userId,
+          measurementType: measurementConfig.measurementType,
+          numericValue: measurementResult.value,
+          unit: measurementConfig.unit,
+          taskLogId: capturedLogId,
+          photoUrl: measurementResult.photoUrl,
+        );
+
+        if (!measurementSuccess) {
+          // Measurement insert ล้มเหลว — revert task กลับ pending บน server ด้วย
+          // เพราะ task ถูก mark complete ไปแล้ว (line 2539)
+          // ถ้าไม่ revert → Realtime จะ push complete กลับมาทำให้ UI ไม่ตรง
+          await service.unmarkTask(capturedLogId);
+          rollback();
+          setState(() {
+            _task = widget.task;
+            _isLoading = false;
+          });
+          if (mounted) {
+            AppToast.error(
+                context, 'ไม่สามารถบันทึกค่า${measurementConfig.label}ได้');
+          }
+          return;
         }
       }
 
@@ -2937,7 +3050,30 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
 
   /// เปิด AdvancedCreatePostScreen พร้อมข้อมูลจาก task
   /// ใช้ full-screen แทน modal เพื่อให้มีพื้นที่พิมพ์ description มากขึ้น
-  void _handleCompleteByPost() {
+  Future<void> _handleCompleteByPost() async {
+    // === ดึงค่า measurement จาก inline section (ถ้ามี) ===
+    // ใช้ค่าที่ user กรอกไว้แล้วใน section แทนเปิด dialog ซ้ำ
+    final measConfig = _measurementConfig;
+    MeasurementResult? measResult;
+
+    if (measConfig != null) {
+      final text = _measurementController.text.trim();
+      final value = double.tryParse(text);
+      if (value != null && value > 0) {
+        measResult = MeasurementResult(
+          value: value,
+          photoUrl: _measurementPhotoUrl,
+        );
+      }
+      // ถ้ายังไม่กรอก → ไม่ block flow (measurement เป็น optional สำหรับ post flow)
+    }
+
+    // Capture ไว้เพื่อ insert measurement หลัง post สร้างสำเร็จ
+    final capturedMeasResult = measResult;
+    final capturedMeasConfig = measConfig;
+    final capturedResidentId = _task.residentId;
+    final capturedLogId = _task.logId;
+
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -2948,10 +3084,32 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           initialTagName: 'งานเช็คลิสต์', // ใช้ tag "งานเช็คลิสต์" สำหรับทุก task
           taskLogId: _task.logId,
           taskConfirmImageUrl: _uploadedImageUrl, // รูปที่ถ่ายไว้ (ถ้ามี)
-          onPostCreated: () {
+          onPostCreated: () async {
             // เมื่อโพสสำเร็จ task จะถูก complete โดย AdvancedCreatePostScreen แล้ว
-            // เพียงแค่กลับไปหน้า checklist
-            if (mounted) Navigator.pop(context);
+            // บันทึก measurement ถ้ามี
+            if (capturedMeasResult != null &&
+                capturedMeasConfig != null &&
+                capturedResidentId != null) {
+              final userId = Supabase.instance.client.auth.currentUser?.id;
+              if (userId != null && mounted) {
+                final nursinghomeId =
+                    await ref.read(nursinghomeIdProvider.future) ?? 0;
+                if (!mounted) return;
+                await MeasurementService.instance.insertMeasurement(
+                  residentId: capturedResidentId,
+                  nursinghomeId: nursinghomeId,
+                  recordedBy: userId,
+                  measurementType: capturedMeasConfig.measurementType,
+                  numericValue: capturedMeasResult.value,
+                  unit: capturedMeasConfig.unit,
+                  taskLogId: capturedLogId,
+                  photoUrl: capturedMeasResult.photoUrl,
+                );
+              }
+            }
+            // กลับไปหน้า checklist
+            if (!mounted) return;
+            Navigator.pop(context);
           },
         ),
       ),

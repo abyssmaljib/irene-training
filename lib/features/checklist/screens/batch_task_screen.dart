@@ -19,6 +19,8 @@ import '../providers/batch_task_provider.dart';
 import '../providers/task_provider.dart';
 import '../widgets/co_worker_picker.dart';
 import '../widgets/difficulty_rating_dialog.dart';
+import '../models/measurement_config.dart';
+import '../widgets/measurement_input_dialog.dart';
 import 'task_detail_screen.dart';
 
 /// หน้า Batch Task — ทำ task เดียวกันข้ามคนไข้หลายคน
@@ -683,7 +685,20 @@ class _ResidentTile extends ConsumerWidget {
     );
     if (confirmedFile == null) return; // user ยกเลิกจาก preview
 
-    // 3. แสดง DifficultyRatingDialog (1-10 หรือข้าม)
+    // 3. ถ้าเป็น measurement task → ขอกรอกค่าก่อน difficulty
+    MeasurementResult? measResult;
+    final measConfig = getMeasurementConfig(resident.task.taskType);
+    if (measConfig != null) {
+      if (!context.mounted) return;
+      measResult = await MeasurementInputDialog.show(
+        context,
+        config: measConfig,
+        taskLogId: resident.task.logId,
+      );
+      if (measResult == null) return; // user กดยกเลิก
+    }
+
+    // 4. แสดง DifficultyRatingDialog (1-10 หรือข้าม)
     if (!context.mounted) return;
     final diffResult = await DifficultyRatingDialog.show(
       context,
@@ -694,12 +709,14 @@ class _ResidentTile extends ConsumerWidget {
     // ถ้า user กด back → ยกเลิกทั้งหมด (ไม่ complete)
     if (diffResult == null) return;
 
-    // 4. Upload + mark complete ทันที
+    // 5. Upload + mark complete ทันที
     final notifier = ref.read(batchTaskProvider(groupKey).notifier);
     final success = await notifier.completeResident(
       residentIndex: index,
       imageFile: confirmedFile,
       difficultyScore: diffResult.score,
+      measurementResult: measResult,
+      measurementConfig: measConfig,
     );
 
     // 5. แสดงผลลัพธ์
