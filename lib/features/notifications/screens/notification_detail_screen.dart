@@ -321,6 +321,16 @@ class NotificationDetailScreen extends StatelessWidget {
         return 'ผู้รับบริการ';
       case 'user_info':
         return 'ผู้ใช้';
+      case 'C_Tasks':
+        return 'งานครั้งเดียว';
+      case 'A_Task_logs_ver2':
+        return 'บันทึกงาน';
+      case 'B_Ticket':
+        return 'ตั๋ว';
+      case 'B_Incident':
+        return 'เหตุการณ์';
+      case 'vitalsign_sent_queue':
+        return 'สัญญาณชีพ';
       default:
         return tableName;
     }

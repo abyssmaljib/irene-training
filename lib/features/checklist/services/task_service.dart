@@ -493,6 +493,31 @@ class TaskService {
     }
   }
 
+  /// ดึง task เดี่ยวจาก C_Tasks.id (สำหรับ one-time task notification)
+  /// Step 1: หา log_id จาก A_Task_logs_ver2 ที่มี c_task_id ตรงกัน
+  /// Step 2: ใช้ log_id ไป fetch จาก v2_task_logs_with_details (view ไม่มี c_task_id column)
+  Future<TaskLog?> getTaskByCTaskId(int cTaskId) async {
+    try {
+      // หา log_id จาก A_Task_logs_ver2 ที่ผูกกับ C_Tasks นี้
+      final logRow = await _supabase
+          .from('A_Task_logs_ver2')
+          .select('id')
+          .eq('c_task_id', cTaskId)
+          .maybeSingle();
+
+      if (logRow == null) {
+        debugPrint('getTaskByCTaskId: no log found for c_task_id $cTaskId');
+        return null;
+      }
+
+      // ใช้ log_id ไป fetch จาก view ที่มีข้อมูลครบ
+      return getTaskByLogId(logRow['id'] as int);
+    } catch (e) {
+      debugPrint('getTaskByCTaskId error: $e');
+      return null;
+    }
+  }
+
   /// ดึงข้อมูล user พื้นฐาน (nickname, photo_url) จาก user_info
   /// ใช้สำหรับ enrich ข้อมูลที่ view ส่งมาเป็น NULL dummy
   /// เช่น sample image creator ที่มีแค่ UUID แต่ไม่มีชื่อ+รูป

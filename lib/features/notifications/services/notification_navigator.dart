@@ -86,9 +86,15 @@ class NotificationNavigator {
           _showError(context, 'ไม่พบข้อมูลงาน');
           return;
         }
+        // แยก fetch ตาม reference_table:
+        // - C_Tasks → one-time task, ใช้ c_task_id หา log
+        // - อื่นๆ (A_Task_logs_ver2 หรือ null) → ใช้ log_id ตรง
+        final isCTask = notification.referenceTable == 'C_Tasks';
         await _navigateWithLoading(
           context,
-          fetchData: () => TaskService.instance.getTaskByLogId(referenceId),
+          fetchData: () => isCTask
+              ? TaskService.instance.getTaskByCTaskId(referenceId)
+              : TaskService.instance.getTaskByLogId(referenceId),
           onSuccess: (task) {
             if (task == null) {
               _showError(context, 'ไม่พบข้อมูลงานนี้แล้ว');
