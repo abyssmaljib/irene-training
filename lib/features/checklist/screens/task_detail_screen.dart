@@ -3108,7 +3108,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
               }
             }
             // กลับไปหน้า checklist
-            if (!mounted) return;
+            if (!context.mounted) return;
             Navigator.pop(context);
           },
         ),

@@ -267,7 +267,9 @@ class EditMedicineFormNotifier
         beforeAfter: currentState.beforeAfter,
         everyHr: everyHr,
         typeOfTime: everyHr != null ? currentState.typeOfTime : null,
-        daysOfWeek: currentState.selectedDays.isNotEmpty ? currentState.selectedDays : null,
+        // ส่ง selectedDays เสมอ (แม้ว่าง) เพื่อ clear DaysOfWeek เก่าออกจาก DB
+        // เมื่อเปลี่ยนจาก สัปดาห์ → วัน/เดือน
+        daysOfWeek: currentState.selectedDays,
         prn: currentState.prn,
         onDate: currentState.onDate,
         offDate: currentState.isContinuous ? null : currentState.offDate,

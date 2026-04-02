@@ -17,6 +17,7 @@ enum PointTransactionType {
   manualAdjustment('manual_adjustment', 'ปรับปรุงคะแนน', '🔧'),
   transfer('transfer', 'โอนคะแนน', '🔄'),
   periodReward('period_reward', 'รางวัลประจำรอบ', '🎁'),
+  seasonCarryover('season_carryover', 'โบนัสเริ่มต้น Season', '🎁'),
   other('other', 'อื่นๆ', '📌');
 
   final String value;
@@ -132,6 +133,7 @@ class UserPointsSummary {
   final int totalPoints;
   final int weekPoints;
   final int monthPoints;
+  final int seasonPoints; // คะแนนใน season ปัจจุบัน (รวม carry-over bonus)
   final int transactionCount;
 
   // Tier info (ใช้ได้ทั้ง fixed และ percentile mode)
@@ -160,6 +162,7 @@ class UserPointsSummary {
     required this.totalPoints,
     required this.weekPoints,
     required this.monthPoints,
+    this.seasonPoints = 0,
     required this.transactionCount,
     this.tierId,
     this.tierName,
@@ -185,6 +188,7 @@ class UserPointsSummary {
       totalPoints: (json['total_points'] as num?)?.toInt() ?? 0,
       weekPoints: (json['week_points'] as num?)?.toInt() ?? 0,
       monthPoints: (json['month_points'] as num?)?.toInt() ?? 0,
+      seasonPoints: (json['season_points'] as num?)?.toInt() ?? 0,
       transactionCount: (json['transaction_count'] as num?)?.toInt() ?? 0,
       tierId: json['tier_id'] as String?,
       tierName: json['tier_name'] as String?,

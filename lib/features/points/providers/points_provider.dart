@@ -166,8 +166,8 @@ final userRewardsProvider = FutureProvider<List<RewardWithStatus>>((ref) async {
 
 /// StateNotifier สำหรับ selected period ใน leaderboard
 class LeaderboardPeriodNotifier extends StateNotifier<LeaderboardPeriod> {
-  // Default เป็น rolling_3m เพราะ tier คำนวณจาก rolling 3-month window
-  LeaderboardPeriodNotifier() : super(LeaderboardPeriod.rolling3m);
+  // Default เป็น thisSeason — แสดงคะแนนตั้งแต่ season ปัจจุบันเริ่ม (รวม carry-over bonus)
+  LeaderboardPeriodNotifier() : super(LeaderboardPeriod.thisSeason);
 
   void setPeriod(LeaderboardPeriod period) {
     state = period;

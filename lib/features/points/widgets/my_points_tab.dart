@@ -232,9 +232,19 @@ class MyPointsTab extends ConsumerWidget {
             ],
           ],
 
-          // สถิติคะแนน: สัปดาห์นี้ / เดือนนี้ / 3 เดือน (ถ้ามี)
+          // สถิติคะแนน: Season นี้ / สัปดาห์นี้ / เดือนนี้
           Row(
             children: [
+              // Season นี้ (คะแนนตั้งแต่ season เริ่ม รวม carry-over bonus)
+              Expanded(
+                child: _buildStatBox(
+                  label: 'Season นี้',
+                  value: summary.seasonPoints,
+                  color: tierColor,
+                  showSign: false,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
               // สัปดาห์นี้
               Expanded(
                 child: _buildStatBox(
@@ -252,18 +262,6 @@ class MyPointsTab extends ConsumerWidget {
                   color: AppColors.primary,
                 ),
               ),
-              // 3 เดือนล่าสุด (แสดงเฉพาะ percentile mode)
-              if (summary.rollingPoints != null) ...[
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: _buildStatBox(
-                    label: '3 เดือน',
-                    value: summary.rollingPoints!,
-                    color: tierColor,
-                    showSign: false, // Rolling points ไม่ต้องใส่ +/-
-                  ),
-                ),
-              ],
             ],
           ),
         ],

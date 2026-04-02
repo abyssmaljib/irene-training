@@ -1334,9 +1334,7 @@ extension MedicineServiceMedicineList on MedicineService {
       // โยน error กลับไปพร้อมรายละเอียด เพื่อให้ UI แสดง hint ที่ชัดเจน
       // แทนที่จะ return null ซึ่งทำให้ UI บอกแค่ "ไม่สามารถบันทึกยาได้"
       final errorMsg = e.toString();
-      if (errorMsg.contains('duplicate') || errorMsg.contains('unique')) {
-        throw Exception('คนไข้มียานี้อยู่แล้ว กรุณาตรวจสอบรายการยาปัจจุบัน');
-      } else if (errorMsg.contains('permission') || errorMsg.contains('RLS')) {
+      if (errorMsg.contains('permission') || errorMsg.contains('RLS')) {
         throw Exception('ไม่มีสิทธิ์เพิ่มยา กรุณาติดต่อผู้ดูแลระบบ');
       } else if (errorMsg.contains('network') || errorMsg.contains('SocketException')) {
         throw Exception('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ กรุณาตรวจสอบอินเทอร์เน็ต');
@@ -1455,9 +1453,9 @@ extension MedicineServiceMedicineList on MedicineService {
       if (typeOfTime != null) {
         medicineData['typeOfTime'] = typeOfTime;
       }
-      if (daysOfWeek != null) {
-        medicineData['DaysOfWeek'] = daysOfWeek;
-      }
+      // DaysOfWeek — always set เพื่อ clear ค่าเก่าเมื่อเปลี่ยนจาก สัปดาห์ → วัน/เดือน
+      // ถ้าส่ง null มา = ไม่ได้เลือกวัน → clear เป็น [] (ป้องกัน stale data ค้างใน DB)
+      medicineData['DaysOfWeek'] = daysOfWeek ?? [];
       if (underlyingDiseaseTag != null) {
         medicineData['underlying_disease_tag'] = underlyingDiseaseTag;
       }

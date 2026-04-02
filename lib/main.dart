@@ -21,6 +21,7 @@ import 'core/services/app_version_service.dart';
 import 'core/services/force_update_service.dart';
 import 'core/services/onesignal_service.dart';
 import 'core/widgets/force_update_dialog.dart';
+import 'core/widgets/national_id_dialog.dart';
 import 'features/learning/services/badge_service.dart';
 import 'features/learning/screens/badge_collection_screen.dart';
 import 'features/learning/widgets/badge_earned_dialog.dart';
@@ -206,6 +207,11 @@ class _AuthWrapperState extends State<AuthWrapper>
   // กัน concurrent force update check (login + resume เรียกพร้อมกัน)
   bool _forceUpdateCheckInProgress = false;
 
+  // National ID check: ไม่มี cooldown — เช็คทุกครั้งที่เปิดแอป/resume
+  // เพื่อให้ user ที่กด dismiss ยังเห็น popup ซ้ำจนกว่าจะกรอก
+  bool _isNationalIdDialogShowing = false;
+  bool _nationalIdCheckInProgress = false;
+
   @override
   void initState() {
     super.initState();
@@ -251,6 +257,7 @@ class _AuthWrapperState extends State<AuthWrapper>
           _isForceUpdateDialogShowing = false;
           _lastBadgeCheck = null;
           _isBadgeDialogShowing = false;
+          _isNationalIdDialogShowing = false;
         }
       }
     });
@@ -268,11 +275,53 @@ class _AuthWrapperState extends State<AuthWrapper>
     }
   }
 
-  /// เช็ค force update ก่อน แล้วค่อยเช็ค badge
-  /// ต้อง await force update เพื่อให้ flag _isForceUpdateDialogShowing ถูก set ก่อน badge check
+  /// เช็ค force update ก่อน → national_id → badge ตามลำดับ
+  /// ต้อง await ทีละตัวเพื่อไม่ให้ dialog ซ้อนกัน
   Future<void> _postLoginChecks() async {
     await _checkForceUpdate();
+    await _checkNationalId();
     _checkUnseenBadges();
+  }
+
+  /// เช็คว่า user มี national_id หรือยัง — ถ้ายังไม่มีจะแสดง popup ขอ
+  /// ไม่มี cooldown เพราะต้องการให้ขึ้นทุกครั้งที่เปิดแอปจนกว่าจะกรอก
+  /// user สามารถ dismiss ได้ แต่เปิดแอปมาใหม่ก็จะเจออีก
+  Future<void> _checkNationalId() async {
+    // ถ้า dialog/check กำลังแสดงอยู่ หรือ force update dialog ค้างอยู่ → ข้าม
+    if (_isNationalIdDialogShowing || _nationalIdCheckInProgress ||
+        _isForceUpdateDialogShowing) {
+      return;
+    }
+
+    _nationalIdCheckInProgress = true;
+
+    try {
+      // Query DB เช็คว่ามี national_id หรือยัง
+      final needsId = await NationalIdDialog.needsNationalId();
+      debugPrint('🆔 _checkNationalId: needsId=$needsId, mounted=$mounted');
+
+      if (needsId && mounted) {
+        // ใช้ Completer เพื่อ await จนกว่า dialog จะปิด
+        // ป้องกัน badge dialog ซ้อนก่อนที่ national_id dialog จะปิด
+        final completer = Completer<void>();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && navigatorKey.currentContext != null) {
+            _isNationalIdDialogShowing = true;
+            NationalIdDialog.show(navigatorKey.currentContext!).then((_) {
+              _isNationalIdDialogShowing = false;
+              completer.complete();
+            });
+          } else {
+            completer.complete();
+          }
+        });
+        await completer.future;
+      }
+    } catch (e) {
+      debugPrint('_checkNationalId: Error: $e');
+    } finally {
+      _nationalIdCheckInProgress = false;
+    }
   }
 
   /// ตรวจสอบว่าต้อง force update หรือไม่

@@ -128,19 +128,47 @@ function doGet(e) {
 }
 
 /**
+ * Normalize เลขบัตรประชาชนให้เป็น string ตัวเลขล้วนๆ
+ * แก้ปัญหา Google Sheet เก็บเป็น number/scientific notation ทำให้เปรียบเทียบไม่ตรง
+ *
+ * ตัวอย่าง:
+ * - 886814647 (number) → "886814647"
+ * - "886814647" (string) → "886814647"
+ * - 1.499900502633E12 (scientific) → "1499900502633"
+ * - " 886814647 " (whitespace) → "886814647"
+ *
+ * @param {*} value - ค่าที่จะ normalize
+ * @returns {string} - เลขบัตรประชาชนที่ normalize แล้ว
+ */
+function normalizeNationalId(value) {
+  if (value === null || value === undefined || value === '') return '';
+
+  // ถ้าเป็น number ให้แปลงเป็น string แบบไม่ใช้ scientific notation
+  if (typeof value === 'number') {
+    return value.toFixed(0);
+  }
+
+  // ถ้าเป็น string ให้ลบ whitespace และ - ออก
+  return String(value).trim().replace(/[-\s]/g, '');
+}
+
+/**
  * หา row ที่มีเลขบัตรประชาชนตรงกัน
+ * ใช้ normalizeNationalId เพื่อแก้ปัญหา number vs string comparison
+ *
  * @param {Sheet} sheet - Google Sheet object
  * @param {string} nationalId - เลขบัตรประชาชน
  * @returns {number|null} - Row number หรือ null ถ้าไม่เจอ
  */
 function findRowByNationalId(sheet, nationalId) {
   const data = sheet.getDataRange().getValues();
+  const searchValue = normalizeNationalId(nationalId);
+
+  if (!searchValue) return null;
 
   // เริ่มจาก row 2 (skip header)
   for (let i = 1; i < data.length; i++) {
-    // เปรียบเทียบเลขบัตรประชาชน (column G = index 6)
-    const cellValue = String(data[i][UNIQUE_ID_COLUMN - 1]).trim();
-    const searchValue = String(nationalId).trim();
+    const cellValue = normalizeNationalId(data[i][UNIQUE_ID_COLUMN - 1]);
 
     if (cellValue === searchValue) {
       return i + 1; // Row number (1-indexed)
@@ -165,6 +193,12 @@ function updateRow(sheet, row, data) {
     // ตรวจสอบว่ามี field นี้ และมีค่าจริงๆ (ไม่ใช่ null, undefined, หรือ empty string)
     if (data.hasOwnProperty(field) && hasValue(data[field])) {
       const value = formatValue(field, data[field]);
+
+      // เลขบัตรประชาชน → set เป็น plain text เพื่อป้องกัน Google Sheet แปลงเป็น number
+      if (field === 'national_id') {
+        sheet.getRange(row, col).setNumberFormat('@STRING@');
+      }
+
       sheet.getRange(row, col).setValue(value);
     }
     // ถ้าไม่มีค่า จะไม่ทำอะไร (ข้อมูลเดิมจะยังคงอยู่)
@@ -222,6 +256,12 @@ function appendRow(sheet, data) {
   for (const [field, col] of Object.entries(COLUMN_MAP)) {
     if (data.hasOwnProperty(field) && data[field] !== null && data[field] !== undefined) {
       const value = formatValue(field, data[field]);
+
+      // เลขบัตรประชาชน → set เป็น plain text ก่อนเพื่อป้องกัน Google Sheet แปลงเป็น number
+      if (field === 'national_id') {
+        sheet.getRange(newRow, col).setNumberFormat('@STRING@');
+      }
+
       sheet.getRange(newRow, col).setValue(value);
     }
   }

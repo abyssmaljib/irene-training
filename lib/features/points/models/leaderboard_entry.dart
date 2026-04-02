@@ -3,6 +3,8 @@
 
 /// Period สำหรับ filter leaderboard
 enum LeaderboardPeriod {
+  // "Season นี้" เป็น default — แสดงคะแนนตั้งแต่ season ปัจจุบันเริ่ม (รวม carry-over bonus)
+  thisSeason('this_season', 'Season นี้'),
   thisWeek('this_week', 'สัปดาห์นี้'),
   thisMonth('this_month', 'เดือนนี้'),
   rolling3m('rolling_3m', '3 เดือน'), // Rolling 3-month window (ใช้คำนวณ tier percentile)
