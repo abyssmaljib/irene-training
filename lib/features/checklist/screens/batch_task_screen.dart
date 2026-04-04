@@ -626,8 +626,9 @@ class _ResidentTile extends ConsumerWidget {
       final diffResult = await DifficultyRatingDialog.show(
         context,
         taskTitle: resident.task.title,
-        allowSkip: true,
+        allowSkip: false, // ต้องให้คะแนนทุกครั้ง
         avgScore: resident.task.avgDifficultyScore30d,
+        initialScore: resident.task.clinicalWeight,
       );
       if (diffResult == null) return;
 
@@ -700,11 +701,13 @@ class _ResidentTile extends ConsumerWidget {
 
     // 4. แสดง DifficultyRatingDialog (1-10 หรือข้าม)
     if (!context.mounted) return;
+    // initialScore ใช้ clinicalWeight จากแพทย์เป็น default ของ slider
     final diffResult = await DifficultyRatingDialog.show(
       context,
       taskTitle: resident.task.title,
-      allowSkip: true,
+      allowSkip: false, // ต้องให้คะแนนทุกครั้ง
       avgScore: resident.task.avgDifficultyScore30d,
+      initialScore: resident.task.clinicalWeight, // ค่าจากแพทย์เป็น default slider
     );
     // ถ้า user กด back → ยกเลิกทั้งหมด (ไม่ complete)
     if (diffResult == null) return;

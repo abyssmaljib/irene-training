@@ -96,6 +96,11 @@ class TaskLog {
   final String? difficultyRaterNickname; // ชื่อ user ที่ให้คะแนน
   final double? avgDifficultyScore30d; // ค่าเฉลี่ยย้อนหลัง 30 วัน
 
+  // Clinical weight - ค่าความยากที่แพทย์ตั้งไว้ใน A_Tasks (1-10)
+  // ใช้เป็น default ของ difficulty slider แทน hardcode 5
+  // Priority: avgDifficultyScore30d > clinicalWeight > 5
+  final int? clinicalWeight;
+
   const TaskLog({
     required this.logId,
     this.taskId,
@@ -157,6 +162,7 @@ class TaskLog {
     this.difficultyRatedBy,
     this.difficultyRaterNickname,
     this.avgDifficultyScore30d,
+    this.clinicalWeight,
   });
 
   /// Parse จาก Supabase response
@@ -225,6 +231,8 @@ class TaskLog {
       difficultyRatedBy: json['difficulty_rated_by'] as String?,
       difficultyRaterNickname: json['difficulty_rater_nickname'] as String?,
       avgDifficultyScore30d: (json['avg_difficulty_score_30d'] as num?)?.toDouble(),
+      // Clinical weight จากแพทย์ (ใช้เป็น default difficulty แทน hardcode 5)
+      clinicalWeight: json['clinical_weight'] as int?,
     );
   }
 
@@ -434,6 +442,7 @@ class TaskLog {
     String? difficultyRatedBy,
     String? difficultyRaterNickname,
     double? avgDifficultyScore30d,
+    int? clinicalWeight,
     // ใช้สำหรับ clear ค่าเป็น null (เช่น ยกเลิก status)
     bool clearStatus = false,
     bool clearCompletedAt = false,
@@ -506,6 +515,7 @@ class TaskLog {
       difficultyRatedBy: clearDifficultyRatedBy ? null : (difficultyRatedBy ?? this.difficultyRatedBy),
       difficultyRaterNickname: clearDifficultyRatedBy ? null : (difficultyRaterNickname ?? this.difficultyRaterNickname),
       avgDifficultyScore30d: avgDifficultyScore30d ?? this.avgDifficultyScore30d,
+      clinicalWeight: clinicalWeight ?? this.clinicalWeight,
     );
   }
 }

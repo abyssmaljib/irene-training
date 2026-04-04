@@ -343,31 +343,7 @@ class _DifficultyRatingDialogState extends State<DifficultyRatingDialog> {
               ),
             ),
 
-            // ปุ่มข้าม (ไม่ให้คะแนน)
-            if (widget.allowSkip)
-              Padding(
-                padding: EdgeInsets.fromLTRB(
-                  AppSpacing.md,
-                  AppSpacing.xs,
-                  AppSpacing.md,
-                  AppSpacing.md,
-                ),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: AppSpacing.buttonHeight,
-                  child: TextButton(
-                    onPressed: () {
-                      Navigator.pop(context, const DifficultyResult.skip());
-                    },
-                    child: Text(
-                      'ข้ามไปก่อน',
-                      style: AppTypography.body.copyWith(
-                        color: AppColors.secondaryText,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+            SizedBox(height: AppSpacing.md),
             ],
           ),
         ),

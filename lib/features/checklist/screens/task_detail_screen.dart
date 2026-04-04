@@ -2538,11 +2538,13 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
 
     // === แสดง Dialog ให้ประเมินความยากของงาน ===
     // ถ้า user ปิด dialog (กด back) จะได้ null → ยกเลิก completion
+    // initialScore ใช้ clinicalWeight จากแพทย์เป็น default ของ slider
     final difficultyResult = await DifficultyRatingDialog.show(
       context,
       taskTitle: _task.title,
-      allowSkip: true, // ให้ข้ามได้
-      avgScore: _task.avgDifficultyScore30d, // ค่าเฉลี่ยย้อนหลัง 30 วัน
+      allowSkip: false, // ต้องให้คะแนนทุกครั้ง
+      avgScore: _task.avgDifficultyScore30d, // ค่าเฉลี่ยย้อนหลัง 30 วัน (แสดงให้ดูเฉยๆ)
+      initialScore: _task.clinicalWeight, // ค่าจากแพทย์เป็น default slider
     );
 
     // ถ้า user ปิด dialog โดยไม่ทำอะไร → ยกเลิก
@@ -2571,7 +2573,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       completedByNickname: userNickname,
       completedAt: DateTime.now(),
       confirmImage: capturedImageUrl,
-      difficultyScore: difficultyScore ?? 5, // default 5 ถ้า skip
+      difficultyScore: difficultyScore, // ต้องมีค่าเสมอ (ไม่มีปุ่มข้าม)
       difficultyRatedBy: userId,
       difficultyRaterNickname: userNickname,
     );
@@ -2837,8 +2839,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       type: ConfirmDialogType.warning,
       title: 'ยกเลิกการรับทราบ?',
       message: message,
-      cancelText: 'ไม่',
-      confirmText: 'ยกเลิก',
+      cancelText: 'เก็บไว้',
+      confirmText: 'ยกเลิกรับทราบ',
     );
 
     // ถ้าไม่ได้กดยืนยัน ไม่ทำอะไร

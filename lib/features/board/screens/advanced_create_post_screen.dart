@@ -599,7 +599,7 @@ class _AdvancedCreatePostScreenState
           final difficultyResult = await DifficultyRatingDialog.show(
             context,
             taskTitle: widget.initialTitle,
-            allowSkip: true, // ให้ข้ามได้
+            allowSkip: false, // ต้องให้คะแนนทุกครั้ง
           );
 
           // คะแนนความยากที่ user ให้ (null = ปิด dialog หรือข้าม)
