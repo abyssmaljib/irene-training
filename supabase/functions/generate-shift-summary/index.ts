@@ -133,16 +133,18 @@ function getShiftRange(date: string, shift: string): { start: string; end: strin
   const isMorning = shift.includes('เช้า') || shift === 'เวรเช้า'
 
   if (isMorning) {
-    // เวรเช้า: 07:00 → 19:00 เวลาไทย
+    // เวรเช้า: 07:00 → 19:30 เวลาไทย
+    // ขยาย 30 นาที buffer เพื่อรองรับ task ที่ complete เลยเวลา
     return {
       start: `${date}T07:00:00+07:00`, // 07:00 BKK = 00:00 UTC
-      end: `${date}T19:00:00+07:00`,   // 19:00 BKK = 12:00 UTC
+      end: `${date}T19:30:00+07:00`,   // 19:30 BKK (buffer 30 นาที)
     }
   } else {
-    // เวรดึก: 19:00 วันนี้ → 07:00 วันถัดไป
+    // เวรดึก: 19:00 วันนี้ → 07:30 วันถัดไป
+    // ขยาย 30 นาที buffer เพื่อรองรับ task ที่ complete เลยเวลา
     return {
       start: `${date}T19:00:00+07:00`,   // 19:00 BKK = 12:00 UTC
-      end: `${nextDay}T07:00:00+07:00`,  // 07:00 BKK วันถัดไป = 00:00 UTC
+      end: `${nextDay}T07:30:00+07:00`,  // 07:30 BKK วันถัดไป (buffer 30 นาที)
     }
   }
 }

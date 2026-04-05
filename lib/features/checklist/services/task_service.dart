@@ -367,6 +367,16 @@ class TaskService {
         }
       }
 
+      // ลบ assessment ratings ก่อน (ถ้ามี) — เพราะ CASCADE delete ไม่ทำงานกับ UPDATE
+      try {
+        await _supabase
+            .from('Scale_Report_Log')
+            .delete()
+            .eq('task_log_id', logId);
+      } catch (e) {
+        debugPrint('unmarkTask: failed to delete assessment ratings: $e');
+      }
+
       await _supabase.from('A_Task_logs_ver2').update({
         'status': null,
         'completed_by': null,
@@ -380,7 +390,7 @@ class TaskService {
       }).eq('id', logId);
 
       invalidateCache();
-      debugPrint('unmarkTask: log $logId unmarked');
+      debugPrint('unmarkTask: log $logId unmarked (+ assessment ratings deleted)');
       return true;
     } catch (e) {
       debugPrint('unmarkTask error: $e');

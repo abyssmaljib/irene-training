@@ -11,7 +11,6 @@ import '../../../core/widgets/success_popup.dart';
 import '../providers/vital_sign_form_provider.dart';
 import '../widgets/create_vital_sign/vital_input_section.dart';
 import '../widgets/create_vital_sign/care_input_section.dart';
-import '../widgets/create_vital_sign/rating_section.dart';
 
 /// Screen for editing existing vital sign records
 class EditVitalSignScreen extends ConsumerWidget {
@@ -147,17 +146,7 @@ class EditVitalSignScreen extends ConsumerWidget {
           ),
           const SizedBox(height: AppSpacing.md),
 
-          // Ratings Section (Collapsible) - Only for Full Report
-          if (data.isFullReport)
-            _buildCollapsibleSection(
-              context: context,
-              title: '⭐ การประเมิน (${data.shift}) *',
-              subtitle: 'ให้คะแนนครบทุกหัวข้อ',
-              initiallyExpanded: true,
-              children: [
-                _EditRatingSection(params: params),
-              ],
-            ),
+          // Rating Section ย้ายไป checklist task completion แล้ว
 
           // General Report Section - Only for Full Report
           if (data.isFullReport) ...[
@@ -465,21 +454,6 @@ class _EditCareInputSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CareInputSection(
-      residentId: params.residentId,
-      vitalSignId: params.vitalSignId,
-    );
-  }
-}
-
-/// Wrapper for RatingSection that uses edit provider
-class _EditRatingSection extends StatelessWidget {
-  const _EditRatingSection({required this.params});
-
-  final EditVitalSignParams params;
-
-  @override
-  Widget build(BuildContext context) {
-    return RatingSection(
       residentId: params.residentId,
       vitalSignId: params.vitalSignId,
     );

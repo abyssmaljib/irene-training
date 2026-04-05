@@ -38,6 +38,9 @@ import '../widgets/co_worker_picker.dart';
 import '../models/measurement_config.dart';
 import '../widgets/measurement_input_dialog.dart';
 import '../services/measurement_service.dart';
+import '../services/assessment_service.dart';
+import '../models/assessment_models.dart';
+import '../widgets/assessment_inline_section.dart';
 
 /// หน้ารายละเอียด Task แบบ Full Page
 class TaskDetailScreen extends ConsumerStatefulWidget {
@@ -68,12 +71,17 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
   // สำหรับ expandable details ในหน้าจัดยา (default: ซ่อนไว้เพื่อให้เห็นรูปยาทันที)
   bool _isDetailExpanded = false;
 
-  // สำหรับ measurement task (ชั่งน้ำหนัก, วัดส่วนสูง)
+  // สำหรับ measurement task (ชั่งน้ำหนัก, วัดส่วนสูง, DTX, Insulin)
   // ค่าจาก inline section — ใช้ตอน _handleComplete
   MeasurementConfig? _measurementConfig;
   final _measurementController = TextEditingController();
   String? _measurementPhotoUrl;
   bool _hasMeasurementValue = false; // true เมื่อ user กรอกค่าแล้ว
+
+  // Assessment — prefetch subjects ตอน initState, เก็บ ratings จาก inline section
+  List<AssessmentSubject> _assessmentSubjects = [];
+  List<AssessmentRating> _assessmentRatings = [];
+  bool _assessmentComplete = false; // true เมื่อประเมินครบทุกหัวข้อ
 
   // Realtime subscription
   RealtimeChannel? _taskChannel;
@@ -96,8 +104,28 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       _loadMedicines();
     }
 
-    // ตรวจว่าเป็น measurement task หรือไม่ (เช่น ชั่งน้ำหนัก, วัดส่วนสูง)
+    // ตรวจว่าเป็น measurement task หรือไม่ (เช่น ชั่งน้ำหนัก, วัดส่วนสูง, DTX, Insulin)
     _measurementConfig = getMeasurementConfig(_task.taskType);
+
+    // Prefetch assessment subjects ล่วงหน้า เพื่อไม่ต้องรอตอนกด complete
+    _prefetchAssessmentSubjects();
+  }
+
+  /// โหลดหัวข้อประเมินล่วงหน้าจาก TaskType_Report_Subject
+  /// ถ้า taskType ไม่มี subjects กำหนดไว้ก็ได้ list ว่าง — ไม่แสดง dialog
+  Future<void> _prefetchAssessmentSubjects() async {
+    if (_task.taskType == null || _task.taskType!.isEmpty) return;
+    if (_task.residentId == null) return;
+    try {
+      final nhId = await ref.read(nursinghomeIdProvider.future) ?? 0;
+      final subjects = await AssessmentService.instance
+          .getSubjectsForTaskType(_task.taskType!, nhId);
+      if (mounted) {
+        setState(() => _assessmentSubjects = subjects);
+      }
+    } catch (e) {
+      debugPrint('Prefetch assessment subjects failed: $e');
+    }
   }
 
   @override
@@ -502,7 +530,23 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         _buildPostponeInfo(),
       ],
 
-      // Measurement input section (ชั่งน้ำหนัก/วัดส่วนสูง)
+      // Assessment inline section (ประเมินสุขภาพ เช่น ทานอาหารกี่ %)
+      // แสดงเมื่อ taskType มี subjects กำหนดไว้ และ task ยังไม่ done
+      if (_assessmentSubjects.isNotEmpty && !_task.isDone) ...[
+        SizedBox(height: AppSpacing.lg),
+        AssessmentInlineSection(
+          subjects: _assessmentSubjects,
+          onChanged: (ratings) => _assessmentRatings = ratings,
+          onCompletionChanged: (complete) {
+            if (complete != _assessmentComplete) {
+              setState(() => _assessmentComplete = complete);
+            }
+          },
+        ),
+        AppSpacing.verticalGapMd,
+      ],
+
+      // Measurement input section (ชั่งน้ำหนัก/วัดส่วนสูง/DTX/Insulin)
       // อยู่ล่างสุดก่อน co-worker picker — ใกล้ปุ่ม action เพื่อ UX ที่ดี
       if (_measurementConfig != null && !_task.isDone) ...[
         MeasurementInputSection(
@@ -2364,7 +2408,10 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                         ? null
                         : (_measurementConfig != null && !_hasMeasurementValue)
                             ? null // disabled ถ้ายังไม่กรอกค่า measurement
-                            : _handleComplete,
+                            : (_assessmentSubjects.isNotEmpty &&
+                                    !_assessmentComplete)
+                                ? null // disabled ถ้ายังประเมินไม่ครบ
+                                : _handleComplete,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
@@ -2389,9 +2436,12 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                                 : HugeIcons.strokeRoundedCheckmarkCircle02,
                           ),
                     label: Text(
-                      _measurementConfig != null
-                          ? 'บันทึก${_measurementConfig!.label}'
-                          : 'เรียบร้อย',
+                      // แสดงข้อความตามสถานะ: ยังประเมินไม่ครบ / ยังไม่กรอกค่า / พร้อม
+                      (_assessmentSubjects.isNotEmpty && !_assessmentComplete)
+                          ? 'ประเมินให้ครบก่อน'
+                          : _measurementConfig != null
+                              ? 'บันทึก${_measurementConfig!.label}'
+                              : 'เรียบร้อย',
                       style: AppTypography.button,
                     ),
                   ),
@@ -2508,14 +2558,19 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
 
   // Action handlers
   Future<void> _handleComplete() async {
-    // Guard double-tap — ป้องกันเรียกซ้ำก่อน difficulty dialog แสดง
+    // Guard double-tap — set _isLoading ทันทีก่อนเปิด dialog
+    // (แก้ bug: เดิม set หลัง dialog return ทำให้กดซ้ำได้ระหว่าง dialog เปิด)
     if (_isLoading) return;
+    setState(() => _isLoading = true);
 
     final service = ref.read(taskServiceProvider);
     final userId = ref.read(currentUserIdProvider);
     final userNickname = ref.read(currentUserNicknameProvider).valueOrNull;
 
-    if (userId == null) return;
+    if (userId == null) {
+      setState(() => _isLoading = false);
+      return;
+    }
 
     // === ดึงค่า measurement จาก inline section (ถ้าเป็น measurement task) ===
     // ค่ามาจาก _measurementController ที่ user กรอกไว้ก่อนกด complete
@@ -2528,6 +2583,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       if (value == null || value <= 0) {
         // ไม่ควรเกิด เพราะปุ่ม disabled ถ้ายังไม่กรอก — แต่ guard ไว้
         AppToast.warning(context, 'กรุณากรอกค่า${measurementConfig.label}');
+        setState(() => _isLoading = false);
         return;
       }
       measurementResult = MeasurementResult(
@@ -2548,11 +2604,19 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     );
 
     // ถ้า user ปิด dialog โดยไม่ทำอะไร → ยกเลิก
-    if (difficultyResult == null) return;
+    if (difficultyResult == null) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
     if (!mounted) return;
 
     // คะแนนความยากที่ user ให้ (null = ข้าม → ใช้ default 5)
     final difficultyScore = difficultyResult.score;
+
+    // === Assessment Rating (ประเมินสุขภาพ resident) ===
+    // ใช้ _assessmentRatings จาก inline section ที่ user กรอกไว้แล้ว (ไม่มี dialog)
+    final assessmentRatings =
+        _assessmentRatings.isNotEmpty ? _assessmentRatings : null;
 
     // === Capture data ก่อน async operations ===
     // เพราะ Realtime event จาก markTaskComplete อาจ trigger _refreshTaskData()
@@ -2578,14 +2642,16 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       difficultyRaterNickname: userNickname,
     );
 
-    // อัพเดต local state ทันที
+    // อัพเดต local state ทันที (_isLoading ถูก set true แล้วตั้งแต่ต้น method)
     setState(() {
       _task = optimisticTask;
-      _isLoading = true;
     });
 
     // อัพเดต provider เพื่อให้ checklist screen เห็นผลทันที
     final rollback = optimisticUpdateTask(ref, optimisticTask);
+
+    // === Capture assessment data ก่อน async operations ===
+    final capturedAssessmentRatings = assessmentRatings;
 
     // === เรียก Server ===
     // ถ้ามีเพื่อนร่วมเวร → ข้าม points recording ปกติ แล้วจัดการหาร points แยก
@@ -2618,6 +2684,23 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           );
         } catch (e) {
           debugPrint('⚠️ Batch points recording failed: $e');
+          // ไม่ block flow — task ถูก mark complete แล้ว
+        }
+      }
+
+      // === บันทึกผลประเมินสุขภาพ (ถ้ามี) ===
+      // ไม่ block flow — ถ้า save fail task ยังเสร็จจริง
+      if (capturedAssessmentRatings != null &&
+          capturedAssessmentRatings.isNotEmpty &&
+          capturedResidentId != null) {
+        try {
+          await AssessmentService.instance.saveRatings(
+            taskLogId: capturedLogId,
+            residentId: capturedResidentId,
+            ratings: capturedAssessmentRatings,
+          );
+        } catch (e) {
+          debugPrint('⚠️ Assessment ratings save failed: $e');
           // ไม่ block flow — task ถูก mark complete แล้ว
         }
       }

@@ -463,13 +463,7 @@ class VitalSignFormNotifier
       return 'กรุณาเลือกสถานะการขับถ่าย';
     }
 
-    // Full Report: ต้องให้คะแนนครบทุกหัวข้อ
-    if (currentState.isFullReport && !currentState.allRatingsComplete) {
-      final incompleteCount = currentState.ratings.values
-          .where((r) => !r.isComplete)
-          .length;
-      return 'กรุณาให้คะแนนครบทุกหัวข้อ (เหลืออีก $incompleteCount หัวข้อ)';
-    }
+    // Rating section ย้ายไป checklist task completion แล้ว — ไม่ต้อง validate ratings
 
     return null; // Valid
   }

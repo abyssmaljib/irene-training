@@ -164,25 +164,8 @@ class VitalSignService {
 
       final vitalSignId = vitalSignRow['id'] as int;
 
-      // Step 2: Insert Scale_Report_Log entries (only for full report and rated items)
-      if (formState.isFullReport) {
-        final ratedItems = formState.ratings.values
-            .where((r) => r.isComplete)
-            .toList();
-
-        if (ratedItems.isNotEmpty) {
-          await _supabase.from('Scale_Report_Log').insert(
-            ratedItems.map((r) => {
-              'vital_sign_id': vitalSignId,
-              'Subject_id': r.subjectId,
-              'Choice_id': r.rating,
-              'Relation_id': r.relationId,
-              'resident_id': residentId,
-              'report_description': r.description ?? '',
-            }).toList(),
-          );
-        }
-      }
+      // Scale_Report_Log ย้ายไป checklist task completion แล้ว
+      // ไม่ insert ratings จาก vital sign อีกต่อไป
 
       return vitalSignId;
     } catch (_) {
@@ -263,28 +246,8 @@ class VitalSignService {
         'created_at': formState.selectedDateTime.toIso8601String(),
       }).eq('id', id);
 
-      // Step 2: Delete old Scale_Report_Log entries
-      await _supabase.from('Scale_Report_Log').delete().eq('vital_sign_id', id);
-
-      // Step 3: Insert new Scale_Report_Log entries (only for full report)
-      if (formState.isFullReport) {
-        final ratedItems = formState.ratings.values
-            .where((r) => r.isComplete)
-            .toList();
-
-        if (ratedItems.isNotEmpty) {
-          await _supabase.from('Scale_Report_Log').insert(
-            ratedItems.map((r) => {
-              'vital_sign_id': id,
-              'Subject_id': r.subjectId,
-              'Choice_id': r.rating,
-              'Relation_id': r.relationId,
-              'resident_id': residentId,
-              'report_description': r.description ?? '',
-            }).toList(),
-          );
-        }
-      }
+      // Scale_Report_Log ย้ายไป checklist task completion แล้ว
+      // ไม่ delete/insert ratings จาก vital sign อีกต่อไป
     } catch (_) {
       rethrow;
     }

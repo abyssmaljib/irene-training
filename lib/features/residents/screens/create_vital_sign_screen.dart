@@ -12,7 +12,6 @@ import '../providers/resident_detail_provider.dart';
 import '../providers/vital_sign_form_provider.dart';
 import '../widgets/create_vital_sign/vital_input_section.dart';
 import '../widgets/create_vital_sign/care_input_section.dart';
-import '../widgets/create_vital_sign/rating_section.dart';
 import '../widgets/create_vital_sign/shift_card.dart';
 import '../widgets/create_vital_sign/ai_shift_summary_button.dart';
 import '../widgets/create_vital_sign/preview_vital_sign_dialog.dart';
@@ -118,17 +117,8 @@ class CreateVitalSignScreen extends ConsumerWidget {
           ),
           const SizedBox(height: AppSpacing.md),
 
-          // Ratings Section (Collapsible) - Only for Full Report
-          if (data.isFullReport)
-            _buildCollapsibleSection(
-              context: context,
-              title: '⭐ การประเมิน (${data.shift}) *',
-              subtitle: 'ให้คะแนนครบทุกหัวข้อ',
-              initiallyExpanded: true,
-              children: [
-                RatingSection(residentId: residentId),
-              ],
-            ),
+          // Rating Section ย้ายไป checklist task completion แล้ว
+          // ผู้ช่วยพยาบาลจะประเมินตอนทำ task แทน
 
           // General Report Section - Only for Full Report
           if (data.isFullReport) ...[

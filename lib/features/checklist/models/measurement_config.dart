@@ -1,6 +1,5 @@
 /// Configuration สำหรับ measurement tasks
 /// Match ด้วย taskType ของ task (ไม่ใช่ title)
-/// taskType ที่รองรับ: 'ชั่งน้ำหนัก', 'วัดส่วนสูง'
 class MeasurementConfig {
   /// ประเภทการวัด ตรงกับ measurement_type ใน resident_measurements table
   final String measurementType;
@@ -47,6 +46,22 @@ const Map<String, MeasurementConfig> measurementTaskTypes = {
     min: 50,
     max: 220,
     placeholder: 'เช่น 165',
+  ),
+  'DTX': MeasurementConfig(
+    measurementType: 'dtx',
+    unit: 'mg/dL',
+    label: 'น้ำตาลในเลือด (mg/dL)',
+    min: 30,
+    max: 500,
+    placeholder: 'เช่น 120',
+  ),
+  'Insulin': MeasurementConfig(
+    measurementType: 'insulin',
+    unit: 'units',
+    label: 'อินซูลิน (units)',
+    min: 0,
+    max: 100,
+    placeholder: 'เช่น 10',
   ),
 };
 

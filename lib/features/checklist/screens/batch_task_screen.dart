@@ -22,6 +22,9 @@ import '../widgets/difficulty_rating_dialog.dart';
 import '../models/measurement_config.dart';
 import '../widgets/measurement_input_dialog.dart';
 import 'task_detail_screen.dart';
+import '../services/assessment_service.dart';
+import '../models/assessment_models.dart';
+import '../widgets/assessment_rating_dialog.dart';
 
 /// หน้า Batch Task — ทำ task เดียวกันข้ามคนไข้หลายคน
 ///
@@ -712,6 +715,25 @@ class _ResidentTile extends ConsumerWidget {
     // ถ้า user กด back → ยกเลิกทั้งหมด (ไม่ complete)
     if (diffResult == null) return;
 
+    // 4.5 Assessment Rating (ประเมินสุขภาพ ถ้า taskType มี subjects กำหนดไว้)
+    List<AssessmentRating>? assessmentRatings;
+    if (resident.task.taskType != null &&
+        resident.task.taskType!.isNotEmpty &&
+        resident.task.residentId != null) {
+      final nhId = await ref.read(nursinghomeIdProvider.future) ?? 0;
+      final subjects = await AssessmentService.instance
+          .getSubjectsForTaskType(resident.task.taskType!, nhId);
+      if (subjects.isNotEmpty && context.mounted) {
+        assessmentRatings = await AssessmentRatingDialog.show(
+          context,
+          subjects: subjects,
+          residentName: resident.task.residentName,
+        );
+        // ถ้า user กดยกเลิก → ยกเลิกทั้งหมด
+        if (assessmentRatings == null) return;
+      }
+    }
+
     // 5. Upload + mark complete ทันที
     final notifier = ref.read(batchTaskProvider(groupKey).notifier);
     final success = await notifier.completeResident(
@@ -722,7 +744,23 @@ class _ResidentTile extends ConsumerWidget {
       measurementConfig: measConfig,
     );
 
-    // 5. แสดงผลลัพธ์
+    // 5.5 บันทึก assessment ratings (ถ้ามี) — ไม่ block flow
+    if (success &&
+        assessmentRatings != null &&
+        assessmentRatings.isNotEmpty &&
+        resident.task.residentId != null) {
+      try {
+        await AssessmentService.instance.saveRatings(
+          taskLogId: resident.task.logId,
+          residentId: resident.task.residentId!,
+          ratings: assessmentRatings,
+        );
+      } catch (e) {
+        debugPrint('⚠️ Batch assessment save failed: $e');
+      }
+    }
+
+    // 6. แสดงผลลัพธ์
     if (!context.mounted) return;
     if (success) {
       AppToast.success(
