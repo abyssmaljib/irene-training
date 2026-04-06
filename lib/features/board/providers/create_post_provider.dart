@@ -129,6 +129,8 @@ class CreatePostState {
   // DD Record context (for creating post from shift summary)
   final int? ddId;
   final String? ddTemplateText;
+  // Calendar appointment ID — เชื่อมโพสกับนัดหมายใน C_Calendar_with_Post
+  final int? calendarAppointmentId;
 
   // Restock items — รายการยาที่จะ restock พร้อม post นี้
   // แสดงเมื่อเลือก resident แล้ว ใน AdvancedCreatePostScreen
@@ -174,6 +176,7 @@ class CreatePostState {
     // DD Record context
     this.ddId,
     this.ddTemplateText,
+    this.calendarAppointmentId,
     // Restock items
     this.restockItems = const [],
     // Pending med_history IDs (จากปุ่ม "เพิ่มยาอื่น")
@@ -278,6 +281,7 @@ class CreatePostState {
     // DD Record context
     int? ddId,
     String? ddTemplateText,
+    int? calendarAppointmentId,
     bool? clearDD,
     // Restock items
     List<RestockItem>? restockItems,
@@ -344,6 +348,7 @@ class CreatePostState {
       // DD Record context
       ddId: clearDD == true ? null : (ddId ?? this.ddId),
       ddTemplateText: clearDD == true ? null : (ddTemplateText ?? this.ddTemplateText),
+      calendarAppointmentId: clearDD == true ? null : (calendarAppointmentId ?? this.calendarAppointmentId),
       // Restock items — clearRestockItems = true จะ reset เป็น empty list
       restockItems: clearRestockItems == true
           ? const []
@@ -704,6 +709,7 @@ class CreatePostNotifier extends StateNotifier<CreatePostState> {
     String? residentName,
     String? title,
     NewTag? preselectedTag,
+    int? calendarAppointmentId,
   }) {
     // ถ้ามี preselectedTag ให้ set handover ตาม mode ของ tag นั้น
     final isHandover = preselectedTag?.isForceHandover ?? false;
@@ -717,6 +723,8 @@ class CreatePostNotifier extends StateNotifier<CreatePostState> {
       title: title,
       selectedTag: preselectedTag,
       isHandover: isHandover,
+      // เชื่อมโพสกับนัดหมายใน calendar — เพื่อให้ดูย้อนหลักฐานจากหน้าปฏิทินได้
+      calendarAppointmentId: calendarAppointmentId,
     );
   }
 

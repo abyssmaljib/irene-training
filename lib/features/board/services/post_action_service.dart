@@ -122,6 +122,8 @@ class PostActionService {
     String? qaAnswer,
     // DD Record link (for DD handover posts)
     int? ddId,
+    // Calendar appointment ID — เชื่อมโพสกับนัดหมายเพื่อให้ดูหลักฐานจากปฏิทินได้
+    int? calendarAppointmentId,
   }) async {
     try {
       // Build Tag_Topics from tagName if provided
@@ -181,6 +183,21 @@ class PostActionService {
       // เพื่อไม่ต้องกลับมากด like โพสตัวเองอีกรอบ
       await likePost(postId, userId);
       debugPrint('PostActionService: auto-acknowledged post $postId for creator');
+
+      // เชื่อมโพสกับนัดหมายใน C_Calendar_with_Post junction table
+      // เพื่อให้ดูหลักฐานการไปพบแพทย์จากหน้าปฏิทินได้
+      if (calendarAppointmentId != null) {
+        try {
+          await _supabase.from('C_Calendar_with_Post').insert({
+            'CalendarId': calendarAppointmentId,
+            'PostId': postId,
+          });
+          debugPrint('PostActionService: linked calendar $calendarAppointmentId → post $postId');
+        } catch (e) {
+          // ไม่ throw — post สร้างสำเร็จแล้ว แค่ link ไม่ได้
+          debugPrint('PostActionService: failed to link calendar to post: $e');
+        }
+      }
 
       return postId;
     } catch (e) {

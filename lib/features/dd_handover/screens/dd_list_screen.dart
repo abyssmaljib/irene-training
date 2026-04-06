@@ -50,6 +50,7 @@ class _DDListScreenState extends ConsumerState<DDListScreen>
     final doctorTag = tags.where((t) => t.name == 'พบแพทย์').firstOrNull;
 
     // Init create post provider with DD data + preselected tag
+    // ส่ง calendarAppointmentId ไปด้วยเพื่อเชื่อมโพสกับนัดหมายใน C_Calendar_with_Post
     ref.read(createPostProvider.notifier).initFromDD(
           ddId: record.ddId,
           templateText: record.templateText,
@@ -57,6 +58,7 @@ class _DDListScreenState extends ConsumerState<DDListScreen>
           residentName: record.appointmentResidentName,
           title: record.templateTitle,
           preselectedTag: doctorTag,
+          calendarAppointmentId: record.calendarAppointmentId,
         );
 
     // Navigate to advanced create post

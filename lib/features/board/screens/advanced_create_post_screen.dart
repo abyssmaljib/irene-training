@@ -534,6 +534,8 @@ class _AdvancedCreatePostScreenState
         qaAnswer: state.qaAnswer,
         // DD Record link
         ddId: state.ddId,
+        // เชื่อมโพสกับนัดหมายใน C_Calendar_with_Post
+        calendarAppointmentId: state.calendarAppointmentId,
       );
 
       if (postId != null) {
