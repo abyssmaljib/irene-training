@@ -692,17 +692,24 @@ class _AdvancedCreatePostScreenState
       },
       child: Scaffold(
         backgroundColor: AppColors.surface,
+        // ให้ Scaffold หดตัว body เมื่อ keyboard เปิด — toolbar จะอยู่เหนือ keyboard เสมอ
+        resizeToAvoidBottomInset: true,
         appBar: IreneSecondaryAppBar(
           title: 'สร้างประกาศใหม่',
           backgroundColor: AppColors.surface,
         ),
-        body: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+        // ใช้ Column[Expanded(ScrollView), BottomBar] แทน bottomNavigationBar
+        // เพื่อให้ toolbar อยู่เหนือ keyboard เสมอ (bottomNavigationBar อาจถูกซ่อน)
+        body: Column(
+          children: [
+            Expanded(
+              child: Form(
+                key: _formKey,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
               // Title field
               // ถ้ามาจาก task จะแสดง "หัวข้อ" และ lock ไว้
               // ถ้าไม่ได้มาจาก task จะแสดง "หัวข้อ (ถ้ามี)" และแก้ไขได้
@@ -973,13 +980,18 @@ class _AdvancedCreatePostScreenState
                 ),
               ],
 
-              // Bottom padding for safe area
-              const SizedBox(height: 100),
-            ],
-          ),
+              // Bottom padding
+              const SizedBox(height: 16),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // Toolbar อยู่ใน body Column — จะอยู่เหนือ keyboard เสมอ
+            _buildBottomBar(state),
+          ],
         ),
-      ),
-      bottomNavigationBar: _buildBottomBar(state),
       ),
     );
   }
@@ -1085,10 +1097,34 @@ class _AdvancedCreatePostScreenState
                 ),
               ],
             ),
+
+            // Hint text บอก user ว่าขาดอะไรถึงโพสไม่ได้
+            if (!canSubmit && !_isSubmitting)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  _getSubmitHint(state),
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.secondaryText,
+                  ),
+                ),
+              ),
           ],
         ),
       ),
     );
+  }
+
+  /// สร้างข้อความ hint บอก user ว่าขาดอะไรถึงโพสไม่ได้
+  String _getSubmitHint(CreatePostState state) {
+    final hasTag = state.selectedTag != null;
+    final hasMedia = state.hasImages || state.hasVideo;
+    if (!hasTag && widget.isFromTask && !hasMedia) {
+      return 'กรุณาเลือกหมวดหมู่และแนบรูป/วิดีโอ';
+    }
+    if (!hasTag) return 'กรุณาเลือกหมวดหมู่';
+    if (widget.isFromTask && !hasMedia) return 'กรุณาแนบรูปหรือวิดีโอ';
+    return '';
   }
 
   Widget _buildIconButton({
@@ -1107,8 +1143,9 @@ class _AdvancedCreatePostScreenState
           onTap: onTap,
           borderRadius: BorderRadius.circular(8),
           child: Container(
-            width: 40,
-            height: 40,
+            // ขั้นต่ำ 44x44 ตาม touch target guideline (Apple HIG / Material)
+            width: 44,
+            height: 44,
             alignment: Alignment.center,
             child: HugeIcon(
               icon: icon,

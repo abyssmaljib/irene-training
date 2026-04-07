@@ -70,10 +70,19 @@ class _AdvancedEditPostScreenState
           .read(editPostProvider(widget.post.id).notifier)
           .initFromPost(widget.post);
     });
+
+    // Listen for text changes เพื่ออัพเดตสถานะปุ่มบันทึก (enabled/disabled) และ hint text
+    _textController.addListener(_onTextChanged);
+  }
+
+  /// Callback เมื่อ text เปลี่ยน — rebuild เพื่ออัพเดตสถานะปุ่มบันทึก
+  void _onTextChanged() {
+    setState(() {});
   }
 
   @override
   void dispose() {
+    _textController.removeListener(_onTextChanged);
     _titleController.dispose();
     _textController.dispose();
     _descriptionFocusNode.dispose();
@@ -310,17 +319,23 @@ class _AdvancedEditPostScreenState
       },
       child: Scaffold(
       backgroundColor: AppColors.surface,
+      resizeToAvoidBottomInset: true,
       appBar: IreneSecondaryAppBar(
         title: 'แก้ไขโพส',
         backgroundColor: AppColors.surface,
       ),
-      body: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+      // ใช้ Column[Expanded(ScrollView), BottomBar] แทน bottomNavigationBar
+      // เพื่อให้ toolbar อยู่เหนือ keyboard เสมอ
+      body: Column(
+        children: [
+          Expanded(
+            child: Form(
+              key: _formKey,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
               // Title field
               _buildSectionLabel('หัวข้อ (ถ้ามี)'),
               const SizedBox(height: 8),
@@ -475,13 +490,18 @@ class _AdvancedEditPostScreenState
                 AppSpacing.verticalGapMd,
               ],
 
-              // Bottom padding for safe area
-              const SizedBox(height: 100),
-            ],
-          ),
+              // Bottom padding
+              const SizedBox(height: 16),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // Toolbar อยู่ใน body Column — จะอยู่เหนือ keyboard เสมอ
+            _buildBottomBar(state),
+          ],
         ),
-      ),
-      bottomNavigationBar: _buildBottomBar(state),
     ),
     );
   }
@@ -503,77 +523,105 @@ class _AdvancedEditPostScreenState
         ),
       ),
       child: SafeArea(
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // Media picker buttons (images and video)
-            Wrap(
-              spacing: 8,
+            Row(
               children: [
-                _buildIconButton(
-                  icon: HugeIcons.strokeRoundedCamera01,
-                  onTap: _isSubmitting || !state.canAddMoreImages
-                      ? null
-                      : _pickFromCamera,
-                  tooltip: 'ถ่ายรูป',
+                // Media picker buttons (images and video)
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    _buildIconButton(
+                      icon: HugeIcons.strokeRoundedCamera01,
+                      onTap: _isSubmitting || !state.canAddMoreImages
+                          ? null
+                          : _pickFromCamera,
+                      tooltip: 'ถ่ายรูป',
+                    ),
+                    _buildIconButton(
+                      icon: HugeIcons.strokeRoundedImageComposition,
+                      onTap: _isSubmitting || !state.canAddMoreImages
+                          ? null
+                          : _pickFromGallery,
+                      tooltip: 'เลือกจากแกลเลอรี่',
+                    ),
+                    _buildIconButton(
+                      icon: HugeIcons.strokeRoundedVideo01,
+                      onTap: _isSubmitting || !state.canAddVideo
+                          ? null
+                          : _pickVideo,
+                      tooltip: 'เลือกวีดีโอ',
+                    ),
+                  ],
                 ),
-                _buildIconButton(
-                  icon: HugeIcons.strokeRoundedImageComposition,
-                  onTap: _isSubmitting || !state.canAddMoreImages
-                      ? null
-                      : _pickFromGallery,
-                  tooltip: 'เลือกจากแกลเลอรี่',
-                ),
-                _buildIconButton(
-                  icon: HugeIcons.strokeRoundedVideo01,
-                  onTap: _isSubmitting || !state.canAddVideo
-                      ? null
-                      : _pickVideo,
-                  tooltip: 'เลือกวีดีโอ',
+                const Spacer(),
+                // Submit button
+                ElevatedButton(
+                  onPressed: canSubmit ? _submit : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: AppColors.alternate,
+                    disabledForegroundColor: AppColors.secondaryText,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: _isSubmitting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            HugeIcon(icon: HugeIcons.strokeRoundedFloppyDisk, size: AppIconSize.md, color: Colors.white),
+                            const SizedBox(width: 8),
+                            Text(
+                              'บันทึก',
+                              style: AppTypography.body.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
                 ),
               ],
             ),
-            const Spacer(),
-            // Submit button
-            ElevatedButton(
-              onPressed: canSubmit ? _submit : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: AppColors.alternate,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+
+            // Hint text บอก user ว่าขาดอะไรถึงบันทึกไม่ได้
+            if (!canSubmit && !_isSubmitting)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  _getSubmitHint(state),
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.secondaryText,
+                  ),
                 ),
               ),
-              child: _isSubmitting
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        HugeIcon(icon: HugeIcons.strokeRoundedFloppyDisk, size: AppIconSize.md, color: Colors.white),
-                        const SizedBox(width: 8),
-                        Text(
-                          'บันทึก',
-                          style: AppTypography.body.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-            ),
           ],
         ),
       ),
     );
+  }
+
+  /// สร้างข้อความ hint บอก user ว่าขาดอะไรถึงบันทึกไม่ได้
+  String _getSubmitHint(EditPostState state) {
+    final hasText = _textController.text.trim().isNotEmpty;
+    final hasTag = state.selectedTag != null || state.originalTagName != null;
+    if (!hasText && !hasTag) return 'กรุณาเลือกหมวดหมู่และใส่ข้อความ';
+    if (!hasTag) return 'กรุณาเลือกหมวดหมู่';
+    if (!hasText) return 'กรุณาใส่ข้อความ';
+    return '';
   }
 
   Widget _buildIconButton({
@@ -592,8 +640,9 @@ class _AdvancedEditPostScreenState
           onTap: onTap,
           borderRadius: BorderRadius.circular(8),
           child: Container(
-            width: 40,
-            height: 40,
+            // ขั้นต่ำ 44x44 ตาม touch target guideline (Apple HIG / Material)
+            width: 44,
+            height: 44,
             alignment: Alignment.center,
             child: HugeIcon(
               icon: icon,

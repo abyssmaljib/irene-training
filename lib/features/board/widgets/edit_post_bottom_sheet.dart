@@ -72,10 +72,19 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
           .read(editPostProvider(widget.post.id).notifier)
           .initFromPost(widget.post);
     });
+
+    // Listen for text changes เพื่ออัพเดตสถานะปุ่มบันทึก (enabled/disabled) และ hint text
+    _textController.addListener(_onTextChanged);
+  }
+
+  /// Callback เมื่อ text เปลี่ยน — rebuild เพื่ออัพเดตสถานะปุ่มบันทึก
+  void _onTextChanged() {
+    setState(() {});
   }
 
   @override
   void dispose() {
+    _textController.removeListener(_onTextChanged);
     _textController.dispose();
     _titleController.dispose();
     _descriptionFocusNode.dispose();
@@ -934,90 +943,106 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
   }
 
   Widget _buildBottomBar(EditPostState state) {
-    // ใช้ viewInsetsOf แทน .of().viewInsets เพื่อ subscribe เฉพาะ viewInsets
-    // ลดการ rebuild ทุก MediaQuery change ตอน keyboard animation
-    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-
+    // bottomInset จัดการที่ wrapper แล้ว (Padding + SizedBox หดตัว)
+    // ที่นี่ใช้ constant padding เท่านั้น
     return Container(
-      padding: EdgeInsets.fromLTRB(16, 8, 16, 8 + bottomInset),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       decoration: BoxDecoration(
         color: AppColors.surface,
         border: Border(
           top: BorderSide(color: AppColors.alternate),
         ),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // Image/Video picker buttons
-          Wrap(
-            spacing: 8,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Camera button (images only)
-              _buildIconButton(
-                icon: HugeIcons.strokeRoundedCamera01,
-                onTap: _isUploading || state.isSubmitting || !state.canAddMoreImages
-                    ? null
-                    : _pickFromCamera,
-                tooltip: 'ถ่ายรูป',
+              // Image/Video picker buttons
+              Wrap(
+                spacing: 8,
+                children: [
+                  // Camera button (images only)
+                  _buildIconButton(
+                    icon: HugeIcons.strokeRoundedCamera01,
+                    onTap: _isUploading || state.isSubmitting || !state.canAddMoreImages
+                        ? null
+                        : _pickFromCamera,
+                    tooltip: 'ถ่ายรูป',
+                  ),
+                  // Gallery button (images only)
+                  _buildIconButton(
+                    icon: HugeIcons.strokeRoundedImageComposition,
+                    onTap: _isUploading || state.isSubmitting || !state.canAddMoreImages
+                        ? null
+                        : _pickFromGallery,
+                    tooltip: 'เลือกจากแกลเลอรี่',
+                  ),
+                  // Video button
+                  _buildIconButton(
+                    icon: HugeIcons.strokeRoundedVideo01,
+                    onTap: _isUploading || state.isSubmitting || !state.canAddVideo
+                        ? null
+                        : _pickVideo,
+                    tooltip: 'เลือกวีดีโอ',
+                  ),
+                ],
               ),
-              // Gallery button (images only)
-              _buildIconButton(
-                icon: HugeIcons.strokeRoundedImageComposition,
-                onTap: _isUploading || state.isSubmitting || !state.canAddMoreImages
+
+              // Submit button
+              ElevatedButton(
+                onPressed: state.isSubmitting || !_canSubmit(state)
                     ? null
-                    : _pickFromGallery,
-                tooltip: 'เลือกจากแกลเลอรี่',
-              ),
-              // Video button
-              _buildIconButton(
-                icon: HugeIcons.strokeRoundedVideo01,
-                onTap: _isUploading || state.isSubmitting || !state.canAddVideo
-                    ? null
-                    : _pickVideo,
-                tooltip: 'เลือกวีดีโอ',
+                    : () => _handleSubmit(state),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: AppColors.alternate,
+              disabledForegroundColor: AppColors.secondaryText,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: state.isSubmitting
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          HugeIcon(icon: HugeIcons.strokeRoundedFloppyDisk, size: AppIconSize.md, color: Colors.white),
+                          const SizedBox(width: 8),
+                          Text(
+                            'บันทึก',
+                            style: AppTypography.body.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
               ),
             ],
           ),
 
-          // Submit button
-          ElevatedButton(
-            onPressed: state.isSubmitting || !_canSubmit(state)
-                ? null
-                : () => _handleSubmit(state),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              disabledBackgroundColor: AppColors.alternate,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+          // Hint text บอก user ว่าขาดอะไรถึงบันทึกไม่ได้
+          if (!_canSubmit(state) && !state.isSubmitting)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                _getSubmitHint(state),
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.secondaryText,
+                ),
               ),
             ),
-            child: state.isSubmitting
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      HugeIcon(icon: HugeIcons.strokeRoundedFloppyDisk, size: AppIconSize.md, color: Colors.white),
-                      const SizedBox(width: 8),
-                      Text(
-                        'บันทึก',
-                        style: AppTypography.body.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-          ),
         ],
       ),
     );
@@ -1039,8 +1064,9 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
           onTap: onTap,
           borderRadius: BorderRadius.circular(8),
           child: Container(
-            width: 40,
-            height: 40,
+            // ขั้นต่ำ 44x44 ตาม touch target guideline (Apple HIG / Material)
+            width: 44,
+            height: 44,
             alignment: Alignment.center,
             child: HugeIcon(
               icon: icon,
@@ -1057,6 +1083,16 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
     // ต้องมีข้อความ + ต้องมี tag (เดิมหรือเลือกใหม่)
     final hasTag = state.selectedTag != null || state.originalTagName != null;
     return _textController.text.trim().isNotEmpty && hasTag;
+  }
+
+  /// สร้างข้อความ hint บอก user ว่าขาดอะไรถึงบันทึกไม่ได้
+  String _getSubmitHint(EditPostState state) {
+    final hasText = _textController.text.trim().isNotEmpty;
+    final hasTag = state.selectedTag != null || state.originalTagName != null;
+    if (!hasText && !hasTag) return 'กรุณาเลือกหมวดหมู่และใส่ข้อความ';
+    if (!hasTag) return 'กรุณาเลือกหมวดหมู่';
+    if (!hasText) return 'กรุณาใส่ข้อความ';
+    return '';
   }
 
   Future<void> _pickFromCamera() async {
@@ -1288,10 +1324,12 @@ class _EditPostBottomSheetWrapperState
 
   @override
   Widget build(BuildContext context) {
-    // คำนวณความสูงของ modal (70% ของหน้าจอ)
-    // ใช้ sizeOf แทน .of().size เพื่อไม่ rebuild ตอน keyboard animation
+    // คำนวณความสูงของ modal — หดตัวตาม keyboard เพื่อให้ toolbar ลอยอยู่เหนือ keyboard เสมอ
     final screenHeight = MediaQuery.sizeOf(context).height;
-    final modalHeight = screenHeight * 0.7;
+    // ใช้ viewInsetsOf เพื่อรับค่า keyboard height (rebuild เมื่อ keyboard เปิด/ปิด)
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    // modal หดตัวตาม keyboard — clamp ขั้นต่ำ 200px ป้องกัน negative height
+    final modalHeight = ((screenHeight * 0.7) - bottomInset).clamp(200.0, screenHeight * 0.7);
 
     return PopScope(
       canPop: false,
@@ -1310,13 +1348,17 @@ class _EditPostBottomSheetWrapperState
           }
         }
       },
-      child: SizedBox(
-        height: modalHeight,
-        child: EditPostBottomSheet(
-          key: _sheetKey,
-          post: widget.post,
-          onPostUpdated: widget.onPostUpdated,
-          onAdvancedTap: widget.onAdvancedTap,
+      // Padding ดัน modal ขึ้นเหนือ keyboard + SizedBox หดตัวตาม keyboard
+      child: Padding(
+        padding: EdgeInsets.only(bottom: bottomInset),
+        child: SizedBox(
+          height: modalHeight,
+          child: EditPostBottomSheet(
+            key: _sheetKey,
+            post: widget.post,
+            onPostUpdated: widget.onPostUpdated,
+            onAdvancedTap: widget.onAdvancedTap,
+          ),
         ),
       ),
     );

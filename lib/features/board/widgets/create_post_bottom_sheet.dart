@@ -191,10 +191,16 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
   // Draft Management Functions
   // ============================================================
 
-  /// Callback เมื่อ content เปลี่ยน - debounce แล้ว auto-save draft
+  /// Callback เมื่อ content เปลี่ยน - rebuild เพื่ออัพเดตสถานะปุ่ม + debounce auto-save draft
   void _onContentChanged() {
-    // ถ้ากำลัง restore draft อยู่ ไม่ต้อง save
+    // ถ้ากำลัง restore draft อยู่ ข้ามทั้ง rebuild และ save เพื่อไม่ให้ rebuild ทุก keystroke
     if (_isRestoringDraft) return;
+
+    // rebuild เพื่ออัพเดตสถานะปุ่มโพส (enabled/disabled) และ hint text
+    // หมายเหตุ: setState ที่นี่ rebuild เฉพาะ widget นี้ ไม่ใช่ sync ไป provider
+    // (ซึ่งจะ rebuild ทุก consumer — นั่นคือสิ่งที่ comment บรรทัด ~968 เตือนไว้)
+    setState(() {});
+
     // ถ้ามาจาก task ไม่ต้อง save draft
     if (widget.isFromTask) return;
 
@@ -992,13 +998,10 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
   }
 
   Widget _buildBottomBar(CreatePostState state) {
-    // รับค่า keyboard padding
-    // ใช้ viewInsetsOf แทน .of().viewInsets เพื่อ subscribe เฉพาะ viewInsets
-    // ไม่ rebuild เมื่อ MediaQuery อื่นเปลี่ยน (เช่น orientation, textScaleFactor)
-    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-
+    // bottomInset จัดการที่ wrapper แล้ว (Padding + SizedBox หดตัว)
+    // ที่นี่ใช้ constant padding เท่านั้น
     return Container(
-      padding: EdgeInsets.fromLTRB(16, 8, 16, 8 + bottomInset),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       decoration: BoxDecoration(
         color: AppColors.surface,
         border: Border(
@@ -1082,6 +1085,7 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
               disabledBackgroundColor: AppColors.alternate,
+              disabledForegroundColor: AppColors.secondaryText,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -1117,6 +1121,18 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
             ),
           ],
         ),  // Row
+
+        // Hint text บอก user ว่าขาดอะไรถึงโพสไม่ได้
+        if (!_canSubmit(state) && !state.isSubmitting)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              _getSubmitHint(state),
+              style: AppTypography.caption.copyWith(
+                color: AppColors.secondaryText,
+              ),
+            ),
+          ),
         ],
       ),  // Column
     );
@@ -1138,8 +1154,9 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
           onTap: onTap,
           borderRadius: BorderRadius.circular(8),
           child: Container(
-            width: 40,
-            height: 40,
+            // ขั้นต่ำ 44x44 ตาม touch target guideline (Apple HIG / Material)
+            width: 44,
+            height: 44,
             alignment: Alignment.center,
             child: HugeIcon(
               icon: icon,
@@ -1157,6 +1174,16 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
     return _textController.text.trim().isNotEmpty &&
         state.selectedTag != null &&
         !state.isSubmitting;
+  }
+
+  /// สร้างข้อความ hint บอก user ว่าขาดอะไรถึงโพสไม่ได้
+  String _getSubmitHint(CreatePostState state) {
+    final hasText = _textController.text.trim().isNotEmpty;
+    final hasTag = state.selectedTag != null;
+    if (!hasText && !hasTag) return 'กรุณาเลือกหมวดหมู่และใส่ข้อความ';
+    if (!hasTag) return 'กรุณาเลือกหมวดหมู่';
+    if (!hasText) return 'กรุณาใส่ข้อความ';
+    return '';
   }
 
   Future<void> _pickFromCamera() async {
@@ -1729,11 +1756,13 @@ class _CreatePostBottomSheetWrapperState
 
   @override
   Widget build(BuildContext context) {
-    // คำนวณความสูงของ modal (85% ของหน้าจอ)
-    // ใช้ sizeOf แทน .of().size เพื่อ subscribe เฉพาะ size change
-    // ไม่ rebuild ทุกเฟรมตอน keyboard animation (viewInsets เปลี่ยน)
+    // คำนวณความสูงของ modal — หดตัวตาม keyboard เพื่อให้ toolbar ลอยอยู่เหนือ keyboard เสมอ
     final screenHeight = MediaQuery.sizeOf(context).height;
-    final modalHeight = screenHeight * 0.85;
+    // ใช้ viewInsetsOf เพื่อรับค่า keyboard height (rebuild เมื่อ keyboard เปิด/ปิด)
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    // modal หดตัวตาม keyboard — เหลือพื้นที่ให้ content + toolbar พอดี
+    // clamp ขั้นต่ำ 200px เพื่อป้องกัน negative height บนจอเล็ก + keyboard ใหญ่
+    final modalHeight = ((screenHeight * 0.85) - bottomInset).clamp(200.0, screenHeight * 0.85);
 
     return PopScope(
       // ไม่ให้ pop อัตโนมัติ - เราจะจัดการเอง
@@ -1755,18 +1784,22 @@ class _CreatePostBottomSheetWrapperState
           }
         }
       },
-      child: SizedBox(
-        height: modalHeight,
-        child: CreatePostBottomSheet(
-          key: _sheetKey,
-          onPostCreated: widget.onPostCreated,
-          onAdvancedTap: widget.onAdvancedTap,
-          initialText: widget.initialText,
-          initialResidentId: widget.initialResidentId,
-          initialResidentName: widget.initialResidentName,
-          initialTagName: widget.initialTagName,
-          taskLogId: widget.taskLogId,
-          taskConfirmImageUrl: widget.taskConfirmImageUrl,
+      // Padding ดัน modal ขึ้นเหนือ keyboard + SizedBox หดตัวตาม keyboard
+      child: Padding(
+        padding: EdgeInsets.only(bottom: bottomInset),
+        child: SizedBox(
+          height: modalHeight,
+          child: CreatePostBottomSheet(
+            key: _sheetKey,
+            onPostCreated: widget.onPostCreated,
+            onAdvancedTap: widget.onAdvancedTap,
+            initialText: widget.initialText,
+            initialResidentId: widget.initialResidentId,
+            initialResidentName: widget.initialResidentName,
+            initialTagName: widget.initialTagName,
+            taskLogId: widget.taskLogId,
+            taskConfirmImageUrl: widget.taskConfirmImageUrl,
+          ),
         ),
       ),
     );
