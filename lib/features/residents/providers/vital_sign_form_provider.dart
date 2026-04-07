@@ -503,22 +503,6 @@ class VitalSignFormNotifier
       return false;
     }
 
-    // Validate ratings for full report
-    if (currentState.isFullReport) {
-      // Check if all ratings are complete
-      final incompleteRatings = currentState.ratings.values
-          .where((r) => !r.isComplete)
-          .toList();
-
-      if (incompleteRatings.isNotEmpty) {
-        state = AsyncValue.data(
-          currentState.copyWith(
-            errorMessage: 'กรุณาให้คะแนนครบทุกหัวข้อ (เหลืออีก ${incompleteRatings.length} หัวข้อ)',
-          ),
-        );
-        return false;
-      }
-    }
 
     state = AsyncValue.data(currentState.copyWith(isLoading: true, errorMessage: null));
 
@@ -887,22 +871,6 @@ class EditVitalSignFormNotifier
         ),
       );
       return false;
-    }
-
-    // Validate ratings for full report
-    if (currentState.isFullReport) {
-      final incompleteRatings = currentState.ratings.values
-          .where((r) => !r.isComplete)
-          .toList();
-
-      if (incompleteRatings.isNotEmpty) {
-        state = AsyncValue.data(
-          currentState.copyWith(
-            errorMessage: 'กรุณาให้คะแนนครบทุกหัวข้อ (เหลืออีก ${incompleteRatings.length} หัวข้อ)',
-          ),
-        );
-        return false;
-      }
     }
 
     state = AsyncValue.data(currentState.copyWith(isLoading: true, errorMessage: null));
