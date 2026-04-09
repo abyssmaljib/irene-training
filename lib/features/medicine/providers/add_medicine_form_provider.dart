@@ -381,6 +381,12 @@ class AddMedicineFormNotifier
       final newSetting = settingParts.join(' | ');
 
       // Insert medicine
+      // ส่ง daysOfWeek เฉพาะเมื่อเป็นรายสัปดาห์และมีวันที่เลือก
+      final daysOfWeek = currentState.typeOfTime == 'สัปดาห์' &&
+              currentState.selectedDays.isNotEmpty
+          ? currentState.selectedDays
+          : null;
+
       final result = await _service.addMedicineToResident(
         medDbId: currentState.selectedMedDbId!,
         residentId: residentId,
@@ -389,6 +395,7 @@ class AddMedicineFormNotifier
         beforeAfter: currentState.beforeAfter,
         everyHr: everyHr,
         typeOfTime: everyHr != null ? currentState.typeOfTime : null,
+        daysOfWeek: daysOfWeek,
         prn: currentState.prn,
         onDate: currentState.onDate,
         offDate: currentState.isContinuous ? null : currentState.offDate,

@@ -94,6 +94,7 @@ interface AIAnalysis {
 // Map วันภาษาไทย → index (0=อาทิตย์, 1=จันทร์, ...)
 // ใช้แปลง daysOfWeek จาก DB (ภาษาไทย) เป็น JS getDay() index
 const THAI_DAY_TO_INDEX: Record<string, number> = {
+  // ชื่อเต็ม
   'อาทิตย์': 0,
   'จันทร์': 1,
   'อังคาร': 2,
@@ -102,6 +103,8 @@ const THAI_DAY_TO_INDEX: Record<string, number> = {
   'พฤหัสบดี': 4,
   'ศุกร์': 5,
   'เสาร์': 6,
+  // ชื่อย่อ (จาก Flutter add_medicine เก่า)
+  'อา': 0, 'จ': 1, 'อ': 2, 'พ': 3, 'พฤ': 4, 'ศ': 5, 'ส': 6,
 }
 
 // แปลง meal name → BeforeAfter + BLDB สำหรับ filter ยา

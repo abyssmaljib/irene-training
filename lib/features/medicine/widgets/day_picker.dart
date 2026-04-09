@@ -30,7 +30,7 @@ class DayPicker extends StatelessWidget {
   ];
 
   // Thai day names
-  static const _thaiDays = ['จันทร์', 'อังคาร', 'พุธ', 'พฤหัส', 'ศุกร์', 'เสาร์', 'อาทิตย์'];
+  static const _thaiDays = ['จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์', 'อาทิตย์'];
 
   @override
   Widget build(BuildContext context) {

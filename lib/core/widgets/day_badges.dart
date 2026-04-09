@@ -44,8 +44,9 @@ class DayBadges extends StatelessWidget {
     double size = 22,
     double spacing = 4,
   }) {
-    // สีสำหรับแต่ละวัน
+    // สีสำหรับแต่ละวัน (รองรับทุกรูปแบบชื่อวันที่อาจเก็บใน DB)
     const dayColors = {
+      // ชื่อเต็ม
       'จันทร์': Color(0xFFF1EF99), // เหลือง
       'อังคาร': Color(0xFFFFB6C1), // ชมพู
       'พุธ': Color(0xFF90EE90), // เขียว
@@ -53,14 +54,25 @@ class DayBadges extends StatelessWidget {
       'ศุกร์': Color(0xFFADD8E6), // ฟ้า
       'เสาร์': Color(0xFFDDA0DD), // ม่วง
       'อาทิตย์': Color(0xFFFF6B6B), // แดง
+      // ชื่อกลาง (จาก Flutter day_picker)
+      'พฤหัส': Color(0xFFFFD4B2), // ส้ม
+      // ชื่อย่อ (จาก Flutter add_medicine เก่า)
+      'จ': Color(0xFFF1EF99),
+      'อ': Color(0xFFFFB6C1),
+      'พ': Color(0xFF90EE90),
+      'พฤ': Color(0xFFFFD4B2),
+      'ศ': Color(0xFFADD8E6),
+      'ส': Color(0xFFDDA0DD),
+      'อา': Color(0xFFFF6B6B),
     };
 
-    // ตัวย่อสำหรับแต่ละวัน
+    // ตัวย่อสำหรับแต่ละวัน (รองรับทุกรูปแบบ)
     const dayAbbr = {
       'จันทร์': 'จ',
       'อังคาร': 'อ',
       'พุธ': 'พ',
       'พฤหัสบดี': 'พฤ',
+      'พฤหัส': 'พฤ',
       'ศุกร์': 'ศ',
       'เสาร์': 'ส',
       'อาทิตย์': 'อา',

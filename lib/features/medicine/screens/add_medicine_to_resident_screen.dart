@@ -1684,15 +1684,16 @@ class _DayOfWeekSelector extends StatelessWidget {
   final VoidCallback? onClear;
 
   /// รายการวันทั้งหมด พร้อมสีประจำวัน
-  /// สีตาม FlutterFlow example ที่ user ให้มา
+  /// value = ชื่อเต็มที่เก็บลง DB (ตรงกับ admin app DAYS_OF_WEEK_OPTIONS)
+  /// label = ชื่อย่อสำหรับแสดงบนปุ่มกลม
   static const List<_DayInfo> _days = [
-    _DayInfo('จ', Color(0xFFE1BC29)),   // จันทร์ - เหลือง
-    _DayInfo('อ', Color(0xFFF991CC)),   // อังคาร - ชมพู
-    _DayInfo('พ', Color(0xFF1B998B)),   // พุธ - เขียว teal
-    _DayInfo('พฤ', Color(0xFFEB8258)),  // พฤหัส - ส้ม
-    _DayInfo('ศ', Color(0xFF648DE5)),   // ศุกร์ - ฟ้า
-    _DayInfo('ส', Color(0xFF8A4F7D)),   // เสาร์ - ม่วง
-    _DayInfo('อา', Color(0xFFC92828)),  // อาทิตย์ - แดง
+    _DayInfo('จ', 'จันทร์', Color(0xFFE1BC29)),       // จันทร์ - เหลือง
+    _DayInfo('อ', 'อังคาร', Color(0xFFF991CC)),       // อังคาร - ชมพู
+    _DayInfo('พ', 'พุธ', Color(0xFF1B998B)),           // พุธ - เขียว teal
+    _DayInfo('พฤ', 'พฤหัสบดี', Color(0xFFEB8258)),    // พฤหัส - ส้ม
+    _DayInfo('ศ', 'ศุกร์', Color(0xFF648DE5)),         // ศุกร์ - ฟ้า
+    _DayInfo('ส', 'เสาร์', Color(0xFF8A4F7D)),         // เสาร์ - ม่วง
+    _DayInfo('อา', 'อาทิตย์', Color(0xFFC92828)),      // อาทิตย์ - แดง
   ];
 
   @override
@@ -1705,12 +1706,13 @@ class _DayOfWeekSelector extends StatelessWidget {
             spacing: AppSpacing.md,
             runSpacing: AppSpacing.md,
             children: _days.map((dayInfo) {
-              final isSelected = selectedDays.contains(dayInfo.label);
+              // เช็คทั้ง value (full name) เพื่อรองรับข้อมูลใหม่ที่เก็บเป็นชื่อเต็ม
+              final isSelected = selectedDays.contains(dayInfo.value);
               return _DayCircleButton(
                 label: dayInfo.label,
                 color: dayInfo.color,
                 isSelected: isSelected,
-                onTap: () => onToggle(dayInfo.label),
+                onTap: () => onToggle(dayInfo.value),
               );
             }).toList(),
           ),
@@ -1735,10 +1737,11 @@ class _DayOfWeekSelector extends StatelessWidget {
   }
 }
 
-/// ข้อมูลวัน (label + สี)
+/// ข้อมูลวัน (label แสดง UI, value เก็บ DB, สี)
 class _DayInfo {
-  const _DayInfo(this.label, this.color);
-  final String label;
+  const _DayInfo(this.label, this.value, this.color);
+  final String label; // ชื่อย่อแสดงบนปุ่ม: 'พฤ'
+  final String value; // ชื่อเต็มเก็บ DB: 'พฤหัสบดี'
   final Color color;
 }
 

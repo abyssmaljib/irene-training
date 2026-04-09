@@ -328,14 +328,28 @@ class MedicineSummary {
       case 'สัปดาห์':
         // ยาทุก X สัปดาห์
         // แปลงวันในสัปดาห์ไทย→อังกฤษ
+        // รองรับทุกรูปแบบที่อาจเก็บใน DB:
+        // - เต็ม: 'พฤหัสบดี' (จาก admin DayPickerChips)
+        // - กลาง: 'พฤหัส' (จาก Flutter day_picker.dart)
+        // - ย่อ: 'พฤ' (จาก Flutter add_medicine_to_resident_screen)
         const dayMapping = {
+          // ชื่อเต็ม
           'จันทร์': 'Monday',
           'อังคาร': 'Tuesday',
           'พุธ': 'Wednesday',
+          'พฤหัสบดี': 'Thursday',
           'พฤหัส': 'Thursday',
           'ศุกร์': 'Friday',
           'เสาร์': 'Saturday',
           'อาทิตย์': 'Sunday',
+          // ชื่อย่อ (1-2 ตัวอักษร)
+          'จ': 'Monday',
+          'อ': 'Tuesday',
+          'พ': 'Wednesday',
+          'พฤ': 'Thursday',
+          'ศ': 'Friday',
+          'ส': 'Saturday',
+          'อา': 'Sunday',
         };
 
         final dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];

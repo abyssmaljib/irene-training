@@ -660,14 +660,16 @@ class _DayOfWeekSelector extends StatelessWidget {
   final void Function(String day) onToggle;
   final VoidCallback? onClear;
 
+  /// value = ชื่อเต็มที่เก็บลง DB (ตรงกับ admin app DAYS_OF_WEEK_OPTIONS)
+  /// label = ชื่อย่อสำหรับแสดงบนปุ่มกลม
   static const List<_DayInfo> _days = [
-    _DayInfo('จ', Color(0xFFE1BC29)),
-    _DayInfo('อ', Color(0xFFF991CC)),
-    _DayInfo('พ', Color(0xFF1B998B)),
-    _DayInfo('พฤ', Color(0xFFEB8258)),
-    _DayInfo('ศ', Color(0xFF648DE5)),
-    _DayInfo('ส', Color(0xFF8A4F7D)),
-    _DayInfo('อา', Color(0xFFC92828)),
+    _DayInfo('จ', 'จันทร์', Color(0xFFE1BC29)),
+    _DayInfo('อ', 'อังคาร', Color(0xFFF991CC)),
+    _DayInfo('พ', 'พุธ', Color(0xFF1B998B)),
+    _DayInfo('พฤ', 'พฤหัสบดี', Color(0xFFEB8258)),
+    _DayInfo('ศ', 'ศุกร์', Color(0xFF648DE5)),
+    _DayInfo('ส', 'เสาร์', Color(0xFF8A4F7D)),
+    _DayInfo('อา', 'อาทิตย์', Color(0xFFC92828)),
   ];
 
   @override
@@ -679,12 +681,12 @@ class _DayOfWeekSelector extends StatelessWidget {
             spacing: AppSpacing.md,
             runSpacing: AppSpacing.md,
             children: _days.map((dayInfo) {
-              final isSelected = selectedDays.contains(dayInfo.label);
+              final isSelected = selectedDays.contains(dayInfo.value);
               return _DayCircleButton(
                 label: dayInfo.label,
                 color: dayInfo.color,
                 isSelected: isSelected,
-                onTap: () => onToggle(dayInfo.label),
+                onTap: () => onToggle(dayInfo.value),
               );
             }).toList(),
           ),
@@ -709,8 +711,9 @@ class _DayOfWeekSelector extends StatelessWidget {
 }
 
 class _DayInfo {
-  const _DayInfo(this.label, this.color);
-  final String label;
+  const _DayInfo(this.label, this.value, this.color);
+  final String label; // ชื่อย่อแสดงบนปุ่ม: 'พฤ'
+  final String value; // ชื่อเต็มเก็บ DB: 'พฤหัสบดี'
   final Color color;
 }
 

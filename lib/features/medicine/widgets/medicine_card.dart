@@ -340,14 +340,18 @@ class MedicineCard extends StatelessWidget {
 
   Widget _buildDaysOfWeek() {
     const allDays = ['จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส', 'อา'];
+    // รองรับทุกรูปแบบชื่อวันที่อาจเก็บใน DB
     const dayMapping = {
+      // ชื่อเต็ม
       'จันทร์': 'จ',
       'อังคาร': 'อ',
       'พุธ': 'พ',
       'พฤหัสบดี': 'พฤ',
+      'พฤหัส': 'พฤ',
       'ศุกร์': 'ศ',
       'เสาร์': 'ส',
       'อาทิตย์': 'อา',
+      // ชื่อย่อ (ไม่ต้อง map เพราะเป็นชื่อเดียวกับ allDays แล้ว)
     };
 
     // Convert full day names to short names

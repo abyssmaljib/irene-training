@@ -103,6 +103,28 @@ class EditMedicineFormState {
 
   /// สร้าง EditMedicineFormState จาก MedicineSummary
   /// Pre-populate ค่าเดิมทั้งหมดจากยาที่ต้องการแก้ไข
+  /// Normalize ชื่อวันจาก DB ให้เป็นชื่อเต็มมาตรฐาน
+  /// DB อาจเก็บ 'พฤ', 'พฤหัส', หรือ 'พฤหัสบดี' ขึ้นกับว่าสร้างจากที่ไหน
+  /// Normalize เป็นชื่อเต็มเสมอเพื่อให้ UI selector แสดงถูกต้อง
+  static const _dayNormalize = {
+    // ชื่อย่อ → ชื่อเต็ม
+    'จ': 'จันทร์',
+    'อ': 'อังคาร',
+    'พ': 'พุธ',
+    'พฤ': 'พฤหัสบดี',
+    'ศ': 'ศุกร์',
+    'ส': 'เสาร์',
+    'อา': 'อาทิตย์',
+    // ชื่อกลาง → ชื่อเต็ม
+    'พฤหัส': 'พฤหัสบดี',
+    // ชื่อเต็ม → ชื่อเต็ม (ไม่ต้อง map เพราะ ?? day คืนค่าเดิม)
+  };
+
+  /// แปลง list ของชื่อวัน (ทุกรูปแบบ) เป็นชื่อเต็มมาตรฐาน
+  static List<String> normalizeDayNames(List<String> days) {
+    return days.map((day) => _dayNormalize[day] ?? day).toList();
+  }
+
   factory EditMedicineFormState.fromMedicineSummary(MedicineSummary medicine) {
     return EditMedicineFormState(
       medicineListId: medicine.medicineListId,
@@ -115,7 +137,8 @@ class EditMedicineFormState {
       prn: medicine.prn ?? false,
       everyHr: medicine.everyHr?.toString() ?? '1',
       typeOfTime: medicine.typeOfTime ?? 'วัน',
-      selectedDays: List<String>.from(medicine.daysOfWeek),
+      // Normalize ชื่อวันจาก DB เป็นชื่อเต็มเพื่อให้ UI selector แสดงถูก
+      selectedDays: normalizeDayNames(List<String>.from(medicine.daysOfWeek)),
       // วันที่เริ่มใหม่ = วันนี้ (ไม่ใช่วันที่เริ่มเดิม)
       onDate: DateTime.now(),
       isContinuous: medicine.lastMedHistoryOffDate == null,
@@ -176,7 +199,7 @@ class EditMedicineFormState {
     if (prn != (original.prn ?? false)) return true;
     if (_parseInt(everyHr) != original.everyHr) return true;
     if (typeOfTime != (original.typeOfTime ?? 'วัน')) return true;
-    if (!_listEquals(selectedDays, original.daysOfWeek)) return true;
+    if (!_listEquals(selectedDays, normalizeDayNames(original.daysOfWeek))) return true;
 
     return false;
   }

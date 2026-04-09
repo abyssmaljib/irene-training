@@ -664,15 +664,23 @@ class TaskCard extends StatelessWidget {
 
   /// Badges สำหรับ daysOfWeek (วงกลมสีแต่ละวัน)
   Widget _buildDaysOfWeekBadges() {
-    // สีสำหรับแต่ละวัน
+    // สีสำหรับแต่ละวัน (รองรับทุกรูปแบบชื่อวันที่อาจเก็บใน DB)
     const dayColors = {
-      'จันทร์': Color(0xFFF1EF99), // เหลือง
-      'อังคาร': Color(0xFFFFB6C1), // ชมพู
-      'พุธ': Color(0xFF90EE90), // เขียว
-      'พฤหัสบดี': Color(0xFFFFD4B2), // ส้ม
-      'ศุกร์': Color(0xFFADD8E6), // ฟ้า
-      'เสาร์': Color(0xFFDDA0DD), // ม่วง
-      'อาทิตย์': Color(0xFFFF6B6B), // แดง
+      'จันทร์': Color(0xFFF1EF99),
+      'อังคาร': Color(0xFFFFB6C1),
+      'พุธ': Color(0xFF90EE90),
+      'พฤหัสบดี': Color(0xFFFFD4B2),
+      'พฤหัส': Color(0xFFFFD4B2),
+      'ศุกร์': Color(0xFFADD8E6),
+      'เสาร์': Color(0xFFDDA0DD),
+      'อาทิตย์': Color(0xFFFF6B6B),
+      'จ': Color(0xFFF1EF99),
+      'อ': Color(0xFFFFB6C1),
+      'พ': Color(0xFF90EE90),
+      'พฤ': Color(0xFFFFD4B2),
+      'ศ': Color(0xFFADD8E6),
+      'ส': Color(0xFFDDA0DD),
+      'อา': Color(0xFFFF6B6B),
     };
 
     const dayAbbr = {
@@ -680,6 +688,7 @@ class TaskCard extends StatelessWidget {
       'อังคาร': 'อ',
       'พุธ': 'พ',
       'พฤหัสบดี': 'พฤ',
+      'พฤหัส': 'พฤ',
       'ศุกร์': 'ศ',
       'เสาร์': 'ส',
       'อาทิตย์': 'อา',
