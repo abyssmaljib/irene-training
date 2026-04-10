@@ -34,6 +34,11 @@ class ClockInVerificationResult {
   final int registeredWifiCount;  // จำนวน WiFi ที่ลงทะเบียนไว้ (active)
   final String? wifiError;        // error message ถ้าดึง WiFi ไม่ได้
 
+  // --- Permission Action Flags ---
+  // ใช้บอก UI ว่าต้องพา user ไปหน้าไหน
+  final bool needsAppSettings;      // true = permission deniedForever → ต้องเปิด App Settings
+  final bool needsLocationSettings;  // true = Location Services ปิด → ต้องเปิด Location Settings
+
   const ClockInVerificationResult({
     this.gpsMatch,
     this.distanceMeters,
@@ -45,6 +50,8 @@ class ClockInVerificationResult {
     this.matchedSsid,
     this.registeredWifiCount = 0,
     this.wifiError,
+    this.needsAppSettings = false,
+    this.needsLocationSettings = false,
   });
 }
 
@@ -151,6 +158,13 @@ class ClockInVerificationService {
     final gpsResult = await checkGps(locationConfig);
     final wifiResult = await checkWifi(wifiConfigs);
 
+    // รวม needsAppSettings / needsLocationSettings จากทั้ง GPS และ WiFi
+    // ถ้าอันใดอันหนึ่งต้องการ → flag = true
+    final needsApp = (gpsResult['needsAppSettings'] == true) ||
+        (wifiResult['needsAppSettings'] == true);
+    final needsLocation = (gpsResult['needsLocationSettings'] == true) ||
+        (wifiResult['needsLocationSettings'] == true);
+
     return ClockInVerificationResult(
       // GPS
       gpsMatch: gpsResult['match'] as bool?,
@@ -164,6 +178,9 @@ class ClockInVerificationService {
       matchedSsid: wifiResult['matchedSsid'] as String?,
       registeredWifiCount: wifiResult['registeredCount'] as int? ?? 0,
       wifiError: wifiResult['error'] as String?,
+      // Permission action flags
+      needsAppSettings: needsApp,
+      needsLocationSettings: needsLocation,
     );
   }
 
@@ -221,6 +238,7 @@ class ClockInVerificationService {
           'error': 'กรุณาเปิดบริการตำแหน่งที่ตั้ง (Location Services) ในตั้งค่าเครื่อง',
           'name': config['name'] as String?,
           'radius': (config['radius_meters'] as num?)?.toDouble(),
+          'needsLocationSettings': true, // พา user ไปหน้า Location Settings ของเครื่อง
         };
       }
 
@@ -228,8 +246,16 @@ class ClockInVerificationService {
       final permission = await geolocatorCheckPermission();
       if (permission == LocationPermission.denied) {
         final requested = await geolocatorRequestPermission();
-        if (requested == LocationPermission.denied ||
-            requested == LocationPermission.deniedForever) {
+        if (requested == LocationPermission.deniedForever) {
+          // user กด "Don't Allow" ครั้งที่ 2 → deniedForever
+          return {
+            'match': false,
+            'error': 'สิทธิ์ตำแหน่งถูกปิดถาวร กรุณากดปุ่มด้านล่างเพื่อเปิดในตั้งค่า',
+            'name': config['name'] as String?,
+            'radius': (config['radius_meters'] as num?)?.toDouble(),
+            'needsAppSettings': true, // พา user ไปหน้า App Settings
+          };
+        } else if (requested == LocationPermission.denied) {
           return {
             'match': false,
             'error': 'กรุณาอนุญาตสิทธิ์การเข้าถึงตำแหน่งเพื่อตรวจสอบ GPS',
@@ -241,9 +267,10 @@ class ClockInVerificationService {
         // user เคยปฏิเสธถาวร → ต้องไปเปิดใน Settings เอง
         return {
           'match': false,
-          'error': 'สิทธิ์ตำแหน่งถูกปิดถาวร กรุณาเปิดในตั้งค่าแอป',
+          'error': 'สิทธิ์ตำแหน่งถูกปิดถาวร กรุณากดปุ่มด้านล่างเพื่อเปิดในตั้งค่า',
           'name': config['name'] as String?,
           'radius': (config['radius_meters'] as num?)?.toDouble(),
+          'needsAppSettings': true, // พา user ไปหน้า App Settings
         };
       }
 
@@ -348,6 +375,7 @@ class ClockInVerificationService {
           'match': false,
           'error': 'กรุณาเปิดบริการตำแหน่งที่ตั้ง (Location Services) ในตั้งค่าเครื่อง',
           'registeredCount': configs.length,
+          'needsLocationSettings': true,
         };
       }
 
@@ -357,8 +385,14 @@ class ClockInVerificationService {
       final permission = await geolocatorCheckPermission();
       if (permission == LocationPermission.denied) {
         final requested = await geolocatorRequestPermission();
-        if (requested == LocationPermission.denied ||
-            requested == LocationPermission.deniedForever) {
+        if (requested == LocationPermission.deniedForever) {
+          return {
+            'match': false,
+            'error': 'สิทธิ์ตำแหน่งถูกปิดถาวร กรุณากดปุ่มด้านล่างเพื่อเปิดในตั้งค่า',
+            'registeredCount': configs.length,
+            'needsAppSettings': true,
+          };
+        } else if (requested == LocationPermission.denied) {
           return {
             'match': false,
             'error': 'กรุณาอนุญาตสิทธิ์การเข้าถึงตำแหน่งเพื่อตรวจสอบ WiFi',
@@ -368,8 +402,9 @@ class ClockInVerificationService {
       } else if (permission == LocationPermission.deniedForever) {
         return {
           'match': false,
-          'error': 'สิทธิ์ตำแหน่งถูกปิดถาวร กรุณาเปิดในตั้งค่าแอป',
+          'error': 'สิทธิ์ตำแหน่งถูกปิดถาวร กรุณากดปุ่มด้านล่างเพื่อเปิดในตั้งค่า',
           'registeredCount': configs.length,
+          'needsAppSettings': true,
         };
       }
 

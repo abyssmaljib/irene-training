@@ -50,6 +50,7 @@ import '../../learning/models/badge.dart' as learning; // สำหรับ moc
 import '../services/shift_summary_service.dart' as clock_out_summary; // สำหรับ ShiftSummary (clock out)
 import '../widgets/clock_out_summary_modal.dart'; // สำหรับ dev test
 import '../models/shift_leader.dart'; // สำหรับ mock ShiftLeader ใน dev button
+import 'package:geolocator/geolocator.dart'; // สำหรับ openAppSettings / openLocationSettings
 import '../../settings/services/clockin_verification_service.dart'; // สำหรับตรวจ GPS+WiFi ก่อนขึ้นเวร
 import '../../../core/widgets/buttons.dart'; // สำหรับ PrimaryButton ใน verification dialog
 import '../../../core/widgets/app_toast.dart';
@@ -756,17 +757,66 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
               SizedBox(height: AppSpacing.md),
 
-              // ปุ่ม "รับทราบ" (ปุ่มเดียว)
+              // ปุ่ม "เปิดตั้งค่า" — แสดงเมื่อ permission ถูกปิดถาวร หรือ Location Services ปิด
+              // กดแล้วพา user ไปหน้า Settings โดยตรง ไม่ต้องหาเอง
+              if (result.needsAppSettings || result.needsLocationSettings)
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    AppSpacing.lg, 0, AppSpacing.lg, AppSpacing.xs,
+                  ),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: PrimaryButton(
+                      text: result.needsAppSettings
+                          ? 'เปิดตั้งค่าแอป'
+                          : 'เปิดตั้งค่าตำแหน่ง',
+                      onPressed: () async {
+                        if (result.needsAppSettings) {
+                          // พาไปหน้า App Settings → user กดเปิด Location Permission
+                          await Geolocator.openAppSettings();
+                        } else {
+                          // พาไปหน้า Location Settings → user เปิด Location Services
+                          await Geolocator.openLocationSettings();
+                        }
+                        // ปิด dialog หลังเปิด Settings แล้ว
+                        // user กลับมาแล้วกดขึ้นเวรใหม่ → verify อีกครั้ง
+                        if (ctx.mounted) Navigator.pop(ctx);
+                      },
+                    ),
+                  ),
+                ),
+
+              // ปุ่ม "รับทราบ" — ปิด dialog
               Padding(
                 padding: EdgeInsets.fromLTRB(
                   AppSpacing.lg, 0, AppSpacing.lg, AppSpacing.lg,
                 ),
                 child: SizedBox(
                   width: double.infinity,
-                  child: PrimaryButton(
-                    text: 'รับทราบ',
-                    onPressed: () => Navigator.pop(ctx),
-                  ),
+                  child: result.needsAppSettings || result.needsLocationSettings
+                      // ถ้ามีปุ่ม "เปิดตั้งค่า" → ปุ่มรับทราบเป็น secondary (outline)
+                      ? OutlinedButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          style: OutlinedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(
+                              vertical: AppSpacing.sm + 2,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: AppRadius.mediumRadius,
+                            ),
+                          ),
+                          child: Text(
+                            'ปิด',
+                            style: AppTypography.body.copyWith(
+                              color: AppColors.secondaryText,
+                            ),
+                          ),
+                        )
+                      // ถ้าไม่มีปัญหา permission → ปุ่มเดียวเหมือนเดิม
+                      : PrimaryButton(
+                          text: 'รับทราบ',
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
                 ),
               ),
             ],

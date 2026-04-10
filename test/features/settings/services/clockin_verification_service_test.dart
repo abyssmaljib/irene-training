@@ -333,7 +333,7 @@ void main() {
       expect(result.gpsError, contains('อนุญาตสิทธิ์'));
     });
 
-    test('GPS permission deniedForever → gpsMatch: false', () async {
+    test('GPS permission deniedForever → gpsMatch: false + needsAppSettings', () async {
       // Arrange — user ปฏิเสธถาวร
       service.locationConfigResult = createGpsConfig();
       service.wifiConfigResult = [];
@@ -343,9 +343,11 @@ void main() {
       // Act
       final result = await service.verify(1);
 
-      // Assert
+      // Assert — ต้อง block + flag ให้ UI แสดงปุ่มเปิดตั้งค่าแอป
       expect(result.gpsMatch, isFalse);
       expect(result.gpsError, isNotNull);
+      expect(result.needsAppSettings, isTrue,
+          reason: 'deniedForever → UI ควรแสดงปุ่มเปิดตั้งค่าแอป');
     });
   });
 
@@ -456,7 +458,7 @@ void main() {
   // Scenario 14: Location Services ปิดที่ระดับ system
   // ============================================================
   group('Scenario 14: Location Services ปิดที่ระดับ system', () {
-    test('GPS: Location Services ปิด → gpsMatch: false + error บอกให้เปิด', () async {
+    test('GPS: Location Services ปิด → gpsMatch: false + needsLocationSettings', () async {
       // Arrange — Location Services ปิดที่ระดับ system
       service.locationConfigResult = createGpsConfig();
       service.wifiConfigResult = [];
@@ -465,13 +467,15 @@ void main() {
       // Act
       final result = await service.verify(1);
 
-      // Assert — ต้องแจ้ง error ที่ชัดเจนว่าต้องเปิด Location Services
+      // Assert — ต้องแจ้ง error + flag ให้ UI แสดงปุ่มเปิด Location Settings
       expect(result.gpsMatch, isFalse);
       expect(result.gpsError, isNotNull);
       expect(result.gpsError, contains('บริการตำแหน่งที่ตั้ง'));
+      expect(result.needsLocationSettings, isTrue,
+          reason: 'Location Services ปิด → UI ควรแสดงปุ่มเปิดตั้งค่าตำแหน่ง');
     });
 
-    test('WiFi: Location Services ปิด → wifiMatch: false + error บอกให้เปิด', () async {
+    test('WiFi: Location Services ปิด → wifiMatch: false + needsLocationSettings', () async {
       // Arrange — Location Services ปิดที่ระดับ system
       service.wifiConfigResult = createWifiConfigs();
       service.locationConfigResult = null;
@@ -480,10 +484,12 @@ void main() {
       // Act
       final result = await service.verify(1);
 
-      // Assert — ต้องแจ้ง error ที่ชัดเจนว่าต้องเปิด Location Services
+      // Assert — ต้องแจ้ง error + flag ให้ UI แสดงปุ่มเปิด Location Settings
       expect(result.wifiMatch, isFalse);
       expect(result.wifiError, isNotNull);
       expect(result.wifiError, contains('บริการตำแหน่งที่ตั้ง'));
+      expect(result.needsLocationSettings, isTrue,
+          reason: 'Location Services ปิด → UI ควรแสดงปุ่มเปิดตั้งค่าตำแหน่ง');
     });
 
     test('ทั้ง GPS + WiFi fail พร้อมกันเมื่อ Location Services ปิด', () async {
@@ -495,11 +501,12 @@ void main() {
       // Act
       final result = await service.verify(1);
 
-      // Assert — ทั้งคู่ต้อง fail พร้อม error ที่ชัดเจน
+      // Assert — ทั้งคู่ต้อง fail + needsLocationSettings
       expect(result.gpsMatch, isFalse);
       expect(result.gpsError, contains('บริการตำแหน่งที่ตั้ง'));
       expect(result.wifiMatch, isFalse);
       expect(result.wifiError, contains('บริการตำแหน่งที่ตั้ง'));
+      expect(result.needsLocationSettings, isTrue);
     });
   });
 
@@ -516,10 +523,12 @@ void main() {
       // Act
       final result = await service.verify(1);
 
-      // Assert — ต้อง block + บอกให้ไปเปิดในตั้งค่าแอป
+      // Assert — ต้อง block + บอกให้ไปเปิดในตั้งค่าแอป + flag needsAppSettings
       expect(result.gpsMatch, isFalse);
       expect(result.gpsError, isNotNull);
-      expect(result.gpsError, contains('ตั้งค่าแอป'));
+      expect(result.gpsError, contains('ตั้งค่า'));
+      expect(result.needsAppSettings, isTrue,
+          reason: 'deniedForever ตั้งแต่แรก → UI ควรแสดงปุ่มเปิดตั้งค่าแอป');
     });
   });
 
