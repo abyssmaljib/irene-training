@@ -280,7 +280,7 @@ class _CoWorkerPickerSectionState
                             return ConstrainedBox(
                               constraints: BoxConstraints(
                                 maxHeight:
-                                    MediaQuery.of(context).size.height * 0.4,
+                                    MediaQuery.sizeOf(context).height * 0.4,
                               ),
                               child: ListView.builder(
                                 shrinkWrap: true,

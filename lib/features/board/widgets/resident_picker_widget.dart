@@ -8,6 +8,8 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/input_fields.dart';
 import '../services/post_service.dart';
 import '../providers/post_provider.dart';
+import '../../checklist/providers/task_provider.dart'
+    show currentShiftProvider, nursinghomeZonesProvider;
 
 /// Model สำหรับ Resident option
 class ResidentOption {
@@ -182,8 +184,49 @@ class ResidentPickerSheet extends ConsumerStatefulWidget {
 
 class _ResidentPickerSheetState extends ConsumerState<ResidentPickerSheet> {
   final _searchController = TextEditingController();
-  // ลบ _searchQuery ออก - ใช้ _searchController.text แทน
-  // ใช้ ValueListenableBuilder wrap ส่วน list เพื่อ rebuild เฉพาะส่วนนั้นเมื่อพิมพ์
+
+  /// true = แสดงทุกโซน, false = แสดงเฉพาะโซนที่ user clock-in อยู่
+  bool _showAllZones = false;
+
+  /// รายชื่อ zone names ที่ user clock-in อยู่ (โหลดจาก provider)
+  List<String> _userZoneNames = [];
+
+  @override
+  void initState() {
+    super.initState();
+    // โหลด zone names ของ user จาก currentShift + nursinghomeZones
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadUserZones());
+  }
+
+  /// ดึง zone names ที่ user clock-in อยู่
+  Future<void> _loadUserZones() async {
+    try {
+      final shift = await ref.read(currentShiftProvider.future);
+      if (shift == null || !shift.isClockedIn || shift.zones.isEmpty) {
+        // ไม่ได้ clock-in หรือไม่มีโซน → แสดงทั้งหมด
+        if (mounted) setState(() => _showAllZones = true);
+        return;
+      }
+
+      final allZones = await ref.read(nursinghomeZonesProvider.future);
+      // Map zone IDs → zone names
+      final zoneNames = allZones
+          .where((z) => shift.zones.contains(z.id))
+          .map((z) => z.name)
+          .toList();
+
+      if (mounted) {
+        setState(() {
+          _userZoneNames = zoneNames;
+          // ถ้าไม่มี zone names ที่ match → แสดงทั้งหมด
+          if (zoneNames.isEmpty) _showAllZones = true;
+        });
+      }
+    } catch (_) {
+      // Error → fallback แสดงทั้งหมด
+      if (mounted) setState(() => _showAllZones = true);
+    }
+  }
 
   @override
   void dispose() {
@@ -195,8 +238,9 @@ class _ResidentPickerSheetState extends ConsumerState<ResidentPickerSheet> {
   Widget build(BuildContext context) {
     final residentsAsync = ref.watch(residentsProvider);
 
+    // ใช้ sizeOf แทน of เพื่อไม่ rebuild ตาม viewInsets (keyboard)
     return Container(
-      height: MediaQuery.of(context).size.height * 0.7,
+      height: MediaQuery.sizeOf(context).height * 0.85,
       decoration: const BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -223,16 +267,67 @@ class _ResidentPickerSheetState extends ConsumerState<ResidentPickerSheet> {
             ),
           ),
 
-          // Search field - ลบ onChanged/onClear ออก เพราะใช้ ValueListenableBuilder แทน
+          // Search field + ปุ่มแสดงทั้งหมด/เฉพาะโซน
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: SearchField(
-              controller: _searchController,
-              hintText: 'ค้นหาชื่อ...',
-              isDense: true,
-              // ไม่ต้องใช้ onChanged/onClear เพราะ ValueListenableBuilder
-              // จะ listen _searchController โดยตรง
-              onClear: () => _searchController.clear(),
+            child: Row(
+              children: [
+                // ช่อง search
+                Expanded(
+                  child: SearchField(
+                    controller: _searchController,
+                    hintText: 'ค้นหาชื่อ...',
+                    isDense: true,
+                    onClear: () => _searchController.clear(),
+                  ),
+                ),
+                // ปุ่ม toggle โซน (แสดงเมื่อมี zone data)
+                if (_userZoneNames.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  InkWell(
+                    onTap: () => setState(() => _showAllZones = !_showAllZones),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: _showAllZones
+                            ? AppColors.background
+                            : AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: _showAllZones
+                              ? AppColors.alternate
+                              : AppColors.primary,
+                          width: _showAllZones ? 1 : 1.5,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          HugeIcon(
+                            // icon บอกสถานะปัจจุบัน
+                            icon: _showAllZones
+                                ? HugeIcons.strokeRoundedLocation01
+                                : HugeIcons.strokeRoundedBuilding06,
+                            size: 16,
+                            color: AppColors.primary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            // label บอกว่ากดแล้วจะไปไหน (hint)
+                            _showAllZones ? 'เฉพาะโซนฉัน' : 'แสดงทั้งหมด',
+                            style: AppTypography.caption.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
 
@@ -264,7 +359,9 @@ class _ResidentPickerSheetState extends ConsumerState<ResidentPickerSheet> {
                             Text(
                               searchQuery.isNotEmpty
                                   ? 'ไม่พบผู้พักอาศัย'
-                                  : 'ไม่มีข้อมูลผู้พักอาศัย',
+                                  : !_showAllZones && _userZoneNames.isNotEmpty
+                                      ? 'ไม่มีผู้พักอาศัยในโซนนี้'
+                                      : 'ไม่มีข้อมูลผู้พักอาศัย',
                               style: AppTypography.body
                                   .copyWith(color: AppColors.secondaryText),
                             ),
@@ -308,19 +405,30 @@ class _ResidentPickerSheetState extends ConsumerState<ResidentPickerSheet> {
     );
   }
 
-  /// Filter residents โดยรับ searchQuery เป็น parameter
-  /// เพื่อให้ใช้กับ ValueListenableBuilder ได้
+  /// Filter residents ตาม search query + zone filter
   List<ResidentOption> _filterResidents(
     List<ResidentOption> residents,
     String searchQuery,
   ) {
-    if (searchQuery.isEmpty) return residents;
+    var filtered = residents;
 
-    final query = searchQuery.toLowerCase();
-    return residents.where((r) {
-      return r.name.toLowerCase().contains(query) ||
-          (r.zone?.toLowerCase().contains(query) ?? false);
-    }).toList();
+    // Zone filter: ถ้าไม่ได้แสดงทั้งหมด → เฉพาะโซนที่ user clock-in
+    if (!_showAllZones && _userZoneNames.isNotEmpty) {
+      filtered = filtered
+          .where((r) => r.zone != null && _userZoneNames.contains(r.zone))
+          .toList();
+    }
+
+    // Search filter
+    if (searchQuery.isNotEmpty) {
+      final query = searchQuery.toLowerCase();
+      filtered = filtered.where((r) {
+        return r.name.toLowerCase().contains(query) ||
+            (r.zone?.toLowerCase().contains(query) ?? false);
+      }).toList();
+    }
+
+    return filtered;
   }
 
   /// จัดกลุ่ม residents ตามโซน → return flat list ที่มีทั้ง zone header (String)

@@ -13,15 +13,10 @@ class MeasurementService {
 
   /// Insert ค่า measurement เข้า resident_measurements
   ///
-  /// Parameters:
-  /// - [residentId] — ID ของผู้พักอาศัย
-  /// - [nursinghomeId] — ID ของสถานดูแล
-  /// - [recordedBy] — UUID ของ staff ที่กรอกค่า
-  /// - [measurementType] — ประเภท เช่น 'weight', 'height'
-  /// - [numericValue] — ค่าที่วัดได้ เช่น 65.5
-  /// - [unit] — หน่วย เช่น 'kg', 'cm'
-  /// - [taskLogId] — ID ของ task log ที่ผูกกับ measurement นี้
-  /// - [photoUrl] — URL ของรูปตาชั่ง/อุปกรณ์วัด (ถ้ามี)
+  /// รองรับทั้ง task (taskLogId) และ post (postId)
+  /// - ถ้ามี taskLogId → source = 'task'
+  /// - ถ้ามี postId → source = 'post'
+  /// - ต้องส่งอย่างใดอย่างหนึ่ง
   ///
   /// Returns: true ถ้า insert สำเร็จ, false ถ้าล้มเหลว
   Future<bool> insertMeasurement({
@@ -31,9 +26,20 @@ class MeasurementService {
     required String measurementType,
     required double numericValue,
     required String unit,
-    required int taskLogId,
+    int? taskLogId,
+    int? postId,
     String? photoUrl,
   }) async {
+    // กำหนด source ตาม context ที่ส่งมา
+    final String source;
+    if (taskLogId != null) {
+      source = 'task';
+    } else if (postId != null) {
+      source = 'post';
+    } else {
+      source = 'manual';
+    }
+
     try {
       await _supabase.from('resident_measurements').insert({
         'resident_id': residentId,
@@ -43,14 +49,43 @@ class MeasurementService {
         'measurement_type': measurementType,
         'numeric_value': numericValue,
         'unit': unit,
-        'source': 'task', // มาจาก checklist task
-        'task_log_id': taskLogId,
+        'source': source,
+        if (taskLogId != null) 'task_log_id': taskLogId,
+        if (postId != null) 'post_id': postId,
         if (photoUrl != null) 'photo_url': photoUrl,
       });
       return true;
     } catch (e) {
       // ไม่ print error — ให้ caller จัดการ error เอง
       return false;
+    }
+  }
+
+  /// ดึง measurements ที่ผูกกับ post (สำหรับ edit post)
+  /// Returns: list ของ map { measurement_type, numeric_value, unit, photo_url }
+  Future<List<Map<String, dynamic>>> getMeasurementsForPost(int postId) async {
+    try {
+      final result = await _supabase
+          .from('resident_measurements')
+          .select('measurement_type, numeric_value, unit, photo_url')
+          .eq('post_id', postId)
+          .eq('is_deleted', false);
+      return List<Map<String, dynamic>>.from(result);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /// Soft-delete measurements ทั้งหมดที่ผูกกับ post (ใช้ก่อน re-insert เมื่อ edit)
+  /// ใช้ soft delete (is_deleted = true) เพื่อเก็บ audit trail
+  Future<void> deleteMeasurementsForPost(int postId) async {
+    try {
+      await _supabase
+          .from('resident_measurements')
+          .update({'is_deleted': true, 'post_id': null})
+          .eq('post_id', postId);
+    } catch (e) {
+      // silent fail — ถ้าลบไม่ได้ re-insert จะ error เอง
     }
   }
 }

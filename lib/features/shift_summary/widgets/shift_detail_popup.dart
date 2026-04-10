@@ -103,7 +103,7 @@ class _ShiftDetailPopupState extends ConsumerState<ShiftDetailPopup> {
     final title = 'เวร${thaiMonths[widget.month]} ${widget.year}';
 
     return Container(
-      height: MediaQuery.of(context).size.height * 0.92,
+      height: MediaQuery.sizeOf(context).height * 0.92,
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),

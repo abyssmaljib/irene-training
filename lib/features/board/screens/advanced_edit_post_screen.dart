@@ -21,6 +21,10 @@ import '../widgets/edit_ai_summary_widget.dart';
 import '../widgets/edit_quiz_form_widget.dart';
 import '../widgets/resident_tag_picker_row.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../checklist/services/measurement_service.dart';
+import '../../checklist/services/assessment_service.dart';
+import '../widgets/post_measurement_section.dart';
+import '../widgets/post_assessment_section.dart';
 
 /// Advanced Edit Post Screen - Full page version for editing posts with title/quiz
 class AdvancedEditPostScreen extends ConsumerStatefulWidget {
@@ -69,10 +73,31 @@ class _AdvancedEditPostScreenState
       ref
           .read(editPostProvider(widget.post.id).notifier)
           .initFromPost(widget.post);
+
+      // โหลด measurements + assessments ที่แนบกับ post เดิม
+      _loadExistingMeasurementsAndAssessments();
     });
 
     // Listen for text changes เพื่ออัพเดตสถานะปุ่มบันทึก (enabled/disabled) และ hint text
     _textController.addListener(_onTextChanged);
+  }
+
+  /// โหลด measurements + assessments ที่แนบกับ post เดิม (สำหรับ edit)
+  Future<void> _loadExistingMeasurementsAndAssessments() async {
+    final postId = widget.post.id;
+    final notifier = ref.read(editPostProvider(postId).notifier);
+
+    final measurementRows =
+        await MeasurementService.instance.getMeasurementsForPost(postId);
+    if (measurementRows.isNotEmpty && mounted) {
+      notifier.initMeasurementsFromDb(measurementRows);
+    }
+
+    final ratings =
+        await AssessmentService.instance.getRatingsForPost(postId);
+    if (ratings.isNotEmpty && mounted) {
+      notifier.initAssessmentsFromDb(ratings);
+    }
   }
 
   /// Callback เมื่อ text เปลี่ยน — rebuild เพื่ออัพเดตสถานะปุ่มบันทึก
@@ -101,9 +126,11 @@ class _AdvancedEditPostScreenState
     final textChanged = _textController.text != _initialText;
     final titleChanged = _titleController.text != _initialTitle;
 
-    // เช็คว่ามีการเปลี่ยนแปลงใน state (รูป, วีดีโอ, tag, resident, handover)
+    // เช็คว่ามีการเปลี่ยนแปลงใน state (รูป, วีดีโอ, tag, resident, handover, measurement, assessment)
     final stateChanged = state.hasTagChanged ||
         state.hasResidentChanged ||
+        state.hasMeasurementChanges ||
+        state.hasAssessmentChanges ||
         state.newImages.isNotEmpty ||
         state.removedExistingIndexes.isNotEmpty ||
         state.newVideos.isNotEmpty ||
@@ -252,10 +279,36 @@ class _AdvancedEditPostScreenState
         isHandover = state.isHandover;
       }
 
+      // รูป measurement: เพิ่มเฉพาะรูปใหม่ที่ยังไม่อยู่ใน list (ป้องกัน duplicate)
+      if (state.hasMeasurements) {
+        for (final entry in state.measurements.values) {
+          if (entry.hasPhoto && !allMediaUrls.contains(entry.photoUrl!)) {
+            allMediaUrls.add(entry.photoUrl!);
+          }
+        }
+      }
+
+      // === สรุปค่าวัดต่อท้ายข้อความ (ถ้ามี measurement) ===
+      String finalText = text.replaceAll(RegExp(r'\n\n📊 .+$'), '');
+      if (state.hasMeasurements) {
+        final parts = <String>[];
+        for (final entry in state.measurements.values) {
+          if (entry.hasValue) {
+            parts.add('${entry.config.label}: ${entry.value} ${entry.config.unit}');
+          }
+        }
+        if (parts.isNotEmpty) {
+          final summary = '📊 ${parts.join(' | ')}';
+          finalText = finalText.trim().isEmpty
+              ? summary
+              : '${finalText.trim()}\n\n$summary';
+        }
+      }
+
       // Update post with quiz fields and tag/resident
       final success = await PostActionService.instance.updatePost(
         postId: widget.post.id,
-        text: text,
+        text: finalText,
         title: _titleController.text.trim().isEmpty
             ? null
             : _titleController.text.trim(),
@@ -274,6 +327,41 @@ class _AdvancedEditPostScreenState
       );
 
       if (success) {
+        // === UPDATE measurements (delete + re-insert) ===
+        if (state.hasMeasurementChanges && state.residentId != null) {
+          final nursinghomeId =
+              await ref.read(postNursinghomeIdProvider.future);
+          await MeasurementService.instance
+              .deleteMeasurementsForPost(widget.post.id);
+          for (final entry in state.measurements.values) {
+            if (entry.hasValue && nursinghomeId != null) {
+              await MeasurementService.instance.insertMeasurement(
+                residentId: state.residentId!,
+                nursinghomeId: nursinghomeId,
+                recordedBy: userId,
+                measurementType: entry.measurementType,
+                numericValue: entry.value!,
+                unit: entry.config.unit,
+                postId: widget.post.id,
+                photoUrl: entry.photoUrl,
+              );
+            }
+          }
+        }
+
+        // === UPDATE assessment ratings (delete + re-insert) ===
+        if (state.hasAssessmentChanges && state.residentId != null) {
+          await AssessmentService.instance
+              .deleteRatingsForPost(widget.post.id);
+          if (state.assessmentRatings.isNotEmpty) {
+            await AssessmentService.instance.saveRatings(
+              postId: widget.post.id,
+              residentId: state.residentId!,
+              ratings: state.assessmentRatings,
+            );
+          }
+        }
+
         // Refresh posts
         refreshPosts(ref);
         ref.invalidate(postDetailProvider(widget.post.id));
@@ -869,6 +957,44 @@ class _AdvancedEditPostScreenState
             // Edit mode: ไม่บังคับส่งเวรเมื่อไม่มี resident
             forceHandoverWhenNoResident: false,
           ),
+
+          // === Measurement + Assessment Sections ===
+          if (state.residentId != null) ...[
+            AppSpacing.verticalGapSm,
+            PostMeasurementSection(
+              measurements: state.measurements,
+              onMeasurementAdded: (type) =>
+                  ref.read(editPostProvider(widget.post.id).notifier).addMeasurement(type),
+              onMeasurementRemoved: (type) =>
+                  ref.read(editPostProvider(widget.post.id).notifier).removeMeasurement(type),
+              onValueChanged: (type, value) =>
+                  ref.read(editPostProvider(widget.post.id).notifier).updateMeasurementValue(type, value),
+              onPhotoChanged: (type, url) =>
+                  ref.read(editPostProvider(widget.post.id).notifier).updateMeasurementPhoto(type, url),
+              onPhotoUploaded: (url) {
+                ref.read(editPostProvider(widget.post.id).notifier)
+                    .addExistingImageUrl(url);
+              },
+              onPhotoRemoved: (url) {
+                final current = ref.read(editPostProvider(widget.post.id));
+                final idx = current.existingImageUrls.indexOf(url);
+                if (idx >= 0) {
+                  ref.read(editPostProvider(widget.post.id).notifier)
+                      .removeExistingImage(idx);
+                }
+              },
+            ),
+            AppSpacing.verticalGapSm,
+            PostAssessmentSection(
+              nursinghomeId: ref.watch(postNursinghomeIdProvider).valueOrNull ?? 0,
+              subjects: state.assessmentSubjects,
+              initialRatings: state.originalAssessmentRatings,
+              onSubjectsLoaded: (subjects) =>
+                  ref.read(editPostProvider(widget.post.id).notifier).setAssessmentSubjects(subjects),
+              onRatingsChanged: (ratings) =>
+                  ref.read(editPostProvider(widget.post.id).notifier).setAssessmentRatings(ratings),
+            ),
+          ],
         ],
       ),
     );

@@ -18,6 +18,10 @@ import '../screens/advanced_edit_post_screen.dart';
 import 'image_picker_bar.dart';
 import 'create_post_bottom_sheet.dart' show navigateToAdvancedPostScreen;
 import 'resident_tag_picker_row.dart';
+import 'post_measurement_section.dart';
+import 'post_assessment_section.dart';
+import '../../checklist/services/measurement_service.dart';
+import '../../checklist/services/assessment_service.dart';
 
 // ============================================================
 // Edit Post Bottom Sheet - พร้อม confirmation ก่อนปิด
@@ -71,15 +75,39 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
       ref
           .read(editPostProvider(widget.post.id).notifier)
           .initFromPost(widget.post);
+
+      // โหลด measurements + assessments ที่แนบกับ post เดิม
+      _loadExistingMeasurementsAndAssessments();
     });
 
     // Listen for text changes เพื่ออัพเดตสถานะปุ่มบันทึก (enabled/disabled) และ hint text
     _textController.addListener(_onTextChanged);
   }
 
-  /// Callback เมื่อ text เปลี่ยน — rebuild เพื่ออัพเดตสถานะปุ่มบันทึก
+  /// Callback เมื่อ text เปลี่ยน
+  /// ไม่ใช้ setState — ปุ่มบันทึกใช้ ValueListenableBuilder แทน
   void _onTextChanged() {
-    setState(() {});
+    // ไม่ rebuild ทั้ง bottom sheet ทุก keystroke
+  }
+
+  /// โหลด measurements + assessments ที่แนบกับ post เดิม (สำหรับ edit)
+  Future<void> _loadExistingMeasurementsAndAssessments() async {
+    final postId = widget.post.id;
+    final notifier = ref.read(editPostProvider(postId).notifier);
+
+    // โหลด measurements จาก resident_measurements (ถ้ามี)
+    final measurementRows =
+        await MeasurementService.instance.getMeasurementsForPost(postId);
+    if (measurementRows.isNotEmpty && mounted) {
+      notifier.initMeasurementsFromDb(measurementRows);
+    }
+
+    // โหลด assessment ratings จาก Scale_Report_Log (ถ้ามี)
+    final ratings =
+        await AssessmentService.instance.getRatingsForPost(postId);
+    if (ratings.isNotEmpty && mounted) {
+      notifier.initAssessmentsFromDb(ratings);
+    }
   }
 
   @override
@@ -103,9 +131,11 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
     final textChanged = _textController.text != _initialText;
     final titleChanged = _titleController.text != _initialTitle;
 
-    // เช็คว่ามีการเปลี่ยนแปลงใน state (รูป, วีดีโอ, tag, resident, handover)
+    // เช็คว่ามีการเปลี่ยนแปลงใน state (รูป, วีดีโอ, tag, resident, handover, measurement, assessment)
     final stateChanged = state.hasTagChanged ||
         state.hasResidentChanged ||
+        state.hasMeasurementChanges ||
+        state.hasAssessmentChanges ||
         state.newImages.isNotEmpty ||
         state.removedExistingIndexes.isNotEmpty ||
         state.newVideos.isNotEmpty ||
@@ -548,6 +578,45 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
             // Edit mode: ไม่บังคับส่งเวรเมื่อไม่มี resident
             forceHandoverWhenNoResident: false,
           ),
+
+          // === Measurement + Assessment Sections ===
+          // แสดงเมื่อมี resident (ค่าวัดต้องมี resident)
+          if (state.residentId != null) ...[
+            AppSpacing.verticalGapSm,
+            PostMeasurementSection(
+              measurements: state.measurements,
+              onMeasurementAdded: (type) =>
+                  ref.read(editPostProvider(widget.post.id).notifier).addMeasurement(type),
+              onMeasurementRemoved: (type) =>
+                  ref.read(editPostProvider(widget.post.id).notifier).removeMeasurement(type),
+              onValueChanged: (type, value) =>
+                  ref.read(editPostProvider(widget.post.id).notifier).updateMeasurementValue(type, value),
+              onPhotoChanged: (type, url) =>
+                  ref.read(editPostProvider(widget.post.id).notifier).updateMeasurementPhoto(type, url),
+              onPhotoUploaded: (url) {
+                ref.read(editPostProvider(widget.post.id).notifier)
+                    .addExistingImageUrl(url);
+              },
+              onPhotoRemoved: (url) {
+                // Edit: หา index ของรูปเก่าใน existingImageUrls แล้ว mark removed
+                final current = ref.read(editPostProvider(widget.post.id));
+                final idx = current.existingImageUrls.indexOf(url);
+                if (idx >= 0) {
+                  ref.read(editPostProvider(widget.post.id).notifier).removeExistingImage(idx);
+                }
+              },
+            ),
+            AppSpacing.verticalGapSm,
+            PostAssessmentSection(
+              nursinghomeId: ref.watch(postNursinghomeIdProvider).valueOrNull ?? 0,
+              subjects: state.assessmentSubjects,
+              initialRatings: state.originalAssessmentRatings,
+              onSubjectsLoaded: (subjects) =>
+                  ref.read(editPostProvider(widget.post.id).notifier).setAssessmentSubjects(subjects),
+              onRatingsChanged: (ratings) =>
+                  ref.read(editPostProvider(widget.post.id).notifier).setAssessmentRatings(ratings),
+            ),
+          ],
         ],
       ),
     );
@@ -990,59 +1059,72 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
                 ],
               ),
 
-              // Submit button
-              ElevatedButton(
-                onPressed: state.isSubmitting || !_canSubmit(state)
-                    ? null
-                    : () => _handleSubmit(state),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  disabledBackgroundColor: AppColors.alternate,
-              disabledForegroundColor: AppColors.secondaryText,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: state.isSubmitting
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          HugeIcon(icon: HugeIcons.strokeRoundedFloppyDisk, size: AppIconSize.md, color: Colors.white),
-                          const SizedBox(width: 8),
-                          Text(
-                            'บันทึก',
-                            style: AppTypography.body.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
+              // Submit button — ValueListenableBuilder rebuild เฉพาะปุ่มเมื่อ text เปลี่ยน
+              ValueListenableBuilder<TextEditingValue>(
+                valueListenable: _textController,
+                builder: (context, textValue, _) {
+                  final canSubmit = _canSubmit(state);
+                  return ElevatedButton(
+                    onPressed: state.isSubmitting || !canSubmit
+                        ? null
+                        : () => _handleSubmit(state),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: AppColors.alternate,
+                      disabledForegroundColor: AppColors.secondaryText,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
                       ),
+                    ),
+                    child: state.isSubmitting
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              HugeIcon(icon: HugeIcons.strokeRoundedFloppyDisk, size: AppIconSize.md, color: Colors.white),
+                              const SizedBox(width: 8),
+                              Text(
+                                'บันทึก',
+                                style: AppTypography.body.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                  );
+                },
               ),
             ],
           ),
 
-          // Hint text บอก user ว่าขาดอะไรถึงบันทึกไม่ได้
-          if (!_canSubmit(state) && !state.isSubmitting)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                _getSubmitHint(state),
-                style: AppTypography.caption.copyWith(
-                  color: AppColors.secondaryText,
+          // Hint text — rebuild เฉพาะเมื่อ text เปลี่ยน
+          ValueListenableBuilder<TextEditingValue>(
+            valueListenable: _textController,
+            builder: (context, textValue, _) {
+              if (_canSubmit(state) || state.isSubmitting) {
+                return const SizedBox.shrink();
+              }
+              return Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  _getSubmitHint(state),
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.secondaryText,
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
+          ),
         ],
       ),
     );
@@ -1227,10 +1309,37 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
         isHandover = state.isHandover;
       }
 
+      // รูป measurement: เพิ่มเฉพาะรูปใหม่ที่ยังไม่อยู่ใน list (ป้องกัน duplicate)
+      if (state.hasMeasurements) {
+        for (final entry in state.measurements.values) {
+          if (entry.hasPhoto && !allMediaUrls.contains(entry.photoUrl!)) {
+            allMediaUrls.add(entry.photoUrl!);
+          }
+        }
+      }
+
+      // === สรุปค่าวัดต่อท้ายข้อความ (ถ้ามี measurement) ===
+      // ลบ summary เดิมออกก่อน (ถ้ามี) แล้วใส่ใหม่
+      String finalText = text.replaceAll(RegExp(r'\n\n📊 .+$'), '');
+      if (state.hasMeasurements) {
+        final parts = <String>[];
+        for (final entry in state.measurements.values) {
+          if (entry.hasValue) {
+            parts.add('${entry.config.label}: ${entry.value} ${entry.config.unit}');
+          }
+        }
+        if (parts.isNotEmpty) {
+          final summary = '📊 ${parts.join(' | ')}';
+          finalText = finalText.trim().isEmpty
+              ? summary
+              : '${finalText.trim()}\n\n$summary';
+        }
+      }
+
       // Update post
       final success = await actionService.updatePost(
         postId: widget.post.id,
-        text: text,
+        text: finalText,
         title: _titleController.text.trim().isEmpty
             ? null
             : _titleController.text.trim(),
@@ -1242,6 +1351,43 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
       );
 
       if (success) {
+        // === UPDATE measurements (delete + re-insert) ===
+        if (state.hasMeasurementChanges && state.residentId != null) {
+          final nursinghomeId =
+              await ref.read(postNursinghomeIdProvider.future);
+          // ลบ measurements เดิมก่อน
+          await MeasurementService.instance
+              .deleteMeasurementsForPost(widget.post.id);
+          // Insert ใหม่เฉพาะที่มีค่า
+          for (final entry in state.measurements.values) {
+            if (entry.hasValue && nursinghomeId != null) {
+              await MeasurementService.instance.insertMeasurement(
+                residentId: state.residentId!,
+                nursinghomeId: nursinghomeId,
+                recordedBy: userId,
+                measurementType: entry.measurementType,
+                numericValue: entry.value!,
+                unit: entry.config.unit,
+                postId: widget.post.id,
+                photoUrl: entry.photoUrl,
+              );
+            }
+          }
+        }
+
+        // === UPDATE assessment ratings (delete + re-insert) ===
+        if (state.hasAssessmentChanges && state.residentId != null) {
+          await AssessmentService.instance
+              .deleteRatingsForPost(widget.post.id);
+          if (state.assessmentRatings.isNotEmpty) {
+            await AssessmentService.instance.saveRatings(
+              postId: widget.post.id,
+              residentId: state.residentId!,
+              ratings: state.assessmentRatings,
+            );
+          }
+        }
+
         // Refresh posts
         refreshPosts(ref);
         ref.invalidate(postDetailProvider(widget.post.id));

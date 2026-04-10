@@ -7,7 +7,23 @@ import '../../../core/widgets/network_image.dart';
 import '../models/post.dart';
 
 /// Card แสดง Post
+/// Pre-compute styles เพื่อไม่สร้างใหม่ทุก scroll frame
 class PostCard extends StatelessWidget {
+  // === Pre-computed colors (ลด withValues() ทุก frame) ===
+  static final _errorBorderLight = AppColors.error.withValues(alpha: 0.2);
+  static final _errorBorderMedium = AppColors.error.withValues(alpha: 0.3);
+
+  // === Pre-computed text styles (ลด copyWith() ทุก frame) ===
+  static final _captionSecondary = AppTypography.caption.copyWith(
+    color: AppColors.secondaryText,
+  );
+  static final _captionPrimary = AppTypography.caption.copyWith(
+    color: AppColors.primary,
+    fontWeight: FontWeight.w500,
+  );
+  static final _captionError = AppTypography.caption.copyWith(
+    color: AppColors.error,
+  );
   final Post post;
   final bool isLiked;
   final String? currentUserId;
@@ -42,19 +58,15 @@ class PostCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: EdgeInsets.all(AppSpacing.md),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: AppRadius.mediumRadius,
           boxShadow: [AppShadows.subtle],
-          // tab ศูนย์ = กรอบสีแดงพาสเทลทุก card
-          // tab ผู้พัก = กรอบสีแดงเฉพาะ critical
           border: isCenterTab
-              ? Border.all(
-                  color: AppColors.error.withValues(alpha: 0.2), width: 1.5)
+              ? Border.all(color: _errorBorderLight, width: 1.5)
               : (post.isCritical
-                  ? Border.all(
-                      color: AppColors.error.withValues(alpha: 0.3), width: 2)
+                  ? Border.all(color: _errorBorderMedium, width: 2)
                   : null),
         ),
         child: Column(
@@ -120,7 +132,7 @@ class PostCard extends StatelessWidget {
         ],
         Text(
           _formatTimeAgo(post.createdAt),
-          style: AppTypography.caption.copyWith(color: AppColors.secondaryText),
+          style: _captionSecondary,
         ),
       ],
     );
@@ -137,8 +149,8 @@ class PostCard extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: displayTags.map((tag) {
         return Container(
-          margin: EdgeInsets.only(right: 4),
-          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          margin: const EdgeInsets.only(right: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
             color: AppColors.primary.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(4),
@@ -176,7 +188,7 @@ class PostCard extends StatelessWidget {
 
   Widget _buildResidentTag() {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
         color: AppColors.tagReadBg,
         borderRadius: BorderRadius.circular(4),
@@ -367,7 +379,7 @@ class PostCard extends StatelessWidget {
           AppSpacing.horizontalGapXs,
           Text(
             'ยา ${post.medHistoryCount}',
-            style: AppTypography.caption.copyWith(color: AppColors.primary),
+            style: _captionPrimary,
           ),
         ],
       ),
@@ -376,7 +388,7 @@ class PostCard extends StatelessWidget {
 
   Widget _buildQuizBadge() {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
         color: AppColors.error.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(4),
@@ -388,7 +400,7 @@ class PostCard extends StatelessWidget {
           AppSpacing.horizontalGapXs,
           Text(
             'มี Quiz',
-            style: AppTypography.caption.copyWith(color: AppColors.error),
+            style: _captionError,
           ),
         ],
       ),
@@ -401,7 +413,7 @@ class PostCard extends StatelessWidget {
     return GestureDetector(
       onTap: onLikeTap,
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
           color: isLiked
               ? AppColors.primary.withValues(alpha: 0.1)
@@ -478,7 +490,7 @@ class _CancelLineButtonState extends State<_CancelLineButton> {
       onTap: _isLoading ? null : _handleCancel,
       child: Container(
         height: 28,
-        padding: EdgeInsets.symmetric(horizontal: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
           color: Colors.transparent,
           borderRadius: BorderRadius.circular(8),

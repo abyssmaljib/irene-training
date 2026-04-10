@@ -220,8 +220,8 @@ class MedicinePhotoItem extends StatelessWidget {
         insetPadding: EdgeInsets.all(AppSpacing.md),
         child: Container(
           constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.9,
-            maxHeight: MediaQuery.of(context).size.height * 0.85,
+            maxWidth: MediaQuery.sizeOf(context).width * 0.9,
+            maxHeight: MediaQuery.sizeOf(context).height * 0.85,
           ),
           decoration: BoxDecoration(
             color: AppColors.secondaryBackground,

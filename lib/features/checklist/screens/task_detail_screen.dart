@@ -1380,7 +1380,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     final hasImage = imageUrl != null && imageUrl.isNotEmpty;
 
     // ความกว้างของ content area (หัก padding ซ้าย-ขวา)
-    final screenWidth = MediaQuery.of(context).size.width;
+    final screenWidth = MediaQuery.sizeOf(context).width;
     final contentWidth = screenWidth - (AppSpacing.md * 2);
 
     // ถ้ามีรูปยืนยัน → แสดง side-by-side (grid ซ้าย, รูปขวา)

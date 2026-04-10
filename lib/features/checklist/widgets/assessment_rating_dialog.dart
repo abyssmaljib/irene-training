@@ -131,7 +131,7 @@ class _AssessmentRatingDialogState extends State<AssessmentRatingDialog> {
         // จำกัดความสูง เพื่อให้ scroll ได้ถ้ามีหลาย subjects
         child: ConstrainedBox(
           constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.8,
+            maxHeight: MediaQuery.sizeOf(context).height * 0.8,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,

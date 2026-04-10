@@ -27,11 +27,15 @@ class AssessmentInlineSection extends StatefulWidget {
   /// callback เมื่อประเมินครบ/ไม่ครบ — ใช้ enable/disable ปุ่ม complete
   final ValueChanged<bool> onCompletionChanged;
 
+  /// ผลประเมินเดิม (สำหรับ edit/restore) — ถ้ามีจะ pre-fill ratings
+  final List<AssessmentRating> initialRatings;
+
   const AssessmentInlineSection({
     super.key,
     required this.subjects,
     required this.onChanged,
     required this.onCompletionChanged,
+    this.initialRatings = const [],
   });
 
   @override
@@ -57,7 +61,20 @@ class _AssessmentInlineSectionState extends State<AssessmentInlineSection> {
     super.initState();
     // สร้าง controller สำหรับแต่ละ subject
     for (final s in widget.subjects) {
-      _controllers[s.subjectId] = TextEditingController();
+      // หา initial rating สำหรับ subject นี้ (ถ้ามี)
+      final initial = widget.initialRatings.cast<AssessmentRating?>().firstWhere(
+            (r) => r!.subjectId == s.subjectId,
+            orElse: () => null,
+          );
+      if (initial != null) {
+        _ratings[s.subjectId] = initial.rating;
+        if (initial.description != null && initial.description!.isNotEmpty) {
+          _descriptions[s.subjectId] = initial.description!;
+        }
+      }
+      _controllers[s.subjectId] = TextEditingController(
+        text: initial?.description ?? '',
+      );
     }
   }
 

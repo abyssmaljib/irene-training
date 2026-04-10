@@ -1,7 +1,10 @@
 import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/new_tag.dart';
+import '../models/post_measurement_entry.dart';
 import '../services/ticket_service.dart';
+import '../../checklist/models/assessment_models.dart';
+import '../../checklist/models/measurement_config.dart';
 import '../../checklist/providers/task_provider.dart';
 import '../../medicine/models/medicine_summary.dart';
 
@@ -140,6 +143,22 @@ class CreatePostState {
   // ตอน submit post จะ UPDATE med_history SET post_id สำหรับ IDs เหล่านี้
   final List<int> pendingMedHistoryIds;
 
+  // === Measurement + Assessment fields (แนบค่าวัดและประเมินสุขภาพกับ post) ===
+
+  /// ค่าวัดที่กรอก keyed by measurementType (เช่น 'weight', 'dtx')
+  /// เลือกได้หลายตัวพร้อมกัน เช่น น้ำหนัก + DTX ใน post เดียว
+  final Map<String, PostMeasurementEntry> measurements;
+
+  /// หัวข้อประเมินที่โหลดมาจาก DB (subjects ทั้งหมดของ nursing home)
+  final List<AssessmentSubject> assessmentSubjects;
+
+  /// ผลประเมินที่ user กรอก (1-5 rating + notes)
+  final List<AssessmentRating> assessmentRatings;
+
+  /// measurement type ที่ pre-select จาก FAB shortcut (เช่น 'weight')
+  /// ถ้ามีค่า → section จะ auto-expand + auto-select ตัวนี้
+  final String? preSelectedMeasurementType;
+
   const CreatePostState({
     this.text = '',
     this.selectedTag,
@@ -181,6 +200,11 @@ class CreatePostState {
     this.restockItems = const [],
     // Pending med_history IDs (จากปุ่ม "เพิ่มยาอื่น")
     this.pendingMedHistoryIds = const [],
+    // Measurement + Assessment
+    this.measurements = const {},
+    this.assessmentSubjects = const [],
+    this.assessmentRatings = const [],
+    this.preSelectedMeasurementType,
   });
 
   bool get isValid => text.trim().isNotEmpty;
@@ -234,6 +258,16 @@ class CreatePostState {
 
   bool get hasAiQuizPreview =>
       aiQuizQuestion != null && aiQuizQuestion!.trim().isNotEmpty;
+
+  /// มี measurement ที่กรอกค่าแล้วอย่างน้อย 1 ตัว
+  bool get hasMeasurements => measurements.values.any((e) => e.hasValue);
+
+  /// จำนวน measurement ที่กรอกค่าแล้ว
+  int get filledMeasurementCount =>
+      measurements.values.where((e) => e.hasValue).length;
+
+  /// มี assessment rating อย่างน้อย 1 หัวข้อ
+  bool get hasAssessmentRatings => assessmentRatings.isNotEmpty;
 
   CreatePostState copyWith({
     String? text,
@@ -289,6 +323,15 @@ class CreatePostState {
     // Pending med_history IDs (จากปุ่ม "เพิ่มยาอื่น")
     List<int>? pendingMedHistoryIds,
     bool? clearPendingMedHistoryIds,
+    // Measurement + Assessment
+    Map<String, PostMeasurementEntry>? measurements,
+    bool? clearMeasurements,
+    List<AssessmentSubject>? assessmentSubjects,
+    bool? clearAssessmentSubjects,
+    List<AssessmentRating>? assessmentRatings,
+    bool? clearAssessmentRatings,
+    String? preSelectedMeasurementType,
+    bool? clearPreSelectedMeasurement,
   }) {
     return CreatePostState(
       text: text ?? this.text,
@@ -357,6 +400,19 @@ class CreatePostState {
       pendingMedHistoryIds: clearPendingMedHistoryIds == true
           ? const []
           : (pendingMedHistoryIds ?? this.pendingMedHistoryIds),
+      // Measurement + Assessment
+      measurements: clearMeasurements == true
+          ? const {}
+          : (measurements ?? this.measurements),
+      assessmentSubjects: clearAssessmentSubjects == true
+          ? const []
+          : (assessmentSubjects ?? this.assessmentSubjects),
+      assessmentRatings: clearAssessmentRatings == true
+          ? const []
+          : (assessmentRatings ?? this.assessmentRatings),
+      preSelectedMeasurementType: clearPreSelectedMeasurement == true
+          ? null
+          : (preSelectedMeasurementType ?? this.preSelectedMeasurementType),
     );
   }
 
@@ -426,6 +482,10 @@ class CreatePostNotifier extends StateNotifier<CreatePostState> {
       clearRestockItems: true,
       // เปลี่ยน resident → reset pending med_history IDs (ยาที่สร้างไว้เป็นของ resident เก่า)
       clearPendingMedHistoryIds: true,
+      // เปลี่ยน resident → reset measurement + assessment (ข้อมูลเป็นของ resident เก่า)
+      clearMeasurements: true,
+      clearAssessmentRatings: true,
+      clearAssessmentSubjects: true,
       clearError: true,
     );
   }
@@ -440,6 +500,10 @@ class CreatePostNotifier extends StateNotifier<CreatePostState> {
       clearRestockItems: true,
       // ยกเลิก resident → reset pending med_history IDs
       clearPendingMedHistoryIds: true,
+      // ยกเลิก resident → ไม่มีข้อมูลวัดให้แนบ
+      clearMeasurements: true,
+      clearAssessmentRatings: true,
+      clearAssessmentSubjects: true,
       clearError: true,
     );
   }
@@ -792,6 +856,98 @@ class CreatePostNotifier extends StateNotifier<CreatePostState> {
   void addPendingMedHistoryId(int id) {
     state = state.copyWith(
       pendingMedHistoryIds: [...state.pendingMedHistoryIds, id],
+    );
+  }
+
+  // === Measurement Methods (ค่าวัดร่างกายแนบกับ post) ===
+
+  /// เพิ่ม measurement type (เช่น user กด chip 'weight')
+  void addMeasurement(String measurementType) {
+    final config = measurementConfigByType[measurementType];
+    if (config == null) return;
+
+    final updated = Map<String, PostMeasurementEntry>.from(state.measurements);
+    // ถ้ามีอยู่แล้วไม่ทำซ้ำ
+    if (updated.containsKey(measurementType)) return;
+
+    updated[measurementType] = PostMeasurementEntry(
+      measurementType: measurementType,
+      config: config,
+    );
+    state = state.copyWith(measurements: updated);
+  }
+
+  /// ลบ measurement type (user กด chip อีกครั้งเพื่อ toggle ออก)
+  void removeMeasurement(String measurementType) {
+    final updated = Map<String, PostMeasurementEntry>.from(state.measurements);
+    updated.remove(measurementType);
+    state = state.copyWith(measurements: updated);
+  }
+
+  /// อัพเดทค่าที่กรอก
+  void updateMeasurementValue(String measurementType, double? value) {
+    final entry = state.measurements[measurementType];
+    if (entry == null) return;
+
+    final updated = Map<String, PostMeasurementEntry>.from(state.measurements);
+    updated[measurementType] = entry.copyWith(
+      value: value,
+      clearValue: value == null,
+    );
+    state = state.copyWith(measurements: updated);
+  }
+
+  /// อัพเดท photo URL (หลัง upload สำเร็จ)
+  void updateMeasurementPhoto(String measurementType, String? photoUrl) {
+    final entry = state.measurements[measurementType];
+    if (entry == null) return;
+
+    final updated = Map<String, PostMeasurementEntry>.from(state.measurements);
+    updated[measurementType] = entry.copyWith(
+      photoUrl: photoUrl,
+      clearPhotoUrl: photoUrl == null,
+    );
+    state = state.copyWith(measurements: updated);
+  }
+
+  /// อัพเดท photo uploading state
+  void setMeasurementPhotoUploading(String measurementType, bool uploading) {
+    final entry = state.measurements[measurementType];
+    if (entry == null) return;
+
+    final updated = Map<String, PostMeasurementEntry>.from(state.measurements);
+    updated[measurementType] = entry.copyWith(isUploadingPhoto: uploading);
+    state = state.copyWith(measurements: updated);
+  }
+
+  /// Set pre-selected measurement type (จาก FAB shortcut)
+  void setPreSelectedMeasurement(String? type) {
+    state = state.copyWith(
+      preSelectedMeasurementType: type,
+      clearPreSelectedMeasurement: type == null,
+    );
+    // ถ้ามี type → เพิ่ม measurement entry ด้วย
+    if (type != null) addMeasurement(type);
+  }
+
+  // === Assessment Methods (ประเมินสุขภาพแนบกับ post) ===
+
+  /// Set assessment subjects (โหลดจาก DB)
+  void setAssessmentSubjects(List<AssessmentSubject> subjects) {
+    state = state.copyWith(assessmentSubjects: subjects);
+  }
+
+  /// Set assessment ratings (user กรอก)
+  void setAssessmentRatings(List<AssessmentRating> ratings) {
+    state = state.copyWith(assessmentRatings: ratings);
+  }
+
+  /// Clear measurement + assessment ทั้งหมด
+  void clearMeasurementsAndAssessments() {
+    state = state.copyWith(
+      clearMeasurements: true,
+      clearAssessmentRatings: true,
+      clearAssessmentSubjects: true,
     );
   }
 }

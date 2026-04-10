@@ -22,6 +22,7 @@ import '../widgets/post_tab_bar.dart';
 import '../widgets/post_search_bar.dart';
 import '../widgets/post_filter_drawer.dart';
 import '../widgets/create_post_bottom_sheet.dart';
+import '../widgets/resident_picker_widget.dart' show ResidentPickerSheet;
 import '../widgets/edit_post_bottom_sheet.dart' show showEditPostBottomSheet, navigateToAdvancedEditPostScreen;
 import '../widgets/create_ticket_bottom_sheet.dart';
 import '../widgets/full_screen_image_viewer.dart';
@@ -29,6 +30,10 @@ import '../widgets/ticket_detail_bottom_sheet.dart';
 import '../widgets/video_player_widget.dart';
 import '../services/ticket_service.dart';
 import '../../checklist/providers/task_provider.dart' show currentUserSystemRoleProvider;
+import '../../checklist/services/assessment_service.dart';
+import '../../checklist/models/assessment_models.dart';
+import '../../checklist/models/measurement_config.dart'
+    show measurementConfigByType, postMeasurementTypes;
 import 'advanced_create_post_screen.dart';
 import 'required_posts_screen.dart';
 
@@ -533,39 +538,33 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
   }
 
   /// สร้าง posts list view พร้อม loading indicator ที่ท้าย
+  /// ref.watch ย้ายออกจาก itemBuilder เพื่อไม่ให้ rebuild ทุก item ซ้ำ
   Widget _buildPostsListView(PostsState postsState) {
     final posts = postsState.posts;
+    // อ่านค่า 1 ครั้ง ไม่ใช่ทุก item
     final currentUserId = ref.watch(postCurrentUserIdProvider);
     final mainTab = ref.watch(postMainTabProvider);
-    // TODO: Get userRole from provider when available
     const userRole = 'user';
-    // ถ้าอยู่ใน tab ศูนย์ (announcement) = isCenterTab
     final isCenterTab = mainTab == PostMainTab.announcement;
-
-    // จำนวน items = posts + 1 (สำหรับ loading indicator หรือ end message)
     final itemCount = posts.length + 1;
 
     return SliverPadding(
-      padding: EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, 0),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
       sliver: SliverList(
         delegate: SliverChildBuilderDelegate(
           (context, index) {
-            // ถ้าเป็น item สุดท้าย = แสดง loading หรือ end message
             if (index == posts.length) {
               return _buildLoadMoreIndicator(postsState);
             }
 
             final post = posts[index];
             final isLiked = post.hasUserLiked(currentUserId);
-
-            // ทุก post ที่แสดงในหน้านี้ถือว่า required อยู่แล้ว
-            // (Tab ศูนย์ = resident_id IS NULL, Tab ผู้พัก = is_handover = true)
-            // ดังนั้นแค่เช็คว่ายังไม่ได้ like ก็พอ
             final isRequiredUnread = !isLiked;
 
             return Padding(
-              padding: EdgeInsets.only(bottom: AppSpacing.sm),
+              padding: const EdgeInsets.only(bottom: 8),
               child: PostCard(
+                key: ValueKey(post.id),
                 post: post,
                 isLiked: isLiked,
                 currentUserId: currentUserId,
@@ -664,24 +663,256 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
     // TODO: Check if user is admin
     return FloatingActionButton(
       onPressed: () {
-        _showCreatePostScreen();
+        _showPostTypePickerSheet();
       },
       backgroundColor: AppColors.primary,
       child: HugeIcon(icon: HugeIcons.strokeRoundedAdd01, color: Colors.white),
     );
   }
 
-  void _showCreatePostScreen() {
+  /// แสดง bottom sheet เลือกประเภทโพส (ปกติ หรือ บันทึกค่าวัด)
+  void _showPostTypePickerSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        // จำกัดความสูงไม่เกิน 60% ของจอ เพื่อไม่บัง content ด้านหลัง
+        final maxHeight = MediaQuery.sizeOf(ctx).height * 0.6;
+        return ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: maxHeight),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // === Header (อยู่นอก scroll) ===
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: Text(
+                    'สร้างโพส',
+                    style: AppTypography.heading3.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+
+                // === Scrollable content ===
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // === โพสเกี่ยวกับผู้พัก (เลือก resident ก่อน) ===
+                        ListTile(
+                          leading: HugeIcon(
+                            icon: HugeIcons.strokeRoundedUserAccount,
+                            size: 24,
+                            color: AppColors.primary,
+                          ),
+                          title: const Text('โพสเกี่ยวกับผู้พักอาศัย'),
+                          subtitle: Text(
+                            'เลือกผู้พักก่อน → เขียนข้อความ, แนบรูป',
+                            style: AppTypography.caption
+                                .copyWith(color: AppColors.secondaryText),
+                          ),
+                          onTap: () {
+                            Navigator.pop(ctx);
+                            // เลือก resident ก่อน → เปิด form
+                            _showResidentPickerThenCreate(null);
+                          },
+                        ),
+                        // === โพสทั่วไป (ไม่ต้องเลือก resident) ===
+                        ListTile(
+                          leading: HugeIcon(
+                            icon: HugeIcons.strokeRoundedEdit02,
+                            size: 24,
+                            color: AppColors.secondaryText,
+                          ),
+                          title: const Text('โพสทั่วไป / ประกาศ'),
+                          subtitle: Text(
+                            'ไม่ระบุผู้พัก เช่น ส่งเวร, ประกาศ',
+                            style: AppTypography.caption
+                                .copyWith(color: AppColors.secondaryText),
+                          ),
+                          onTap: () {
+                            Navigator.pop(ctx);
+                            _showCreatePostScreen();
+                          },
+                        ),
+
+                        // === Divider + Section Title ===
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Divider(color: AppColors.alternate, height: 1),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                          child: Text(
+                            'บันทึกค่าวัด',
+                            style: AppTypography.caption.copyWith(
+                              color: AppColors.secondaryText,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+
+                        // === Measurement Shortcuts ===
+                        ..._buildMeasurementShortcuts(ctx),
+
+                        // === Assessment Shortcut ===
+                        // โหลดชื่อ subjects จริงจาก DB แสดงใน menu
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Divider(color: AppColors.alternate, height: 1),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                          child: Text(
+                            'ประเมินสุขภาพ (1-5 คะแนน)',
+                            style: AppTypography.caption.copyWith(
+                              color: AppColors.secondaryText,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        _AssessmentShortcutList(
+                          onTap: (subjectId) {
+                            Navigator.pop(ctx);
+                            _showResidentPickerThenCreate(
+                              null,
+                              openAssessment: true,
+                              assessmentSubjectId: subjectId,
+                            );
+                          },
+                        ),
+
+                        const SizedBox(height: 8),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// สร้าง ListTile shortcuts สำหรับ measurement types ที่ใช้บ่อย
+  List<Widget> _buildMeasurementShortcuts(BuildContext ctx) {
+    // Icon ตาม measurement type
+    dynamic iconFor(String type) {
+      switch (type) {
+        case 'weight':
+          return HugeIcons.strokeRoundedWeightScale01;
+        case 'height':
+          return HugeIcons.strokeRoundedRuler;
+        case 'dtx':
+          return HugeIcons.strokeRoundedTestTube;
+        case 'insulin':
+          return HugeIcons.strokeRoundedInjection;
+        case 'fasting_glucose':
+          return HugeIcons.strokeRoundedDroplet;
+        case 'hba1c':
+          return HugeIcons.strokeRoundedChartLineData02;
+        case 'cholesterol':
+        case 'hdl':
+        case 'ldl':
+        case 'triglyceride':
+          return HugeIcons.strokeRoundedBloodBag;
+        case 'creatinine':
+        case 'egfr':
+          return HugeIcons.strokeRoundedTestTube;
+        case 'albumin':
+        case 'hemoglobin':
+          return HugeIcons.strokeRoundedMicroscope;
+        case 'bmi':
+          return HugeIcons.strokeRoundedBodyWeight;
+        default:
+          return HugeIcons.strokeRoundedChart;
+      }
+    }
+
+    // Label ตาม measurement type
+    String labelFor(String type) {
+      final config = measurementConfigByType[type];
+      if (config == null) return type;
+      // ตัด unit ในวงเล็บออก เช่น "น้ำหนัก (กก.)" → "น้ำหนัก"
+      return 'บันทึก${config.label.replaceAll(RegExp(r'\s*\(.*\)'), '')}';
+    }
+
+    return postMeasurementTypes.map((type) {
+      return ListTile(
+        leading: HugeIcon(
+          icon: iconFor(type),
+          size: 24,
+          color: AppColors.primary,
+        ),
+        title: Text(labelFor(type)),
+        visualDensity: const VisualDensity(vertical: -1),
+        onTap: () {
+          Navigator.pop(ctx);
+          _showResidentPickerThenCreate(type);
+        },
+      );
+    }).toList();
+  }
+
+  /// เปิด resident picker ก่อน → เลือกเสร็จแล้วเปิด form พร้อม measurement
+  /// เปิด resident picker ก่อน → เลือกเสร็จแล้วเปิด form
+  /// [measurementType] = pre-select measurement (เช่น 'weight'), null = ไม่ pre-select
+  /// [openAssessment] = true → เปิด assessment section expanded
+  void _showResidentPickerThenCreate(String? measurementType, {bool openAssessment = false, int? assessmentSubjectId}) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => ResidentPickerSheet(
+        onSelect: (resident) {
+          Navigator.pop(ctx);
+          _showCreatePostScreen(
+            preSelectedMeasurement: measurementType,
+            initialResidentId: resident.id,
+            initialResidentName: resident.name,
+            openAssessment: openAssessment,
+            assessmentSubjectId: assessmentSubjectId,
+          );
+        },
+      ),
+    );
+  }
+
+  void _showCreatePostScreen({
+    String? preSelectedMeasurement,
+    int? initialResidentId,
+    String? initialResidentName,
+    bool openAssessment = false,
+    int? assessmentSubjectId,
+  }) {
     showCreatePostBottomSheet(
       context,
+      preSelectedMeasurementType: preSelectedMeasurement,
+      initialResidentId: initialResidentId,
+      initialResidentName: initialResidentName,
+      openAssessment: openAssessment,
+      assessmentSubjectId: assessmentSubjectId,
       onPostCreated: () {
         refreshPosts(ref);
       },
       onAdvancedTap: () {
-        // ใช้ expand animation จาก bottom sheet ไป full page
         navigateToAdvancedPostScreen(
           context,
-          advancedScreen: const AdvancedCreatePostScreen(),
+          advancedScreen: AdvancedCreatePostScreen(
+            preSelectedMeasurementType: preSelectedMeasurement,
+            initialResidentId: initialResidentId,
+            initialResidentName: initialResidentName,
+            openAssessment: openAssessment,
+            assessmentSubjectId: assessmentSubjectId,
+          ),
         );
       },
     );
@@ -1746,4 +1977,142 @@ class _WrongAnswerDialogContentState extends State<_WrongAnswerDialogContent>
   }
 }
 
+// ============================================
+// _AssessmentShortcutList — แสดงรายชื่อ assessment subjects จริงจาก DB
+// ============================================
+class _AssessmentShortcutList extends ConsumerStatefulWidget {
+  /// Callback เมื่อเลือก subject — ส่ง subjectId ที่เลือก
+  final ValueChanged<int> onTap;
+  const _AssessmentShortcutList({required this.onTap});
+
+  @override
+  ConsumerState<_AssessmentShortcutList> createState() =>
+      _AssessmentShortcutListState();
+}
+
+class _AssessmentShortcutListState
+    extends ConsumerState<_AssessmentShortcutList> {
+  List<AssessmentSubject>? _subjects;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSubjects();
+  }
+
+  Future<void> _loadSubjects() async {
+    try {
+      final nursinghomeId =
+          await ref.read(postNursinghomeIdProvider.future);
+      if (nursinghomeId == null || nursinghomeId == 0 || !mounted) return;
+
+      final subjects = await AssessmentService.instance
+          .getAllSubjectsForNursingHome(nursinghomeId);
+      if (mounted) {
+        setState(() {
+          _subjects = subjects;
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // กำลังโหลด
+    if (_isLoading) {
+      return ListTile(
+        leading: HugeIcon(
+          icon: HugeIcons.strokeRoundedStethoscope02,
+          size: 24,
+          color: AppColors.primary,
+        ),
+        title: const Text('ประเมินสุขภาพ'),
+        subtitle: Text(
+          'กำลังโหลด...',
+          style: AppTypography.caption
+              .copyWith(color: AppColors.secondaryText),
+        ),
+        visualDensity: const VisualDensity(vertical: -1),
+      );
+    }
+
+    // ไม่มี subjects
+    if (_subjects == null || _subjects!.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    // Icon ตามชื่อ subject (match keyword)
+    dynamic iconFor(String name) {
+      final n = name.toLowerCase();
+      if (n.contains('อารมณ์') || n.contains('mood')) {
+        return HugeIcons.strokeRoundedSmile;
+      }
+      if (n.contains('นอน') || n.contains('sleep')) {
+        return HugeIcons.strokeRoundedSleeping;
+      }
+      if (n.contains('อาหาร') || n.contains('กิน') || n.contains('eat')) {
+        return HugeIcons.strokeRoundedRestaurant01;
+      }
+      if (n.contains('เคลื่อนไหว') || n.contains('movement') || n.contains('walk')) {
+        return HugeIcons.strokeRoundedRunningShoes;
+      }
+      if (n.contains('ปวด') || n.contains('pain')) {
+        return HugeIcons.strokeRoundedHeartbreak;
+      }
+      if (n.contains('หายใจ') || n.contains('breath')) {
+        return HugeIcons.strokeRoundedWindPower;
+      }
+      if (n.contains('ผิวหนัง') || n.contains('skin') || n.contains('แผล')) {
+        return HugeIcons.strokeRoundedBandage;
+      }
+      if (n.contains('สื่อสาร') || n.contains('พูด') || n.contains('commun')) {
+        return HugeIcons.strokeRoundedComment01;
+      }
+      if (n.contains('ร่วมมือ') || n.contains('cooperat')) {
+        return HugeIcons.strokeRoundedHandGrip;
+      }
+      if (n.contains('จิตใจ') || n.contains('สุขภาพจิต') || n.contains('mental')) {
+        return HugeIcons.strokeRoundedBrain02;
+      }
+      if (n.contains('ทำกิจกรรม') || n.contains('กิจวัตร') || n.contains('activit')) {
+        return HugeIcons.strokeRoundedTask01;
+      }
+      if (n.contains('น้ำ') || n.contains('ดื่ม') || n.contains('drink')) {
+        return HugeIcons.strokeRoundedDroplet;
+      }
+      if (n.contains('ขับถ่าย') || n.contains('ปัสสาวะ') || n.contains('อุจจาระ')) {
+        return HugeIcons.strokeRoundedWashingtonMonument;
+      }
+      return HugeIcons.strokeRoundedStethoscope02;
+    }
+
+    // แสดงแต่ละ subject เป็น ListTile แยก กดได้
+    return Column(
+      children: _subjects!.map((subject) {
+        return ListTile(
+          leading: HugeIcon(
+            icon: iconFor(subject.subjectName),
+            size: 24,
+            color: AppColors.primary,
+          ),
+          title: Text(subject.subjectName),
+          // แสดง choices เป็น subtitle (เช่น "แย่มาก → ดีมาก")
+          subtitle: subject.choices.length >= 2
+              ? Text(
+                  '${subject.choices.first} → ${subject.choices.last}',
+                  style: AppTypography.caption
+                      .copyWith(color: AppColors.secondaryText),
+                )
+              : null,
+          visualDensity: const VisualDensity(vertical: -1),
+          onTap: () => widget.onTap(subject.subjectId),
+        );
+      }).toList(),
+    );
+  }
+}
 

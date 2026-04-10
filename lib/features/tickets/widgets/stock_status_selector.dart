@@ -161,7 +161,7 @@ class StockStatusSelector extends StatelessWidget {
               // กรณีที่มีสถานะเยอะจะ scroll ได้
               ConstrainedBox(
                 constraints: BoxConstraints(
-                  maxHeight: MediaQuery.of(context).size.height * 0.6,
+                  maxHeight: MediaQuery.sizeOf(context).height * 0.6,
                 ),
                 child: ListView.builder(
                   shrinkWrap: true,

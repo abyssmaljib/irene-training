@@ -3,6 +3,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/post.dart';
 import '../models/new_tag.dart';
+import '../models/post_measurement_entry.dart';
+import '../../checklist/models/assessment_models.dart';
+import '../../checklist/models/measurement_config.dart';
 
 /// State for Edit Post form
 class EditPostState {
@@ -62,6 +65,23 @@ class EditPostState {
   final NewTag? selectedTag;
   final bool isHandover;
 
+  // === Measurement + Assessment (แนบค่าวัดและประเมินสุขภาพกับ post) ===
+
+  /// ค่าวัดปัจจุบัน keyed by measurementType
+  final Map<String, PostMeasurementEntry> measurements;
+
+  /// ค่าวัดเดิมจาก DB (สำหรับเปรียบเทียบว่ามีการเปลี่ยนแปลงไหม)
+  final Map<String, PostMeasurementEntry> originalMeasurements;
+
+  /// หัวข้อประเมินที่โหลดจาก DB
+  final List<AssessmentSubject> assessmentSubjects;
+
+  /// ผลประเมินปัจจุบัน
+  final List<AssessmentRating> assessmentRatings;
+
+  /// ผลประเมินเดิมจาก DB
+  final List<AssessmentRating> originalAssessmentRatings;
+
   const EditPostState({
     required this.postId,
     this.text = '',
@@ -99,6 +119,12 @@ class EditPostState {
     this.residentName,
     this.selectedTag,
     this.isHandover = false,
+    // Measurement + Assessment
+    this.measurements = const {},
+    this.originalMeasurements = const {},
+    this.assessmentSubjects = const [],
+    this.assessmentRatings = const [],
+    this.originalAssessmentRatings = const [],
   });
 
   /// Get final list of existing image URLs (excluding removed ones)
@@ -163,6 +189,45 @@ class EditPostState {
   /// Check if resident has changed
   bool get hasResidentChanged => residentId != originalResidentId;
 
+  /// มี measurement ที่กรอกค่าแล้วอย่างน้อย 1 ตัว
+  bool get hasMeasurements => measurements.values.any((e) => e.hasValue);
+
+  /// จำนวน measurement ที่กรอกค่าแล้ว
+  int get filledMeasurementCount =>
+      measurements.values.where((e) => e.hasValue).length;
+
+  /// มี assessment rating อย่างน้อย 1 หัวข้อ
+  bool get hasAssessmentRatings => assessmentRatings.isNotEmpty;
+
+  /// ตรวจว่า measurements เปลี่ยนจากเดิมไหม
+  bool get hasMeasurementChanges {
+    if (measurements.length != originalMeasurements.length) return true;
+    for (final entry in measurements.entries) {
+      final orig = originalMeasurements[entry.key];
+      if (orig == null) return true;
+      if (entry.value.value != orig.value) return true;
+      if (entry.value.photoUrl != orig.photoUrl) return true;
+    }
+    return false;
+  }
+
+  /// ตรวจว่า assessments เปลี่ยนจากเดิมไหม
+  bool get hasAssessmentChanges {
+    if (assessmentRatings.length != originalAssessmentRatings.length) {
+      return true;
+    }
+    for (int i = 0; i < assessmentRatings.length; i++) {
+      final curr = assessmentRatings[i];
+      final orig = originalAssessmentRatings.where(
+        (r) => r.subjectId == curr.subjectId,
+      );
+      if (orig.isEmpty) return true;
+      if (orig.first.rating != curr.rating) return true;
+      if (orig.first.description != curr.description) return true;
+    }
+    return false;
+  }
+
   /// Check if quiz is complete (has question and all choices)
   bool get hasQuiz =>
       qaQuestion != null &&
@@ -222,6 +287,15 @@ class EditPostState {
     bool? isHandover,
     bool clearResident = false,
     bool clearTag = false,
+    // Measurement + Assessment
+    Map<String, PostMeasurementEntry>? measurements,
+    bool clearMeasurements = false,
+    Map<String, PostMeasurementEntry>? originalMeasurements,
+    List<AssessmentSubject>? assessmentSubjects,
+    bool clearAssessmentSubjects = false,
+    List<AssessmentRating>? assessmentRatings,
+    bool clearAssessmentRatings = false,
+    List<AssessmentRating>? originalAssessmentRatings,
   }) {
     return EditPostState(
       postId: postId ?? this.postId,
@@ -262,6 +336,12 @@ class EditPostState {
       residentName: clearResident ? null : (residentName ?? this.residentName),
       selectedTag: clearTag ? null : (selectedTag ?? this.selectedTag),
       isHandover: isHandover ?? this.isHandover,
+      // Measurement + Assessment
+      measurements: clearMeasurements ? const {} : (measurements ?? this.measurements),
+      originalMeasurements: originalMeasurements ?? this.originalMeasurements,
+      assessmentSubjects: clearAssessmentSubjects ? const [] : (assessmentSubjects ?? this.assessmentSubjects),
+      assessmentRatings: clearAssessmentRatings ? const [] : (assessmentRatings ?? this.assessmentRatings),
+      originalAssessmentRatings: originalAssessmentRatings ?? this.originalAssessmentRatings,
     );
   }
 }
@@ -351,6 +431,14 @@ class EditPostNotifier extends StateNotifier<EditPostState> {
     final updated = {...state.removedExistingIndexes, index};
     state = state.copyWith(removedExistingIndexes: updated);
     debugPrint('EditPostNotifier: marked existing image $index for removal');
+  }
+
+  /// เพิ่ม URL เข้า existing images (สำหรับรูป measurement ที่ upload ใหม่ระหว่าง edit)
+  void addExistingImageUrl(String url) {
+    state = state.copyWith(
+      existingImageUrls: [...state.existingImageUrls, url],
+    );
+    debugPrint('EditPostNotifier: added existing image URL');
   }
 
   /// Restore a previously removed existing image
@@ -531,6 +619,106 @@ class EditPostNotifier extends StateNotifier<EditPostState> {
 
   void reset() {
     state = EditPostState(postId: state.postId);
+  }
+
+  // === Measurement Methods ===
+
+  /// Initialize measurements จาก DB (สำหรับ edit post)
+  void initMeasurementsFromDb(List<Map<String, dynamic>> rows) {
+    final map = <String, PostMeasurementEntry>{};
+    for (final row in rows) {
+      final type = row['measurement_type'] as String;
+      final config = measurementConfigByType[type];
+      if (config == null) continue;
+
+      map[type] = PostMeasurementEntry(
+        measurementType: type,
+        config: config,
+        value: (row['numeric_value'] as num?)?.toDouble(),
+        photoUrl: row['photo_url'] as String?,
+      );
+    }
+    state = state.copyWith(
+      measurements: map,
+      originalMeasurements: Map.unmodifiable(map),
+    );
+  }
+
+  /// เพิ่ม measurement type
+  void addMeasurement(String measurementType) {
+    final config = measurementConfigByType[measurementType];
+    if (config == null) return;
+    if (state.measurements.containsKey(measurementType)) return;
+
+    final updated = Map<String, PostMeasurementEntry>.from(state.measurements);
+    updated[measurementType] = PostMeasurementEntry(
+      measurementType: measurementType,
+      config: config,
+    );
+    state = state.copyWith(measurements: updated);
+  }
+
+  /// ลบ measurement type
+  void removeMeasurement(String measurementType) {
+    final updated = Map<String, PostMeasurementEntry>.from(state.measurements);
+    updated.remove(measurementType);
+    state = state.copyWith(measurements: updated);
+  }
+
+  /// อัพเดทค่า
+  void updateMeasurementValue(String measurementType, double? value) {
+    final entry = state.measurements[measurementType];
+    if (entry == null) return;
+
+    final updated = Map<String, PostMeasurementEntry>.from(state.measurements);
+    updated[measurementType] = entry.copyWith(
+      value: value,
+      clearValue: value == null,
+    );
+    state = state.copyWith(measurements: updated);
+  }
+
+  /// อัพเดท photo URL
+  void updateMeasurementPhoto(String measurementType, String? photoUrl) {
+    final entry = state.measurements[measurementType];
+    if (entry == null) return;
+
+    final updated = Map<String, PostMeasurementEntry>.from(state.measurements);
+    updated[measurementType] = entry.copyWith(
+      photoUrl: photoUrl,
+      clearPhotoUrl: photoUrl == null,
+    );
+    state = state.copyWith(measurements: updated);
+  }
+
+  /// อัพเดท photo uploading state
+  void setMeasurementPhotoUploading(String measurementType, bool uploading) {
+    final entry = state.measurements[measurementType];
+    if (entry == null) return;
+
+    final updated = Map<String, PostMeasurementEntry>.from(state.measurements);
+    updated[measurementType] = entry.copyWith(isUploadingPhoto: uploading);
+    state = state.copyWith(measurements: updated);
+  }
+
+  // === Assessment Methods ===
+
+  /// Initialize assessments จาก DB (สำหรับ edit post)
+  void initAssessmentsFromDb(List<AssessmentRating> ratings) {
+    state = state.copyWith(
+      assessmentRatings: ratings,
+      originalAssessmentRatings: List.unmodifiable(ratings),
+    );
+  }
+
+  /// Set assessment subjects (โหลดจาก DB)
+  void setAssessmentSubjects(List<AssessmentSubject> subjects) {
+    state = state.copyWith(assessmentSubjects: subjects);
+  }
+
+  /// Set assessment ratings (user กรอก)
+  void setAssessmentRatings(List<AssessmentRating> ratings) {
+    state = state.copyWith(assessmentRatings: ratings);
   }
 }
 

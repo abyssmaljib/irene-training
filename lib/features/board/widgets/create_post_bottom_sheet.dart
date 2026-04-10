@@ -30,6 +30,10 @@ import '../services/post_media_service.dart';
 import '../../../core/widgets/success_popup.dart';
 import '../../../core/widgets/checkbox_tile.dart';
 import 'handover_toggle_widget.dart';
+import 'post_measurement_section.dart';
+import 'post_assessment_section.dart';
+import '../../checklist/services/measurement_service.dart';
+import '../../checklist/services/assessment_service.dart';
 
 /// Bottom Sheet สำหรับสร้างโพสแบบรวดเร็ว
 class CreatePostBottomSheet extends ConsumerStatefulWidget {
@@ -46,6 +50,15 @@ class CreatePostBottomSheet extends ConsumerStatefulWidget {
   final int? taskLogId; // ถ้ามี จะ complete task เมื่อโพสสำเร็จ
   final String? taskConfirmImageUrl; // รูปยืนยันจาก task (ถ้ามี)
 
+  /// Measurement type ที่ pre-select จาก FAB shortcut (เช่น 'weight')
+  final String? preSelectedMeasurementType;
+
+  /// เปิด assessment section expanded ตั้งแต่แรก (จาก FAB shortcut)
+  final bool openAssessment;
+
+  /// Subject ID ที่เลือกจาก FAB shortcut (แสดงแค่หัวข้อนี้ตัวเดียว)
+  final int? assessmentSubjectId;
+
   /// ตรวจสอบว่ามาจาก task หรือไม่ (ถ้ามา text จะแก้ไขไม่ได้)
   bool get isFromTask => taskLogId != null;
 
@@ -59,6 +72,9 @@ class CreatePostBottomSheet extends ConsumerStatefulWidget {
     this.initialTagName,
     this.taskLogId,
     this.taskConfirmImageUrl,
+    this.preSelectedMeasurementType,
+    this.openAssessment = false,
+    this.assessmentSubjectId,
   });
 
   @override
@@ -132,6 +148,17 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
         _checkAndRestoreDraft();
       }
 
+      // === Pre-select จาก FAB shortcut ===
+      if (widget.preSelectedMeasurementType != null) {
+        ref.read(createPostProvider.notifier)
+            .setPreSelectedMeasurement(widget.preSelectedMeasurementType);
+        _autoSelectTagByName('การวัด');
+      }
+      if (widget.openAssessment) {
+        _autoSelectTagByName('การวัด');
+        _preloadAssessmentSubjects();
+      }
+
       // [FUTURE] Listen to provider changes and update overlays when data arrives
       // เก็บไว้สำหรับฟีเจอร์ # และ @ shortcut ในอนาคต (เช่น การสั่งงานระหว่างทีม)
       // ref.listenManual(tagsProvider, (previous, next) {
@@ -154,6 +181,18 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
 
     // [FUTURE] Listen for keyboard navigation - disabled for now
     // _focusNode.onKeyEvent = _handleKeyEvent;
+  }
+
+  /// โหลด assessment subjects ล่วงหน้า → ใส่ใน provider state
+  Future<void> _preloadAssessmentSubjects() async {
+    final nursinghomeId = await ref.read(postNursinghomeIdProvider.future);
+    if (nursinghomeId == null || nursinghomeId == 0 || !mounted) return;
+
+    final subjects = await AssessmentService.instance
+        .getAllSubjectsForNursingHome(nursinghomeId);
+    if (mounted && subjects.isNotEmpty) {
+      ref.read(createPostProvider.notifier).setAssessmentSubjects(subjects);
+    }
   }
 
   /// Auto-select tag by name (match by taskType name)
@@ -196,10 +235,8 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
     // ถ้ากำลัง restore draft อยู่ ข้ามทั้ง rebuild และ save เพื่อไม่ให้ rebuild ทุก keystroke
     if (_isRestoringDraft) return;
 
-    // rebuild เพื่ออัพเดตสถานะปุ่มโพส (enabled/disabled) และ hint text
-    // หมายเหตุ: setState ที่นี่ rebuild เฉพาะ widget นี้ ไม่ใช่ sync ไป provider
-    // (ซึ่งจะ rebuild ทุก consumer — นั่นคือสิ่งที่ comment บรรทัด ~968 เตือนไว้)
-    setState(() {});
+    // ไม่ใช้ setState(() {}) เพราะ rebuild ทั้ง bottom sheet ทุก keystroke → กระตุก
+    // ปุ่มโพสใช้ ValueListenableBuilder listen _textController โดยตรงแทน
 
     // ถ้ามาจาก task ไม่ต้อง save draft
     if (widget.isFromTask) return;
@@ -618,7 +655,7 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
 
     _tagOverlay = OverlayEntry(
       builder: (context) => Positioned(
-        width: MediaQuery.of(context).size.width - 32,
+        width: MediaQuery.sizeOf(context).width - 32,
         child: CompositedTransformFollower(
           link: _layerLink,
           showWhenUnlinked: false,
@@ -713,7 +750,7 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
 
     _residentOverlay = OverlayEntry(
       builder: (context) => Positioned(
-        width: MediaQuery.of(context).size.width - 32,
+        width: MediaQuery.sizeOf(context).width - 32,
         child: CompositedTransformFollower(
           link: _layerLink,
           showWhenUnlinked: false,
@@ -791,9 +828,11 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Text input
-                    _buildTextInput(),
-                    AppSpacing.verticalGapMd,
+                    // Text input — ซ่อนเมื่อใช้ shortcut (measurement/assessment)
+                    if (widget.preSelectedMeasurementType == null && !widget.openAssessment) ...[
+                      _buildTextInput(),
+                      AppSpacing.verticalGapMd,
+                    ],
 
                     // Resident picker + Tag picker (ใช้ reusable widget)
                     ResidentTagPickerRow(
@@ -822,28 +861,82 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
                       isTagRequired: true, // บังคับเลือก tag
                     ),
 
-                    // Handover toggle (แสดงเมื่อเลือก tag แล้ว)
-                    if (state.selectedTag != null) ...[
+                    // Handover + Send to family — ซ่อนใน shortcut mode (ไม่จำเป็นสำหรับการวัด)
+                    if (!_isShortcutMode) ...[
+                      // Handover toggle (แสดงเมื่อเลือก tag แล้ว)
+                      if (state.selectedTag != null) ...[
+                        AppSpacing.verticalGapSm,
+                        HandoverToggleWidget(
+                          selectedTag: state.selectedTag,
+                          isHandover: state.isHandover,
+                          selectedResidentId: state.selectedResidentId,
+                          onHandoverChanged: (value) {
+                            ref.read(createPostProvider.notifier).setHandover(value);
+                          },
+                          descriptionFocusNode: _focusNode,
+                          descriptionText: _textController.text,
+                          onAutoEnableHandover: () {
+                            ref.read(createPostProvider.notifier).setHandover(true);
+                          },
+                        ),
+                      ],
+
+                      // Send to family toggle (แสดงเมื่อเลือก resident แล้ว)
+                      if (state.selectedResidentId != null) ...[
+                        AppSpacing.verticalGapSm,
+                        _buildSendToFamilyToggle(state),
+                      ],
+                    ],
+
+                    // === Measurement Section ===
+                    // ซ่อนถ้าเข้ามาจาก assessment shortcut
+                    if (!widget.openAssessment &&
+                        (state.selectedResidentId != null ||
+                         state.preSelectedMeasurementType != null ||
+                         state.measurements.isNotEmpty)) ...[
                       AppSpacing.verticalGapSm,
-                      HandoverToggleWidget(
-                        selectedTag: state.selectedTag,
-                        isHandover: state.isHandover,
-                        selectedResidentId: state.selectedResidentId,
-                        onHandoverChanged: (value) {
-                          ref.read(createPostProvider.notifier).setHandover(value);
-                        },
-                        descriptionFocusNode: _focusNode,
-                        descriptionText: _textController.text,
-                        onAutoEnableHandover: () {
-                          ref.read(createPostProvider.notifier).setHandover(true);
-                        },
+                      PostMeasurementSection(
+                        measurements: state.measurements,
+                        preSelectedType: state.preSelectedMeasurementType,
+                        // Shortcut mode → แสดงแค่ input ตัวเดียว ไม่มี chips
+                        singleMode: widget.preSelectedMeasurementType != null,
+                        onMeasurementAdded: (type) =>
+                            ref.read(createPostProvider.notifier).addMeasurement(type),
+                        onMeasurementRemoved: (type) =>
+                            ref.read(createPostProvider.notifier).removeMeasurement(type),
+                        onValueChanged: (type, value) =>
+                            ref.read(createPostProvider.notifier).updateMeasurementValue(type, value),
+                        onPhotoChanged: (type, url) =>
+                            ref.read(createPostProvider.notifier).updateMeasurementPhoto(type, url),
+                        onPhotoUploaded: (url) =>
+                            ref.read(createPostProvider.notifier).setUploadedImageUrls(
+                              [...ref.read(createPostProvider).uploadedImageUrls, url],
+                            ),
+                        onPhotoRemoved: (url) =>
+                            ref.read(createPostProvider.notifier).setUploadedImageUrls(
+                              ref.read(createPostProvider).uploadedImageUrls
+                                  .where((u) => u != url).toList(),
+                            ),
                       ),
                     ],
 
-                    // Send to family toggle (แสดงเมื่อเลือก resident แล้ว)
-                    if (state.selectedResidentId != null) ...[
+                    // === Assessment Section ===
+                    // ซ่อนถ้าเข้ามาจาก measurement shortcut (แสดงเฉพาะ assessment shortcut หรือโพสปกติ)
+                    if (widget.preSelectedMeasurementType == null &&
+                        (state.selectedResidentId != null || widget.openAssessment)) ...[
                       AppSpacing.verticalGapSm,
-                      _buildSendToFamilyToggle(state),
+                      PostAssessmentSection(
+                        nursinghomeId: ref.watch(postNursinghomeIdProvider).valueOrNull ?? 0,
+                        subjects: state.assessmentSubjects,
+                        initialRatings: state.assessmentRatings,
+                        initiallyExpanded: widget.openAssessment,
+                        singleMode: widget.openAssessment,
+                        subjectId: widget.assessmentSubjectId,
+                        onSubjectsLoaded: (subjects) =>
+                            ref.read(createPostProvider.notifier).setAssessmentSubjects(subjects),
+                        onRatingsChanged: (ratings) =>
+                            ref.read(createPostProvider.notifier).setAssessmentRatings(ratings),
+                      ),
                     ],
                     AppSpacing.verticalGapMd,
 
@@ -1076,63 +1169,77 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
                 ],
               ),
 
-              // Submit button
-          ElevatedButton(
-            onPressed: state.isSubmitting || !_canSubmit(state)
-                ? null
-                : () => _handleSubmit(state),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              disabledBackgroundColor: AppColors.alternate,
-              disabledForegroundColor: AppColors.secondaryText,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: state.isSubmitting
-                ? SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
+              // Submit button — wrap ValueListenableBuilder เพื่อ rebuild เฉพาะปุ่มเมื่อ text เปลี่ยน
+              // ไม่ต้อง rebuild ทั้ง bottom sheet ทุก keystroke
+              ValueListenableBuilder<TextEditingValue>(
+                valueListenable: _textController,
+                builder: (context, textValue, _) {
+                  final canSubmit = _canSubmit(state);
+                  return ElevatedButton(
+                    onPressed: state.isSubmitting || !canSubmit
+                        ? null
+                        : () => _handleSubmit(state),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: AppColors.alternate,
+                      disabledForegroundColor: AppColors.secondaryText,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
-                  )
-                : Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      HugeIcon(
-                        icon: HugeIcons.strokeRoundedFloppyDisk,
-                        size: AppIconSize.md,
-                        color: Colors.white,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'โพส',
-                        style: AppTypography.body.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-            ),
+                    child: state.isSubmitting
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              HugeIcon(
+                                icon: HugeIcons.strokeRoundedFloppyDisk,
+                                size: AppIconSize.md,
+                                color: Colors.white,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'โพส',
+                                style: AppTypography.body.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                  );
+                },
+              ),
           ],
         ),  // Row
 
-        // Hint text บอก user ว่าขาดอะไรถึงโพสไม่ได้
-        if (!_canSubmit(state) && !state.isSubmitting)
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text(
-              _getSubmitHint(state),
-              style: AppTypography.caption.copyWith(
-                color: AppColors.secondaryText,
+        // Hint text — rebuild เฉพาะเมื่อ text เปลี่ยน
+        ValueListenableBuilder<TextEditingValue>(
+          valueListenable: _textController,
+          builder: (context, textValue, _) {
+            if (_canSubmit(state) || state.isSubmitting) {
+              return const SizedBox.shrink();
+            }
+            return Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                _getSubmitHint(state),
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.secondaryText,
+                ),
               ),
-            ),
-          ),
+            );
+          },
+        ),
         ],
       ),  // Column
     );
@@ -1169,17 +1276,36 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
     );
   }
 
+  /// ตรวจว่าอยู่ใน shortcut mode (measurement หรือ assessment)
+  bool get _isShortcutMode =>
+      widget.preSelectedMeasurementType != null || widget.openAssessment;
+
   bool _canSubmit(CreatePostState state) {
-    // ต้องมีข้อความ + ต้องเลือก tag + ไม่กำลัง submit อยู่
-    return _textController.text.trim().isNotEmpty &&
-        state.selectedTag != null &&
-        !state.isSubmitting;
+    if (state.selectedTag == null || state.isSubmitting) return false;
+
+    if (_isShortcutMode) {
+      // Shortcut mode: ต้องมี resident + ต้องมีค่าวัดหรือ assessment อย่างน้อย 1
+      if (state.selectedResidentId == null) return false;
+      return state.hasMeasurements || state.hasAssessmentRatings;
+    }
+
+    // ปกติ → ต้องมีข้อความ
+    return _textController.text.trim().isNotEmpty;
   }
 
-  /// สร้างข้อความ hint บอก user ว่าขาดอะไรถึงโพสไม่ได้
   String _getSubmitHint(CreatePostState state) {
-    final hasText = _textController.text.trim().isNotEmpty;
     final hasTag = state.selectedTag != null;
+
+    if (_isShortcutMode) {
+      if (!hasTag) return 'กรุณาเลือกหมวดหมู่';
+      if (state.selectedResidentId == null) return 'กรุณาเลือกผู้พักอาศัย';
+      if (!state.hasMeasurements && !state.hasAssessmentRatings) {
+        return 'กรุณากรอกค่าวัดหรือประเมินสุขภาพอย่างน้อย 1 รายการ';
+      }
+      return '';
+    }
+
+    final hasText = _textController.text.trim().isNotEmpty;
     if (!hasText && !hasTag) return 'กรุณาเลือกหมวดหมู่และใส่ข้อความ';
     if (!hasTag) return 'กรุณาเลือกหมวดหมู่';
     if (!hasText) return 'กรุณาใส่ข้อความ';
@@ -1543,13 +1669,19 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
 
   Future<void> _handleSubmit(CreatePostState state) async {
     final text = _textController.text.trim();
-    if (text.isEmpty) return;
 
-    // ถ้าติ๊ก "ส่งเวร" บังคับต้องกรอกรายละเอียด
-    // เพื่อให้พี่เลี้ยงเขียนข้อมูลสำคัญที่ต้องส่งต่อให้เวรถัดไป
-    if (state.isHandover && text.isEmpty) {
-      // แจ้งเตือน validation: ต้องกรอกรายละเอียดเมื่อติ๊กส่งเวร
+    // ถ้าไม่ใช่ shortcut mode → ต้องมีข้อความ
+    if (!_isShortcutMode && text.isEmpty) return;
+
+    // ถ้าติ๊ก "ส่งเวร" บังคับต้องกรอกรายละเอียด (ไม่ apply กับ shortcut mode)
+    if (!_isShortcutMode && state.isHandover && text.isEmpty) {
       AppToast.warning(context, 'กรุณากรอกรายละเอียดเมื่อติ๊กส่งเวร');
+      return;
+    }
+
+    // ถ้ามีค่าวัดแต่ยังไม่เลือก resident → เตือนให้เลือก
+    if (state.hasMeasurements && state.selectedResidentId == null) {
+      AppToast.warning(context, 'กรุณาเลือกผู้พักอาศัยก่อนบันทึกค่าวัด');
       return;
     }
 
@@ -1615,11 +1747,30 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
         tagTopics = [...?tagTopics, familyTag];
       }
 
+      // รูป measurement อยู่ใน uploadedImageUrls แล้ว (เพิ่มตอนถ่ายรูป)
+      // ไม่ต้องเพิ่มซ้ำ
+
+      // === สร้างข้อความจากค่าวัด (measurement mode) ===
+      // ถ้า user ไม่ได้พิมพ์ข้อความ → สร้างสรุปค่าวัดอัตโนมัติ
+      String finalText = text;
+      if (state.hasMeasurements) {
+        final parts = <String>[];
+        for (final entry in state.measurements.values) {
+          if (entry.hasValue) {
+            parts.add('${entry.config.label}: ${entry.value} ${entry.config.unit}');
+          }
+        }
+        if (parts.isNotEmpty) {
+          final summary = '📊 ${parts.join(' | ')}';
+          finalText = text.isEmpty ? summary : '$text\n\n$summary';
+        }
+      }
+
       // Create post
       final postId = await actionService.createPost(
         userId: userId,
         nursinghomeId: nursinghomeId,
-        text: text,
+        text: finalText,
         tagId: state.selectedTag?.id,
         tagTopics: tagTopics,
         isHandover: state.isHandover,
@@ -1629,6 +1780,33 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
       );
 
       if (postId != null) {
+        // === INSERT measurements (ค่าวัดร่างกายที่แนบกับ post) ===
+        if (state.hasMeasurements && state.selectedResidentId != null) {
+          for (final entry in state.measurements.values) {
+            if (entry.hasValue) {
+              await MeasurementService.instance.insertMeasurement(
+                residentId: state.selectedResidentId!,
+                nursinghomeId: nursinghomeId,
+                recordedBy: userId,
+                measurementType: entry.measurementType,
+                numericValue: entry.value!,
+                unit: entry.config.unit,
+                postId: postId,
+                photoUrl: entry.photoUrl,
+              );
+            }
+          }
+        }
+
+        // === INSERT assessment ratings (ประเมินสุขภาพแนบกับ post) ===
+        if (state.hasAssessmentRatings && state.selectedResidentId != null) {
+          await AssessmentService.instance.saveRatings(
+            postId: postId,
+            residentId: state.selectedResidentId!,
+            ratings: state.assessmentRatings,
+          );
+        }
+
         // ถ้ามี taskLogId ให้ complete task ด้วย
         // ไม่ส่ง imageUrl เพราะรูปอยู่ใน Post แล้ว (ผ่าน post_id)
         // ป้องกันการบันทึกซ้ำซ้อนและเข้าคิวส่งซ้ำ
@@ -1701,14 +1879,15 @@ void showCreatePostBottomSheet(
   String? initialTagName,
   int? taskLogId,
   String? taskConfirmImageUrl,
+  String? preSelectedMeasurementType,
+  bool openAssessment = false,
+  int? assessmentSubjectId,
 }) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    // ปิด drag - ใช้ปุ่มกากบาทแทน
     enableDrag: false,
-    // isDismissible: false เพื่อป้องกัน tap outside ปิด modal
     isDismissible: false,
     builder: (context) => _CreatePostBottomSheetWrapper(
       onPostCreated: onPostCreated,
@@ -1719,6 +1898,9 @@ void showCreatePostBottomSheet(
       initialTagName: initialTagName,
       taskLogId: taskLogId,
       taskConfirmImageUrl: taskConfirmImageUrl,
+      preSelectedMeasurementType: preSelectedMeasurementType,
+      openAssessment: openAssessment,
+      assessmentSubjectId: assessmentSubjectId,
     ),
   );
 }
@@ -1733,6 +1915,9 @@ class _CreatePostBottomSheetWrapper extends ConsumerStatefulWidget {
   final String? initialTagName;
   final int? taskLogId;
   final String? taskConfirmImageUrl;
+  final String? preSelectedMeasurementType;
+  final bool openAssessment;
+  final int? assessmentSubjectId;
 
   const _CreatePostBottomSheetWrapper({
     this.onPostCreated,
@@ -1743,6 +1928,9 @@ class _CreatePostBottomSheetWrapper extends ConsumerStatefulWidget {
     this.initialTagName,
     this.taskLogId,
     this.taskConfirmImageUrl,
+    this.preSelectedMeasurementType,
+    this.openAssessment = false,
+    this.assessmentSubjectId,
   });
 
   @override
@@ -1754,23 +1942,37 @@ class _CreatePostBottomSheetWrapperState
     extends ConsumerState<_CreatePostBottomSheetWrapper> {
   final GlobalKey<_CreatePostBottomSheetState> _sheetKey = GlobalKey();
 
+  /// เก็บ child widget ไว้ไม่ให้ rebuild ตาม keyboard animation
+  /// สร้างครั้งเดียวใน build แรก แล้ว reuse ทุก frame
+  late final Widget _sheetChild = CreatePostBottomSheet(
+    key: _sheetKey,
+    onPostCreated: widget.onPostCreated,
+    onAdvancedTap: widget.onAdvancedTap,
+    initialText: widget.initialText,
+    initialResidentId: widget.initialResidentId,
+    initialResidentName: widget.initialResidentName,
+    initialTagName: widget.initialTagName,
+    taskLogId: widget.taskLogId,
+    taskConfirmImageUrl: widget.taskConfirmImageUrl,
+    preSelectedMeasurementType: widget.preSelectedMeasurementType,
+    openAssessment: widget.openAssessment,
+    assessmentSubjectId: widget.assessmentSubjectId,
+  );
+
   @override
   Widget build(BuildContext context) {
-    // คำนวณความสูงของ modal — หดตัวตาม keyboard เพื่อให้ toolbar ลอยอยู่เหนือ keyboard เสมอ
     final screenHeight = MediaQuery.sizeOf(context).height;
-    // ใช้ viewInsetsOf เพื่อรับค่า keyboard height (rebuild เมื่อ keyboard เปิด/ปิด)
+    // viewInsetsOf rebuild wrapper ทุก keyboard frame
+    // แต่ _sheetChild ไม่ rebuild เพราะเป็น same widget instance
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-    // modal หดตัวตาม keyboard — เหลือพื้นที่ให้ content + toolbar พอดี
-    // clamp ขั้นต่ำ 200px เพื่อป้องกัน negative height บนจอเล็ก + keyboard ใหญ่
-    final modalHeight = ((screenHeight * 0.85) - bottomInset).clamp(200.0, screenHeight * 0.85);
+    final isShortcut = widget.preSelectedMeasurementType != null || widget.openAssessment;
+    final heightRatio = isShortcut ? 0.92 : 0.85;
+    final modalHeight = ((screenHeight * heightRatio) - bottomInset).clamp(200.0, screenHeight * heightRatio);
 
     return PopScope(
-      // ไม่ให้ pop อัตโนมัติ - เราจะจัดการเอง
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
-
-        // เรียก _handleCloseAttempt จาก CreatePostBottomSheet
         final sheetState = _sheetKey.currentState;
         if (sheetState != null) {
           final shouldClose = await sheetState._handleCloseAttempt();
@@ -1778,28 +1980,18 @@ class _CreatePostBottomSheetWrapperState
             Navigator.of(context).pop();
           }
         } else {
-          // ถ้าไม่มี state ให้ปิดเลย
           if (context.mounted) {
             Navigator.of(context).pop();
           }
         }
       },
-      // Padding ดัน modal ขึ้นเหนือ keyboard + SizedBox หดตัวตาม keyboard
+      // Padding + SizedBox เปลี่ยนตาม keyboard แต่ child (sheet) เป็น same instance
+      // → Flutter skip rebuild ของ child → smooth keyboard animation
       child: Padding(
         padding: EdgeInsets.only(bottom: bottomInset),
         child: SizedBox(
           height: modalHeight,
-          child: CreatePostBottomSheet(
-            key: _sheetKey,
-            onPostCreated: widget.onPostCreated,
-            onAdvancedTap: widget.onAdvancedTap,
-            initialText: widget.initialText,
-            initialResidentId: widget.initialResidentId,
-            initialResidentName: widget.initialResidentName,
-            initialTagName: widget.initialTagName,
-            taskLogId: widget.taskLogId,
-            taskConfirmImageUrl: widget.taskConfirmImageUrl,
-          ),
+          child: _sheetChild,
         ),
       ),
     );

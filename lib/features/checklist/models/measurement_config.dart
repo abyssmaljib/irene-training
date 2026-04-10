@@ -71,3 +71,20 @@ MeasurementConfig? getMeasurementConfig(String? taskType) {
   if (taskType == null || taskType.isEmpty) return null;
   return measurementTaskTypes[taskType];
 }
+
+/// Map จาก measurementType → MeasurementConfig (สำหรับ post measurement)
+/// ใช้เมื่อต้อง lookup config โดย measurementType แทน taskType
+/// เช่น measurementConfigByType['weight'] → MeasurementConfig(weight, kg, ...)
+final Map<String, MeasurementConfig> measurementConfigByType = {
+  for (final config in measurementTaskTypes.values)
+    config.measurementType: config,
+};
+
+/// รายการ measurement types ทั้งหมดที่ใช้ได้ใน post + FAB shortcut
+/// เรียงตามลำดับที่ต้องการแสดงใน UI
+const List<String> postMeasurementTypes = [
+  'weight',
+  'height',
+  'dtx',
+  'insulin',
+];

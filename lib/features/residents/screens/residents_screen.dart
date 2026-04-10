@@ -618,7 +618,7 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
     // เดิมใช้ Column ซึ่งสร้าง card ทุกตัวพร้อมกัน → กระตุก
     // ใหม่ใช้ SliverList ซึ่งสร้างเฉพาะ card ที่มองเห็น → ลื่น
     final List<Widget> slivers = [
-      SliverPadding(padding: EdgeInsets.only(top: AppSpacing.sm)),
+      const SliverPadding(padding: EdgeInsets.only(top: 8)),
     ];
 
     for (final zoneName in zoneKeys) {
@@ -627,12 +627,7 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
       // Zone header — ชื่อ zone + จำนวนผู้พัก
       slivers.add(SliverToBoxAdapter(
         child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            AppSpacing.md,
-            AppSpacing.md,
-            AppSpacing.md,
-            AppSpacing.sm,
-          ),
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
           child: Row(
             children: [
               Text(
@@ -643,7 +638,7 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
               ),
               Spacer(),
               Container(
-                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppColors.background,
                   borderRadius: BorderRadius.circular(12),
@@ -686,7 +681,7 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
       ));
     }
 
-    slivers.add(SliverPadding(padding: EdgeInsets.only(bottom: AppSpacing.xl)));
+    slivers.add(const SliverPadding(padding: EdgeInsets.only(bottom: 24)));
     return slivers;
   }
 
@@ -731,7 +726,7 @@ class _ResidentsScreenState extends State<ResidentsScreen> {
     return Container(
       color: color,
       alignment: alignment,
-      padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: alignment == Alignment.centerRight

@@ -77,7 +77,7 @@ class PreviewVitalSignDialog extends StatelessWidget {
     return Container(
       // จำกัดความสูงไม่เกิน 85% ของหน้าจอ
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.85,
+        maxHeight: MediaQuery.sizeOf(context).height * 0.85,
       ),
       decoration: const BoxDecoration(
         color: AppColors.surface,

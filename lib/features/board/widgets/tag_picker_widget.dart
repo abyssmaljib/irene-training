@@ -363,7 +363,7 @@ class _TagPickerSheetState extends ConsumerState<TagPickerSheet> {
     final tagsAsync = ref.watch(tagsProvider);
 
     return Container(
-      height: MediaQuery.of(context).size.height * 0.6,
+      height: MediaQuery.sizeOf(context).height * 0.6,
       decoration: const BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),

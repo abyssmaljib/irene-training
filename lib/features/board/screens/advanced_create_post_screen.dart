@@ -43,6 +43,10 @@ import '../../checklist/providers/task_provider.dart'
         optimisticUpdateTask,
         commitOptimisticUpdate;
 import '../../checklist/widgets/difficulty_rating_dialog.dart';
+import '../../checklist/services/measurement_service.dart';
+import '../../checklist/services/assessment_service.dart';
+import '../widgets/post_measurement_section.dart';
+import '../widgets/post_assessment_section.dart';
 
 /// Advanced Create Post Screen - Full page version for supervisors+
 /// Features: Title, AI summarize, Quiz, Tag, Resident, Images/Video
@@ -63,6 +67,15 @@ class AdvancedCreatePostScreen extends ConsumerStatefulWidget {
   final int? taskLogId;
   final String? taskConfirmImageUrl;
 
+  /// Measurement type ที่ pre-select จาก FAB shortcut (เช่น 'weight')
+  final String? preSelectedMeasurementType;
+
+  /// เปิด assessment section expanded ตั้งแต่แรก (จาก FAB shortcut)
+  final bool openAssessment;
+
+  /// Subject ID ที่เลือกจาก FAB shortcut (แสดงแค่หัวข้อนี้ตัวเดียว)
+  final int? assessmentSubjectId;
+
   /// ตรวจสอบว่ามาจาก task หรือไม่
   bool get isFromTask => taskLogId != null;
 
@@ -76,6 +89,9 @@ class AdvancedCreatePostScreen extends ConsumerStatefulWidget {
     this.initialTagName,
     this.taskLogId,
     this.taskConfirmImageUrl,
+    this.preSelectedMeasurementType,
+    this.openAssessment = false,
+    this.assessmentSubjectId,
   });
 
   @override
@@ -124,23 +140,29 @@ class _AdvancedCreatePostScreenState
       final prefs = ref.read(sharedPreferencesProvider);
       _draftService = PostDraftService(prefs);
 
-      // ถ้ามาจาก task หรือมี initial values ให้ใช้ค่าจาก widget
-      if (widget.isFromTask ||
+      // ถ้ามาจาก shortcut (measurement/assessment) → ไม่ reset state
+      // เพราะ bottom sheet ตั้งค่า provider ไว้แล้ว (resident, tag, measurements, assessments)
+      final isFromShortcut = widget.preSelectedMeasurementType != null || widget.openAssessment;
+
+      if (isFromShortcut) {
+        // อ่าน state จาก provider ที่ bottom sheet ตั้งค่าไว้
+        final state = ref.read(createPostProvider);
+        if (state.text.isNotEmpty) _textController.text = state.text;
+        if (state.title != null) _titleController.text = state.title!;
+      } else if (widget.isFromTask ||
           widget.initialResidentId != null ||
           widget.initialTagName != null) {
-        // Initialize provider state จาก task parameters
+        // มาจาก task → Initialize provider state จาก task parameters
         ref.read(createPostProvider.notifier).initFromTask(
               text: widget.initialText ?? '',
               residentId: widget.initialResidentId,
               residentName: widget.initialResidentName,
             );
 
-        // Auto-select tag ถ้ามี initialTagName
         if (widget.initialTagName != null) {
           _autoSelectTagByName(widget.initialTagName!);
         }
 
-        // ถ้ามาจาก task ให้ตั้งค่า sendToFamily = true (บังคับส่งให้ญาติ)
         if (widget.isFromTask) {
           ref.read(createPostProvider.notifier).setSendToFamily(true);
         }
@@ -161,11 +183,36 @@ class _AdvancedCreatePostScreenState
           _checkAndRestoreDraft();
         }
       }
+
+      // === Pre-select จาก FAB shortcut ===
+      if (widget.preSelectedMeasurementType != null) {
+        ref.read(createPostProvider.notifier)
+            .setPreSelectedMeasurement(widget.preSelectedMeasurementType);
+        _autoSelectTagByName('การวัด');
+      }
+      if (widget.openAssessment) {
+        _autoSelectTagByName('การวัด');
+        // โหลด assessment subjects ล่วงหน้า (ไม่รอ PostAssessmentSection)
+        _preloadAssessmentSubjects();
+      }
     });
 
     // Listen for text changes เพื่อ auto-save draft
     _titleController.addListener(_onContentChanged);
     _textController.addListener(_onContentChanged);
+  }
+
+  /// โหลด assessment subjects ล่วงหน้า → ใส่ใน provider state
+  /// เพื่อให้ PostAssessmentSection ไม่ต้องโหลดเอง (แก้ปัญหา nursinghomeId = 0)
+  Future<void> _preloadAssessmentSubjects() async {
+    final nursinghomeId = await ref.read(postNursinghomeIdProvider.future);
+    if (nursinghomeId == null || nursinghomeId == 0 || !mounted) return;
+
+    final subjects = await AssessmentService.instance
+        .getAllSubjectsForNursingHome(nursinghomeId);
+    if (mounted && subjects.isNotEmpty) {
+      ref.read(createPostProvider.notifier).setAssessmentSubjects(subjects);
+    }
   }
 
   /// Auto-select tag by name (ใช้เมื่อมาจาก task)
@@ -426,16 +473,26 @@ class _AdvancedCreatePostScreenState
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    final isMeasurementMode = widget.preSelectedMeasurementType != null;
+    // Measurement mode ไม่มี form fields → ข้าม validate
+    if (!isMeasurementMode && !_formKey.currentState!.validate()) return;
 
     final state = ref.read(createPostProvider);
     final text = _textController.text.trim();
 
-    // ถ้าติ๊ก "ส่งเวร" บังคับต้องกรอกรายละเอียด
-    // เพื่อให้พี่เลี้ยงเขียนข้อมูลสำคัญที่ต้องส่งต่อให้เวรถัดไป
-    if (state.isHandover && text.isEmpty) {
-      // แจ้งเตือน validation: ต้องกรอกรายละเอียดเมื่อติ๊กส่งเวร
+    // ถ้าไม่ใช่ measurement mode + ติ๊กส่งเวร → บังคับต้องกรอกรายละเอียด
+    if (!isMeasurementMode && state.isHandover && text.isEmpty) {
       AppToast.warning(context, 'กรุณากรอกรายละเอียดเมื่อติ๊กส่งเวร');
+      return;
+    }
+
+    // Measurement mode: ต้องมีค่าวัดอย่างน้อย 1 + ต้องมี resident
+    if (isMeasurementMode && !state.hasMeasurements) {
+      AppToast.warning(context, 'กรุณากรอกค่าวัดอย่างน้อย 1 รายการ');
+      return;
+    }
+    if (state.hasMeasurements && state.selectedResidentId == null) {
+      AppToast.warning(context, 'กรุณาเลือกผู้พักอาศัยก่อนบันทึกค่าวัด');
       return;
     }
 
@@ -502,11 +559,24 @@ class _AdvancedCreatePostScreenState
         tagTopics = [...?tagTopics, familyTag];
       }
 
-      // === สรุป restock ต่อท้ายข้อความ (เมื่อส่งให้ญาติ) ===
-      // ญาติจะได้เห็นว่ามียาอะไรถูกเติมบ้าง
-      // === สรุป restock ต่อท้ายข้อความเสมอ (ไม่ว่าจะส่งให้ญาติหรือไม่) ===
-      // เพื่อให้โพสมีบันทึกว่าเติมยาอะไรไปบ้าง
+      // รูป measurement อยู่ใน uploadedImageUrls แล้ว (เพิ่มตอนถ่ายรูป)
+
+      // === สรุปค่าวัดต่อท้ายข้อความ (measurement mode) ===
       String finalText = text;
+      if (state.hasMeasurements) {
+        final parts = <String>[];
+        for (final entry in state.measurements.values) {
+          if (entry.hasValue) {
+            parts.add('${entry.config.label}: ${entry.value} ${entry.config.unit}');
+          }
+        }
+        if (parts.isNotEmpty) {
+          final summary = '📊 ${parts.join(' | ')}';
+          finalText = finalText.isEmpty ? summary : '$finalText\n\n$summary';
+        }
+      }
+
+      // === สรุป restock ต่อท้ายข้อความ ===
       final restockSummary = _buildRestockSummaryText(state.restockItems);
       if (restockSummary.isNotEmpty) {
         finalText = text.isEmpty
@@ -539,6 +609,33 @@ class _AdvancedCreatePostScreenState
       );
 
       if (postId != null) {
+        // === INSERT measurements (ค่าวัดร่างกายที่แนบกับ post) ===
+        if (state.hasMeasurements && state.selectedResidentId != null) {
+          for (final entry in state.measurements.values) {
+            if (entry.hasValue) {
+              await MeasurementService.instance.insertMeasurement(
+                residentId: state.selectedResidentId!,
+                nursinghomeId: nursinghomeId,
+                recordedBy: userId,
+                measurementType: entry.measurementType,
+                numericValue: entry.value!,
+                unit: entry.config.unit,
+                postId: postId,
+                photoUrl: entry.photoUrl,
+              );
+            }
+          }
+        }
+
+        // === INSERT assessment ratings (ประเมินสุขภาพแนบกับ post) ===
+        if (state.hasAssessmentRatings && state.selectedResidentId != null) {
+          await AssessmentService.instance.saveRatings(
+            postId: postId,
+            residentId: state.selectedResidentId!,
+            ratings: state.assessmentRatings,
+          );
+        }
+
         // === Link pending med_history (จากการสร้างยาใหม่ระหว่าง session) ===
         // UPDATE med_history rows ที่สร้างไว้ก่อนหน้า ให้มี post_id
         if (state.pendingMedHistoryIds.isNotEmpty) {
@@ -710,6 +807,9 @@ class _AdvancedCreatePostScreenState
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+              // ซ่อน Title + Description + AI + Quiz เมื่อใช้ shortcut
+              if (widget.preSelectedMeasurementType == null && !widget.openAssessment) ...[
+
               // Title field
               // ถ้ามาจาก task จะแสดง "หัวข้อ" และ lock ไว้
               // ถ้าไม่ได้มาจาก task จะแสดง "หัวข้อ (ถ้ามี)" และแก้ไขได้
@@ -846,6 +946,8 @@ class _AdvancedCreatePostScreenState
                 AppSpacing.verticalGapLg,
               ],
 
+              ], // ปิด if (preSelectedMeasurementType == null) — ซ่อน Title/Description/AI/Quiz
+
               // Resident & Tag pickers
               _buildSectionLabel('ตั้งค่าเพิ่มเติม'),
               const SizedBox(height: 12),
@@ -898,6 +1000,52 @@ class _AdvancedCreatePostScreenState
               if (state.selectedResidentId != null) ...[
                 AppSpacing.verticalGapSm,
                 _buildSendToFamilyToggle(state),
+              ],
+
+              // === Measurement Section ===
+              // แสดงเมื่อ: เลือก resident แล้ว หรือ มี shortcut จาก FAB
+              if (state.selectedResidentId != null ||
+                  state.preSelectedMeasurementType != null ||
+                  state.measurements.isNotEmpty) ...[
+                AppSpacing.verticalGapSm,
+                PostMeasurementSection(
+                  measurements: state.measurements,
+                  preSelectedType: state.preSelectedMeasurementType,
+                  onMeasurementAdded: (type) =>
+                      ref.read(createPostProvider.notifier).addMeasurement(type),
+                  onMeasurementRemoved: (type) =>
+                      ref.read(createPostProvider.notifier).removeMeasurement(type),
+                  onValueChanged: (type, value) =>
+                      ref.read(createPostProvider.notifier).updateMeasurementValue(type, value),
+                  onPhotoChanged: (type, url) =>
+                      ref.read(createPostProvider.notifier).updateMeasurementPhoto(type, url),
+                  onPhotoUploaded: (url) =>
+                      ref.read(createPostProvider.notifier).setUploadedImageUrls(
+                        [...ref.read(createPostProvider).uploadedImageUrls, url],
+                      ),
+                  onPhotoRemoved: (url) =>
+                      ref.read(createPostProvider.notifier).setUploadedImageUrls(
+                        ref.read(createPostProvider).uploadedImageUrls
+                            .where((u) => u != url).toList(),
+                      ),
+                ),
+              ],
+
+              // === Assessment Section ===
+              // ต้องเลือก resident ก่อน
+              if (state.selectedResidentId != null) ...[
+                AppSpacing.verticalGapSm,
+                PostAssessmentSection(
+                  nursinghomeId: ref.watch(postNursinghomeIdProvider).valueOrNull ?? 0,
+                  subjects: state.assessmentSubjects,
+                  initialRatings: state.assessmentRatings,
+                  initiallyExpanded: widget.openAssessment,
+                  // Advanced = ฟอร์มเต็ม → แสดงทุกหัวข้อ (ไม่ filter)
+                  onSubjectsLoaded: (subjects) =>
+                      ref.read(createPostProvider.notifier).setAssessmentSubjects(subjects),
+                  onRatingsChanged: (ratings) =>
+                      ref.read(createPostProvider.notifier).setAssessmentRatings(ratings),
+                ),
               ],
 
               // แนบเพิ่มเติม: อัพเดตสต็อก, ใบนัด, อื่นๆ
@@ -1011,8 +1159,14 @@ class _AdvancedCreatePostScreenState
     // - ถ้ามาจาก task: ต้องมีรูป หรือ วิดีโออย่างน้อย 1 อัน (รายละเอียดไม่บังคับ)
     // - ถ้าไม่ได้มาจาก task: โพสได้เลย (ไม่บังคับอะไร)
     final hasTag = state.selectedTag != null;
-    final canSubmit =
-        !_isSubmitting && hasTag && (!widget.isFromTask || hasMedia);
+    final isMeasurementMode = widget.preSelectedMeasurementType != null;
+    final canSubmit = !_isSubmitting &&
+        hasTag &&
+        (isMeasurementMode
+            // Measurement mode: ต้องมีค่าวัด + resident
+            ? (state.hasMeasurements && state.selectedResidentId != null)
+            // ปกติ: ถ้ามาจาก task ต้องมี media, ถ้าไม่ใช่โพสได้เลย
+            : (!widget.isFromTask || hasMedia));
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
