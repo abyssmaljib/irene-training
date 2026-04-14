@@ -8,6 +8,7 @@ import '../models/task_log.dart';
 import '../services/measurement_service.dart';
 import '../widgets/measurement_input_dialog.dart';
 import 'task_provider.dart';
+import '../../../core/services/retry_queue_service.dart';
 
 // ============================================================
 // Co-Workers Provider — ดึงรายชื่อเพื่อนร่วมเวร
@@ -193,20 +194,34 @@ class BatchTaskNotifier extends StateNotifier<BatchState> {
   /// Upload รูป + mark complete สำหรับคนไข้ 1 คน
   /// เรียกหลังจาก user ถ่ายรูป + preview + rate difficulty เสร็จแล้ว
   ///
+  /// ใช้ logId (unique task log ID) แทน array index เพื่อป้องกัน
+  /// race condition: ระหว่างที่ user ถ่ายรูป (async หลายวินาที)
+  /// ลำดับ residents อาจเปลี่ยนเมื่อ provider rebuild จาก realtime update
+  /// ถ้าใช้ index → อาจ complete task ผิดคน!
+  ///
   /// Flow:
-  /// 1. อัพเดต status → completing
-  /// 2. Upload รูปไป Supabase Storage
-  /// 3. เรียก markTaskComplete()
-  /// 4. อัพเดต status → completed (พร้อม thumbnail + ชื่อคน)
-  /// 5. สร้าง optimistic update ใน provider
+  /// 1. ค้นหา resident ด้วย logId (ไม่ใช่ index)
+  /// 2. อัพเดต status → completing
+  /// 3. Upload รูปไป Supabase Storage
+  /// 4. เรียก markTaskComplete()
+  /// 5. อัพเดต status → completed (พร้อม thumbnail + ชื่อคน)
+  /// 6. สร้าง optimistic update ใน provider
   Future<bool> completeResident({
-    required int residentIndex,
+    required int taskLogId,
     required File imageFile,
     required int? difficultyScore,
     MeasurementResult? measurementResult,
     MeasurementConfig? measurementConfig,
   }) async {
-    final resident = state.residents[residentIndex];
+    // ค้นหา resident ด้วย logId แทน array index
+    // ป้องกัน bug: ลำดับ residents เปลี่ยนระหว่าง async flow (ถ่ายรูป/preview/rating)
+    final resident = state.residents.where(
+      (r) => r.task.logId == taskLogId,
+    ).firstOrNull;
+    if (resident == null) {
+      debugPrint('⚠️ completeResident: logId=$taskLogId not found in state');
+      return false;
+    }
     final task = resident.task;
     final userId = _ref.read(currentUserIdProvider);
     final userNickname = _ref.read(currentUserNicknameProvider).valueOrNull;
@@ -214,7 +229,7 @@ class BatchTaskNotifier extends StateNotifier<BatchState> {
     if (userId == null) return false;
 
     // 1. อัพเดต status → completing
-    _updateResident(residentIndex, resident.copyWith(
+    _updateResidentByLogId(task.logId, resident.copyWith(
       status: BatchResidentStatus.completing,
     ));
 
@@ -266,8 +281,8 @@ class BatchTaskNotifier extends StateNotifier<BatchState> {
       };
       _ref.read(taskRefreshCounterProvider.notifier).state++;
 
-      // 5. อัพเดต status → completed
-      _updateResident(residentIndex, resident.copyWith(
+      // 5. อัพเดต status → completed (ใช้ logId ค้นหาใหม่ ปลอดภัยจาก race condition)
+      _updateResidentByLogId(task.logId, resident.copyWith(
         status: BatchResidentStatus.completed,
         uploadedImageUrl: imageUrl,
         completedByNickname: userNickname ?? 'ฉัน',
@@ -289,7 +304,18 @@ class BatchTaskNotifier extends StateNotifier<BatchState> {
           );
         } catch (e) {
           // ไม่ให้ error จาก points กระทบ task completion
-          debugPrint('Batch points error: $e');
+          // เก็บใน retry queue แล้ว sync ทีหลัง (ไม่หายเงียบ)
+          debugPrint('Batch points error, queuing for retry: $e');
+          final coWorkerIds =
+              state.selectedCoWorkers.map((c) => c.userId).toList();
+          await RetryQueueService.instance.enqueueBatchPoints(
+            completingUserId: userId,
+            taskLogId: task.logId,
+            taskName: task.title ?? 'งาน',
+            residentName: task.residentName ?? 'คนไข้',
+            coWorkerIds: coWorkerIds,
+            difficultyScore: difficultyScore,
+          );
         }
       }
 
@@ -313,6 +339,15 @@ class BatchTaskNotifier extends StateNotifier<BatchState> {
         if (!measSuccess) {
           // Measurement fail → revert task กลับ pending บน server
           await service.unmarkTask(task.logId);
+          // ลบ optimistic update ที่สร้างไว้ตอน step 4 ด้วย
+          // ไม่งั้นหน้า checklist จะยังแสดง task เป็น "complete" ทั้งที่ server เป็น pending
+          final currentUpdates = _ref.read(optimisticTaskUpdatesProvider);
+          if (currentUpdates.containsKey(task.logId)) {
+            final cleaned = Map<int, TaskLog>.of(currentUpdates)
+              ..remove(task.logId);
+            _ref.read(optimisticTaskUpdatesProvider.notifier).state = cleaned;
+            _ref.read(taskRefreshCounterProvider.notifier).state++;
+          }
           throw Exception('insertMeasurement failed');
         }
       }
@@ -320,8 +355,8 @@ class BatchTaskNotifier extends StateNotifier<BatchState> {
       return true;
     } catch (e) {
       debugPrint('Batch complete error: $e');
-      // Rollback status
-      _updateResident(residentIndex, resident.copyWith(
+      // Rollback status (ใช้ logId ค้นหาใหม่ ปลอดภัยจาก race condition)
+      _updateResidentByLogId(task.logId, resident.copyWith(
         status: BatchResidentStatus.failed,
         errorMessage: 'เกิดข้อผิดพลาด กรุณาลองใหม่',
       ));
@@ -329,16 +364,24 @@ class BatchTaskNotifier extends StateNotifier<BatchState> {
     }
   }
 
-  /// อัพเดต state ของ resident ที่ index ที่กำหนด
-  void _updateResident(int index, BatchResidentState newState) {
+  /// อัพเดต state ของ resident ด้วย logId (ปลอดภัยจาก race condition)
+  /// ค้นหา index ใหม่ทุกครั้งเพื่อป้องกันกรณีที่ลำดับ residents เปลี่ยน
+  void _updateResidentByLogId(int logId, BatchResidentState newState) {
+    final index = state.residents.indexWhere((r) => r.task.logId == logId);
+    if (index == -1) return; // resident ถูกลบออกไปแล้ว
     final updated = [...state.residents];
     updated[index] = newState;
     state = state.copyWith(residents: updated);
   }
 
   /// Reset status ของ resident ที่ failed กลับเป็น pending (ลองใหม่ได้)
-  void retryResident(int index) {
-    _updateResident(index, state.residents[index].copyWith(
+  /// ใช้ logId แทน index เพื่อป้องกัน race condition เดียวกับ completeResident
+  void retryResident(int taskLogId) {
+    final index = state.residents.indexWhere(
+      (r) => r.task.logId == taskLogId,
+    );
+    if (index == -1) return;
+    _updateResidentByLogId(taskLogId, state.residents[index].copyWith(
       status: BatchResidentStatus.pending,
       errorMessage: null,
     ));
@@ -348,11 +391,16 @@ class BatchTaskNotifier extends StateNotifier<BatchState> {
 /// Provider สำหรับ BatchTaskNotifier
 /// ใช้ family parameter = groupKey เพื่อให้แต่ละ batch มี state แยกกัน
 /// autoDispose เมื่อออกจากหน้า BatchTaskScreen
+///
+/// ใช้ ref.read (ไม่ใช่ ref.watch) เพื่อป้องกัน provider rebuild ระหว่าง async flow:
+/// ถ้าใช้ watch → realtime update จะ trigger rebuild → สร้าง notifier ใหม่
+/// → old notifier ที่กำลังทำ completeResident() ถูก dispose → state หาย
+/// pull-to-refresh ยังทำงานได้ปกติ เพราะใช้ ref.invalidate() ตรงๆ
 final batchTaskProvider = StateNotifierProvider.autoDispose
     .family<BatchTaskNotifier, BatchState, String>((ref, groupKey) {
   // ดึง batch group จาก batchGroupedTasksProvider
-  // ค้นหา group ที่มี groupKey ตรง
-  final batchGroupedAsync = ref.watch(batchGroupedTasksProvider);
+  // ใช้ ref.read แทน ref.watch เพื่อไม่ให้ provider rebuild อัตโนมัติจาก realtime
+  final batchGroupedAsync = ref.read(batchGroupedTasksProvider);
   final batchData = batchGroupedAsync.valueOrNull;
 
   List<TaskLog> tasks = [];

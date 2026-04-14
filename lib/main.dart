@@ -19,6 +19,7 @@ import 'firebase_options.dart';
 import 'core/providers/shared_preferences_provider.dart';
 import 'core/services/app_version_service.dart';
 import 'core/services/force_update_service.dart';
+import 'core/services/retry_queue_service.dart';
 import 'core/services/onesignal_service.dart';
 import 'core/widgets/force_update_dialog.dart';
 import 'core/widgets/national_id_dialog.dart';
@@ -275,12 +276,14 @@ class _AuthWrapperState extends State<AuthWrapper>
     }
   }
 
-  /// เช็ค force update ก่อน → national_id → badge ตามลำดับ
+  /// เช็ค force update ก่อน → national_id → badge → retry queue ตามลำดับ
   /// ต้อง await ทีละตัวเพื่อไม่ให้ dialog ซ้อนกัน
   Future<void> _postLoginChecks() async {
     await _checkForceUpdate();
     await _checkNationalId();
     _checkUnseenBadges();
+    // Retry queue: ส่ง assessment/points ที่ค้างอยู่ (fail จากครั้งก่อน)
+    RetryQueueService.instance.processQueue();
   }
 
   /// เช็คว่า user มี national_id หรือยัง — ถ้ายังไม่มีจะแสดง popup ขอ

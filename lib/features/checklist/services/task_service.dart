@@ -241,17 +241,31 @@ class TaskService {
     bool skipPointsRecording = false,
   }) async {
     try {
-      await _supabase.from('A_Task_logs_ver2').update({
-        'status': 'complete',
-        'completed_by': userId,
-        'completed_at': DateTime.now().toIso8601String(),
-        if (imageUrl != null) 'confirmImage': imageUrl,
-        if (postId != null) 'post_id': postId,
-        // Difficulty score - ถ้าไม่ระบุจะใช้ default 5 ที่ตั้งไว้ใน database
-        if (difficultyScore != null) 'difficulty_score': difficultyScore,
-        if (difficultyScore != null)
-          'difficulty_rated_by': difficultyRatedBy ?? userId,
-      }).eq('id', logId);
+      // First-write-wins: UPDATE เฉพาะเมื่อ status ยังเป็น null (pending)
+      // ป้องกัน 2 คน complete task เดียวกันพร้อมกัน — คนหลังจะไม่ทับคนแรก
+      // ใช้ .select() เพื่อได้ affected rows กลับมาตรวจสอบ
+      final result = await _supabase
+          .from('A_Task_logs_ver2')
+          .update({
+            'status': 'complete',
+            'completed_by': userId,
+            'completed_at': DateTime.now().toIso8601String(),
+            if (imageUrl != null) 'confirmImage': imageUrl,
+            if (postId != null) 'post_id': postId,
+            if (difficultyScore != null) 'difficulty_score': difficultyScore,
+            if (difficultyScore != null)
+              'difficulty_rated_by': difficultyRatedBy ?? userId,
+          })
+          .eq('id', logId)
+          .isFilter('status', null) // เฉพาะ task ที่ยังไม่ได้ทำ (first-write-wins)
+          .select('id');
+
+      // ถ้า result ว่าง = task ถูก complete ไปแล้ว (คนอื่นทำก่อน)
+      if ((result as List).isEmpty) {
+        debugPrint(
+            'markTaskComplete: log $logId already completed by someone else');
+        return false;
+      }
 
       invalidateCache();
       debugPrint(

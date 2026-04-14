@@ -25,6 +25,7 @@ import 'task_detail_screen.dart';
 import '../services/assessment_service.dart';
 import '../models/assessment_models.dart';
 import '../widgets/assessment_rating_dialog.dart';
+import '../../../core/services/retry_queue_service.dart';
 
 /// หน้า Batch Task — ทำ task เดียวกันข้ามคนไข้หลายคน
 ///
@@ -571,7 +572,7 @@ class _ResidentTile extends ConsumerWidget {
         // GestureDetector แยกจาก card เพื่อให้กด retry ได้โดยไม่ไป TaskDetail
         return GestureDetector(
           onTap: () =>
-              ref.read(batchTaskProvider(groupKey).notifier).retryResident(index),
+              ref.read(batchTaskProvider(groupKey).notifier).retryResident(resident.task.logId),
           child: Container(
             color: AppColors.tagFailedBg,
             padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
@@ -735,9 +736,12 @@ class _ResidentTile extends ConsumerWidget {
     }
 
     // 5. Upload + mark complete ทันที
+    // ใช้ logId แทน index เพื่อป้องกัน race condition:
+    // ระหว่าง async flow (กล้อง/preview/rating) provider อาจ rebuild
+    // ทำให้ลำดับ residents เปลี่ยน → index ชี้ไปผิดคน
     final notifier = ref.read(batchTaskProvider(groupKey).notifier);
     final success = await notifier.completeResident(
-      residentIndex: index,
+      taskLogId: resident.task.logId,
       imageFile: confirmedFile,
       difficultyScore: diffResult.score,
       measurementResult: measResult,
@@ -745,6 +749,7 @@ class _ResidentTile extends ConsumerWidget {
     );
 
     // 5.5 บันทึก assessment ratings (ถ้ามี) — ไม่ block flow
+    // ถ้า fail → เก็บใน retry queue แล้ว sync ทีหลัง (ไม่หายเงียบ)
     if (success &&
         assessmentRatings != null &&
         assessmentRatings.isNotEmpty &&
@@ -756,7 +761,12 @@ class _ResidentTile extends ConsumerWidget {
           ratings: assessmentRatings,
         );
       } catch (e) {
-        debugPrint('⚠️ Batch assessment save failed: $e');
+        debugPrint('⚠️ Batch assessment save failed, queuing for retry: $e');
+        await RetryQueueService.instance.enqueueAssessmentRatings(
+          taskLogId: resident.task.logId,
+          residentId: resident.task.residentId!,
+          ratings: assessmentRatings,
+        );
       }
     }
 

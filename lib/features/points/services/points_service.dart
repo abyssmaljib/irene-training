@@ -587,15 +587,18 @@ class PointsService {
 
     // หารจำนวนคน (user + co-workers)
     final totalPeople = 1 + coWorkerIds.length;
-    // ใช้ ~/ (integer division) เพื่อไม่ให้แต้มรวมเกินจริง
-    // เช่น 5 ~/ 3 = 1 (ไม่ใช่ 2 จาก ceil ที่ทำให้แจก 6 แต้มจาก 5)
+    // ใช้ ~/ (integer division) สำหรับ co-workers
+    // ส่วนที่เหลือ (remainder) ให้ผู้ทำงานหลัก
+    // เช่น 7 points / 3 คน → co-workers ได้ 2 คนละ, ผู้ทำงานได้ 3 (2+1 remainder)
     // กรณี totalPeople > totalPoints (เช่น 6 คน 5 แต้ม) → หารได้ 0
-    // ให้ผู้ทำงานได้ totalPoints เต็ม ส่วน co-workers ได้ 1 คนละ
-    // เพื่อให้ทุกคนได้แต้มแต่รวมไม่ inflate มากจนเกินไป
+    // ให้ทุกคนได้ minimum 1 แต้ม (ผู้ทำงานได้ totalPoints, co-workers ได้ 1)
     final rawPerPerson = totalPoints ~/ totalPeople;
+    final remainder = totalPoints % totalPeople;
     final pointsPerPerson = rawPerPerson > 0 ? rawPerPerson : 1;
-    // ผู้ทำงาน: ได้ points เท่ากัน หรือได้ทั้งหมดถ้าหารไม่พอ
-    final completingUserPoints = rawPerPerson > 0 ? rawPerPerson : totalPoints;
+    // ผู้ทำงาน: ได้ส่วนเท่ากัน + remainder ที่เหลือจากการหาร
+    // ถ้าหารไม่พอ (rawPerPerson == 0) → ได้ทั้งหมด
+    final completingUserPoints =
+        rawPerPerson > 0 ? rawPerPerson + remainder : totalPoints;
 
     final description =
         'Batch: $taskName - $residentName (หาร $totalPeople คน)';

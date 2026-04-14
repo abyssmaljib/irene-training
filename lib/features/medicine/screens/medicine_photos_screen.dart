@@ -494,7 +494,13 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
       if (!mounted) return;
 
       // คืน expandedIndex ก่อน upload เพื่อให้ preserveExpanded ทำงานถูกต้อง
-      _expandedIndex = previousExpandedIndex;
+      // ตรวจ bounds ก่อน: ระหว่าง async flow (กล้อง/preview) จำนวน meal groups อาจเปลี่ยน
+      if (previousExpandedIndex != null &&
+          previousExpandedIndex < _mealGroups.length) {
+        _expandedIndex = previousExpandedIndex;
+      } else {
+        _expandedIndex = null;
+      }
 
       // === Phase 4: Upload ===
       _showLoadingDialog();

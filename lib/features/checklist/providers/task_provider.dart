@@ -256,7 +256,23 @@ final _baseFilteredTasksProvider = Provider<AsyncValue<List<TaskLog>>>((ref) {
   return tasksAsync.when(
     data: (tasks) {
       // merge + filter ทำแค่ครั้งเดียว ที่นี่
-      final mergedTasks = _mergeOptimisticUpdates(tasks, optimisticUpdates);
+      // ใช้ WithCleanup เพื่อลบ optimistic updates ที่ server sync เสร็จแล้ว
+      // ป้องกัน memory leak: optimistic map โตขึ้นเรื่อยๆ ถ้าไม่ cleanup
+      final (mergedTasks, syncedLogIds) =
+          _mergeOptimisticUpdatesWithCleanup(tasks, optimisticUpdates);
+
+      // Cleanup: ลบ optimistic updates ที่ server confirm แล้ว (status ตรงกัน)
+      if (syncedLogIds.isNotEmpty) {
+        Future.microtask(() {
+          final current = ref.read(optimisticTaskUpdatesProvider);
+          final cleaned = Map<int, TaskLog>.of(current)
+            ..removeWhere((logId, _) => syncedLogIds.contains(logId));
+          if (cleaned.length != current.length) {
+            ref.read(optimisticTaskUpdatesProvider.notifier).state = cleaned;
+          }
+        });
+      }
+
       final filteredTasks = _filterByZonesResidentsRoleAndType(
         mergedTasks, selectedZones, selectedResidents, userRole, selectedRoleId, selectedTaskTypes);
       return AsyncValue.data(filteredTasks);

@@ -41,6 +41,7 @@ import '../services/measurement_service.dart';
 import '../services/assessment_service.dart';
 import '../models/assessment_models.dart';
 import '../widgets/assessment_inline_section.dart';
+import '../../../core/services/retry_queue_service.dart';
 
 /// หน้ารายละเอียด Task แบบ Full Page
 class TaskDetailScreen extends ConsumerStatefulWidget {
@@ -2683,8 +2684,16 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
             difficultyScore: difficultyScore,
           );
         } catch (e) {
-          debugPrint('⚠️ Batch points recording failed: $e');
-          // ไม่ block flow — task ถูก mark complete แล้ว
+          // เก็บใน retry queue แล้ว sync ทีหลัง (ไม่หายเงียบ)
+          debugPrint('⚠️ Batch points recording failed, queuing: $e');
+          await RetryQueueService.instance.enqueueBatchPoints(
+            completingUserId: userId,
+            taskLogId: capturedLogId,
+            taskName: capturedTitle ?? 'งาน',
+            residentName: _task.residentName ?? '',
+            coWorkerIds: capturedCoWorkers.map((c) => c.userId).toList(),
+            difficultyScore: difficultyScore,
+          );
         }
       }
 
@@ -2700,8 +2709,13 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
             ratings: capturedAssessmentRatings,
           );
         } catch (e) {
-          debugPrint('⚠️ Assessment ratings save failed: $e');
-          // ไม่ block flow — task ถูก mark complete แล้ว
+          // เก็บใน retry queue แล้ว sync ทีหลัง (ไม่หายเงียบ)
+          debugPrint('⚠️ Assessment ratings save failed, queuing: $e');
+          await RetryQueueService.instance.enqueueAssessmentRatings(
+            taskLogId: capturedLogId,
+            residentId: capturedResidentId,
+            ratings: capturedAssessmentRatings,
+          );
         }
       }
 
