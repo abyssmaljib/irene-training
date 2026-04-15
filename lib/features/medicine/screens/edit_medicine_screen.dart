@@ -93,7 +93,10 @@ class _EditMedicineScreenState extends ConsumerState<EditMedicineScreen> {
 
     final notifier = ref.read(editMedicineFormProvider(widget.medicine.medicineListId).notifier);
 
-    // Sync values ก่อน submit
+    // Sync ค่าจาก controllers ทั้งหมดก่อน submit
+    // ⚠️ ต้อง sync takeTab ด้วย เพราะ listener จะ fire เฉพาะเมื่อ user เปลี่ยนค่า
+    // ถ้า user ไม่ได้แก้ dose → listener ไม่ fire → provider อาจมีค่าเก่าจาก session ก่อน
+    notifier.setTakeTab(_takeTabController.text);
     notifier.setEveryHr(_everyHrController.text);
     notifier.setNote(_noteController.text);
 

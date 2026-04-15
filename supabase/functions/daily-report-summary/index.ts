@@ -18,7 +18,7 @@ const DEV_LINE_GROUP_ID = 'C57c1c76d5500d7eb9d617e1590734290'
 // คนที่ไม่อยู่ใน list → ส่ง DEV group เหมือนเดิม
 // เพิ่มคนใหม่: แค่เพิ่ม resident_id เข้า Set
 // ============================================
-const PRODUCTION_RESIDENTS = new Set([104, 159]) // คุณสุริยะ เชิญศิริ, คุณสุชญา อักษรนิติ
+const PRODUCTION_RESIDENTS = new Set([104, 159, 169, 173, 310]) // คุณสุริยะ เชิญศิริ, คุณสุชญา อักษรนิติ, คุณถเวช เก็งวินิจ, คุณยุทธศาสตร์ ธีรพิริยะ, คุณงามตา รักษาจิต
 
 // ============================================
 // Types (รวมจากทั้ง 3 functions)
@@ -1054,7 +1054,8 @@ Deno.serve(async (req) => {
         LEFT JOIN user_info ui ON tl.completed_by = ui.id
         LEFT JOIN user_info ui_r ON tl.resolved_by = ui_r.id
         LEFT JOIN "B_Ticket" tk ON tk.source_type = 'task_log' AND tk.source_id = tl.id
-        WHERE r.s_status = 'Stay' AND tl."ExpectedDateTime" >= $1::timestamptz AND tl."ExpectedDateTime" < $2::timestamptz
+        WHERE r.s_status = 'Stay' AND r."i_Name_Surname" NOT LIKE 'งาน%'
+          AND tl."ExpectedDateTime" >= $1::timestamptz AND tl."ExpectedDateTime" < $2::timestamptz
         ORDER BY r."i_Name_Surname", tl."ExpectedDateTime"
       `, [startTime, endTime])
       taskRows = taskResult.rows as TaskRow[]
@@ -1076,6 +1077,7 @@ Deno.serve(async (req) => {
         LEFT JOIN user_info ui ON dd.user_id = ui.id
         LEFT JOIN "B_Doctor_Visit_Summary" dvs ON dvs.calendar_id = c.id AND (dvs.is_deleted IS NULL OR dvs.is_deleted = false)
         WHERE c."Type" IN ('นัดหมาย', 'appointment') AND c."dateTime" >= $1::date AND r.s_status = 'Stay'
+          AND r."i_Name_Surname" NOT LIKE 'งาน%'
         ORDER BY c.resident_id, c."dateTime"
       `, [today])  /* นัดหมาย ดึงจาก "วันนี้" เป็นต้นไป (ไม่ใช่ reportDate) เพราะเป็นข้อมูล upcoming */
       apptRows = apptResult.rows as AppointmentRow[]
@@ -1089,7 +1091,7 @@ Deno.serve(async (req) => {
           COALESCE(array_length(ml."medList_id_List", 1), 0) as med_count
         FROM "A_Med_logs" ml JOIN residents r ON ml.resident_id = r.id
         LEFT JOIN user_info ui_3c ON ml."3C_Compleated_by" = ui_3c.id
-        WHERE ml."Created_Date" = $1 AND r.s_status = 'Stay'
+        WHERE ml."Created_Date" = $1 AND r.s_status = 'Stay' AND r."i_Name_Surname" NOT LIKE 'งาน%'
           AND ml.meal NOT IN ('test', 'จัดยาทั้งวัน', 'ให้เมื่อมีอาการ')
         ORDER BY r."i_Name_Surname", ml.meal
       `, [reportDate])
@@ -1134,7 +1136,7 @@ Deno.serve(async (req) => {
         LEFT JOIN vitalsign_sent_queue q ON q.vitalsign_id = v.id
         JOIN residents r ON v.resident_id = r.id
         WHERE v.created_at >= $1::timestamptz AND v.created_at < $2::timestamptz
-          AND r.s_status = 'Stay'
+          AND r.s_status = 'Stay' AND r."i_Name_Surname" NOT LIKE 'งาน%'
         ORDER BY v.resident_id, v.created_at
       `, [startTime, endTime])
       vitalRows = vitalResult.rows as VitalRow[]
@@ -1150,7 +1152,7 @@ Deno.serve(async (req) => {
           AND s.date >= $1::timestamptz AND s.date < $2::timestamptz
           AND s.progression_2_times IS NOT NULL AND s.progression_2_times != ''
           AND s.share_token IS NOT NULL
-          AND r.s_status = 'Stay'
+          AND r.s_status = 'Stay' AND r."i_Name_Surname" NOT LIKE 'งาน%'
         ORDER BY s.resident_id, s.date DESC
       `, [startTime, endTime])
       ptRows = ptResult.rows as PTRow[]
@@ -1164,7 +1166,7 @@ Deno.serve(async (req) => {
         FROM residents r
         LEFT JOIN nursinghome_zone nz ON r.s_zone = nz.id
         LEFT JOIN n8n_agent_resident_profile rp ON r.id = rp.resident_id
-        WHERE r.s_status = 'Stay'
+        WHERE r.s_status = 'Stay' AND r."i_Name_Surname" NOT LIKE 'งาน%'
       `)
       var residentInfoRows = residentInfoResult.rows
     } finally {
@@ -1355,9 +1357,11 @@ Deno.serve(async (req) => {
         const taskData = tasksByRes.get(rid) ? categorizeTasks(tasksByRes.get(rid)!) : null
         results.push({
           id: rid, name, bubbles: bubbles.length, sent: false,
+          production: PRODUCTION_RESIDENTS.has(rid),  // อยู่ใน production list หรือไม่
           picUrl: residentPics.get(rid) || null,
           zone: residentZones.get(rid) ?? null,  // { id, name, abbr }
           sections,
+          medShareToken: residentMedTokens.get(rid) || null,  // token สำหรับลิงก์ดูรายการยา
           // ข้อมูลดิบแต่ละ section
           vitals: vitalsByRes.get(rid) || [],
           tasks: taskData,

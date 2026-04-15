@@ -7,7 +7,10 @@ import '../services/medicine_service.dart';
 
 /// Provider สำหรับ form แก้ไขยาของ resident
 /// ใช้ family เพื่อ scope ตาม medicineListId
-final editMedicineFormProvider = StateNotifierProvider.family<
+/// ⚠️ ต้องใช้ autoDispose เพื่อไม่ให้ state ค้างจาก session ก่อน
+/// ถ้าไม่มี autoDispose → provider จะเก็บ state เก่า (เช่น takeTab เดิม)
+/// ทำให้ submit ส่งค่าเก่าถ้า user ไม่ได้แก้ field นั้น
+final editMedicineFormProvider = StateNotifierProvider.autoDispose.family<
     EditMedicineFormNotifier,
     AsyncValue<EditMedicineFormState>,
     int>((ref, medicineListId) {
