@@ -8,6 +8,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/irene_app_bar.dart';
 import '../../../core/widgets/confirm_dialog.dart';
 import '../../../core/widgets/app_toast.dart';
+import '../../../core/widgets/keyboard_dismiss_scope.dart';
 import '../widgets/handover_toggle_widget.dart';
 import '../models/post.dart';
 import '../providers/edit_post_provider.dart';
@@ -414,7 +415,11 @@ class _AdvancedEditPostScreenState
       ),
       // ใช้ Column[Expanded(ScrollView), BottomBar] แทน bottomNavigationBar
       // เพื่อให้ toolbar อยู่เหนือ keyboard เสมอ
-      body: Column(
+      // Wrap ด้วย KeyboardDismissScope:
+      // 1. แตะพื้นที่ว่าง → keyboard ปิด
+      // 2. แสดง "ตกลง" เหนือ keyboard สำหรับ numeric input (measurement)
+      body: KeyboardDismissScope(
+        child: Column(
         children: [
           Expanded(
             child: Form(
@@ -589,6 +594,7 @@ class _AdvancedEditPostScreenState
             // Toolbar อยู่ใน body Column — จะอยู่เหนือ keyboard เสมอ
             _buildBottomBar(state),
           ],
+          ),
         ),
     ),
     );

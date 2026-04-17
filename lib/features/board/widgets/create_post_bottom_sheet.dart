@@ -14,6 +14,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/providers/shared_preferences_provider.dart';
 import '../../../core/widgets/confirm_dialog.dart';
 import '../../../core/widgets/app_toast.dart';
+import '../../../core/widgets/keyboard_dismiss_scope.dart';
 import '../models/new_tag.dart';
 import '../models/post_draft.dart';
 import '../providers/create_post_provider.dart';
@@ -815,7 +816,12 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: SafeArea(
-        child: Column(
+        // showDoneBar: false — bottom sheet มี Post button เหมือน Done อยู่แล้ว
+        // + sheet size to content ใส่ Stack+Positioned จะทำให้ layout พัง
+        // ใช้แค่ tap-outside-to-dismiss
+        child: KeyboardDismissScope(
+          showDoneBar: false,
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             // Header พร้อมปุ่มกากบาทปิด
@@ -979,6 +985,7 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
             // Bottom bar
             _buildBottomBar(state),
           ],
+          ),
         ),
       ),
     );

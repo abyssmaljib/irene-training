@@ -11,6 +11,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../../../core/widgets/input_fields.dart';
+import '../../../core/widgets/keyboard_dismiss_scope.dart';
 import '../../../core/widgets/network_image.dart';
 import '../../medicine/screens/photo_preview_screen.dart';
 import '../models/measurement_config.dart';
@@ -98,21 +99,26 @@ class _MeasurementInputSectionState extends State<MeasurementInputSection> {
   String? _warningText;
 
   /// ตรวจสอบค่าว่าอยู่ใน range ที่สมเหตุสมผลหรือไม่
+  /// **Perf:** setState เฉพาะตอนที่ _warningText เปลี่ยนจริง
+  /// ลด rebuild ทุกตัวอักษรตอนกรอก → ช่วยให้ keyboard animate ไม่กระตุก
   void _validateValue(String text) {
     final value = double.tryParse(text);
+    String? newWarning;
+
     if (value == null || text.isEmpty) {
-      setState(() => _warningText = null);
-      return;
+      newWarning = null;
+    } else if (value < widget.config.min) {
+      newWarning =
+          'ค่าต่ำกว่าปกติ (ต่ำสุด ${widget.config.min} ${widget.config.unit})';
+    } else if (value > widget.config.max) {
+      newWarning =
+          'ค่าสูงกว่าปกติ (สูงสุด ${widget.config.max} ${widget.config.unit})';
+    } else {
+      newWarning = null;
     }
 
-    if (value < widget.config.min) {
-      setState(() => _warningText =
-          'ค่าต่ำกว่าปกติ (ต่ำสุด ${widget.config.min} ${widget.config.unit})');
-    } else if (value > widget.config.max) {
-      setState(() => _warningText =
-          'ค่าสูงกว่าปกติ (สูงสุด ${widget.config.max} ${widget.config.unit})');
-    } else {
-      setState(() => _warningText = null);
+    if (newWarning != _warningText) {
+      setState(() => _warningText = newWarning);
     }
   }
 
@@ -450,20 +456,25 @@ class _MeasurementInputDialogState extends State<MeasurementInputDialog> {
     super.dispose();
   }
 
+  /// **Perf:** setState เฉพาะตอน _warningText เปลี่ยน
   void _validateValue(String text) {
     final value = double.tryParse(text);
+    String? newWarning;
+
     if (value == null || text.isEmpty) {
-      setState(() => _warningText = null);
-      return;
-    }
-    if (value < widget.config.min) {
-      setState(() => _warningText =
-          'ค่าต่ำกว่าปกติ (ต่ำสุด ${widget.config.min} ${widget.config.unit})');
+      newWarning = null;
+    } else if (value < widget.config.min) {
+      newWarning =
+          'ค่าต่ำกว่าปกติ (ต่ำสุด ${widget.config.min} ${widget.config.unit})';
     } else if (value > widget.config.max) {
-      setState(() => _warningText =
-          'ค่าสูงกว่าปกติ (สูงสุด ${widget.config.max} ${widget.config.unit})');
+      newWarning =
+          'ค่าสูงกว่าปกติ (สูงสุด ${widget.config.max} ${widget.config.unit})';
     } else {
-      setState(() => _warningText = null);
+      newWarning = null;
+    }
+
+    if (newWarning != _warningText) {
+      setState(() => _warningText = newWarning);
     }
   }
 
@@ -596,7 +607,12 @@ class _MeasurementInputDialogState extends State<MeasurementInputDialog> {
       backgroundColor: AppColors.surface,
       contentPadding: EdgeInsets.zero,
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      content: SizedBox(
+      // Wrap ด้วย KeyboardDismissScope (showDoneBar: false) เพื่อ:
+      // - แตะพื้นที่ว่างใน dialog → keyboard ปิด
+      // - ไม่ใช้ Done bar เพราะ dialog size to content + มีปุ่มบันทึกอยู่แล้ว
+      content: KeyboardDismissScope(
+        showDoneBar: false,
+        child: SizedBox(
         width: double.maxFinite,
         child: SingleChildScrollView(
           child: Column(
@@ -721,6 +737,7 @@ class _MeasurementInputDialogState extends State<MeasurementInputDialog> {
               ),
             ],
           ),
+        ),
         ),
       ),
     );

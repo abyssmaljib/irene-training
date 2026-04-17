@@ -8,6 +8,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/confirm_dialog.dart';
 import '../../../core/widgets/app_toast.dart';
+import '../../../core/widgets/keyboard_dismiss_scope.dart';
 import 'handover_toggle_widget.dart';
 import '../models/post.dart';
 import '../providers/edit_post_provider.dart';
@@ -172,7 +173,11 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: SafeArea(
-        child: Column(
+        // showDoneBar: false — bottom sheet size to content, ใส่ Stack+Positioned
+        // จะ conflict กับ mainAxisSize.min + มีปุ่ม Save เหมือน Done อยู่แล้ว
+        child: KeyboardDismissScope(
+          showDoneBar: false,
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             // Header พร้อมปุ่มกากบาทปิด
@@ -253,6 +258,7 @@ class _EditPostBottomSheetState extends ConsumerState<EditPostBottomSheet> {
             // Bottom bar
             _buildBottomBar(state),
           ],
+          ),
         ),
       ),
     );

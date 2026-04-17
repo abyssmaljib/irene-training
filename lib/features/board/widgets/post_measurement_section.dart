@@ -414,21 +414,26 @@ class _MeasurementInputCardState extends State<_MeasurementInputCard> {
   bool _isReadingAI = false; // กำลังให้ AI อ่านค่าจากรูป
 
   /// ตรวจว่าค่าอยู่ใน range ที่สมเหตุสมผล (soft validation)
+  /// **Perf:** setState เฉพาะตอน _warningText เปลี่ยนจริง
+  /// ลด rebuild ทุกตัวอักษรตอนกรอก → keyboard animate ไม่กระตุก
   void _validateValue(String text) {
     final value = double.tryParse(text);
+    String? newWarning;
+
     if (value == null || text.isEmpty) {
-      setState(() => _warningText = null);
-      return;
+      newWarning = null;
+    } else if (value < widget.entry.config.min) {
+      newWarning =
+          'ค่าต่ำกว่าปกติ (ต่ำสุด ${widget.entry.config.min} ${widget.entry.config.unit})';
+    } else if (value > widget.entry.config.max) {
+      newWarning =
+          'ค่าสูงกว่าปกติ (สูงสุด ${widget.entry.config.max} ${widget.entry.config.unit})';
+    } else {
+      newWarning = null;
     }
 
-    if (value < widget.entry.config.min) {
-      setState(() => _warningText =
-          'ค่าต่ำกว่าปกติ (ต่ำสุด ${widget.entry.config.min} ${widget.entry.config.unit})');
-    } else if (value > widget.entry.config.max) {
-      setState(() => _warningText =
-          'ค่าสูงกว่าปกติ (สูงสุด ${widget.entry.config.max} ${widget.entry.config.unit})');
-    } else {
-      setState(() => _warningText = null);
+    if (newWarning != _warningText) {
+      setState(() => _warningText = newWarning);
     }
   }
 

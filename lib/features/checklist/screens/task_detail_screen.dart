@@ -29,6 +29,7 @@ import '../../board/services/post_action_service.dart';
 import '../../board/widgets/video_player_widget.dart';
 import '../../../core/widgets/webview_screen.dart';
 import '../../../core/widgets/app_toast.dart';
+import '../../../core/widgets/keyboard_dismiss_scope.dart';
 import '../../../core/widgets/shimmer_loading.dart';
 import 'split_screen_camera_screen.dart';
 import 'square_camera_screen.dart';
@@ -355,37 +356,44 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // App Bar
-            _buildAppBar(),
+      // Wrap body ด้วย KeyboardDismissScope เพื่อ:
+      // 1. แตะพื้นที่ว่าง → keyboard ปิด (tap-outside-to-dismiss)
+      // 2. แสดงแถบ "ตกลง" เหนือ keyboard เมื่อ numeric keyboard เปิด
+      //    (iOS numeric keyboard ไม่มีปุ่ม Done → ไม่งั้น user ปิดไม่ได้
+      //    + bottomNavigationBar ปุ่ม Complete จะถูกบังอยู่ใต้ keyboard)
+      body: KeyboardDismissScope(
+        child: SafeArea(
+          child: Column(
+            children: [
+              // App Bar
+              _buildAppBar(),
 
-            // ถ้าเป็นงานจัดยา: compact header อยู่บน (fixed) + grid ยาขยายเต็มพื้นที่ล่าง
-            // ถ้าเป็น task อื่น: layout เดิม (scroll ทั้งหน้า)
-            if (_isJudYa) ...[
-              // Compact header — ข้อมูล task แบบย่อ (fixed height, ไม่ scroll)
-              Padding(
-                padding: EdgeInsets.fromLTRB(
-                  AppSpacing.md, AppSpacing.sm, AppSpacing.md, 0,
+              // ถ้าเป็นงานจัดยา: compact header อยู่บน (fixed) + grid ยาขยายเต็มพื้นที่ล่าง
+              // ถ้าเป็น task อื่น: layout เดิม (scroll ทั้งหน้า)
+              if (_isJudYa) ...[
+                // Compact header — ข้อมูล task แบบย่อ (fixed height, ไม่ scroll)
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    AppSpacing.md, AppSpacing.sm, AppSpacing.md, 0,
+                  ),
+                  child: _buildMedicineCompactHeader(),
                 ),
-                child: _buildMedicineCompactHeader(),
-              ),
-              // Grid ยา + expandable details — ขยายเต็มพื้นที่ที่เหลือ
-              Expanded(
-                child: _buildMedicineContent(),
-              ),
-            ] else
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.all(AppSpacing.md),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: _buildDefaultLayout(),
+                // Grid ยา + expandable details — ขยายเต็มพื้นที่ที่เหลือ
+                Expanded(
+                  child: _buildMedicineContent(),
+                ),
+              ] else
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.all(AppSpacing.md),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: _buildDefaultLayout(),
+                    ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
       // Action buttons

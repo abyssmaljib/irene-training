@@ -34,6 +34,7 @@ import '../services/ticket_service.dart';
 import '../providers/tag_provider.dart';
 import '../../../core/widgets/success_popup.dart';
 import '../../../core/widgets/buttons.dart';
+import '../../../core/widgets/keyboard_dismiss_scope.dart';
 import '../../checklist/services/task_service.dart';
 import '../../checklist/providers/task_provider.dart'
     show
@@ -803,7 +804,12 @@ class _AdvancedCreatePostScreenState
         ),
         // ใช้ Column[Expanded(ScrollView), BottomBar] แทน bottomNavigationBar
         // เพื่อให้ toolbar อยู่เหนือ keyboard เสมอ (bottomNavigationBar อาจถูกซ่อน)
-        body: Column(
+        // Wrap ด้วย KeyboardDismissScope:
+        // 1. แตะพื้นที่ว่าง → keyboard ปิด
+        // 2. แสดง "ตกลง" เหนือ keyboard สำหรับ numeric input (measurement)
+        //    ที่ iOS ไม่มีปุ่ม Done ให้
+        body: KeyboardDismissScope(
+          child: Column(
           children: [
             Expanded(
               child: Form(
@@ -1145,6 +1151,7 @@ class _AdvancedCreatePostScreenState
             // Toolbar อยู่ใน body Column — จะอยู่เหนือ keyboard เสมอ
             _buildBottomBar(state),
           ],
+          ),
         ),
       ),
     );
