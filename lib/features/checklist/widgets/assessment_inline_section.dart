@@ -391,7 +391,7 @@ class _LegacySubjectCard extends StatelessWidget {
             ),
           ),
 
-          // Choice text ที่เลือก
+          // Choice text ที่เลือก + รูปตัวอย่างของ rating ที่เลือก
           if (choiceText != null) ...[
             SizedBox(height: AppSpacing.sm),
             Center(
@@ -404,6 +404,42 @@ class _LegacySubjectCard extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
             ),
+          ],
+
+          // รูปตัวอย่างของ rating ที่เลือก — แสดงเต็มรูป ไม่ crop
+          if (rating != null) ...[
+            () {
+              // ดึง represent_url ตาม rating (index = rating - 1)
+              final urlIndex = rating! - 1;
+              final representUrl =
+                  urlIndex >= 0 && urlIndex < subject.representUrls.length
+                      ? subject.representUrls[urlIndex]
+                      : null;
+              if (representUrl != null && representUrl.isNotEmpty) {
+                // ใช้ LayoutBuilder เพื่อคำนวณ 1/3 ของความกว้าง
+                return Padding(
+                  padding: EdgeInsets.only(top: AppSpacing.sm),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final imageWidth = constraints.maxWidth / 3;
+                      return Center(
+                        child: ClipRRect(
+                          borderRadius: AppRadius.mediumRadius,
+                          child: IreneNetworkImage(
+                            imageUrl: representUrl,
+                            width: imageWidth,
+                            fit: BoxFit.contain,
+                            memCacheWidth: 400,
+                            compact: true,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                );
+              }
+              return const SizedBox.shrink();
+            }(),
           ],
 
           SizedBox(height: AppSpacing.sm),
@@ -640,6 +676,40 @@ class _SubItemSubjectCard extends StatelessWidget {
                         ),
                       ),
                     ),
+
+                  // รูปตัวอย่างของ rating ที่เลือก — แสดงเต็มรูป ไม่ crop
+                  if (rating != null) ...[
+                    () {
+                      final urlIndex = rating - 1;
+                      final representUrl =
+                          urlIndex >= 0 && urlIndex < subItem.representUrls.length
+                              ? subItem.representUrls[urlIndex]
+                              : null;
+                      if (representUrl != null && representUrl.isNotEmpty) {
+                        return Padding(
+                          padding: EdgeInsets.only(top: AppSpacing.sm),
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              final imageWidth = constraints.maxWidth / 3;
+                              return Center(
+                                child: ClipRRect(
+                                  borderRadius: AppRadius.mediumRadius,
+                                  child: IreneNetworkImage(
+                                    imageUrl: representUrl,
+                                    width: imageWidth,
+                                    fit: BoxFit.contain,
+                                    memCacheWidth: 400,
+                                    compact: true,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    }(),
+                  ],
 
                   // ดูเกณฑ์ตัวอย่าง สำหรับ sub-item นี้
                   if (subItem.choices.isNotEmpty) ...[

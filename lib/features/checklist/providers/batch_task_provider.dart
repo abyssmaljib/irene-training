@@ -251,7 +251,7 @@ class BatchTaskNotifier extends StateNotifier<BatchState> {
       // ถ้ามี co-workers → skip points recording เพื่อให้ batch จัดการหาร point เอง
       final hasCoWorkers = state.selectedCoWorkers.isNotEmpty;
       final service = _ref.read(taskServiceProvider);
-      final success = await service.markTaskComplete(
+      final completeResult = await service.markTaskComplete(
         task.logId,
         userId,
         imageUrl: imageUrl,
@@ -260,7 +260,10 @@ class BatchTaskNotifier extends StateNotifier<BatchState> {
         skipPointsRecording: hasCoWorkers,
       );
 
-      if (!success) throw Exception('markTaskComplete failed');
+      // ถ้า fail → throw พร้อม error code เพื่อให้ batch screen แสดงสาเหตุได้
+      if (!completeResult.success) {
+        throw Exception(completeResult.userMessage);
+      }
 
       // 4. สร้าง optimistic update ให้ checklist screen เห็นทันที
       // ใช้ _ref.read() โดยตรงเพราะ optimisticUpdateTask รับ WidgetRef
@@ -355,10 +358,12 @@ class BatchTaskNotifier extends StateNotifier<BatchState> {
       return true;
     } catch (e) {
       debugPrint('Batch complete error: $e');
+      // ตัด error message ไม่เกิน 80 ตัว เพื่อ UI ไม่แตก
+      final short = '$e'.length > 80 ? '${'$e'.substring(0, 80)}…' : '$e';
       // Rollback status (ใช้ logId ค้นหาใหม่ ปลอดภัยจาก race condition)
       _updateResidentByLogId(task.logId, resident.copyWith(
         status: BatchResidentStatus.failed,
-        errorMessage: 'เกิดข้อผิดพลาด กรุณาลองใหม่',
+        errorMessage: '$short (BATCH_ERR)',
       ));
       return false;
     }

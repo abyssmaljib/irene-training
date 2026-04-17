@@ -48,6 +48,7 @@
 //
 // =============================================================================
 
+import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
@@ -464,26 +465,39 @@ class _MedicinePhotosScreenState extends State<MedicinePhotosScreen> {
       // === Phase 2: ถ่ายรูป ===
       final file = await _cameraService.takePhoto();
 
-      // คืนค่า cache limits ทันทีหลังกล้องปิด
-      PaintingBinding.instance.imageCache.maximumSize = savedMaxSize;
-      PaintingBinding.instance.imageCache.maximumSizeBytes = savedMaxBytes;
+      // ยังไม่คืน cache limits — รอจน PhotoPreviewScreen ปิดก่อน
+      // เพราะ preview ยังต้อง decode รูปอยู่ ถ้าคืน cache ตอนนี้จะกิน memory เพิ่ม
 
       if (file == null) {
-        // User ยกเลิก → คืน expanded state เดิม
+        // User ยกเลิก → คืน cache limits + expanded state เดิม
+        PaintingBinding.instance.imageCache.maximumSize = savedMaxSize;
+        PaintingBinding.instance.imageCache.maximumSizeBytes = savedMaxBytes;
         if (mounted) setState(() => _expandedIndex = previousExpandedIndex);
         return;
       }
 
-      if (!mounted) return;
+      if (!mounted) {
+        PaintingBinding.instance.imageCache.maximumSize = savedMaxSize;
+        PaintingBinding.instance.imageCache.maximumSizeBytes = savedMaxBytes;
+        return;
+      }
 
       // === Phase 3: แสดง preview ===
+      // ใช้ try/finally เพื่อ guarantee ว่า cache limits จะถูกคืนเสมอ
       final mealLabel = _getMealLabel(mealKey);
-      final confirmedFile = await PhotoPreviewScreen.show(
-        context: context,
-        imageFile: file,
-        photoType: photoType,
-        mealLabel: mealLabel,
-      );
+      File? confirmedFile;
+      try {
+        confirmedFile = await PhotoPreviewScreen.show(
+          context: context,
+          imageFile: file,
+          photoType: photoType,
+          mealLabel: mealLabel,
+        );
+      } finally {
+        // คืนค่า cache limits หลัง preview ปิดแล้ว
+        PaintingBinding.instance.imageCache.maximumSize = savedMaxSize;
+        PaintingBinding.instance.imageCache.maximumSizeBytes = savedMaxBytes;
+      }
 
       if (confirmedFile == null) {
         // User ยกเลิก/ถ่ายใหม่ → คืน expanded state เดิม

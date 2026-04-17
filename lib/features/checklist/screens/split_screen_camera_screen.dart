@@ -218,6 +218,18 @@ class _SplitScreenCameraScreenState extends State<SplitScreenCameraScreen>
 
     try {
       final XFile xfile = await controller.takePicture();
+
+      // === OOM Prevention: ปล่อย memory จากกล้องก่อน process รูป ===
+      // กล้อง iOS ใช้ memory ~50-100MB สำหรับ preview buffer
+      // ถ้าไม่ปล่อยก่อน decode/crop จะ peak สูงจนแอพถูก kill ได้
+      // wrap ด้วย try/catch เพราะ dispose อาจ throw CameraException
+      // แต่เรามีรูปแล้ว (xfile) ดังนั้นแค่ข้ามไปได้
+      try {
+        await _controller?.dispose();
+      } catch (_) {}
+      _controller = null;
+      if (mounted) setState(() => _isInitialized = false);
+
       final bytes = await File(xfile.path).readAsBytes();
 
       // Crop รูปเป็น 1:1 สี่เหลี่ยมจัตุรัส (รันใน isolate ไม่ block UI)
@@ -233,6 +245,11 @@ class _SplitScreenCameraScreenState extends State<SplitScreenCameraScreen>
       );
       await croppedFile.writeAsBytes(croppedBytes);
 
+      // ลบ temp file จาก camera plugin เพื่อประหยัด storage
+      try {
+        await File(xfile.path).delete();
+      } catch (_) {}
+
       if (mounted) {
         // คืน File กลับไป → _handleTakePhoto จะส่งต่อไป PhotoPreviewScreen
         Navigator.pop(context, croppedFile);
@@ -240,14 +257,21 @@ class _SplitScreenCameraScreenState extends State<SplitScreenCameraScreen>
     } on CameraException catch (e) {
       debugPrint('SplitScreenCamera: capture error: $e');
       if (mounted) {
-        AppToast.error(context, 'ถ่ายรูปไม่สำเร็จ กรุณาลองใหม่');
+        final short = '$e'.length > 60 ? '${'$e'.substring(0, 60)}…' : '$e';
+        AppToast.error(
+            context, 'ถ่ายรูปไม่สำเร็จ: $short (CAM_CAPTURE_ERR)');
+        // กล้องยังไม่ถูก dispose ตอนนี้ (error เกิดก่อน dispose) → ให้ user ถ่ายใหม่ได้
         setState(() => _isCapturing = false);
       }
     } catch (e) {
-      debugPrint('SplitScreenCamera: crop error: $e');
+      // กล้องถูก dispose ไปแล้ว (error เกิดหลัง dispose ตอน crop/save)
+      // → ไม่สามารถถ่ายใหม่บนหน้านี้ได้ ต้องปิดแล้วเปิดใหม่
+      debugPrint('SplitScreenCamera: crop error (camera already disposed): $e');
       if (mounted) {
-        AppToast.error(context, 'ประมวลผลรูปไม่สำเร็จ กรุณาลองใหม่');
-        setState(() => _isCapturing = false);
+        final short = '$e'.length > 60 ? '${'$e'.substring(0, 60)}…' : '$e';
+        AppToast.error(
+            context, 'ประมวลผลรูปไม่สำเร็จ: $short (IMG_PROCESS_ERR)');
+        Navigator.pop(context, null); // ปิดหน้ากล้อง → user กดถ่ายใหม่จาก task detail
       }
     }
   }
@@ -666,7 +690,7 @@ Uint8List _cropToAspectRatio(_CropParams params) {
     final resized = origW > 1280
         ? img.copyResize(original, width: 1280)
         : original;
-    return Uint8List.fromList(img.encodeJpg(resized, quality: 85));
+    return Uint8List.fromList(img.encodeJpg(resized, quality: 80));
   }
 
   // คำนวณขนาด crop area ตรงกลาง
@@ -691,5 +715,5 @@ Uint8List _cropToAspectRatio(_CropParams params) {
     cropped = img.copyResize(cropped, width: 1280);
   }
 
-  return Uint8List.fromList(img.encodeJpg(cropped, quality: 85));
+  return Uint8List.fromList(img.encodeJpg(cropped, quality: 80));
 }

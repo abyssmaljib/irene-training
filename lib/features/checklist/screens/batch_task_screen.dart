@@ -524,6 +524,42 @@ class _ResidentTile extends ConsumerWidget {
             ),
           );
         }
+        // ตรวจว่า task ต้องถ่ายรูปหรือไม่
+        // ถ้าไม่ต้องถ่ายรูป (เช่น assessment-only) → แสดงปุ่ม "ประเมิน" นำไป TaskDetailScreen
+        final task = resident.task;
+        final requiresPhoto = task.hasSampleImage ||
+            task.taskType == 'จัดยา' ||
+            task.requireImage;
+
+        if (!requiresPhoto) {
+          // ปุ่ม "ประเมิน" — นำไปหน้า detail เพื่อกรอก assessment
+          return GestureDetector(
+            onTap: () => _navigateToDetail(context),
+            child: Container(
+              color: AppColors.primary,
+              padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+              alignment: Alignment.center,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  HugeIcon(
+                    icon: HugeIcons.strokeRoundedCheckmarkCircle02,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                  AppSpacing.horizontalGapXs,
+                  Text(
+                    'ดำเนินการ',
+                    style: AppTypography.caption.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
         // ปุ่มถ่ายรูป — เต็มความสูง ชิดขอบขวาของ tile
         // GestureDetector แยกจาก card เพื่อให้กดกล้องได้โดยไม่ไป TaskDetail
         return GestureDetector(
@@ -674,20 +710,37 @@ class _ResidentTile extends ConsumerWidget {
       file = await cameraService.takePhoto();
     }
 
-    // คืนค่า cache limits ทันทีหลังกล้องปิด (ต้องคืนก่อน early return)
-    PaintingBinding.instance.imageCache.maximumSize = savedMaxSize;
-    PaintingBinding.instance.imageCache.maximumSizeBytes = savedMaxBytes;
+    // ยังไม่คืน cache limits — รอจน PhotoPreviewScreen ปิดก่อน
+    // เพราะ preview ยังต้อง decode รูปอยู่ ถ้าคืน cache ตอนนี้จะกิน memory เพิ่ม
 
-    if (file == null) return; // user ยกเลิก
+    if (file == null) {
+      // คืนค่า cache limits เมื่อไม่ได้ถ่ายรูป
+      PaintingBinding.instance.imageCache.maximumSize = savedMaxSize;
+      PaintingBinding.instance.imageCache.maximumSizeBytes = savedMaxBytes;
+      return; // user ยกเลิก
+    }
 
     // 2. แสดง PhotoPreviewScreen (หมุนรูปได้)
-    if (!context.mounted) return;
-    final confirmedFile = await PhotoPreviewScreen.show(
-      context: context,
-      imageFile: file,
-      photoType: 'task',
-      mealLabel: resident.task.title ?? 'งาน',
-    );
+    if (!context.mounted) {
+      PaintingBinding.instance.imageCache.maximumSize = savedMaxSize;
+      PaintingBinding.instance.imageCache.maximumSizeBytes = savedMaxBytes;
+      return;
+    }
+
+    // ใช้ try/finally เพื่อ guarantee ว่า cache limits จะถูกคืนเสมอ
+    File? confirmedFile;
+    try {
+      confirmedFile = await PhotoPreviewScreen.show(
+        context: context,
+        imageFile: file,
+        photoType: 'task',
+        mealLabel: resident.task.title ?? 'งาน',
+      );
+    } finally {
+      // คืนค่า cache limits หลัง preview ปิดแล้ว
+      PaintingBinding.instance.imageCache.maximumSize = savedMaxSize;
+      PaintingBinding.instance.imageCache.maximumSizeBytes = savedMaxBytes;
+    }
     if (confirmedFile == null) return; // user ยกเลิกจาก preview
 
     // 3. ถ้าเป็น measurement task → ขอกรอกค่าก่อน difficulty
@@ -778,7 +831,13 @@ class _ResidentTile extends ConsumerWidget {
         '✓ ${resident.task.residentName ?? "คนไข้"} เสร็จแล้ว',
       );
     } else {
-      AppToast.error(context, 'เกิดข้อผิดพลาด กดลองใหม่ได้');
+      // ดึง errorMessage จาก provider state ที่ถูก set ใน catch ของ completeResident
+      final updatedState = ref.read(batchTaskProvider(groupKey));
+      final failedResident = updatedState.residents
+          .where((r) => r.task.logId == resident.task.logId)
+          .firstOrNull;
+      final errMsg = failedResident?.errorMessage ?? 'ไม่ทราบสาเหตุ';
+      AppToast.error(context, errMsg);
     }
   }
 }

@@ -9,9 +9,10 @@ import '../../../core/widgets/app_toast.dart';
 import '../../../core/widgets/irene_app_bar.dart';
 import '../../../core/widgets/network_image.dart';
 
-/// ขนาดสูงสุดของรูปก่อนหมุน (ป้องกัน memory overflow)
-/// ถ้ารูปใหญ่กว่านี้จะ resize ก่อนหมุน
-const int _maxImageDimension = 1920;
+/// ขนาดสูงสุดของรูปก่อนหมุน (ป้องกัน memory overflow / OOM crash บน iOS)
+/// ลดจาก 1920 → 1280 ให้สอดคล้องกับ camera screens ที่ crop เหลือ 1280 อยู่แล้ว
+/// 1280px เพียงพอสำหรับ task confirmation photo (แสดงบนมือถือ)
+const int _maxImageDimension = 1280;
 
 /// Parameters สำหรับส่งไป isolate
 /// ต้องเป็น top-level class เพราะ compute() ต้องการ serializable data
@@ -71,8 +72,8 @@ Uint8List _rotateImageInIsolate(_RotateImageParams params) {
       rotated = processedImage;
   }
 
-  // Encode เป็น JPEG พร้อม compression
-  return Uint8List.fromList(img.encodeJpg(rotated, quality: 85));
+  // Encode เป็น JPEG พร้อม compression (quality 80 ลด memory + ขนาดไฟล์ ไม่เสียคุณภาพสังเกตได้)
+  return Uint8List.fromList(img.encodeJpg(rotated, quality: 80));
 }
 
 /// หน้า Preview รูปก่อน upload
@@ -175,7 +176,9 @@ class _PhotoPreviewScreenState extends State<PhotoPreviewScreen> {
     } catch (e) {
       debugPrint('Error rotating image: $e');
       if (mounted) {
-        AppToast.error(context, 'ไม่สามารถหมุนรูปได้');
+        final short = '$e'.length > 60 ? '${'$e'.substring(0, 60)}…' : '$e';
+        AppToast.error(
+            context, 'ไม่สามารถหมุนรูปได้: $short (IMG_ROTATE_ERR)');
         setState(() => _isProcessing = false);
       }
     }
@@ -212,8 +215,9 @@ class _PhotoPreviewScreenState extends State<PhotoPreviewScreen> {
       return Image.memory(
         _imageBytes!,
         fit: BoxFit.contain,
-        // จำกัดขนาดใน memory เพื่อป้องกัน crash บน iOS/Android สเปคต่ำ
-        cacheWidth: 1200,
+        // จำกัดขนาดใน memory เพื่อป้องกัน OOM crash บน iOS/Android
+        // 800px เพียงพอสำหรับ preview บนหน้าจอมือถือ (ลดจาก 1200)
+        cacheWidth: 800,
       );
     }
 

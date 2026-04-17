@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../points/services/points_service.dart';
 import '../models/task_log.dart';
 import '../models/user_shift.dart';
+import 'task_service.dart' show TaskCompleteResult;
 
 /// Service V2 สำหรับจัดการ Tasks (ใช้ v3_task_logs_simplified view)
 /// Key differences from V1:
@@ -236,7 +237,7 @@ class TaskServiceV2 {
   /// [difficultyScore] - คะแนนความยากของงาน 1-10 (optional)
   /// [difficultyRatedBy] - UUID ของ user ที่ให้คะแนน (optional, ถ้าไม่ระบุจะใช้ userId)
   /// [skipPointsRecording] - ข้าม recording points (ใช้สำหรับ batch mode ที่จัดการ points เอง)
-  Future<bool> markTaskComplete(
+  Future<TaskCompleteResult> markTaskComplete(
     int logId,
     String userId, {
     String? imageUrl,
@@ -268,7 +269,7 @@ class TaskServiceV2 {
       if ((result as List).isEmpty) {
         debugPrint(
             'markTaskComplete (V2): log $logId already completed by someone else');
-        return false;
+        return TaskCompleteResult.alreadyDone(logId);
       }
 
       invalidateCache();
@@ -300,10 +301,10 @@ class TaskServiceV2 {
         }
       }
 
-      return true;
+      return TaskCompleteResult.ok();
     } catch (e) {
       debugPrint('markTaskComplete (V2) error: $e');
-      return false;
+      return TaskCompleteResult.serverError(e);
     }
   }
 

@@ -4,6 +4,58 @@ import '../../points/services/points_service.dart';
 import '../models/task_log.dart';
 import '../models/user_shift.dart';
 
+/// ผลลัพธ์จาก markTaskComplete — บอกสาเหตุเมื่อ fail
+/// [success] = true ถ้าบันทึกสำเร็จ
+/// [errorCode] = รหัส error สั้นๆ (ให้ user cap ส่งมาได้)
+/// [errorDetail] = รายละเอียด error สำหรับ debug
+class TaskCompleteResult {
+  final bool success;
+  final String? errorCode;
+  final String? errorDetail;
+
+  const TaskCompleteResult._({
+    required this.success,
+    this.errorCode,
+    this.errorDetail,
+  });
+
+  /// สำเร็จ
+  factory TaskCompleteResult.ok() =>
+      const TaskCompleteResult._(success: true);
+
+  /// งานถูกทำไปแล้ว (คนอื่นทำก่อน)
+  factory TaskCompleteResult.alreadyDone(int logId) =>
+      TaskCompleteResult._(
+        success: false,
+        errorCode: 'TASK_ALREADY_DONE',
+        errorDetail: 'log $logId already completed by someone else',
+      );
+
+  /// Server/network error
+  factory TaskCompleteResult.serverError(Object error) =>
+      TaskCompleteResult._(
+        success: false,
+        errorCode: 'SERVER_ERROR',
+        errorDetail: error.toString(),
+      );
+
+  /// สร้าง user-facing message ภาษาไทย พร้อม error code
+  String get userMessage {
+    switch (errorCode) {
+      case 'TASK_ALREADY_DONE':
+        return 'งานนี้ถูกทำไปแล้วโดยคนอื่น (TASK_ALREADY_DONE)';
+      case 'SERVER_ERROR':
+        // ตัด error detail ไม่เกิน 80 ตัวอักษร เพื่อไม่ให้ toast ยาวเกิน
+        final short = (errorDetail ?? 'unknown').length > 80
+            ? '${errorDetail!.substring(0, 80)}…'
+            : (errorDetail ?? 'unknown');
+        return 'เกิดข้อผิดพลาด: $short (SERVER_ERROR)';
+      default:
+        return 'ไม่สามารถบันทึกได้ กรุณาลองใหม่';
+    }
+  }
+}
+
 /// Service สำหรับจัดการ Tasks
 /// ใช้ in-memory cache สำหรับ tasks เพื่อลด API calls
 class TaskService {
@@ -231,7 +283,7 @@ class TaskService {
   /// [difficultyScore] - คะแนนความยากของงาน 1-10 (optional)
   /// [difficultyRatedBy] - UUID ของ user ที่ให้คะแนน (optional, ถ้าไม่ระบุจะใช้ userId)
   /// [skipPointsRecording] - ข้าม recording points (ใช้สำหรับ batch mode ที่จัดการ points เอง)
-  Future<bool> markTaskComplete(
+  Future<TaskCompleteResult> markTaskComplete(
     int logId,
     String userId, {
     String? imageUrl,
@@ -264,7 +316,7 @@ class TaskService {
       if ((result as List).isEmpty) {
         debugPrint(
             'markTaskComplete: log $logId already completed by someone else');
-        return false;
+        return TaskCompleteResult.alreadyDone(logId);
       }
 
       invalidateCache();
@@ -296,10 +348,10 @@ class TaskService {
         }
       }
 
-      return true;
+      return TaskCompleteResult.ok();
     } catch (e) {
       debugPrint('markTaskComplete error: $e');
-      return false;
+      return TaskCompleteResult.serverError(e);
     }
   }
 

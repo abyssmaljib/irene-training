@@ -297,9 +297,10 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
 
   /// ตรวจสอบสิทธิ์การยกเลิก task
   /// อนุญาตเฉพาะ: คนที่ทำ task, หัวหน้าเวรขึ้นไป (level >= 30), แพทย์ (role 6)
+  /// ใช้ ref.watch เพื่อ rebuild เมื่อ role โหลดเสร็จ (FutureProvider)
   bool get _canCancelTask {
-    final userId = ref.read(currentUserIdProvider);
-    final systemRole = ref.read(currentUserSystemRoleProvider).valueOrNull;
+    final userId = ref.watch(currentUserIdProvider);
+    final systemRole = ref.watch(currentUserSystemRoleProvider).valueOrNull;
 
     // 1. คนที่ complete/postpone/problem task นี้
     if (_task.completedByUid != null && _task.completedByUid == userId) {
@@ -858,7 +859,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
             difficultyScore: _task.difficultyScore,
           );
         });
-        AppToast.error(context, 'ไม่สามารถอัพเดตคะแนนได้');
+        AppToast.error(context,
+            'ไม่สามารถอัพเดตคะแนนได้ (DIFFICULTY_UPDATE_ERR)');
       }
     }
   }
@@ -2547,13 +2549,29 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
   }
 
   Widget _buildCancelButton({bool enabled = true}) {
-    return DangerOutlinedButton(
-      text: 'ยกเลิกการรับทราบ',
-      icon: HugeIcons.strokeRoundedCancelCircle,
-      isDisabled: !enabled,
-      isLoading: _isLoading,
-      onPressed: _handleCancel,
-      width: double.infinity,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        DangerOutlinedButton(
+          text: 'ยกเลิกการรับทราบ',
+          icon: HugeIcons.strokeRoundedCancelCircle,
+          isDisabled: !enabled,
+          isLoading: _isLoading,
+          onPressed: _handleCancel,
+          width: double.infinity,
+        ),
+        // แสดงเหตุผลว่าทำไมกดไม่ได้ — ช่วยให้ user เข้าใจ permission
+        if (!enabled)
+          Padding(
+            padding: EdgeInsets.only(top: AppSpacing.xs),
+            child: Text(
+              'เฉพาะคนที่ทำ หรือหัวหน้าเวรขึ้นไป จึงยกเลิกได้',
+              style: AppTypography.caption.copyWith(
+                color: AppColors.secondaryText,
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -2660,7 +2678,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     // หลัง markTaskComplete สำเร็จ (task.isDone → clear coworkers)
     final capturedCoWorkers = List<CoWorker>.of(_selectedCoWorkers);
     final hasCoWorkers = capturedCoWorkers.isNotEmpty;
-    final success = await service.markTaskComplete(
+    final completeResult = await service.markTaskComplete(
       capturedLogId,
       userId,
       imageUrl: capturedImageUrl,
@@ -2669,7 +2687,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       skipPointsRecording: hasCoWorkers,
     );
 
-    if (success) {
+    if (completeResult.success) {
       // === หาร Points กับเพื่อนร่วมเวร (ถ้าเลือกไว้) ===
       // ถ้า recordBatchTaskCompleted fail ก็ไม่ rollback task completion
       // เพราะงานเสร็จจริง แค่ points ยังไม่ได้บันทึก (สามารถ retry ได้ภายหลัง)
@@ -2772,8 +2790,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
             _isLoading = false;
           });
           if (mounted) {
-            AppToast.error(
-                context, 'ไม่สามารถบันทึกค่า${measurementConfig.label}ได้');
+            AppToast.error(context,
+                'ไม่สามารถบันทึกค่า${measurementConfig.label}ได้ (MEASUREMENT_SAVE_ERR)');
           }
           return;
         }
@@ -2785,14 +2803,14 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       // Realtime event จะมา trigger refresh และ clear optimistic state ภายหลัง
       if (mounted) Navigator.pop(context);
     } else {
-      // Rollback ถ้า server error
+      // Rollback ถ้า server error — แสดง error code ให้ user cap ส่งมาได้
       rollback();
       setState(() {
         _task = widget.task; // กลับไปใช้ task เดิม
         _isLoading = false;
       });
       if (mounted) {
-        AppToast.error(context, 'ไม่สามารถบันทึกได้ กรุณาลองใหม่');
+        AppToast.error(context, completeResult.userMessage);
       }
     }
   }
@@ -2871,7 +2889,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         _isLoading = false;
       });
       if (mounted) {
-        AppToast.error(context, 'ไม่สามารถบันทึกได้ กรุณาลองใหม่');
+        AppToast.error(
+            context, 'ไม่สามารถแจ้งปัญหาได้ กรุณาลองใหม่ (PROBLEM_SAVE_FAIL)');
       }
     }
   }
@@ -2918,7 +2937,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         _isLoading = false;
       });
       if (mounted) {
-        AppToast.error(context, 'ไม่สามารถบันทึกได้ กรุณาลองใหม่');
+        AppToast.error(
+            context, 'ไม่สามารถบันทึก Refer ได้ กรุณาลองใหม่ (REFER_SAVE_FAIL)');
       }
     }
   }
@@ -3029,7 +3049,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         _isLoading = false;
       });
       if (mounted) {
-        AppToast.error(context, 'ไม่สามารถยกเลิกได้ กรุณาลองใหม่');
+        AppToast.error(context,
+            'ไม่สามารถยกเลิกได้ กรุณาลองใหม่ (CANCEL_SAVE_FAIL)');
       }
     }
   }
@@ -3079,23 +3100,42 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       file = await SquareCameraScreen.show(context: context);
     }
 
-    // คืนค่า cache limits ทันทีหลังกล้องปิด (ต้องคืนก่อน early return)
-    PaintingBinding.instance.imageCache.maximumSize = savedMaxSize;
-    PaintingBinding.instance.imageCache.maximumSizeBytes = savedMaxBytes;
+    // ยังไม่คืน cache limits — รอจน PhotoPreviewScreen ปิดก่อน
+    // เพราะ preview ยังต้อง decode รูปอยู่ ถ้าคืน cache ตอนนี้จะกิน memory เพิ่ม
 
-    if (file == null) return;
+    if (file == null) {
+      // คืนค่า cache limits เมื่อไม่ได้ถ่ายรูป
+      PaintingBinding.instance.imageCache.maximumSize = savedMaxSize;
+      PaintingBinding.instance.imageCache.maximumSizeBytes = savedMaxBytes;
+      return;
+    }
 
     // แสดงหน้า Preview ให้หมุนรูปได้
-    if (!mounted) return;
-    final confirmedFile = await PhotoPreviewScreen.show(
-      context: context,
-      imageFile: file,
-      photoType: 'task',
-      mealLabel: _task.title ?? 'งาน',
-      // ถ้ามีรูปตัวอย่าง → แสดงเทียบในหน้า preview ด้วย
-      sampleImageUrl:
-          _task.hasSampleImage ? _task.sampleImageUrl : null,
-    );
+    if (!mounted) {
+      PaintingBinding.instance.imageCache.maximumSize = savedMaxSize;
+      PaintingBinding.instance.imageCache.maximumSizeBytes = savedMaxBytes;
+      return;
+    }
+
+    // ใช้ try/finally เพื่อ guarantee ว่า cache limits จะถูกคืนเสมอ
+    // แม้ PhotoPreviewScreen จะ throw exception
+    File? confirmedFile;
+    try {
+      confirmedFile = await PhotoPreviewScreen.show(
+        context: context,
+        imageFile: file,
+        photoType: 'task',
+        mealLabel: _task.title ?? 'งาน',
+        // ถ้ามีรูปตัวอย่าง → แสดงเทียบในหน้า preview ด้วย
+        sampleImageUrl:
+            _task.hasSampleImage ? _task.sampleImageUrl : null,
+      );
+    } finally {
+      // คืนค่า cache limits หลัง preview ปิดแล้ว (ปลอดภัยแล้ว)
+      // ต้องอยู่ใน finally เพื่อคืนแม้เกิด error
+      PaintingBinding.instance.imageCache.maximumSize = savedMaxSize;
+      PaintingBinding.instance.imageCache.maximumSizeBytes = savedMaxBytes;
+    }
 
     // ถ้ายกเลิกจาก preview
     if (confirmedFile == null) return;
@@ -3121,11 +3161,21 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         _uploadedImageUrl = url;
         _isLoading = false;
       });
+
+      // ลบ temp files หลัง upload สำเร็จ เพื่อคืน storage
+      try {
+        if (await file.exists()) await file.delete();
+        if (confirmedFile.path != file.path && await confirmedFile.exists()) {
+          await confirmedFile.delete();
+        }
+      } catch (_) {}
     } catch (e) {
       debugPrint('Error uploading photo: $e');
       setState(() => _isLoading = false);
       if (mounted) {
-        AppToast.error(context, 'ไม่สามารถอัพโหลดรูปได้ กรุณาลองใหม่');
+        final short = '$e'.length > 60 ? '${'$e'.substring(0, 60)}…' : '$e';
+        AppToast.error(
+            context, 'อัพโหลดรูปไม่สำเร็จ: $short (UPLOAD_ERR)');
       }
     }
   }
@@ -3221,7 +3271,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     final confirmImage = _task.confirmImage;
 
     if (taskRepeatId == null || confirmImage == null) {
-      AppToast.error(context, 'ไม่สามารถแทนที่รูปตัวอย่างได้');
+      AppToast.error(context,
+          'ไม่มีรูปยืนยันหรือ task repeat id (SAMPLE_REPLACE_NO_DATA)');
       return;
     }
 
@@ -3303,7 +3354,9 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     } catch (e) {
       debugPrint('Error replacing sample image: $e');
       if (mounted) {
-        AppToast.error(context, 'ไม่สามารถแทนที่รูปตัวอย่างได้ กรุณาลองใหม่');
+        final short = '$e'.length > 60 ? '${'$e'.substring(0, 60)}…' : '$e';
+        AppToast.error(context,
+            'แทนที่รูปตัวอย่างไม่สำเร็จ: $short (SAMPLE_REPLACE_ERR)');
       }
     } finally {
       if (mounted) {

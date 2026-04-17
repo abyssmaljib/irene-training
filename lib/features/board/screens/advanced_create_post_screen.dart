@@ -708,7 +708,8 @@ class _AdvancedCreatePostScreenState
             // Complete task พร้อม difficulty score
             // ไม่ส่ง imageUrl เพราะรูปอยู่ใน Post แล้ว (ผ่าน post_id)
             // ป้องกันการบันทึกซ้ำซ้อนและเข้าคิวส่งซ้ำ
-            await TaskService.instance.markTaskComplete(
+            final completeResult =
+                await TaskService.instance.markTaskComplete(
               widget.taskLogId!,
               userId,
               // imageUrl: widget.taskConfirmImageUrl, // ไม่บันทึก confirmImage เพราะดึงจาก post_id แทน
@@ -716,6 +717,11 @@ class _AdvancedCreatePostScreenState
               difficultyScore: difficultyScore,
               difficultyRatedBy: difficultyScore != null ? userId : null,
             );
+
+            // ถ้า task complete ไม่สำเร็จ → throw เพื่อให้ catch block จัดการ
+            if (!completeResult.success) {
+              throw Exception(completeResult.userMessage);
+            }
 
             // Commit optimistic update (ลบ optimistic state)
             commitOptimisticUpdate(ref, widget.taskLogId!);
