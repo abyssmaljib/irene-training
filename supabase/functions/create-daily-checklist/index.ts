@@ -293,18 +293,33 @@ Deno.serve(async (req) => {
     // ────────────────────────────────────────────────────
     // Step 3: ตรวจ duplicate — หา logs ที่สร้างแล้ววันนี้
     // เช็คจาก Task_Repeat_Id + ExpectedDateTime
+    //
+    // ⚠️ FIX: เดิม query ไม่มี date filter → Supabase default limit 1000 rows
+    // แต่มี 30,000+ rows ทั้งหมด → ได้แค่ 1000 → ทำให้ duplicate check ไม่ครบ
+    // → บาง resident ถูก skip หรือถูกสร้างซ้ำ
+    //
+    // แก้: เพิ่ม date filter (วันนี้ + พรุ่งนี้) เพื่อ:
+    // 1. ลด rows ให้เหลือแค่ ~900 (ไม่เกิน limit)
+    // 2. เช็คเฉพาะวันที่ relevant (ไม่ต้องดึง history ทั้งหมด)
     // ────────────────────────────────────────────────────
     const repeatIds = matchedTasks.map(t => t.repeated_task_id)
 
-    // ดึง logs ที่สร้างวันนี้ (Bangkok time) สำหรับ repeat IDs ที่ match
+    // ดึง logs เฉพาะวันนี้+พรุ่งนี้ (ครอบคลุม is_next_day tasks ด้วย)
+    // todayStr = วันนี้ Bangkok, tomorrowStr = พรุ่งนี้ Bangkok
+    // ExpectedDateTime ของ regular tasks = todayStr, ของ is_next_day = tomorrowStr
     const { data: existingLogs, error: logsError } = await supabase
       .from('A_Task_logs_ver2')
       .select('Task_Repeat_Id, ExpectedDateTime')
       .in('Task_Repeat_Id', repeatIds.length > 0 ? repeatIds : [0])
+      .gte('ExpectedDateTime', `${todayStr}T00:00:00+07:00`)
+      .lte('ExpectedDateTime', `${tomorrowStr}T23:59:59+07:00`)
+      .limit(5000) // safety net — ไม่ควรเกิน ~2000 rows
 
     if (logsError) {
       console.warn(`Failed to check existing logs: ${logsError.message}`)
     }
+
+    console.log(`Existing logs found for duplicate check: ${(existingLogs || []).length}`)
 
     // สร้าง set ของ "repeatId|expectedDate" ที่มีอยู่แล้ว
     const existingSet = new Set<string>()

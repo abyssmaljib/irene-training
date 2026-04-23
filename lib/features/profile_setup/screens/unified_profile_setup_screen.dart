@@ -128,9 +128,33 @@ class _UnifiedProfileSetupScreenState
   // Track popup state - แสดง popup เมื่อ user กรอกชื่อจริง+ชื่อเล่น+เลขบัตรประชาชนครบครั้งแรก
   bool _hasShownMinimumFieldsPopup = false;
 
+  /// รวม controllers ทุกตัวที่ส่งผลต่อ validation getters (`_isMinimumValid`,
+  /// `_isSection*Valid`, `_hasSection6Data`) เป็น Listenable เดียว
+  /// ใช้กับ ListenableBuilder เพื่อ rebuild เฉพาะ section badge + bottom bar
+  /// เมื่อ user พิมพ์ — ไม่ rebuild ทั้งหน้า (เลี่ยงปัญหา keyboard กระตุก)
+  late final Listenable _validationListenable;
+
   @override
   void initState() {
     super.initState();
+
+    // สร้าง Listenable.merge ก่อน load profile เพื่อให้ ListenableBuilder
+    // ใน build() ใช้งานได้ทันทีตั้งแต่เฟรมแรก
+    _validationListenable = Listenable.merge([
+      _fullNameController,
+      _englishNameController,
+      _nicknameController,
+      _weightController,
+      _heightController,
+      _nationalIdController,
+      _addressController,
+      _phoneController,
+      _bankAccountController,
+      _childrenCountController,
+      _diseaseController,
+      _aboutMeController,
+    ]);
+
     _loadCurrentProfile();
 
     // ฟัง focus change ของ field ชื่อเล่น และเลขบัตรประชาชน
@@ -305,7 +329,8 @@ class _UnifiedProfileSetupScreenState
   /// ตรวจสอบว่ากรอก ชื่อจริง+ชื่อเล่น+เลขบัตรประชาชน ครบแล้วหรือยัง
   /// ถ้าครบแล้วและยังไม่เคยแสดง popup ให้แสดง popup ถามว่าจะเข้าใช้งานเลยหรือกรอกต่อ
   void _checkMinimumFieldsAndShowPopup() {
-    setState(() {});
+    // ไม่ต้อง setState ที่นี่ — UI ส่วน badge/ปุ่มอัพเดตผ่าน ListenableBuilder
+    // ที่ฟัง _validationListenable อยู่แล้ว (rebuild เฉพาะส่วนที่ต้องอัพเดต)
 
     // ถ้ายังไม่ครบ หรือแสดง popup แล้ว ก็ไม่ต้องทำอะไร
     if (!_isMinimumValid || _hasShownMinimumFieldsPopup) return;
@@ -544,7 +569,7 @@ class _UnifiedProfileSetupScreenState
       title: '📝 ข้อมูลพื้นฐาน',
       subtitle: 'จำเป็นต้องกรอก',
       isRequired: true,
-      hasData: _isSection1Valid,
+      hasData: () => _isSection1Valid,
       isExpanded: _section1Expanded,
       onExpansionChanged: (expanded) {
         setState(() => _section1Expanded = expanded);
@@ -582,7 +607,6 @@ class _UnifiedProfileSetupScreenState
           textCapitalization: TextCapitalization.words,
           prefixIcon: HugeIcons.strokeRoundedUser,
           fillColor: AppColors.primaryBackground,
-          onChanged: (_) => setState(() {}),
         ),
         SizedBox(height: AppSpacing.md),
 
@@ -596,7 +620,6 @@ class _UnifiedProfileSetupScreenState
           textCapitalization: TextCapitalization.words,
           prefixIcon: HugeIcons.strokeRoundedSmile,
           fillColor: AppColors.primaryBackground,
-          onChanged: (_) => setState(() {}),
         ),
         SizedBox(height: AppSpacing.md),
 
@@ -608,7 +631,6 @@ class _UnifiedProfileSetupScreenState
           textCapitalization: TextCapitalization.words,
           prefixIcon: HugeIcons.strokeRoundedLanguageCircle,
           fillColor: AppColors.primaryBackground,
-          onChanged: (_) => setState(() {}),
         ),
         SizedBox(height: AppSpacing.md),
 
@@ -631,7 +653,6 @@ class _UnifiedProfileSetupScreenState
                 keyboardType: TextInputType.number,
                 prefixIcon: HugeIcons.strokeRoundedWeightScale01,
                 fillColor: AppColors.primaryBackground,
-                onChanged: (_) => setState(() {}),
               ),
             ),
             SizedBox(width: AppSpacing.md),
@@ -643,7 +664,6 @@ class _UnifiedProfileSetupScreenState
                 keyboardType: TextInputType.number,
                 prefixIcon: HugeIcons.strokeRoundedRuler,
                 fillColor: AppColors.primaryBackground,
-                onChanged: (_) => setState(() {}),
               ),
             ),
           ],
@@ -662,7 +682,7 @@ class _UnifiedProfileSetupScreenState
       title: '📞 ข้อมูลติดต่อ',
       subtitle: 'จำเป็นต้องกรอก',
       isRequired: true,
-      hasData: _isSection2Valid,
+      hasData: () => _isSection2Valid,
       isExpanded: _section2Expanded,
       onExpansionChanged: (expanded) {
         setState(() => _section2Expanded = expanded);
@@ -677,7 +697,6 @@ class _UnifiedProfileSetupScreenState
           keyboardType: TextInputType.number,
           prefixIcon: HugeIcons.strokeRoundedId,
           fillColor: AppColors.primaryBackground,
-          onChanged: (_) => setState(() {}),
         ),
         SizedBox(height: AppSpacing.md),
 
@@ -689,7 +708,6 @@ class _UnifiedProfileSetupScreenState
           maxLines: 3,
           prefixIcon: HugeIcons.strokeRoundedLocation01,
           fillColor: AppColors.primaryBackground,
-          onChanged: (_) => setState(() {}),
         ),
         SizedBox(height: AppSpacing.md),
 
@@ -701,7 +719,6 @@ class _UnifiedProfileSetupScreenState
           keyboardType: TextInputType.phone,
           prefixIcon: HugeIcons.strokeRoundedCall,
           fillColor: AppColors.primaryBackground,
-          onChanged: (_) => setState(() {}),
         ),
         SizedBox(height: AppSpacing.md),
 
@@ -723,7 +740,7 @@ class _UnifiedProfileSetupScreenState
       title: '🎓 วุฒิการศึกษาและทักษะ',
       subtitle: 'จำเป็นต้องกรอก',
       isRequired: true,
-      hasData: _isSection3Valid,
+      hasData: () => _isSection3Valid,
       isExpanded: _section3Expanded,
       onExpansionChanged: (expanded) {
         setState(() => _section3Expanded = expanded);
@@ -791,7 +808,7 @@ class _UnifiedProfileSetupScreenState
       title: '🏦 การเงิน',
       subtitle: 'จำเป็นต้องกรอก',
       isRequired: true,
-      hasData: _isSection4Valid,
+      hasData: () => _isSection4Valid,
       isExpanded: _section4Expanded,
       onExpansionChanged: (expanded) {
         setState(() => _section4Expanded = expanded);
@@ -809,7 +826,6 @@ class _UnifiedProfileSetupScreenState
           keyboardType: TextInputType.number,
           prefixIcon: HugeIcons.strokeRoundedCreditCard,
           fillColor: AppColors.primaryBackground,
-          onChanged: (_) => setState(() {}),
         ),
         SizedBox(height: AppSpacing.md),
 
@@ -833,7 +849,7 @@ class _UnifiedProfileSetupScreenState
       title: '📄 เอกสาร',
       subtitle: 'จำเป็นต้องกรอก',
       isRequired: true,
-      hasData: _isSection5Valid,
+      hasData: () => _isSection5Valid,
       isExpanded: _section5Expanded,
       onExpansionChanged: (expanded) {
         setState(() => _section5Expanded = expanded);
@@ -883,7 +899,7 @@ class _UnifiedProfileSetupScreenState
       title: '👤 ข้อมูลเพิ่มเติม',
       subtitle: 'กรอกภายหลังได้',
       isRequired: false,
-      hasData: _hasSection6Data,
+      hasData: () => _hasSection6Data,
       isExpanded: _section6Expanded,
       onExpansionChanged: (expanded) {
         setState(() => _section6Expanded = expanded);
@@ -937,7 +953,9 @@ class _UnifiedProfileSetupScreenState
     required String title,
     required String subtitle,
     required bool isRequired,
-    required bool hasData,
+    // ใช้ callback แทน bool ตรงๆ เพื่อให้ AnimatedBuilder อ่านค่าใหม่
+    // ตอน Listenable fire (ถ้ารับเป็น bool จะถูก capture เป็นค่าเดิมตลอด)
+    required ValueGetter<bool> hasData,
     required bool isExpanded,
     required ValueChanged<bool> onExpansionChanged,
     required List<Widget> children,
@@ -965,47 +983,59 @@ class _UnifiedProfileSetupScreenState
               Expanded(
                 child: Text(title, style: AppTypography.heading3),
               ),
-              if (hasData)
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: AppColors.tagPassedBg,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      HugeIcon(
-                        icon: HugeIcons.strokeRoundedCheckmarkCircle02,
-                        color: AppColors.tagPassedText,
-                        size: AppIconSize.sm,
+              // Badge ฟัง _validationListenable เพื่ออัพเดตเมื่อ controller เปลี่ยน
+              // โดยไม่ rebuild ทั้ง section/หน้า (เลี่ยง keyboard กระตุก)
+              AnimatedBuilder(
+                animation: _validationListenable,
+                builder: (context, _) {
+                  if (hasData()) {
+                    return Container(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.tagPassedBg,
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      SizedBox(width: 4),
-                      Text(
-                        'ครบแล้ว',
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          HugeIcon(
+                            icon: HugeIcons.strokeRoundedCheckmarkCircle02,
+                            color: AppColors.tagPassedText,
+                            size: AppIconSize.sm,
+                          ),
+                          SizedBox(width: 4),
+                          Text(
+                            'ครบแล้ว',
+                            style: AppTypography.caption.copyWith(
+                              color: AppColors.tagPassedText,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  if (isRequired) {
+                    return Container(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.tagPendingBg,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        'จำเป็น',
                         style: AppTypography.caption.copyWith(
-                          color: AppColors.tagPassedText,
+                          color: AppColors.tagPendingText,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
-                    ],
-                  ),
-                )
-              else if (isRequired)
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: AppColors.tagPendingBg,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    'จำเป็น',
-                    style: AppTypography.caption.copyWith(
-                      color: AppColors.tagPendingText,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
             ],
           ),
           subtitle: Text(
@@ -1368,28 +1398,37 @@ class _UnifiedProfileSetupScreenState
         boxShadow: const [AppShadows.elevated],
       ),
       child: SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // แสดง progress (ถ้ายังกรอกไม่ครบ 5 sections)
-            if (!_isAllSectionsComplete) ...[
-              _buildProgressIndicator(),
-              SizedBox(height: AppSpacing.sm),
-            ],
+        // ListenableBuilder ฟัง _validationListenable → rebuild เฉพาะ progress
+        // + ปุ่มบันทึก เมื่อ controller text เปลี่ยน (ไม่ rebuild ทั้งหน้า)
+        child: ListenableBuilder(
+          listenable: _validationListenable,
+          builder: (context, _) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // แสดง progress (ถ้ายังกรอกไม่ครบ 5 sections)
+                if (!_isAllSectionsComplete) ...[
+                  _buildProgressIndicator(),
+                  SizedBox(height: AppSpacing.sm),
+                ],
 
-            // ปุ่มบันทึก - enabled เมื่อกรอกชื่อจริง+ชื่อเล่น+เลขบัตรประชาชน (ขั้นต่ำ)
-            // ถ้ากรอกครบทุก section แสดง "บันทึกข้อมูล" แทน "เริ่มใช้งาน!!"
-            PrimaryButton(
-              text: widget.showAsOnboarding
-                  ? (_isAllSectionsComplete ? 'บันทึกข้อมูล' : 'เริ่มใช้งาน!!')
-                  : 'บันทึก',
-              icon: HugeIcons.strokeRoundedFloppyDisk,
-              isLoading: _isSaving,
-              isDisabled: !_isMinimumValid,
-              width: double.infinity,
-              onPressed: _isMinimumValid ? _handleSave : null,
-            ),
-          ],
+                // ปุ่มบันทึก - enabled เมื่อกรอกชื่อจริง+ชื่อเล่น+เลขบัตรประชาชน (ขั้นต่ำ)
+                // ถ้ากรอกครบทุก section แสดง "บันทึกข้อมูล" แทน "เริ่มใช้งาน!!"
+                PrimaryButton(
+                  text: widget.showAsOnboarding
+                      ? (_isAllSectionsComplete
+                          ? 'บันทึกข้อมูล'
+                          : 'เริ่มใช้งาน!!')
+                      : 'บันทึก',
+                  icon: HugeIcons.strokeRoundedFloppyDisk,
+                  isLoading: _isSaving,
+                  isDisabled: !_isMinimumValid,
+                  width: double.infinity,
+                  onPressed: _isMinimumValid ? _handleSave : null,
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

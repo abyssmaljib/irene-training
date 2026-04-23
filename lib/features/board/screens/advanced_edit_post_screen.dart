@@ -79,8 +79,8 @@ class _AdvancedEditPostScreenState
       _loadExistingMeasurementsAndAssessments();
     });
 
-    // Listen for text changes เพื่ออัพเดตสถานะปุ่มบันทึก (enabled/disabled) และ hint text
-    _textController.addListener(_onTextChanged);
+    // ไม่ใช้ addListener(setState) เพราะจะ rebuild ทั้งหน้าทุกตัวอักษร → keyboard กระตุก
+    // ใช้ ValueListenableBuilder wrap เฉพาะปุ่มบันทึก + hint ใน _buildBottomBar แทน
   }
 
   /// โหลด measurements + assessments ที่แนบกับ post เดิม (สำหรับ edit)
@@ -101,14 +101,8 @@ class _AdvancedEditPostScreenState
     }
   }
 
-  /// Callback เมื่อ text เปลี่ยน — rebuild เพื่ออัพเดตสถานะปุ่มบันทึก
-  void _onTextChanged() {
-    setState(() {});
-  }
-
   @override
   void dispose() {
-    _textController.removeListener(_onTextChanged);
     _titleController.dispose();
     _textController.dispose();
     _descriptionFocusNode.dispose();
@@ -605,8 +599,6 @@ class _AdvancedEditPostScreenState
     // ให้ bottomNavigationBar อัตโนมัติ (ลดการ rebuild ทุกเฟรม)
     // ต้องมีข้อความ + ต้องมี tag (เดิมหรือเลือกใหม่) + ไม่กำลัง submit
     final hasTag = state.selectedTag != null || state.originalTagName != null;
-    final canSubmit =
-        _textController.text.trim().isNotEmpty && hasTag && !_isSubmitting;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
@@ -650,58 +642,81 @@ class _AdvancedEditPostScreenState
                   ],
                 ),
                 const Spacer(),
-                // Submit button
-                ElevatedButton(
-                  onPressed: canSubmit ? _submit : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    disabledBackgroundColor: AppColors.alternate,
-                    disabledForegroundColor: AppColors.secondaryText,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: _isSubmitting
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            HugeIcon(icon: HugeIcons.strokeRoundedFloppyDisk, size: AppIconSize.md, color: Colors.white),
-                            const SizedBox(width: 8),
-                            Text(
-                              'บันทึก',
-                              style: AppTypography.body.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
+                // Submit button — ValueListenableBuilder rebuild เฉพาะปุ่ม
+                // เมื่อ text เปลี่ยน (ไม่ rebuild ทั้งหน้า → ไม่กระตุกตอนพิมพ์)
+                ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: _textController,
+                  builder: (context, value, _) {
+                    final canSubmit = value.text.trim().isNotEmpty &&
+                        hasTag &&
+                        !_isSubmitting;
+                    return ElevatedButton(
+                      onPressed: canSubmit ? _submit : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: AppColors.alternate,
+                        disabledForegroundColor: AppColors.secondaryText,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 24, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
                         ),
+                      ),
+                      child: _isSubmitting
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                HugeIcon(
+                                    icon: HugeIcons.strokeRoundedFloppyDisk,
+                                    size: AppIconSize.md,
+                                    color: Colors.white),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'บันทึก',
+                                  style: AppTypography.body.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                    );
+                  },
                 ),
               ],
             ),
 
             // Hint text บอก user ว่าขาดอะไรถึงบันทึกไม่ได้
-            if (!canSubmit && !_isSubmitting)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  _getSubmitHint(state),
-                  style: AppTypography.caption.copyWith(
-                    color: AppColors.secondaryText,
+            // ValueListenableBuilder rebuild แค่ hint เมื่อ text เปลี่ยน
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: _textController,
+              builder: (context, value, _) {
+                final canSubmit = value.text.trim().isNotEmpty &&
+                    hasTag &&
+                    !_isSubmitting;
+                if (canSubmit || _isSubmitting) {
+                  return const SizedBox.shrink();
+                }
+                return Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    _getSubmitHint(state),
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.secondaryText,
+                    ),
                   ),
-                ),
-              ),
+                );
+              },
+            ),
           ],
         ),
       ),

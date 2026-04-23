@@ -15,6 +15,8 @@ import '../../../core/providers/shared_preferences_provider.dart';
 import '../../../core/widgets/confirm_dialog.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../../../core/widgets/keyboard_dismiss_scope.dart';
+import '../../../core/widgets/mic_button.dart';
+import '../../../core/services/stt_service.dart';
 import '../models/new_tag.dart';
 import '../models/post_draft.dart';
 import '../providers/create_post_provider.dart';
@@ -1040,39 +1042,61 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
 
   Widget _buildTextInput() {
     final isFromTask = widget.isFromTask;
+    final state = ref.watch(createPostProvider);
 
     return CompositedTransformTarget(
       link: _layerLink,
-      child: TextField(
-        controller: _textController,
-        focusNode: _focusNode,
-        maxLines: null,
-        minLines: 3,
-        readOnly: isFromTask, // ถ้ามาจาก task ให้แก้ไขไม่ได้
-        enabled: !isFromTask,
-        decoration: InputDecoration(
-          // ถ้ามาจาก task ให้ใช้ hint text พิเศษเพื่อแนะนำ user
-          hintText: isFromTask
-              ? 'หากมีอาการผิดปกติ ผิดแปลกไปจากเดิม ให้บรรยายไว้ที่นี่'
-              : 'เขียนข้อความที่นี่...',
-          hintStyle: AppTypography.body.copyWith(
-            color: AppColors.secondaryText,
+      child: Stack(
+        children: [
+          TextField(
+            controller: _textController,
+            focusNode: _focusNode,
+            maxLines: null,
+            minLines: 3,
+            readOnly: isFromTask, // ถ้ามาจาก task ให้แก้ไขไม่ได้
+            enabled: !isFromTask,
+            decoration: InputDecoration(
+              // ถ้ามาจาก task ให้ใช้ hint text พิเศษเพื่อแนะนำ user
+              hintText: isFromTask
+                  ? 'หากมีอาการผิดปกติ ผิดแปลกไปจากเดิม ให้บรรยายไว้ที่นี่'
+                  : 'เขียนข้อความที่นี่...',
+              hintStyle: AppTypography.body.copyWith(
+                color: AppColors.secondaryText,
+              ),
+              filled: true,
+              fillColor: isFromTask
+                  ? AppColors.alternate.withValues(alpha: 0.5)
+                  : AppColors.background,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              // เว้นที่ด้านขวาบนให้ MicButton (ไม่ทับข้อความ)
+              contentPadding: EdgeInsets.fromLTRB(16, 16, isFromTask ? 16 : 56, 16),
+            ),
+            style: AppTypography.body.copyWith(
+              color: isFromTask ? AppColors.primaryText : null,
+            ),
+            // ไม่ต้อง sync text ทุก keystroke เพราะทำให้ rebuild บ่อย
+            // จะ sync ตอน submit หรือ navigate to advanced แทน
           ),
-          filled: true,
-          fillColor: isFromTask
-              ? AppColors.alternate.withValues(alpha: 0.5)
-              : AppColors.background,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
-          ),
-          contentPadding: const EdgeInsets.all(16),
-        ),
-        style: AppTypography.body.copyWith(
-          color: isFromTask ? AppColors.primaryText : null,
-        ),
-        // ไม่ต้อง sync text ทุก keystroke เพราะทำให้ rebuild บ่อย
-        // จะ sync ตอน submit หรือ navigate to advanced แทน
+          // MicButton — ซ่อนถ้ามาจาก task (field read-only)
+          if (!isFromTask)
+            Positioned(
+              top: 8,
+              right: 8,
+              child: MicButton(
+                controller: _textController,
+                context: SttContext.post,
+                nursinghomeId:
+                    ref.watch(postNursinghomeIdProvider).valueOrNull,
+                // ถ้า user เลือก resident แล้ว → backend ใช้ข้อมูลคนนั้น
+                // (อายุ, เพศ, โรคประจำตัว) ช่วย transcribe แม่นขึ้น
+                residentId: state.selectedResidentId,
+                size: 36,
+              ),
+            ),
+        ],
       ),
     );
   }

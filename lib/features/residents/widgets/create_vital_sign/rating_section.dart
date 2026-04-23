@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/services/stt_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../../core/widgets/mic_button.dart';
 import '../../../../core/widgets/nps_scale.dart';
+import '../../../checklist/providers/task_provider.dart' show nursinghomeIdProvider;
 import '../../providers/vital_sign_form_provider.dart';
 import 'package:hugeicons/hugeicons.dart';
 
@@ -47,6 +50,9 @@ class RatingSection extends ConsumerWidget {
         : createNotifier.setRatingDescription(relationId, description);
 
     final ratings = formState.ratings.values.toList();
+
+    // nursinghome_id สำหรับ MicButton STT prompt (รายชื่อ resident + context)
+    final nursinghomeId = ref.watch(nursinghomeIdProvider).valueOrNull;
 
     if (ratings.isEmpty) {
       return Center(
@@ -103,6 +109,9 @@ class RatingSection extends ConsumerWidget {
               onDescriptionChanged: (description) {
                 setRatingDescription(rating.relationId, description);
               },
+              // STT context — ช่วยให้ถอดเสียงชื่อ resident/คำแพทย์ถูก
+              nursinghomeId: nursinghomeId,
+              residentId: residentId,
             ),
           );
         }),
@@ -121,6 +130,8 @@ class _RatingCard extends StatefulWidget {
     required this.currentDescription,
     required this.onRatingChanged,
     required this.onDescriptionChanged,
+    this.nursinghomeId,
+    this.residentId,
   });
 
   final String subjectName;
@@ -130,6 +141,10 @@ class _RatingCard extends StatefulWidget {
   final String? currentDescription;
   final ValueChanged<int> onRatingChanged;
   final ValueChanged<String> onDescriptionChanged;
+  /// nursinghome_id สำหรับ MicButton — bias STT ให้ถอดชื่อ resident ถูก
+  final int? nursinghomeId;
+  /// resident_id ที่กำลังประเมิน — ส่งให้ backend ดึง age/gender/โรคประจำตัว
+  final int? residentId;
 
   @override
   State<_RatingCard> createState() => _RatingCardState();
@@ -239,36 +254,53 @@ class _RatingCardState extends State<_RatingCard> {
             },
           ),
 
-        // Optional description text field
-        TextField(
-          controller: _descriptionController,
-          maxLines: 2,
-          decoration: InputDecoration(
-            labelText: 'รายละเอียดเพิ่มเติม (ถ้ามี)',
-            hintText: 'เช่น สภาพอารมณ์ การสื่อสาร ฯลฯ',
-            filled: true,
-            fillColor: AppColors.background,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 12,
+        // Optional description text field + MicButton มุมขวาบน
+        Stack(
+          children: [
+            TextField(
+              controller: _descriptionController,
+              maxLines: 2,
+              decoration: InputDecoration(
+                labelText: 'รายละเอียดเพิ่มเติม (ถ้ามี)',
+                hintText: 'เช่น สภาพอารมณ์ การสื่อสาร ฯลฯ',
+                filled: true,
+                fillColor: AppColors.background,
+                // เว้นที่ด้านขวาบนให้ MicButton
+                contentPadding: const EdgeInsets.fromLTRB(16, 12, 48, 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(
+                    color: AppColors.primary,
+                    width: 1.5,
+                  ),
+                ),
+              ),
+              onChanged: widget.onDescriptionChanged,
             ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide.none,
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide.none,
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                color: AppColors.primary,
-                width: 1.5,
+            Positioned(
+              top: 4,
+              right: 4,
+              child: MicButton(
+                controller: _descriptionController,
+                context: SttContext.vitalsign,
+                nursinghomeId: widget.nursinghomeId,
+                residentId: widget.residentId,
+                size: 32,
+                onTranscribed: () {
+                  // TextField.onChanged ไม่ trigger เมื่อ set ด้วย code
+                  widget.onDescriptionChanged(_descriptionController.text);
+                },
               ),
             ),
-          ),
-          onChanged: widget.onDescriptionChanged,
+          ],
         ),
       ],
     );

@@ -154,8 +154,10 @@ function buildBubble(
     const uniq = new Set(g.items.map(i => stripEmoji(i.title)))
 
     // ใช้ time grid เฉพาะเมื่อ title เหมือนกันทั้งหมด AND ไม่มี problem (เพราะ problem ต้องแสดงเหตุผล)
+    // AND ไม่มี completion note (เพราะ grid ไม่มีที่แสดง 📝 note → fall back เป็น per-item เพื่อไม่ให้ note หายเงียบ)
     const hasProblem = g.items.some(i => i.status === 'problem')
-    if (uniq.size === 1 && g.items.length > 1 && !hasProblem) {
+    const hasCompleteNote = g.items.some(i => i.status === 'complete' && i.note)
+    if (uniq.size === 1 && g.items.length > 1 && !hasProblem && !hasCompleteNote) {
       c.push({ type: 'text', text: [...uniq][0], size: 'xs', color: '#777777', margin: 'sm' })
       for (let i = 0; i < g.items.length; i += 4) {
         const line = g.items.slice(i, i + 4).map(it => {
@@ -185,6 +187,10 @@ function buildBubble(
         if (it.status === 'refer' && it.note) {
           c.push({ type: 'text', text: `    ${it.note}`, size: 'xxs', color: '#3498DB', wrap: true, margin: 'none' })
         }
+        // หมายเหตุของ complete task (user ระบุตอนทำเสร็จ) — สีเขียวให้สอดคล้องกับ status "เสร็จเรียบร้อย"
+        if (it.status === 'complete' && it.note) {
+          c.push({ type: 'text', text: `    📝 ${it.note}`, size: 'xxs', color: '#27AE60', wrap: true, margin: 'none' })
+        }
       }
     }
   }
@@ -208,6 +214,10 @@ Deno.serve(async (req) => {
     const url = new URL(req.url)
     const shift = url.searchParams.get('shift') || 'morning'
     const dateOverride = url.searchParams.get('date') // สำหรับทดสอบ เช่น 2026-03-20
+    // Filter เฉพาะ resident id เดียว — ใช้ตอน test ไม่ให้ flood DEV group ด้วย bubble ทุกคน
+    const residentFilter = url.searchParams.get('resident_id')
+      ? Number(url.searchParams.get('resident_id'))
+      : null
 
     // คำนวณช่วงเวลา
     const now = new Date()
@@ -286,10 +296,11 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Group by resident
+    // Group by resident (กรองตาม residentFilter ถ้ามี — ใช้ตอน test)
     const rMap = new Map<number, { name: string; tasks: TaskRow[] }>()
     for (const r of rows) {
       const rid = Number(r.resident_id)
+      if (residentFilter !== null && rid !== residentFilter) continue
       if (!rMap.has(rid)) rMap.set(rid, { name: r.resident_name, tasks: [] })
       rMap.get(rid)!.tasks.push(r)
     }

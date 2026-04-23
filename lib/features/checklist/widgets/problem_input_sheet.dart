@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hugeicons/hugeicons.dart';
+import '../../../core/services/stt_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/input_fields.dart';
+import '../../../core/widgets/mic_button.dart';
 import '../models/problem_type.dart';
 import '../models/task_log.dart';
+import '../providers/task_provider.dart' show nursinghomeIdProvider;
 import '../services/task_service.dart';
 import 'resolution_history_section.dart';
 
@@ -201,14 +205,37 @@ class _ProblemInputSheetState extends State<ProblemInputSheet> {
                     ),
                   ),
                   AppSpacing.verticalGapSm,
-                  AppTextField(
-                    controller: _controller,
-                    focusNode: _focusNode,
-                    hintText: 'รายละเอียดปัญหาที่พบ...',
-                    maxLines: 3,
-                    textInputAction: TextInputAction.done,
-                    onSubmitted: (_) => _handleSubmit(),
-                    // ลบ onChanged: setState ออก - ใช้ ValueListenableBuilder แทน
+                  // Problem description + MicButton มุมขวาบน
+                  Stack(
+                    children: [
+                      AppTextField(
+                        controller: _controller,
+                        focusNode: _focusNode,
+                        hintText: 'รายละเอียดปัญหาที่พบ...',
+                        maxLines: 3,
+                        textInputAction: TextInputAction.done,
+                        onSubmitted: (_) => _handleSubmit(),
+                        // ลบ onChanged: setState ออก - ใช้ ValueListenableBuilder แทน
+                      ),
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: Consumer(
+                          builder: (context, ref, _) {
+                            final nhId = ref
+                                .watch(nursinghomeIdProvider)
+                                .valueOrNull;
+                            return MicButton(
+                              controller: _controller,
+                              context: SttContext.post,
+                              nursinghomeId: nhId,
+                              residentId: widget.task?.residentId,
+                              size: 32,
+                            );
+                          },
+                        ),
+                      ),
+                    ],
                   ),
                   AppSpacing.verticalGapLg,
                 ],

@@ -31,6 +31,8 @@ import '../../board/widgets/video_player_widget.dart';
 import '../../../core/widgets/webview_screen.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../../../core/widgets/keyboard_dismiss_scope.dart';
+import '../../../core/widgets/mic_button.dart';
+import '../../../core/services/stt_service.dart';
 import '../../../core/widgets/shimmer_loading.dart';
 import 'split_screen_camera_screen.dart';
 import 'square_camera_screen.dart';
@@ -2380,12 +2382,34 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
             ],
           ),
           AppSpacing.verticalGapSm,
-          AppTextField(
-            controller: _noteController,
-            hintText: 'เช่น ทำไม่ครบตาม instruction เพราะ...',
-            maxLines: 3,
-            textInputAction: TextInputAction.newline,
-            fillColor: AppColors.background,
+          // Note field + MicButton มุมขวาบน
+          Stack(
+            children: [
+              AppTextField(
+                controller: _noteController,
+                hintText: 'เช่น ทำไม่ครบตาม instruction เพราะ...',
+                maxLines: 3,
+                textInputAction: TextInputAction.newline,
+                fillColor: AppColors.background,
+              ),
+              Positioned(
+                top: 4,
+                right: 4,
+                child: Consumer(
+                  builder: (context, ref, _) {
+                    final nhId =
+                        ref.watch(nursinghomeIdProvider).valueOrNull;
+                    return MicButton(
+                      controller: _noteController,
+                      context: SttContext.post,
+                      nursinghomeId: nhId,
+                      residentId: _task.residentId,
+                      size: 32,
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
         ],
       ),

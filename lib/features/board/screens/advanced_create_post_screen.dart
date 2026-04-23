@@ -35,6 +35,8 @@ import '../providers/tag_provider.dart';
 import '../../../core/widgets/success_popup.dart';
 import '../../../core/widgets/buttons.dart';
 import '../../../core/widgets/keyboard_dismiss_scope.dart';
+import '../../../core/widgets/mic_button.dart';
+import '../../../core/services/stt_service.dart';
 import '../../checklist/services/task_service.dart';
 import '../../checklist/providers/task_provider.dart'
     show
@@ -804,11 +806,11 @@ class _AdvancedCreatePostScreenState
         ),
         // ใช้ Column[Expanded(ScrollView), BottomBar] แทน bottomNavigationBar
         // เพื่อให้ toolbar อยู่เหนือ keyboard เสมอ (bottomNavigationBar อาจถูกซ่อน)
-        // Wrap ด้วย KeyboardDismissScope:
-        // 1. แตะพื้นที่ว่าง → keyboard ปิด
-        // 2. แสดง "ตกลง" เหนือ keyboard สำหรับ numeric input (measurement)
-        //    ที่ iOS ไม่มีปุ่ม Done ให้
+        // Wrap ด้วย KeyboardDismissScope: แตะพื้นที่ว่าง → keyboard ปิด
+        // showDoneBar: false เพราะ overlay Done bar จะลอยทับปุ่มแนบรูป/โพส
+        // — ใช้ปุ่ม "ปิดคีย์บอร์ด" ใน bottom action bar แทน (เห็นเฉพาะตอน keyboard เปิด)
         body: KeyboardDismissScope(
+          showDoneBar: false,
           child: Column(
           children: [
             Expanded(
@@ -902,30 +904,50 @@ class _AdvancedCreatePostScreenState
               // Description field (ไม่บังคับกรอก - ยกเว้นติ๊กส่งเวร)
               _buildSectionLabel('รายละเอียด'),
               const SizedBox(height: 8),
-              TextFormField(
-                controller: _textController,
-                focusNode: _descriptionFocusNode, // ใช้สำหรับ focus เมื่อติ๊กส่งเวร
-                maxLines: null,
-                minLines: 4,
-                decoration: InputDecoration(
-                  // ถ้ามาจาก task ให้ใช้ hint text พิเศษเพื่อแนะนำ user
-                  hintText: widget.isFromTask
-                      ? 'หากมีอาการผิดปกติ ผิดแปลกไปจากเดิม ให้บรรยายไว้ที่นี่'
-                      : 'เขียนรายละเอียดที่นี่...',
-                  hintStyle: AppTypography.body.copyWith(
-                    color: AppColors.secondaryText,
+              // Description field + MicButton ที่มุมขวาบน (ใช้ Stack เพราะ
+              // TextFormField เป็น multiline — suffixIcon จะอยู่กลางแนวตั้ง ดูไม่ดี)
+              Stack(
+                children: [
+                  TextFormField(
+                    controller: _textController,
+                    focusNode: _descriptionFocusNode,
+                    maxLines: null,
+                    minLines: 4,
+                    decoration: InputDecoration(
+                      hintText: widget.isFromTask
+                          ? 'หากมีอาการผิดปกติ ผิดแปลกไปจากเดิม ให้บรรยายไว้ที่นี่'
+                          : 'เขียนรายละเอียดที่นี่...',
+                      hintStyle: AppTypography.body.copyWith(
+                        color: AppColors.secondaryText,
+                      ),
+                      filled: true,
+                      fillColor: AppColors.background,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      // เว้นที่ด้านขวาบนให้ MicButton (ไม่ทับข้อความ)
+                      contentPadding:
+                          const EdgeInsets.fromLTRB(16, 16, 56, 16),
+                    ),
+                    style: AppTypography.body,
+                    // ไม่ sync ทุก keystroke — read ตอน submit เท่านั้น
                   ),
-                  filled: true,
-                  fillColor: AppColors.background,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: MicButton(
+                      controller: _textController,
+                      context: SttContext.post,
+                      nursinghomeId:
+                          ref.watch(postNursinghomeIdProvider).valueOrNull,
+                      // ถ้า user เลือก resident แล้ว → ส่ง id ไปให้ backend
+                      // ดึงข้อมูลคนนั้น (อายุ, โรค) มาช่วย transcribe แม่นขึ้น
+                      residentId: state.selectedResidentId,
+                      size: 36,
+                    ),
                   ),
-                  contentPadding: const EdgeInsets.all(16),
-                ),
-                style: AppTypography.body,
-                // ไม่ต้อง sync ทุก keystroke เพราะทำให้ rebuild บ่อย
-                // จะ read จาก controller ตอน submit แทน
+                ],
               ),
 
               AppSpacing.verticalGapMd,
@@ -1253,6 +1275,20 @@ class _AdvancedCreatePostScreenState
                       tooltip: hasImages ? 'ลบรูปก่อนถึงจะเลือกวิดีโอได้' : 'เลือกวีดีโอ',
                     ),
                   ],
+                ),
+                // ปุ่มปิดคีย์บอร์ด — แสดงเฉพาะตอน keyboard เปิด
+                // ใช้สไตล์เดียวกับปุ่มแนบรูปเพื่อความสอดคล้อง (consistency)
+                // อยู่ติดกับ image picker bar — ไม่ทับปุ่ม "โพส" ที่อยู่ขวาสุด
+                _KeyboardDismissIconButton(
+                  builder: (context) => Padding(
+                    padding: const EdgeInsets.only(left: 8),
+                    child: _buildIconButton(
+                      icon: HugeIcons.strokeRoundedKeyboard,
+                      onTap: () =>
+                          FocusManager.instance.primaryFocus?.unfocus(),
+                      tooltip: 'ปิดคีย์บอร์ด',
+                    ),
+                  ),
                 ),
                 const Spacer(),
                 // Submit button - ใช้ PrimaryButton จาก theme
@@ -1781,6 +1817,70 @@ class _AdvancedCreatePostScreenState
         },
       ),
     );
+  }
+}
+
+/// ปุ่มปิดคีย์บอร์ดที่ตามดู keyboard visibility ผ่าน WidgetsBindingObserver
+/// แสดง builder() เฉพาะตอน keyboard เปิด ซ่อน (SizedBox.shrink) เมื่อปิด
+///
+/// อ่าน viewInsets จาก platformDispatcher (raw) เพราะ MediaQuery ภายใน Scaffold
+/// body ถูก resizeToAvoidBottomInset หักออกแล้ว → จะอ่านได้ 0 ตลอด
+///
+/// แยกเป็น StatefulWidget เพื่อจำกัด rebuild ไว้ที่ปุ่มเท่านั้น
+/// — ไม่กระทบ Form/ScrollView ทั้งหน้า
+class _KeyboardDismissIconButton extends StatefulWidget {
+  /// builder ที่จะ render เมื่อ keyboard เปิด
+  final WidgetBuilder builder;
+
+  const _KeyboardDismissIconButton({required this.builder});
+
+  @override
+  State<_KeyboardDismissIconButton> createState() =>
+      _KeyboardDismissIconButtonState();
+}
+
+class _KeyboardDismissIconButtonState extends State<_KeyboardDismissIconButton>
+    with WidgetsBindingObserver {
+  bool _keyboardVisible = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // sync ค่าเริ่มต้น เผื่อ widget mount ตอน keyboard เปิดอยู่แล้ว
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _syncKeyboardVisibility();
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeMetrics() {
+    if (!mounted) return;
+    _syncKeyboardVisibility();
+  }
+
+  void _syncKeyboardVisibility() {
+    final view = WidgetsBinding.instance.platformDispatcher.views.isNotEmpty
+        ? WidgetsBinding.instance.platformDispatcher.views.first
+        : null;
+    if (view == null) return;
+    final visible = view.viewInsets.bottom > 0;
+    if (visible != _keyboardVisible) {
+      setState(() => _keyboardVisible = visible);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_keyboardVisible) return const SizedBox.shrink();
+    return widget.builder(context);
   }
 }
 

@@ -14,11 +14,13 @@ const LINE_TOKEN = Deno.env.get('LINE_CHANNEL_ACCESS_TOKEN') || ''
 const DEV_LINE_GROUP_ID = 'C57c1c76d5500d7eb9d617e1590734290'
 
 // ============================================
-// Production Rollout — ส่งห้อง LINE จริงเฉพาะ residents ใน list นี้
-// คนที่ไม่อยู่ใน list → ส่ง DEV group เหมือนเดิม
-// เพิ่มคนใหม่: แค่เพิ่ม resident_id เข้า Set
+// Production Rollout (2026-04-23) — เปิดให้ทุกคน Stay ที่มี line_group_id
+// ได้รับรายงานประจำวันที่ห้องญาติจริง
+// หลักการ: ถ้ามี residentLineGroups.get(rid) → ส่งห้องญาติจริง
+//         ถ้าไม่มี → ส่ง DEV group (fallback ปลอดภัย)
+// ไม่ต้อง maintain allowlist อีก — การ config line_group_id ในฐานข้อมูล
+// เป็นตัวควบคุม (หัวหน้าเวรแจ้งญาติล่วงหน้าก่อนตั้ง line_group_id)
 // ============================================
-const PRODUCTION_RESIDENTS = new Set([104, 159, 169, 173, 310]) // คุณสุริยะ เชิญศิริ, คุณสุชญา อักษรนิติ, คุณถเวช เก็งวินิจ, คุณยุทธศาสตร์ ธีรพิริยะ, คุณงามตา รักษาจิต
 
 // ============================================
 // Types (รวมจากทั้ง 3 functions)
@@ -254,6 +256,7 @@ function buildCoverBubble(
   sections: string[],
   picUrl?: string | null,
   timeRangeLabel?: string,
+  medShareToken?: string | null,
 ): Record<string, unknown> {
   const c: Record<string, unknown>[] = []
 
@@ -278,10 +281,43 @@ function buildCoverBubble(
   // คำแนะนำ
   c.push({ type: 'text', text: '👉 เลื่อนไปทางขวาเพื่อดู', size: 'md', color: '#999999', margin: 'xxl' })
 
+  // Footer: ปุ่ม Family Portal (ถ้ามี token) + ปุ่มดูคลิปอธิบาย + IreneOS banner
+  // ญาติกดปุ่มนี้เพื่อเข้าดูข้อมูลทั้งหมดผ่าน web portal
+  const portalUrl = medShareToken ? `${ADMIN_BASE_URL}/family/${medShareToken}` : null
+
+  // รวมปุ่มทั้งหมดไว้ในกล่องเดียว — Family Portal (ถ้ามี) + ดูคลิปอธิบาย
+  const buttons: Record<string, unknown>[] = []
+  if (portalUrl) {
+    buttons.push({
+      type: 'button', style: 'primary', color: '#26A69A', height: 'sm',
+      action: { type: 'uri', label: '👪 Family Portal', uri: portalUrl },
+    })
+  }
+  // ปุ่มคลิปอธิบายจากเจ้าของ — แสดงทุก bubble
+  buttons.push({
+    type: 'button', style: 'primary', color: '#E53935', height: 'sm',
+    action: { type: 'uri', label: '▶ อธิบายวิธีการใช้งาน', uri: INTRO_VIDEO_URL },
+  })
+
+  const coverFooter = {
+    type: 'box', layout: 'vertical', spacing: 'sm', paddingAll: '0px',
+    contents: [
+      {
+        type: 'box', layout: 'vertical', spacing: 'sm', paddingAll: '12px',
+        contents: buttons,
+      },
+      {
+        type: 'image',
+        url: 'https://amthgthvrxhlxpttioxu.supabase.co/storage/v1/object/public/testupload/outsideImage/ireneos-report-banner-v6.png',
+        size: 'full', aspectMode: 'fit', aspectRatio: '8:3',
+      },
+    ],
+  }
+
   const bubble: Record<string, unknown> = {
     type: 'bubble', size: 'mega',
     body: { type: 'box', layout: 'vertical', spacing: 'sm', paddingAll: '20px', contents: c },
-    footer: IRENEOS_FOOTER,
+    footer: coverFooter,
   }
 
   // รูป profile ผู้พักอาศัย (ถ้ามี)
@@ -503,8 +539,10 @@ function buildChecklistBubble(
     const uniq = new Set(g.items.map(i => stripEmoji(i.title)))
 
     // ใช้ time grid เฉพาะเมื่อ title เหมือนกันทั้งหมด AND ไม่มี problem (เพราะ problem ต้องแสดงเหตุผล)
+    // AND ไม่มี completion note (เพราะ grid ไม่มีที่แสดง 📝 note → fall back เป็น per-item เพื่อไม่ให้ note หายเงียบ)
     const hasProblem = g.items.some(i => i.status === 'problem')
-    if (uniq.size === 1 && g.items.length > 1 && !hasProblem) {
+    const hasCompleteNote = g.items.some(i => i.status === 'complete' && i.note)
+    if (uniq.size === 1 && g.items.length > 1 && !hasProblem && !hasCompleteNote) {
       c.push({ type: 'text', text: [...uniq][0], size: 'sm', color: '#777777', margin: 'sm' })
       // ถ้ามีรูป 📸 มาก → ลด chunk เหลือ 3 ต่อบรรทัดเพื่อไม่ให้ล้น
       const hasPhotos = g.items.some(it => it.has_photo)
@@ -552,6 +590,11 @@ function buildChecklistBubble(
           c.push({ type: 'text', text: `${ic} ${stripEmoji(it.title)} ${it.time}${photo}`, size: 'sm', color: col, wrap: true, margin: 'sm' })
           if (it.status === 'refer' && it.note) {
             c.push({ type: 'text', text: `    ${it.note}`, size: 'sm', color: '#3498DB', wrap: true, margin: 'none' })
+          }
+          // แสดงหมายเหตุของ complete task (ถ้า user ระบุไว้ตอนทำเสร็จ)
+          // ใช้สีเขียว (#27AE60) ให้สอดคล้องกับ status "เสร็จเรียบร้อย" และโดดเด่นขึ้นกว่าสีเทา
+          if (it.status === 'complete' && it.note) {
+            c.push({ type: 'text', text: `    📝 ${it.note}`, size: 'sm', color: '#27AE60', wrap: true, margin: 'none' })
           }
         }
       }
@@ -887,6 +930,9 @@ function buildMedBubble(
 
 const ADMIN_BASE_URL = Deno.env.get('ADMIN_BASE_URL') || 'https://ireneos.vercel.app'
 
+// คลิปอธิบายจากเจ้าของ — แสดงปุ่มบน Cover bubble ทุกวัน
+const INTRO_VIDEO_URL = 'https://youtu.be/Z0vkJNIUH70?si=7U9kyAqjZL3r8gCJ'
+
 // ป้าย IreneOS — ใช้เป็น footer ทุก bubble
 const IRENEOS_FOOTER = {
   type: 'box', layout: 'vertical', paddingAll: '0px',
@@ -1097,25 +1143,38 @@ Deno.serve(async (req) => {
       `, [reportDate])
       medLogs = mlResult.rows as MedLogRow[]
 
-      // 4. AI verifications
+      // 4. AI verifications — JOIN med_logs + residents เพื่อกรองเฉพาะ Stay (ให้สอดคล้องกับ query อื่น)
       const aiResult = await conn.queryObject<AIVerRow>(`
-        SELECT med_log_id, photo_type, ai_status, confidence_score::float as confidence_score
-        FROM "A_Med_AI_Verification" WHERE calendar_date = $1
+        SELECT v.med_log_id, v.photo_type, v.ai_status, v.confidence_score::float as confidence_score
+        FROM "A_Med_AI_Verification" v
+        JOIN "A_Med_logs" ml ON v.med_log_id = ml.id
+        JOIN residents r ON ml.resident_id = r.id
+        WHERE v.calendar_date = $1
+          AND r.s_status = 'Stay' AND r."i_Name_Surname" NOT LIKE 'งาน%'
       `, [reportDate])
       aiVers = aiResult.rows as AIVerRow[]
 
-      // 5. Med errors
+      // 5. Med errors — JOIN residents เพื่อกรองเฉพาะ Stay
       const errResult = await conn.queryObject<MedErrorRow>(`
-        SELECT meal, resident_id::int, reason, "reply_nurseMark" as reply_nurse_mark
-        FROM "A_Med_Error_Log" WHERE "CalendarDate" = $1
+        SELECT e.meal, e.resident_id::int, e.reason, e."reply_nurseMark" as reply_nurse_mark
+        FROM "A_Med_Error_Log" e
+        JOIN residents r ON e.resident_id = r.id
+        WHERE e."CalendarDate" = $1
+          AND r.s_status = 'Stay' AND r."i_Name_Surname" NOT LIKE 'งาน%'
       `, [reportDate])
       medErrors = errResult.rows as MedErrorRow[]
 
-      // 6. Incidents
+      // 6. Incidents — เพิ่ม JOIN residents ใน subquery เพื่อกรองเฉพาะ Stay
       const incResult = await conn.queryObject<IncidentRow>(`
-        SELECT source_id::int, title, description, severity, status
-        FROM "B_Incident" WHERE source_type = 'med_log'
-          AND source_id IN (SELECT id FROM "A_Med_logs" WHERE "Created_Date" = $1)
+        SELECT i.source_id::int, i.title, i.description, i.severity, i.status
+        FROM "B_Incident" i
+        WHERE i.source_type = 'med_log'
+          AND i.source_id IN (
+            SELECT ml.id FROM "A_Med_logs" ml
+            JOIN residents r ON ml.resident_id = r.id
+            WHERE ml."Created_Date" = $1
+              AND r.s_status = 'Stay' AND r."i_Name_Surname" NOT LIKE 'งาน%'
+          )
       `, [reportDate])
       incidents = incResult.rows as IncidentRow[]
 
@@ -1350,14 +1409,15 @@ Deno.serve(async (req) => {
       if (medBubble) sections.push('💊 สรุปยา')
       if (ptData) sections.push('🏃‍♂️ กายภาพบำบัด')
       if (apptBubble) sections.push('📅 นัดหมาย')
-      bubbles.unshift(buildCoverBubble(name, dateLabel, sections, residentPics.get(rid), timeRangeLabel))
+      // ส่ง medShareToken เพื่อสร้างปุ่ม Family Portal บนหน้าปก
+      bubbles.unshift(buildCoverBubble(name, dateLabel, sections, residentPics.get(rid), timeRangeLabel, residentMedTokens.get(rid)))
 
       if (previewMode) {
         // Preview mode: เก็บข้อมูลดิบสำหรับ dashboard (ไม่ส่ง LINE)
         const taskData = tasksByRes.get(rid) ? categorizeTasks(tasksByRes.get(rid)!) : null
         results.push({
           id: rid, name, bubbles: bubbles.length, sent: false,
-          production: PRODUCTION_RESIDENTS.has(rid),  // อยู่ใน production list หรือไม่
+          production: !!residentLineGroups.get(rid),  // มี line_group_id = ส่งจริง
           picUrl: residentPics.get(rid) || null,
           zone: residentZones.get(rid) ?? null,  // { id, name, abbr }
           sections,
@@ -1377,9 +1437,11 @@ Deno.serve(async (req) => {
           contents: bubbles.length === 1 ? bubbles[0] : { type: 'carousel', contents: bubbles },
         }
 
-        // ส่งห้องจริงเฉพาะ: send_production=true + อยู่ใน PRODUCTION_RESIDENTS + มี line_group_id
-        const isProduction = sendProduction && PRODUCTION_RESIDENTS.has(rid)
-        const targetGroup = isProduction ? (residentLineGroups.get(rid) || DEV_LINE_GROUP_ID) : DEV_LINE_GROUP_ID
+        // ส่งห้องจริงเมื่อ: send_production=true + resident มี line_group_id ใน DB
+        // ถ้าไม่มี line_group_id → fall back ไป DEV group (ปลอดภัย ไม่ส่งออกนอก)
+        const lineGroup = residentLineGroups.get(rid)
+        const isProduction = sendProduction && !!lineGroup
+        const targetGroup = isProduction ? lineGroup! : DEV_LINE_GROUP_ID
         const res = await pushToLine(LINE_TOKEN, targetGroup, [flexMsg])
         results.push({ id: rid, name, bubbles: bubbles.length, sent: res.success, production: isProduction })
         await new Promise(r => setTimeout(r, 150))

@@ -1,19 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hugeicons/hugeicons.dart';
+import '../../../core/services/stt_service.dart';
 import '../../../core/services/user_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../../../core/widgets/irene_app_bar.dart';
+import '../../../core/widgets/mic_button.dart';
 import '../../../core/widgets/success_popup.dart';
+import '../../checklist/providers/task_provider.dart' show nursinghomeIdProvider;
 import '../providers/resident_detail_provider.dart';
 import '../providers/vital_sign_form_provider.dart';
 import '../widgets/create_vital_sign/vital_input_section.dart';
 import '../widgets/create_vital_sign/care_input_section.dart';
 import '../widgets/create_vital_sign/shift_card.dart';
-import '../widgets/create_vital_sign/ai_shift_summary_button.dart';
 import '../widgets/create_vital_sign/preview_vital_sign_dialog.dart';
 
 /// Single-page scrollable form for creating vital sign records
@@ -393,23 +395,22 @@ class CreateVitalSignScreen extends ConsumerWidget {
   Widget _buildGeneralReportSection(BuildContext context, WidgetRef ref, dynamic data) {
     final notifier = ref.read(vitalSignFormProvider(residentId).notifier);
 
-    // ปุ่ม AI สรุปเวร — ส่งเข้าไปวางมุมบนขวาของ card
-    final aiButton = AiShiftSummaryButton(
-      residentId: residentId,
-      residentName: residentName ?? '',
-    );
+    // ดึง nursinghome_id ของผู้ใช้ ส่งลงไปให้ MicButton ใช้ build STT prompt
+    // ถ้ายังไม่มี (loading / null) ก็ยังใช้ STT ได้ แต่ไม่มี resident name context
+    final nursinghomeId = ref.watch(nursinghomeIdProvider).valueOrNull;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Text field สำหรับรายงาน + ปุ่ม AI อยู่มุมบนขวาของ card
+        // Text field สำหรับรายงาน + ปุ่มไมค์มุมบนขวาของ card
         if (data.shift == 'เวรเช้า')
           _GeneralReportField(
             label: 'รายงานเพิ่มเติมนอกเหนือจากการประเมินด้วยดาว',
             initialValue: data.reportD,
             onChanged: notifier.setReportD,
             minLines: 5,
-            aiButton: aiButton,
+            nursinghomeId: nursinghomeId,
+            residentId: residentId,
           )
         else
           _GeneralReportField(
@@ -417,7 +418,8 @@ class CreateVitalSignScreen extends ConsumerWidget {
             initialValue: data.reportN,
             onChanged: notifier.setReportN,
             minLines: 3,
-            aiButton: aiButton,
+            nursinghomeId: nursinghomeId,
+            residentId: residentId,
           ),
 
         // Disclaimer — เตือนให้ตรวจสอบก่อน save
@@ -493,15 +495,20 @@ class _GeneralReportField extends StatefulWidget {
     required this.initialValue,
     required this.onChanged,
     this.minLines = 5,
-    this.aiButton,
+    this.nursinghomeId,
+    this.residentId,
   });
 
   final String? label;
   final String? initialValue;
   final ValueChanged<String> onChanged;
   final int minLines;
-  /// ปุ่ม AI สรุปเวร — วางไว้มุมบนขวาของ card (ถ้ามี)
-  final Widget? aiButton;
+  /// nursinghome_id ของ user ปัจจุบัน — ส่งให้ MicButton ดึงรายชื่อ resident
+  /// เป็น STT prompt bias (ช่วยให้ถอดชื่อถูก)
+  final int? nursinghomeId;
+  /// resident_id ที่กำลังบันทึก vital sign ให้ — backend ใช้ดึง age, gender,
+  /// โรคประจำตัว มาเป็น context เพิ่ม ช่วยให้ transcribe แม่นขึ้น
+  final int? residentId;
 
   @override
   State<_GeneralReportField> createState() => _GeneralReportFieldState();
@@ -551,18 +558,32 @@ class _GeneralReportFieldState extends State<_GeneralReportField> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header row: ชื่อ card + ปุ่ม AI (ถ้ามี) อยู่มุมบนขวา
+            // Header row: ชื่อ card + ปุ่มไมค์อยู่มุมบนขวา
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'มีรายงานเพิ่มเติมมั้ย?',
-                  style: AppTypography.label.copyWith(
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w500,
+                Expanded(
+                  child: Text(
+                    'มีรายงานเพิ่มเติมมั้ย?',
+                    style: AppTypography.label.copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
-                if (widget.aiButton != null) widget.aiButton!,
+                MicButton(
+                  controller: _controller,
+                  context: SttContext.vitalsign,
+                  nursinghomeId: widget.nursinghomeId,
+                  residentId: widget.residentId,
+                  size: 36,
+                  onTranscribed: () {
+                    // STT insert ข้อความเข้า controller แล้ว — ต้อง notify parent
+                    // เพราะ TextField.onChanged จะไม่ trigger เมื่อ controller.text
+                    // ถูก set ด้วย code
+                    widget.onChanged(_controller.text);
+                  },
+                ),
               ],
             ),
             const SizedBox(height: 8),

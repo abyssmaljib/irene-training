@@ -78,6 +78,12 @@ dependencies:
   tutorial_coach_mark: ^1.2.11
   # Audio
   audioplayers: ^6.1.0
+  # Audio recording (STT)
+  record: ^5.1.2
+  # NOTE: record 5.2.1 locks record_linux <1.0.0 แต่ resolver เลือก record_platform_interface 1.5.0
+  # ทำให้ record_linux 0.7.2 missing method startStream → compile fail
+  # Override ให้ record_linux ใช้ 1.3.0 ที่ implement interface ถูกต้อง
+
   # App Version Info
   package_info_plus: ^8.1.3
   webview_flutter: ^4.13.1
@@ -86,6 +92,9 @@ dependencies:
   permission_handler: ^12.0.1
   firebase_performance: ^0.11.1+4
 
+
+dependency_overrides:
+  record_linux: ^1.3.0
 
 dev_dependencies:
   flutter_test:

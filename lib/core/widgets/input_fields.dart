@@ -340,12 +340,14 @@ class SearchField extends StatefulWidget {
 
 class _SearchFieldState extends State<SearchField> {
   late TextEditingController _controller;
-  
+
   @override
   void initState() {
     super.initState();
     _controller = widget.controller ?? TextEditingController();
-    _controller.addListener(() => setState(() {}));
+    // ไม่ใช้ addListener(() => setState(() {})) เพราะจะ rebuild ทั้ง AppTextField
+    // ทุกตัวอักษร → keyboard กระตุก
+    // ใช้ ValueListenableBuilder wrap แค่ clear button ใน suffixIcon แทน
   }
 
   @override
@@ -366,23 +368,29 @@ class _SearchFieldState extends State<SearchField> {
       isDense: widget.isDense,
       autofocus: widget.autofocus,
       focusNode: widget.focusNode,
-      suffixIcon: _controller.text.isNotEmpty
-          ? GestureDetector(
-              onTap: () {
-                _controller.clear();
-                widget.onClear?.call();
-                widget.onChanged?.call('');
-              },
-              child: Padding(
-                padding: const EdgeInsets.only(left: 8, right: 12),
-                child: HugeIcon(
-                  icon: HugeIcons.strokeRoundedCancelCircle,
-                  color: AppColors.textSecondary,
-                  size: AppIconSize.input,
-                ),
+      // ValueListenableBuilder rebuild เฉพาะ clear button เมื่อ text เปลี่ยน
+      // — ไม่ rebuild AppTextField ทั้งตัว → ไม่กระตุกตอนพิมพ์
+      suffixIcon: ValueListenableBuilder<TextEditingValue>(
+        valueListenable: _controller,
+        builder: (context, value, _) {
+          if (value.text.isEmpty) return const SizedBox.shrink();
+          return GestureDetector(
+            onTap: () {
+              _controller.clear();
+              widget.onClear?.call();
+              widget.onChanged?.call('');
+            },
+            child: Padding(
+              padding: const EdgeInsets.only(left: 8, right: 12),
+              child: HugeIcon(
+                icon: HugeIcons.strokeRoundedCancelCircle,
+                color: AppColors.textSecondary,
+                size: AppIconSize.input,
               ),
-            )
-          : null,
+            ),
+          );
+        },
+      ),
     );
   }
 }
