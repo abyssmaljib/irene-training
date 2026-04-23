@@ -198,6 +198,11 @@ class _ResidentTile extends ConsumerWidget {
     final isFailed = resident.status == BatchResidentStatus.failed;
     final isCompleting = resident.status == BatchResidentStatus.completing;
 
+    // Unseen update — ต้องอ่านก่อนทำ
+    // ใช้ currentUserId จาก provider (match pattern ใน task_card.dart)
+    final currentUserId = ref.watch(currentUserIdProvider);
+    final hasUnseenUpdate = task.hasUnseenUpdate(currentUserId);
+
     // เลือกรูปที่จะแสดง: completed → confirmImage, pending → sampleImage
     final imageUrl = isCompleted
         ? (resident.uploadedImageUrl ?? task.confirmImage ?? task.sampleImageUrl)
@@ -206,7 +211,7 @@ class _ResidentTile extends ConsumerWidget {
 
     return GestureDetector(
       // กด card → ไป TaskDetailScreen เสมอ (ยกเว้นกำลัง upload)
-      onTap: isCompleting ? null : () => _navigateToDetail(context),
+      onTap: isCompleting ? null : () => _navigateToDetail(context, ref),
       child: Container(
         margin: EdgeInsets.only(bottom: AppSpacing.xs),
         // clipBehavior ให้ปุ่มถ่ายรูปชิดขอบขวาถูก clip ตาม border radius
@@ -214,6 +219,10 @@ class _ResidentTile extends ConsumerWidget {
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: AppRadius.mediumRadius,
+          // Border ต้องเป็น uniform เพราะ Flutter ไม่ยอมให้ non-uniform Border
+          // คู่กับ borderRadius → render ว่างเลย
+          // สำหรับ hasUnseenUpdate ใช้ accent strip ซ้าย (Row prefix Container)
+          // แทนที่จะใช้ Border left ไม่สม่ำเสมอ
           border: Border.all(
             color: isCompleted
                 ? AppColors.tagPassedBg
@@ -226,6 +235,14 @@ class _ResidentTile extends ConsumerWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Left accent strip — แสดงเฉพาะเมื่อมี unseen update
+              // ใช้ Container.color เป็น strip แทนการใช้ non-uniform Border
+              // (ถูก clip โดย outer borderRadius → โค้งตาม card)
+              if (hasUnseenUpdate)
+                Container(
+                  width: 4,
+                  color: AppColors.pastelRed,
+                ),
               // ส่วน content ซ้าย (รูป + ชื่อ + info) มี padding
               Expanded(
                 child: Padding(
@@ -301,6 +318,14 @@ class _ResidentTile extends ConsumerWidget {
                                 ),
                               ),
 
+                            // Badge "อัพเดต" — เตือน user ว่ามีข้อมูลใหม่ที่ต้องอ่านก่อนทำ
+                            // ปรากฏใต้ชื่อคนไข้ ก่อนบรรทัดสถานะ เพื่อให้เห็นก่อน
+                            if (hasUnseenUpdate)
+                              Padding(
+                                padding: EdgeInsets.only(top: 4),
+                                child: _buildUnseenChip(),
+                              ),
+
                             // แสดงสถานะจริงจาก task.status + batch status
                             _buildStatusText(task),
 
@@ -336,8 +361,8 @@ class _ResidentTile extends ConsumerWidget {
                 ),
               ),
 
-              // Trailing: ปุ่มถ่ายรูปเต็มความสูง / chevron / retry
-              _buildTrailing(context, ref),
+              // Trailing: ปุ่มถ่ายรูปเต็มความสูง / chevron / retry / อ่านอัพเดต
+              _buildTrailing(context, ref, hasUnseenUpdate: hasUnseenUpdate),
             ],
           ),
         ),
@@ -502,12 +527,48 @@ class _ResidentTile extends ConsumerWidget {
     );
   }
 
+  /// Chip เล็กๆ บอกว่ามีอัพเดตใหม่ต้องอ่าน — ใช้แดงพาสเทล match task_card
+  Widget _buildUnseenChip() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.pastelRed,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          HugeIcon(
+            icon: HugeIcons.strokeRoundedRefresh,
+            size: 11,
+            color: Colors.white,
+          ),
+          const SizedBox(width: 3),
+          Text(
+            'มีอัพเดตใหม่',
+            style: AppTypography.caption.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: 11,
+              height: 1.0,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// Trailing widget:
+  /// - hasUnseenUpdate + pending → ปุ่ม "อ่านอัพเดต" แดงพาสเทล (บังคับให้อ่านก่อนทำ)
   /// - Pending: ปุ่มถ่ายรูปเต็มความสูง ชิดขอบขวา (clip ตาม tile border radius)
   /// - Completing: loading spinner
   /// - Failed: ปุ่มลองใหม่เต็มความสูง
   /// - Completed: chevron (กดเข้า TaskDetailScreen)
-  Widget _buildTrailing(BuildContext context, WidgetRef ref) {
+  Widget _buildTrailing(
+    BuildContext context,
+    WidgetRef ref, {
+    required bool hasUnseenUpdate,
+  }) {
     switch (resident.status) {
       case BatchResidentStatus.pending:
         // ถ้า task มี status แล้ว (problem/refer/postpone) → แสดง chevron เหมือน completed
@@ -524,6 +585,37 @@ class _ResidentTile extends ConsumerWidget {
             ),
           );
         }
+        // ถ้ามีอัพเดตที่ยังไม่อ่าน → ซ่อนปุ่มถ่ายรูป/ดำเนินการ
+        // แสดง "อ่านอัพเดต" สีแดงพาสเทล → บังคับ user เข้าไปอ่านรายละเอียดก่อน
+        // เมื่ออ่านแล้ว (mark seen) จะกลับมาเห็นปุ่มถ่ายรูป/ดำเนินการ
+        if (hasUnseenUpdate) {
+          return GestureDetector(
+            onTap: () => _navigateToDetail(context, ref),
+            child: Container(
+              color: AppColors.pastelRed,
+              padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+              alignment: Alignment.center,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  HugeIcon(
+                    icon: HugeIcons.strokeRoundedRefresh,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                  AppSpacing.horizontalGapXs,
+                  Text(
+                    'อ่านอัพเดต',
+                    style: AppTypography.caption.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
         // ตรวจว่า task ต้องถ่ายรูปหรือไม่
         // ถ้าไม่ต้องถ่ายรูป (เช่น assessment-only) → แสดงปุ่ม "ประเมิน" นำไป TaskDetailScreen
         final task = resident.task;
@@ -534,7 +626,7 @@ class _ResidentTile extends ConsumerWidget {
         if (!requiresPhoto) {
           // ปุ่ม "ประเมิน" — นำไปหน้า detail เพื่อกรอก assessment
           return GestureDetector(
-            onTap: () => _navigateToDetail(context),
+            onTap: () => _navigateToDetail(context, ref),
             child: Container(
               color: AppColors.primary,
               padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
@@ -638,13 +730,20 @@ class _ResidentTile extends ConsumerWidget {
   }
 
   /// กด card → เข้า TaskDetailScreen ของผู้พักคนนั้นเสมอ
-  void _navigateToDetail(BuildContext context) {
+  /// Invalidate batch provider หลัง pop เพื่อให้ unseen badge หายหลัง mark seen
+  /// (mark seen เกิดที่ backend เมื่อเปิด detail → refetch ต้องเห็น user ใน historySeenUsers)
+  void _navigateToDetail(BuildContext context, [WidgetRef? ref]) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => TaskDetailScreen(task: resident.task),
       ),
-    );
+    ).then((_) {
+      // Invalidate เฉพาะเมื่อ widget ยัง mounted — กัน error ถ้า user back เร็วมาก
+      if (ref != null && context.mounted) {
+        ref.invalidate(batchTaskProvider(groupKey));
+      }
+    });
   }
 
   /// Flow: กดถ่ายรูป → camera → preview → difficulty rating → upload + complete

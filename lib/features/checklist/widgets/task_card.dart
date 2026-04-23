@@ -52,7 +52,7 @@ class TaskCard extends StatelessWidget {
               color: flat ? Colors.transparent : AppColors.surface,
               borderRadius: AppRadius.mediumRadius,
               boxShadow: flat ? null : [AppShadows.subtle],
-              border: flat ? Border(bottom: BorderSide(color: AppColors.alternate.withValues(alpha: 0.5))) : _getBorder(),
+              border: flat ? Border(bottom: BorderSide(color: AppColors.alternate.withValues(alpha: 0.5))) : _getBorder(showUnseen: showUnseenBadge),
             ),
             // ใช้ Stack เฉพาะเมื่อมี decorative icon เพื่อลด widget tree depth
             child: showDecorativeIcon
@@ -227,6 +227,13 @@ class TaskCard extends StatelessWidget {
                   ],
                 ),
               ],
+              // Completion note — แสดงหมายเหตุกรณีทำเสร็จแล้ว (ไม่ใช่ปัญหา)
+              // ใช้ styling กลางๆ (ไม่ใช่สีแดงเหมือนปัญหา) เพราะเป็นข้อมูลเสริม
+              // เช่น user ระบุว่างาน modify ไปจาก instruction เพราะอะไร
+              if (task.isDone && !task.isProblem && task.descript != null && task.descript!.isNotEmpty) ...[
+                AppSpacing.verticalGapXs,
+                _buildCompletionNote(),
+              ],
               // Problem type badge — ใช้ _buildProblemTypeBadge() แทน Builder
               if (showProblemNote && task.isProblem && task.problemType != null) ...[
                 AppSpacing.verticalGapSm,
@@ -282,27 +289,96 @@ class TaskCard extends StatelessWidget {
   }
 
   /// Badge แสดงว่ามีอัพเดตที่ยังไม่เห็น
+  /// UX: ข้อความ "อัพเดต" เต็มคำ (เดิม "อัพ" กำกวม อาจอ่านเป็น up/upload)
+  /// + leading icon refresh — ช่วย color-blind users และเตะตาขึ้นในลิสต์
+  /// + font 12px bold — glanceable ในไฟแดด/หลอดฟลูออเรสเซนต์ขาวของ nursing home
   Widget _buildUnseenBadge() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: AppColors.tertiary, // สีชมพู (customColor1 ใน FlutterFlow)
-        borderRadius: BorderRadius.circular(10),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Text(
-        'อัพ',
-        style: AppTypography.caption.copyWith(
-          color: Colors.white,
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
+    return Semantics(
+      label: 'รายการนี้มีอัพเดตใหม่ที่คุณยังไม่เห็น',
+      container: true,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: AppColors.pastelRed, // แดงพาสเทล — เตะตาชัดกว่าชมพู แต่ไม่ alarm เกินไป
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.2),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            HugeIcon(
+              icon: HugeIcons.strokeRoundedRefresh,
+              size: 11,
+              color: Colors.white,
+            ),
+            const SizedBox(width: 3),
+            Text(
+              'อัพเดต',
+              style: AppTypography.caption.copyWith(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                height: 1.0,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// หมายเหตุกรณีทำเสร็จแล้ว (ไม่ใช่ปัญหา)
+  /// ใช้ styling กลางๆ — สีขอบเป็น neutral ไม่ใช่สีแดงเหมือน problem
+  /// แยก component จาก problem description เพื่อให้ user แยกแยะได้ทันที
+  Widget _buildCompletionNote() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.inputBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              HugeIcon(
+                icon: HugeIcons.strokeRoundedNote,
+                size: 14,
+                color: AppColors.secondaryText,
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  task.descript!,
+                  style: AppTypography.caption.copyWith(color: AppColors.textPrimary),
+                ),
+              ),
+            ],
+          ),
+          if (task.completedByNickname != null) ...[
+            const SizedBox(height: 2),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                '- ${task.completedByNickname}',
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.secondaryText,
+                  fontSize: 10,
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -334,12 +410,20 @@ class TaskCard extends StatelessWidget {
     );
   }
 
-  Border? _getBorder() {
+  /// Border ของ card — priority:
+  /// 1. isDone → เขียว (2px)
+  /// 2. isProblem → แดง (2px)
+  /// 3. showUnseen → แดงพาสเทลเฉพาะขอบซ้าย (4px accent) — ทำให้ทั้ง card รู้สึก "ใหม่"
+  /// 4. default → null (ไม่มีขอบ)
+  Border? _getBorder({bool showUnseen = false}) {
     if (task.isDone) {
       return Border.all(color: AppColors.tagPassedBg, width: 2);
     }
     if (task.isProblem) {
       return Border.all(color: AppColors.tagFailedBg, width: 2);
+    }
+    if (showUnseen) {
+      return Border(left: BorderSide(color: AppColors.pastelRed, width: 4));
     }
     return null;
   }

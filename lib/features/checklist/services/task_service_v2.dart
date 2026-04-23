@@ -237,6 +237,8 @@ class TaskServiceV2 {
   /// [difficultyScore] - คะแนนความยากของงาน 1-10 (optional)
   /// [difficultyRatedBy] - UUID ของ user ที่ให้คะแนน (optional, ถ้าไม่ระบุจะใช้ userId)
   /// [skipPointsRecording] - ข้าม recording points (ใช้สำหรับ batch mode ที่จัดการ points เอง)
+  /// [description] - หมายเหตุเพิ่มเติม (optional) ใช้อธิบายกรณีทำไม่ตรง instruction
+  ///   บันทึกลง column `Descript` (ใช้ column เดียวกับกรณีติดปัญหา แยกด้วย status)
   Future<TaskCompleteResult> markTaskComplete(
     int logId,
     String userId, {
@@ -245,6 +247,7 @@ class TaskServiceV2 {
     int? difficultyScore,
     String? difficultyRatedBy,
     bool skipPointsRecording = false,
+    String? description,
   }) async {
     try {
       // First-write-wins: UPDATE เฉพาะเมื่อ status ยังเป็น null (pending)
@@ -260,6 +263,9 @@ class TaskServiceV2 {
             if (difficultyScore != null) 'difficulty_score': difficultyScore,
             if (difficultyScore != null)
               'difficulty_rated_by': difficultyRatedBy ?? userId,
+            // บันทึกหมายเหตุ (ถ้ามี) ลง column เดียวกับกรณีติดปัญหา
+            if (description != null && description.isNotEmpty)
+              'Descript': description,
           })
           .eq('id', logId)
           .isFilter('status', null) // เฉพาะ task ที่ยังไม่ได้ทำ (first-write-wins)

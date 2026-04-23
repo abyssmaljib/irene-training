@@ -12,6 +12,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/buttons.dart';
 import '../../../core/widgets/confirm_dialog.dart';
 import '../../../core/widgets/irene_app_bar.dart';
+import '../../../core/widgets/input_fields.dart';
 import '../../../core/widgets/network_image.dart';
 import '../../medicine/models/medicine_summary.dart';
 import '../../medicine/screens/photo_preview_screen.dart';
@@ -85,6 +86,12 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
   List<AssessmentRating> _assessmentRatings = [];
   bool _assessmentComplete = false; // true เมื่อประเมินครบทุกหัวข้อ
 
+  // หมายเหตุเพิ่มเติม (optional) — inline section ในหน้า task detail
+  // user พิมพ์ได้ตลอดก่อนกดเสร็จ/ติดปัญหา (ไม่ต้องรอ dialog)
+  // เมื่อกดเสร็จ → save ลง Descript (กับ status='complete')
+  // เมื่อกดติดปัญหา → ProblemInputSheet มี description ของตัวเอง (ไม่ใช้ _noteController)
+  final _noteController = TextEditingController();
+
   // Realtime subscription
   RealtimeChannel? _taskChannel;
 
@@ -101,6 +108,10 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     // เรียกครั้งเดียวตอน init — realtime refresh จะเรียกซ้ำเมื่อมี DB update
     _enrichSampleImageCreator();
 
+    // Mark ว่า user เห็น update ของ task แล้ว (ถ้ามี unseen update)
+    // ไม่ block UI — fire and forget
+    _markAsSeenIfNeeded();
+
     // ถ้าเป็นงานจัดยา ให้โหลดข้อมูลยา
     if (_task.taskType == 'จัดยา' && _task.residentId != null) {
       _loadMedicines();
@@ -111,6 +122,34 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
 
     // Prefetch assessment subjects ล่วงหน้า เพื่อไม่ต้องรอตอนกด complete
     _prefetchAssessmentSubjects();
+  }
+
+  /// Mark task ว่า user เห็น update แล้ว (ถ้ามี unseen update)
+  /// เงื่อนไข:
+  /// - มี historySeenId (ต้องมี update ล่าสุด — ถ้า NULL = task ไม่เคยถูก edit)
+  /// - user ยังไม่อยู่ใน historySeenUsers (ยังไม่เคยเห็น)
+  /// - ไม่ใช่งานจัดยา (ไม่มี unseen concept)
+  Future<void> _markAsSeenIfNeeded() async {
+    final userId = ref.read(currentUserIdProvider);
+    if (userId == null) return;
+    if (_task.historySeenId == null) return;
+    if (_task.taskType == 'จัดยา') return;
+    if (_task.historySeenUsers.contains(userId)) return;
+
+    await TaskService.instance.markTaskAsSeen(
+      historySeenId: _task.historySeenId!,
+      userId: userId,
+    );
+
+    // Update local state ทันที — ไม่ต้อง refetch
+    // (badge หายจาก UI นี้, list view parent จะ refetch ผ่าน ref.invalidate ตอน pop)
+    if (mounted) {
+      setState(() {
+        _task = _task.copyWith(
+          historySeenUsers: [..._task.historySeenUsers, userId],
+        );
+      });
+    }
   }
 
   /// โหลดหัวข้อประเมินล่วงหน้าจาก TaskType_Report_Subject
@@ -133,6 +172,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
   @override
   void dispose() {
     _measurementController.dispose();
+    _noteController.dispose();
     _unsubscribeFromTaskUpdates();
     super.dispose();
   }
@@ -579,6 +619,15 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         AppSpacing.verticalGapMd,
       ],
 
+      // Note input section (หมายเหตุเพิ่มเติม, optional)
+      // ใช้สำหรับอธิบายว่าเกิดอะไรขึ้นระหว่างทำงาน — เช่น ทำไม่ตรง instruction
+      // จะถูกบันทึกลง Descript เมื่อกด "เสร็จแล้ว" (ถ้ามีข้อความ)
+      // กรณีกด "ติดปัญหา" → ใช้ description จาก ProblemInputSheet แทน
+      if (!_task.isDone) ...[
+        AppSpacing.verticalGapMd,
+        _buildNoteSection(),
+      ],
+
       // Co-worker picker (แสดงเฉพาะ task ที่ยังไม่ done — ให้เลือกเพื่อนร่วมเวรเพื่อหาร point)
       if (!_task.isDone) ...[
         AppSpacing.verticalGapMd,
@@ -596,6 +645,25 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
   }
 
   Widget _buildAppBar() {
+    // Title 2 บรรทัด: บรรทัดบน = wayfinding context (เวลา · resident · zone)
+    //                  บรรทัดล่าง = static "รายละเอียดงาน"
+    // ช่วย user ที่เปิดหลาย task แยกได้ทันทีว่าอยู่หน้าไหน
+    final time = _task.expectedDateTime != null
+        ? DateFormat('HH:mm').format(_task.expectedDateTime!.toLocal())
+        : null;
+    final contextParts = <String>[
+      if (time != null) '$time น.',
+      if (_task.residentName != null) _task.residentName!,
+    ];
+    final contextLine = contextParts.join(' · ');
+
+    // แสดงปุ่ม ⋯ options ใน AppBar เมื่อ task ยัง active
+    // (task ที่ isDone/isProblem/isPostponed/isReferred จะแสดงปุ่ม cancel แทน → ไม่ต้องมี options)
+    final showOptions = !(_task.isDone ||
+        _task.isProblem ||
+        _task.isPostponed ||
+        _task.isReferred);
+
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: AppSpacing.sm,
@@ -609,17 +677,53 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         children: [
           IconButton(
             onPressed: () => Navigator.pop(context),
-            icon: HugeIcon(icon: HugeIcons.strokeRoundedArrowLeft01),
+            tooltip: 'ย้อนกลับ',
+            icon: Semantics(
+              label: 'ย้อนกลับ',
+              button: true,
+              child: HugeIcon(icon: HugeIcons.strokeRoundedArrowLeft01),
+            ),
           ),
           Expanded(
-            child: Text(
-              'รายละเอียดงาน',
-              style: AppTypography.title,
-              textAlign: TextAlign.center,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                if (contextLine.isNotEmpty)
+                  Text(
+                    contextLine,
+                    style: AppTypography.title.copyWith(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                Text(
+                  'รายละเอียดงาน',
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.secondaryText,
+                  ),
+                ),
+              ],
             ),
           ),
           // Status badge
           _buildStatusBadge(),
+          // Options menu (⋯) — ย้ายมาจาก bottom action row เพื่อเปิดพื้นที่ให้ primary action
+          if (showOptions)
+            IconButton(
+              onPressed: () => setState(() => _isOptionOpen = true),
+              tooltip: 'ตัวเลือกเพิ่มเติม',
+              icon: Semantics(
+                label: 'ตัวเลือกเพิ่มเติม เช่น แจ้งติดปัญหา ไม่อยู่ศูนย์',
+                button: true,
+                child: HugeIcon(
+                  icon: HugeIcons.strokeRoundedMoreHorizontal,
+                  color: AppColors.secondaryText,
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -681,19 +785,40 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     );
   }
 
+  /// Banner บอกว่ามีอัพเดตที่ user ยังไม่เห็น — ใช้แดงพาสเทล match กับ task card
+  /// UX: วาง full-width ด้านบนสุด + icon refresh + ข้อความชัดเจน
+  /// ไม่ใช้ "จ้า" (casual เกินไปสำหรับ clinical context)
   Widget _buildUnseenBadge() {
-    return Container(
-      margin: EdgeInsets.only(bottom: AppSpacing.sm),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: AppColors.tertiary,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        'มีอัพเดตจ้า',
-        style: AppTypography.caption.copyWith(
-          color: Colors.white,
-          fontWeight: FontWeight.w600,
+    return Semantics(
+      label: 'งานนี้มีข้อมูลอัพเดตใหม่ที่คุณยังไม่เห็น',
+      container: true,
+      child: Container(
+        width: double.infinity,
+        margin: EdgeInsets.only(bottom: AppSpacing.sm),
+        padding: EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
+        decoration: BoxDecoration(
+          color: AppColors.pastelRed,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            HugeIcon(
+              icon: HugeIcons.strokeRoundedRefresh,
+              size: 16,
+              color: Colors.white,
+            ),
+            SizedBox(width: AppSpacing.sm),
+            Text(
+              'มีอัพเดตใหม่',
+              style: AppTypography.body.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -711,6 +836,15 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       spacing: AppSpacing.sm,
       runSpacing: AppSpacing.sm,
       children: [
+        // Expected time — ตัวแรก + emphasis เพราะสำคัญสุดใน clinical workflow
+        if (_task.expectedDateTime != null)
+          _buildBadge(
+            icon: HugeIcons.strokeRoundedClock01,
+            text: DateFormat('HH:mm').format(_task.expectedDateTime!.toLocal()),
+            color: AppColors.tagPendingText,
+            emphasis: true,
+          ),
+
         // Resident name
         if (_task.residentName != null)
           _buildBadge(
@@ -727,14 +861,6 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
             color: AppColors.secondary,
           ),
 
-        // Expected time
-        if (_task.expectedDateTime != null)
-          _buildBadge(
-            icon: HugeIcons.strokeRoundedClock01,
-            text: DateFormat('HH:mm').format(_task.expectedDateTime!.toLocal()),
-            color: AppColors.tagPendingText,
-          ),
-
         // Time block
         if (_task.timeBlock != null)
           _buildBadge(
@@ -743,8 +869,11 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
             color: AppColors.secondaryText,
           ),
 
-        // Completed by
-        if (_task.completedByNickname != null && _task.completedAt != null)
+        // Completed by — แสดงเฉพาะกรณีเสร็จแล้วแบบพิเศษ (problem/postpone/refer)
+        // ถ้า isDone ปกติ → ซ้ำกับ StatusBadge "เสร็จแล้ว" ใน AppBar แล้ว
+        if (_task.completedByNickname != null &&
+            _task.completedAt != null &&
+            !_task.isDone)
           _buildBadge(
             icon: HugeIcons.strokeRoundedCheckmarkCircle02,
             text:
@@ -873,27 +1002,38 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     }
   }
 
+  /// InfoBadge — [emphasis] ใช้กับ badge ที่มี visual priority สูง (เช่น เวลา)
+  /// Emphasis mode: bg เข้มขึ้น, font ใหญ่ขึ้น, w700 — เตะตาในกลุ่ม badge อื่น
   Widget _buildBadge({
     required dynamic icon,
     required String text,
     required Color color,
+    bool emphasis = false,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: EdgeInsets.symmetric(
+        horizontal: emphasis ? 12 : 10,
+        vertical: emphasis ? 8 : 6,
+      ),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: color.withValues(alpha: emphasis ? 0.16 : 0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          HugeIcon(icon: icon, size: AppIconSize.sm, color: color),
-          const SizedBox(width: 4),
+          HugeIcon(
+            icon: icon,
+            size: emphasis ? AppIconSize.md : AppIconSize.sm,
+            color: color,
+          ),
+          SizedBox(width: emphasis ? 6 : 4),
           Text(
             text,
             style: AppTypography.caption.copyWith(
               color: color,
-              fontWeight: FontWeight.w500,
+              fontWeight: emphasis ? FontWeight.w700 : FontWeight.w500,
+              fontSize: emphasis ? 14 : null,
             ),
           ),
         ],
@@ -1641,17 +1781,24 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                       ),
                     ],
                   ),
-                  // Avatar ผู้สร้างสรรค์ - ใช้ IreneNetworkAvatar ที่มี timeout และ retry
-                  child: IreneNetworkAvatar(
-                    imageUrl: _task.sampleImageCreatorPhotoUrl,
-                    radius: 18,
-                    backgroundColor: const Color(0xFFFDE68A), // amber-200
-                    fallbackIcon: HugeIcon(
-                      icon: HugeIcons.strokeRoundedUser,
-                      size: 18,
-                      color: const Color(0xFFB45309), // amber-700
-                    ),
-                  ),
+                  // Avatar ผู้สร้างสรรค์ — แสดง shimmer skeleton ขณะ enrich ยังไม่เสร็จ
+                  // (view ส่ง nickname/photo_url เป็น NULL เพื่อ performance ของ list view
+                  // แล้ว _enrichSampleImageCreator ค่อย fetch มา set — ระหว่างนั้นโชว์ skeleton)
+                  child: _task.sampleImageCreatorNickname == null
+                      ? const ShimmerWrapper(
+                          isLoading: true,
+                          child: ShimmerBox.circle(size: 36),
+                        )
+                      : IreneNetworkAvatar(
+                          imageUrl: _task.sampleImageCreatorPhotoUrl,
+                          radius: 18,
+                          backgroundColor: const Color(0xFFFDE68A), // amber-200
+                          fallbackIcon: HugeIcon(
+                            icon: HugeIcons.strokeRoundedUser,
+                            size: 18,
+                            color: const Color(0xFFB45309), // amber-700
+                          ),
+                        ),
                 ),
                 AppSpacing.horizontalGapMd,
                 Expanded(
@@ -1679,14 +1826,22 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                         ],
                       ),
                       const SizedBox(height: 2),
-                      Text(
-                        _task.sampleImageCreatorNickname ?? 'ไม่ระบุ',
-                        style: AppTypography.subtitle.copyWith(
-                          color: const Color(0xFF92400E), // amber-800
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
+                      // Nickname — ถ้ายัง enrich ไม่เสร็จ โชว์ skeleton bar แทน "ไม่ระบุ"
+                      // (กัน flash "ไม่ระบุ" ชั่ววินาทีก่อน data มา → สับสน)
+                      if (_task.sampleImageCreatorNickname == null)
+                        const ShimmerWrapper(
+                          isLoading: true,
+                          child: ShimmerBox(width: 120, height: 18),
+                        )
+                      else
+                        Text(
+                          _task.sampleImageCreatorNickname!,
+                          style: AppTypography.subtitle.copyWith(
+                            color: const Color(0xFF92400E), // amber-800
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ),
@@ -2186,6 +2341,57 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     );
   }
 
+  /// Inline section สำหรับพิมพ์หมายเหตุเพิ่มเติม (optional)
+  /// user กรอกได้ตลอดก่อนกด "เสร็จแล้ว" / "ติดปัญหา"
+  /// กด "เสร็จแล้ว" → save ลง Descript (ถ้ามีข้อความ)
+  /// กด "ติดปัญหา" → ProblemInputSheet จัดการ description ของตัวเอง (ช่องนี้ไม่ถูกใช้)
+  Widget _buildNoteSection() {
+    return Container(
+      padding: EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.inputBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              HugeIcon(
+                icon: HugeIcons.strokeRoundedNote,
+                color: AppColors.secondaryText,
+                size: AppIconSize.md,
+              ),
+              AppSpacing.horizontalGapSm,
+              Text(
+                'หมายเหตุเพิ่มเติม',
+                style: AppTypography.body.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              AppSpacing.horizontalGapXs,
+              Text(
+                '(ไม่บังคับ)',
+                style: AppTypography.bodySmall.copyWith(
+                  color: AppColors.secondaryText,
+                ),
+              ),
+            ],
+          ),
+          AppSpacing.verticalGapSm,
+          AppTextField(
+            controller: _noteController,
+            hintText: 'เช่น ทำไม่ครบตาม instruction เพราะ...',
+            maxLines: 3,
+            textInputAction: TextInputAction.newline,
+            fillColor: AppColors.background,
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildPostponeInfo() {
     return Container(
       padding: EdgeInsets.all(AppSpacing.md),
@@ -2282,43 +2488,51 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       mainAxisSize: MainAxisSize.min,
       children: [
         // ป้ายเตือนสีแดง (แสดงเมื่อถ่ายรูปแล้ว และยังไม่ได้กดเรียบร้อย)
+        // UX: ย่อรูป peep2 100→56px + padding เล็กลง — เหลือพื้นที่ให้ปุ่มหลักเห็นชัด
         if (_showCompleteButton && _hasConfirmImage)
           Padding(
             padding: EdgeInsets.only(bottom: AppSpacing.sm),
             child: Container(
               width: double.infinity,
-              padding: EdgeInsets.all(AppSpacing.md),
+              padding: EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm,
+              ),
               decoration: BoxDecoration(
-                color: AppColors.error.withValues(alpha: 0.1),
+                color: AppColors.error.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: AppColors.error.withValues(alpha: 0.3),
+                  color: AppColors.error.withValues(alpha: 0.25),
                 ),
               ),
               child: Row(
                 children: [
-                  // รูปแอบมอง
+                  // รูปแอบมอง — ย่อจาก 100 เหลือ 56 ไม่บังพื้นที่
                   Image.asset(
                     'assets/images/peep2.webp',
-                    width: 100,
-                    height: 100,
+                    width: 56,
+                    height: 56,
                   ),
+                  SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
                           'ตรวจสอบความถูกต้องก่อนส่งรายงาน',
                           style: AppTypography.body.copyWith(
                             color: AppColors.error,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w700,
+                            height: 1.2,
                           ),
                         ),
+                        SizedBox(height: 2),
                         Text(
                           'รูป ชื่อผู้ทำ และเวลา จะถูกส่งไปไลน์กลุ่มญาติ',
                           style: AppTypography.caption.copyWith(
-                            color: AppColors.error.withValues(alpha: 0.8),
-                            fontSize: 13,
+                            color: AppColors.error.withValues(alpha: 0.85),
+                            height: 1.3,
                           ),
                         ),
                       ],
@@ -2330,31 +2544,14 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           ),
 
         // Action buttons row
+        // Options button (⋯) ย้ายไป AppBar แล้ว — ให้ primary action ใช้พื้นที่เต็ม
         Row(
           children: [
-            // Options button (?)
-            SizedBox(
-              width: 48,
-              height: 48,
-              child: OutlinedButton(
-                onPressed: () => setState(() => _isOptionOpen = true),
-                style: OutlinedButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  side: BorderSide(color: AppColors.inputBorder),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: HugeIcon(icon: HugeIcons.strokeRoundedMoreHorizontal, color: AppColors.secondaryText),
-              ),
-            ),
-            AppSpacing.horizontalGapSm,
-
             // Camera button (ถ้าต้องถ่ายรูป - สำหรับงานปกติ)
             if (_showCameraButton)
               Expanded(
                 child: SizedBox(
-                  height: 48,
+                  height: 56,
                   child: ElevatedButton.icon(
                     onPressed: _isLoading ? null : _handleTakePhoto,
                     style: ElevatedButton.styleFrom(
@@ -2380,14 +2577,15 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
               ),
 
             // Camera button (สำหรับ mustCompleteByPost - ต้องถ่ายรูปก่อนโพส)
+            // ใช้ secondary (ฟ้า) แยกจาก primary — บอกว่าเป็นขั้นตอนก่อน post
             if (_showCameraForPostButton)
               Expanded(
                 child: SizedBox(
-                  height: 48,
+                  height: 56,
                   child: ElevatedButton.icon(
                     onPressed: _isLoading ? null : _handleTakePhoto,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.tertiary,
+                      backgroundColor: AppColors.secondary,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -2413,7 +2611,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
             if (_showCompleteButton)
               Expanded(
                 child: SizedBox(
-                  height: 48,
+                  height: 56,
                   child: ElevatedButton.icon(
                     onPressed: _isLoading
                         ? null
@@ -2460,14 +2658,15 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
               ),
 
             // Complete by post button (สำหรับ task ที่ต้องสำเร็จด้วยโพส)
+            // ใช้ primary (teal) เหมือนปุ่มเรียบร้อย — เป็น action จบงาน
             if (_showCompleteByPostButton)
               Expanded(
                 child: SizedBox(
-                  height: 48,
+                  height: 56,
                   child: ElevatedButton.icon(
                     onPressed: _isLoading ? null : _handleCompleteByPost,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.tertiary,
+                      backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -2493,8 +2692,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           children: [
             // Back button (<)
             SizedBox(
-              width: 48,
-              height: 48,
+              width: 56,
+              height: 56,
               child: OutlinedButton(
                 onPressed: () => setState(() => _isOptionOpen = false),
                 style: OutlinedButton.styleFrom(
@@ -2512,7 +2711,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
             // Problem button
             Expanded(
               child: SizedBox(
-                height: 48,
+                height: 56,
                 child: ElevatedButton.icon(
                   onPressed: _isLoading ? null : _handleProblem,
                   style: ElevatedButton.styleFrom(
@@ -2534,7 +2733,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         // Refer button (ปุ่มเลื่อนวันพรุ่งนี้ถูกลบออก - ให้หัวหน้าเวรตัดสินใจแทน)
         SizedBox(
           width: double.infinity,
-          height: 48,
+          height: 56,
           child: OutlinedButton.icon(
             onPressed: _isLoading ? null : _handleRefer,
             style: OutlinedButton.styleFrom(
@@ -2640,6 +2839,11 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     // คะแนนความยากที่ user ให้ (null = ข้าม → ใช้ default 5)
     final difficultyScore = difficultyResult.score;
 
+    // หมายเหตุเพิ่มเติม (optional) จาก inline note section ในหน้า task detail
+    // ถ้า user ไม่กรอกจะเป็น null และจะไม่ถูก update ลง DB
+    final noteText = _noteController.text.trim();
+    final completionNote = noteText.isEmpty ? null : noteText;
+
     // === Assessment Rating (ประเมินสุขภาพ resident) ===
     // ใช้ _assessmentRatings จาก inline section ที่ user กรอกไว้แล้ว (ไม่มี dialog)
     final assessmentRatings =
@@ -2667,6 +2871,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       difficultyScore: difficultyScore, // ต้องมีค่าเสมอ (ไม่มีปุ่มข้าม)
       difficultyRatedBy: userId,
       difficultyRaterNickname: userNickname,
+      // รวม note ลง optimistic state เพื่อให้ UI แสดงทันที (ถ้ามี)
+      descript: completionNote,
     );
 
     // อัพเดต local state ทันที (_isLoading ถูก set true แล้วตั้งแต่ต้น method)
@@ -2693,6 +2899,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       difficultyScore: difficultyScore, // null = ใช้ default ใน database
       difficultyRatedBy: userId,
       skipPointsRecording: hasCoWorkers,
+      description: completionNote, // หมายเหตุเพิ่มเติม (optional)
     );
 
     if (completeResult.success) {

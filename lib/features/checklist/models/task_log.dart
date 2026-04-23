@@ -69,6 +69,10 @@ class TaskLog {
   // History seen users (รายชื่อ user ที่เคยเห็น task นี้แล้ว)
   final List<String> historySeenUsers;
 
+  // ID ของ A_Task_History_Seen latest record — ใช้ insert ลง user_task_seen
+  // เมื่อ user เข้าอ่าน task detail เพื่อ mark ว่าเห็น update แล้ว
+  final int? historySeenId;
+
   // Resident special status (refer = ส่งต่อ/ย้ายออก)
   final String? residentSpecialStatus;
 
@@ -150,6 +154,7 @@ class TaskLog {
     this.recurringDates = const [],
     this.isOneTime = false,
     this.historySeenUsers = const [],
+    this.historySeenId,
     this.residentSpecialStatus,
     this.residentUnderlyingDiseaseList,
     this.creatorId,
@@ -218,6 +223,7 @@ class TaskLog {
       recurringDates: _parseIntList(json['recurring_dates']),
       isOneTime: json['is_one_time'] == true,
       historySeenUsers: _parseStringList(json['history_seen_users']),
+      historySeenId: json['history_seen_id'] as int?,
       residentSpecialStatus: json['s_special_status'] as String?,
       residentUnderlyingDiseaseList: _parseUnderlyingDiseaseList(json['resident_underlying_disease_list']),
       creatorId: json['creator_id'] as String?,
@@ -430,6 +436,7 @@ class TaskLog {
     List<int>? recurringDates,
     bool? isOneTime,
     List<String>? historySeenUsers,
+    int? historySeenId,
     String? residentSpecialStatus,
     String? residentUnderlyingDiseaseList,
     String? creatorId,
@@ -503,6 +510,7 @@ class TaskLog {
       recurringDates: recurringDates ?? this.recurringDates,
       isOneTime: isOneTime ?? this.isOneTime,
       historySeenUsers: historySeenUsers ?? this.historySeenUsers,
+      historySeenId: historySeenId ?? this.historySeenId,
       residentSpecialStatus: residentSpecialStatus ?? this.residentSpecialStatus,
       residentUnderlyingDiseaseList: residentUnderlyingDiseaseList ?? this.residentUnderlyingDiseaseList,
       creatorId: creatorId ?? this.creatorId,

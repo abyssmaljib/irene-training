@@ -283,6 +283,8 @@ class TaskService {
   /// [difficultyScore] - คะแนนความยากของงาน 1-10 (optional)
   /// [difficultyRatedBy] - UUID ของ user ที่ให้คะแนน (optional, ถ้าไม่ระบุจะใช้ userId)
   /// [skipPointsRecording] - ข้าม recording points (ใช้สำหรับ batch mode ที่จัดการ points เอง)
+  /// [description] - หมายเหตุเพิ่มเติม (optional) ใช้อธิบายกรณีทำไม่ตรง instruction
+  ///   บันทึกลง column `Descript` (ใช้ column เดียวกับกรณีติดปัญหา แยกด้วย status)
   Future<TaskCompleteResult> markTaskComplete(
     int logId,
     String userId, {
@@ -291,6 +293,7 @@ class TaskService {
     int? difficultyScore,
     String? difficultyRatedBy,
     bool skipPointsRecording = false,
+    String? description,
   }) async {
     try {
       // First-write-wins: UPDATE เฉพาะเมื่อ status ยังเป็น null (pending)
@@ -307,6 +310,9 @@ class TaskService {
             if (difficultyScore != null) 'difficulty_score': difficultyScore,
             if (difficultyScore != null)
               'difficulty_rated_by': difficultyRatedBy ?? userId,
+            // บันทึกหมายเหตุ (ถ้ามี) ลง column เดียวกับกรณีติดปัญหา
+            if (description != null && description.isNotEmpty)
+              'Descript': description,
           })
           .eq('id', logId)
           .isFilter('status', null) // เฉพาะ task ที่ยังไม่ได้ทำ (first-write-wins)
@@ -614,6 +620,45 @@ class TaskService {
     } catch (e) {
       debugPrint('getUserBasicInfo error: $e');
       return null;
+    }
+  }
+
+  /// Mark ว่า user เห็น update ของ task แล้ว
+  /// Insert row ลง user_task_seen (user_id, Task_seen_id) — idempotent
+  /// RLS: active_insert_own_subquery + insert_own_records → user insert ของตัวเองได้เสมอ
+  ///
+  /// [historySeenId] = A_Task_History_Seen.id (จาก view column 'history_seen_id')
+  /// [userId] = auth.uid() ของ user ปัจจุบัน
+  ///
+  /// ไม่ throw error ถ้าล้มเหลว — แค่ log debug (feature non-critical)
+  Future<void> markTaskAsSeen({
+    required int historySeenId,
+    required String userId,
+  }) async {
+    try {
+      // Check ก่อนว่า row (user_id, Task_seen_id) นี้มีอยู่แล้วหรือยัง
+      // กัน duplicate insert (schema ไม่มี unique constraint)
+      final existing = await _supabase
+          .from('user_task_seen')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('Task_seen_id', historySeenId)
+          .maybeSingle();
+
+      if (existing != null) {
+        // มีอยู่แล้ว — ข้าม (user เคยเห็น update นี้แล้ว)
+        return;
+      }
+
+      await _supabase.from('user_task_seen').insert({
+        'user_id': userId,
+        'Task_seen_id': historySeenId,
+      });
+
+      debugPrint('markTaskAsSeen: marked seen for user=$userId, seenId=$historySeenId');
+    } catch (e) {
+      // Non-critical — แค่ log ไม่ต้อง toast ให้ user รู้
+      debugPrint('markTaskAsSeen error: $e');
     }
   }
 
