@@ -110,11 +110,6 @@ class TaskFilterDrawer extends ConsumerWidget {
 
             const Divider(height: 32),
 
-            // Role Filter Section (กรองตามตำแหน่ง - ใช้บ่อย)
-            _RoleFilterSection(),
-
-            const Divider(height: 32),
-
             // Task Type Filter Section
             _TaskTypeFilterSection(),
 
@@ -424,123 +419,6 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-/// Section สำหรับเลือก filter ตามตำแหน่ง
-class _RoleFilterSection extends ConsumerWidget {
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final allRolesAsync = ref.watch(allSystemRolesProvider);
-    final selectedRoleId = ref.watch(selectedRoleFilterProvider);
-    final userRoleAsync = ref.watch(currentUserSystemRoleProvider);
-    final pendingPerRole = ref.watch(pendingTasksPerRoleProvider);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: EdgeInsets.all(AppSpacing.md),
-          child: Text(
-            'กรองตามตำแหน่ง',
-            style: AppTypography.title.copyWith(
-              color: AppColors.secondaryText,
-            ),
-          ),
-        ),
-        allRolesAsync.when(
-          data: (allRoles) {
-            final userRole = userRoleAsync.valueOrNull;
-            if (userRole == null) {
-              return Padding(
-                padding: EdgeInsets.all(AppSpacing.md),
-                child: Column(
-                  children: [
-                    Image.asset(
-                      'assets/images/not_found.webp',
-                      width: 80,
-                      height: 80,
-                    ),
-                    AppSpacing.verticalGapSm,
-                    Text(
-                      'ไม่พบข้อมูลตำแหน่ง',
-                      style: AppTypography.body.copyWith(color: AppColors.secondaryText),
-                    ),
-                  ],
-                ),
-              );
-            }
-
-            // สร้างรายการ role ที่ user มีสิทธิ์ดู
-            // 1. role ของตัวเอง
-            // 2. role ใน relatedRoleIds
-            final visibleRoleIds = <int>{userRole.id, ...userRole.relatedRoleIds};
-            final visibleRoles = allRoles
-                .where((r) => visibleRoleIds.contains(r.id))
-                .toList();
-
-            // เรียงลำดับให้ role ของตัวเองอยู่บนสุด
-            visibleRoles.sort((a, b) {
-              if (a.id == userRole.id) return -1;
-              if (b.id == userRole.id) return 1;
-              return a.name.compareTo(b.name);
-            });
-
-            // คำนวณจำนวนงานที่ไม่ระบุ role (ทุกคนทำได้)
-            final unassignedCount = pendingPerRole[-999] ?? 0;
-
-            return Padding(
-              padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
-              child: Column(
-                children: [
-                  // แสดงแต่ละ role ที่มีสิทธิ์ดู
-                  for (int i = 0; i < visibleRoles.length; i++) ...[
-                    if (i > 0) AppSpacing.verticalGapSm,
-                    Builder(builder: (context) {
-                      final role = visibleRoles[i];
-                      final isMyRole = role.id == userRole.id;
-                      final isSelected = selectedRoleId == role.id ||
-                          (selectedRoleId == null && isMyRole);
-                      // จำนวนงาน = งานของ role นั้น + งานที่ไม่ระบุ role (ทุกคนทำได้)
-                      final roleCount = (pendingPerRole[role.id] ?? 0) + unassignedCount;
-
-                      return _RoleOption(
-                        label: isMyRole
-                            ? '${role.abb ?? role.name} (ฉัน)'
-                            : role.abb ?? role.name,
-                        subtitle: role.name,
-                        isSelected: isSelected,
-                        pendingCount: roleCount,
-                        onTap: () {
-                          ref.read(selectedRoleFilterProvider.notifier).state = role.id;
-                        },
-                      );
-                    }),
-                  ],
-                ],
-              ),
-            );
-          },
-          loading: () => Padding(
-            padding: EdgeInsets.all(AppSpacing.md),
-            child: const Center(
-              child: SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            ),
-          ),
-          error: (_, _) => Padding(
-            padding: EdgeInsets.all(AppSpacing.md),
-            child: Text(
-              'ไม่สามารถโหลดข้อมูลได้',
-              style: AppTypography.body.copyWith(color: AppColors.error),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 /// Section สำหรับเลือก filter ตามประเภทงาน
 class _TaskTypeFilterSection extends ConsumerStatefulWidget {
   @override
@@ -715,99 +593,6 @@ class _TaskTypeFilterSectionState extends ConsumerState<_TaskTypeFilterSection> 
   }
 }
 
-/// Widget สำหรับแต่ละ role option
-class _RoleOption extends StatelessWidget {
-  final String label;
-  final String subtitle;
-  final bool isSelected;
-  final int pendingCount;
-  final VoidCallback onTap;
-
-  const _RoleOption({
-    required this.label,
-    required this.subtitle,
-    required this.isSelected,
-    this.pendingCount = 0,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        InkWell(
-          onTap: onTap,
-          borderRadius: AppRadius.mediumRadius,
-          child: Container(
-            padding: EdgeInsets.all(AppSpacing.md),
-            decoration: BoxDecoration(
-              color: isSelected ? AppColors.accent1 : Colors.transparent,
-              borderRadius: AppRadius.mediumRadius,
-              border: Border.all(
-                color: isSelected ? AppColors.primary : AppColors.inputBorder,
-              ),
-            ),
-            child: Row(
-              children: [
-                HugeIcon(
-                  icon: isSelected ? HugeIcons.strokeRoundedCheckmarkCircle02 : HugeIcons.strokeRoundedCircle,
-                  color: isSelected ? AppColors.primary : AppColors.secondaryText,
-                  size: AppIconSize.lg,
-                ),
-                AppSpacing.horizontalGapMd,
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        label,
-                        style: AppTypography.body.copyWith(
-                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                          color: isSelected ? AppColors.primary : AppColors.textPrimary,
-                        ),
-                      ),
-                      Text(
-                        subtitle,
-                        style: AppTypography.caption.copyWith(
-                          color: AppColors.secondaryText,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        // Warning badge for pending tasks (แดงพาสเทล)
-        if (pendingCount > 0)
-          Positioned(
-            top: -6,
-            right: -6,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-              decoration: BoxDecoration(
-                color: AppColors.tagFailedBg, // แดงพาสเทล
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppColors.surface, width: 1.5),
-              ),
-              constraints: const BoxConstraints(minWidth: 20),
-              child: Text(
-                pendingCount > 99 ? '99+' : '$pendingCount',
-                style: AppTypography.caption.copyWith(
-                  color: AppColors.tagFailedText, // ตัวอักษรแดงเข้ม
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}
 
 // ============================================================
 // Impersonation Widgets (Dev Mode)
@@ -892,15 +677,11 @@ class _ImpersonationBanner extends ConsumerWidget {
 
     // Invalidate role-related providers
     ref.invalidate(currentUserSystemRoleProvider);
-    ref.invalidate(effectiveRoleFilterProvider);
     ref.invalidate(currentShiftProvider);
     ref.invalidate(userShiftProvider);
 
     // Increment user change counter to refresh Riverpod providers
     ref.read(userChangeCounterProvider.notifier).state++;
-
-    // Reset role filter to use new user's role
-    ref.read(selectedRoleFilterProvider.notifier).state = null;
 
     // Refresh tasks
     refreshTasks(ref);
@@ -1108,15 +889,11 @@ class _DevModeUserSelectorState extends ConsumerState<_DevModeUserSelector> {
 
     // Invalidate role-related providers
     ref.invalidate(currentUserSystemRoleProvider);
-    ref.invalidate(effectiveRoleFilterProvider);
     ref.invalidate(currentShiftProvider);
     ref.invalidate(userShiftProvider);
 
     // Increment user change counter to refresh Riverpod providers
     ref.read(userChangeCounterProvider.notifier).state++;
-
-    // Reset role filter to use new user's role
-    ref.read(selectedRoleFilterProvider.notifier).state = null;
 
     // Refresh tasks
     refreshTasks(ref);

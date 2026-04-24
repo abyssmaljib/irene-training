@@ -29,14 +29,12 @@ final tasksV2Provider = FutureProvider<List<TaskLog>>((ref) async {
 /// Provider V2 สำหรับ refresh tasks (เพิ่ม counter เพื่อ trigger rebuild)
 final taskRefreshCounterV2Provider = StateProvider<int>((ref) => 0);
 
-/// Helper function to filter tasks by selected zones, residents, role, and task types
+/// Helper function to filter tasks by selected zones, residents, and task types
 /// (เหมือน V1 เป๊ะ - copy logic จาก task_provider.dart)
-/// selectedRoleId: null = แสดงทุก role, อื่นๆ = filter ตาม role นั้นเฉพาะ
-List<TaskLog> _filterByZonesResidentsRoleAndType(
+List<TaskLog> _filterByZonesResidentsAndType(
   List<TaskLog> tasks,
   Set<int> selectedZones,
   Set<int> selectedResidents,
-  int? selectedRoleId,
   Set<String> selectedTaskTypes,
 ) {
   var filtered = tasks;
@@ -57,16 +55,6 @@ List<TaskLog> _filterByZonesResidentsRoleAndType(
     filtered = filtered
         .where(
             (t) => t.residentId != null && selectedResidents.contains(t.residentId))
-        .toList();
-  }
-
-  // Filter by role (only if selectedRoleId is specified)
-  // selectedRoleId == null means show all roles (no filter)
-  // ✅ เหมือน V1 - ไม่มี special case สำหรับ roleId=0
-  if (selectedRoleId != null) {
-    filtered = filtered
-        .where((t) =>
-            t.assignedRoleId == null || t.assignedRoleId == selectedRoleId)
         .toList();
   }
 
@@ -136,7 +124,6 @@ final filteredTasksV2Provider =
   final service = ref.watch(taskServiceV2Provider);
   final selectedZones = ref.watch(selectedZonesFilterProvider);
   final selectedResidents = ref.watch(selectedResidentsFilterProvider);
-  final selectedRoleId = ref.watch(effectiveRoleFilterProvider);
   final selectedTaskTypes = ref.watch(selectedTaskTypesFilterProvider);
 
   return tasksAsync.when(
@@ -146,12 +133,11 @@ final filteredTasksV2Provider =
 
       final shift = shiftAsync.valueOrNull;
 
-      // Apply zone, resident, role, and task type filter
-      final filteredTasks = _filterByZonesResidentsRoleAndType(
+      // Apply zone, resident, and task type filter
+      final filteredTasks = _filterByZonesResidentsAndType(
           mergedTasks,
           selectedZones,
           selectedResidents,
-          selectedRoleId,
           selectedTaskTypes);
 
       switch (viewMode) {
@@ -183,7 +169,6 @@ final groupedTasksV2Provider =
   final service = ref.watch(taskServiceV2Provider);
   final selectedZones = ref.watch(selectedZonesFilterProvider);
   final selectedResidents = ref.watch(selectedResidentsFilterProvider);
-  final selectedRoleId = ref.watch(effectiveRoleFilterProvider);
   final selectedTaskTypes = ref.watch(selectedTaskTypesFilterProvider);
 
   return tasksAsync.when(
@@ -191,12 +176,11 @@ final groupedTasksV2Provider =
       // รวม optimistic updates เข้ากับ tasks (ใช้ smart merge)
       final mergedTasks = _mergeOptimisticUpdates(tasks, optimisticUpdates);
 
-      // Apply zone, resident, role, and task type filter
-      final filteredTasks = _filterByZonesResidentsRoleAndType(
+      // Apply zone, resident, and task type filter
+      final filteredTasks = _filterByZonesResidentsAndType(
           mergedTasks,
           selectedZones,
           selectedResidents,
-          selectedRoleId,
           selectedTaskTypes);
       return AsyncValue.data(service.groupTasksByTimeBlock(filteredTasks));
     },
@@ -315,7 +299,6 @@ final taskCountsV2Provider = Provider<Map<TaskViewMode, int>>((ref) {
   final service = ref.watch(taskServiceV2Provider);
   final selectedZones = ref.watch(selectedZonesFilterProvider);
   final selectedResidents = ref.watch(selectedResidentsFilterProvider);
-  final selectedRoleId = ref.watch(effectiveRoleFilterProvider);
   final selectedTaskTypes = ref.watch(selectedTaskTypesFilterProvider);
 
   if (!tasksAsync.hasValue) return {};
@@ -325,12 +308,11 @@ final taskCountsV2Provider = Provider<Map<TaskViewMode, int>>((ref) {
   // รวม optimistic updates เข้ากับ tasks (ใช้ smart merge)
   final mergedTasks = _mergeOptimisticUpdates(allTasks, optimisticUpdates);
 
-  // Apply zone, resident, role, and task type filter
-  final tasks = _filterByZonesResidentsRoleAndType(
+  // Apply zone, resident, and task type filter
+  final tasks = _filterByZonesResidentsAndType(
       mergedTasks,
       selectedZones,
       selectedResidents,
-      selectedRoleId,
       selectedTaskTypes);
   final shift = shiftAsync.valueOrNull;
 
@@ -369,26 +351,13 @@ List<TaskLog> _getPendingTasksInNext2Hours(List<TaskLog> tasks) {
   }).toList();
 }
 
-/// Provider V2 สำหรับจำนวนงานค้างของ role ตัวเอง (ใน 2 ชม. ข้างหน้า)
-/// ใช้แสดง badge ที่ icon filter - ไม่ขึ้นกับ role ที่เลือกในตัวกรอง
-/// ✅ เหมือน V1 เป๊ะ (myRolePendingTasksCountProvider ใน task_provider.dart)
-final myRolePendingTasksCountV2Provider = Provider<int>((ref) {
+/// Provider V2 สำหรับจำนวนงานค้างทั้งหมด (ใน 2 ชม. ข้างหน้า)
+final totalPendingTasksCountV2Provider = Provider<int>((ref) {
   final tasksAsync = ref.watch(tasksV2Provider);
-  final userRole = ref.watch(currentUserSystemRoleProvider).valueOrNull;
 
   if (!tasksAsync.hasValue) return 0;
 
-  var tasks = tasksAsync.value!;
-
-  // Filter เฉพาะงานของ role ตัวเอง + งานที่ไม่ระบุ role
-  if (userRole != null) {
-    tasks = tasks
-        .where(
-            (t) => t.assignedRoleId == null || t.assignedRoleId == userRole.id)
-        .toList();
-  }
-
-  return _getPendingTasksInNext2Hours(tasks).length;
+  return _getPendingTasksInNext2Hours(tasksAsync.value!).length;
 });
 
 /// ✨ Refresh tasks V2 - ใช้กับ ChecklistScreenV2

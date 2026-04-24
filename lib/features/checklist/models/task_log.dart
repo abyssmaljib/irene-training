@@ -372,14 +372,6 @@ class TaskLog {
     return residentIds.contains(residentId);
   }
 
-  /// ตรวจสอบว่างานถูก assign ให้ role ที่กำหนดหรือไม่
-  /// ถ้า assignedRoleId เป็น null = งานสำหรับทุก role
-  bool isAssignedToRole(int? roleId) {
-    if (assignedRoleId == null) return true; // งานสำหรับทุก role
-    if (roleId == null) return true; // ไม่ได้ filter ตาม role
-    return assignedRoleId == roleId;
-  }
-
   @override
   String toString() {
     return 'TaskLog(logId: $logId, title: $title, status: $status, timeBlock: $timeBlock)';

@@ -429,7 +429,7 @@ class _ChecklistAppBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final viewMode = ref.watch(taskViewModeProvider);
-    final pendingCount = ref.watch(myRolePendingTasksCountProvider);
+    final pendingCount = ref.watch(totalPendingTasksCountProvider);
 
     return IreneAppBar(
       title: 'เช็คลิสต์',

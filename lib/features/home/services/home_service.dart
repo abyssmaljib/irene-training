@@ -135,8 +135,6 @@ class HomeService {
   }
 
   /// ดึงจำนวนงานที่ยังไม่เสร็จ (completed_by is null) สำหรับ shift นี้
-  /// filter ตาม role ของ user — นับเฉพาะงานที่ user เห็นได้
-  /// (งานของ role ตัวเอง + งานที่ไม่ระบุ role + งานของ related roles)
   /// [clockInTime] - เวลาที่ clock in (ใช้คำนวณ adjust_date)
   Future<int> getRemainingTasksCount({
     required String shift,
@@ -145,9 +143,6 @@ class HomeService {
     try {
       final nursinghomeId = await _userService.getNursinghomeId();
       if (nursinghomeId == null) return 0;
-
-      // ดึง role ของ user เพื่อ filter งานที่เห็นได้
-      final systemRole = await _userService.getSystemRole();
 
       // วันทำงาน: 07:00 - 06:59 วันถัดไป
       // ใช้เวลา clock in ถ้ามี ไม่งั้นใช้เวลาปัจจุบัน
@@ -158,10 +153,9 @@ class HomeService {
       final dateStr =
           '${adjustDate.year}-${adjustDate.month.toString().padLeft(2, '0')}-${adjustDate.day.toString().padLeft(2, '0')}';
 
-      // ดึง assigned_role_id มาด้วย เพื่อ filter ตาม role ของ user
       final response = await _supabase
           .from('v2_task_logs_with_details')
-          .select('log_id, assigned_role_id')
+          .select('log_id')
           .eq('nursinghome_id', nursinghomeId)
           .eq('adjust_date', dateStr)
           .eq('shift_response', shift)
@@ -169,17 +163,7 @@ class HomeService {
           .neq('s_special_status', 'Refer')
           .neq('s_special_status', 'Home');
 
-      final tasks = response as List;
-
-      // ถ้าไม่มี role (ไม่น่าเกิด) → นับทั้งหมดเหมือนเดิม
-      if (systemRole == null) return tasks.length;
-
-      // นับเฉพาะงานที่ user เห็นได้ตาม role
-      // (งานของตัวเอง + งานที่ไม่ระบุ role + งานของ related roles)
-      return tasks.where((t) {
-        final assignedRoleId = t['assigned_role_id'] as int?;
-        return systemRole.canSeeTasksForRole(assignedRoleId);
-      }).length;
+      return (response as List).length;
     } catch (e) {
       debugPrint('getRemainingTasksCount error: $e');
       return 0;
@@ -187,7 +171,6 @@ class HomeService {
   }
 
   /// ดึงข้อมูล jobs ที่ยังไม่เสร็จ (completed_by is null)
-  /// filter ตาม role ของ user — แสดงเฉพาะงานที่ user เห็นได้
   /// [clockInTime] - เวลาที่ clock in (ใช้คำนวณ adjust_date)
   Future<List<Map<String, dynamic>>> getRemainingTasks({
     required String shift,
@@ -198,9 +181,6 @@ class HomeService {
       final nursinghomeId = await _userService.getNursinghomeId();
       if (nursinghomeId == null) return [];
 
-      // ดึง role ของ user เพื่อ filter งานที่เห็นได้
-      final systemRole = await _userService.getSystemRole();
-
       // วันทำงาน: 07:00 - 06:59 วันถัดไป
       // ใช้เวลา clock in ถ้ามี ไม่งั้นใช้เวลาปัจจุบัน
       final referenceTime = clockInTime?.toLocal() ?? DateTime.now();
@@ -210,31 +190,19 @@ class HomeService {
       final dateStr =
           '${adjustDate.year}-${adjustDate.month.toString().padLeft(2, '0')}-${adjustDate.day.toString().padLeft(2, '0')}';
 
-      // ดึง assigned_role_id มาด้วย เพื่อ filter ตาม role ของ user
-      // ดึงเยอะกว่า limit เพราะต้อง filter ก่อน (บาง task อาจถูกกรองออก)
       final response = await _supabase
           .from('v2_task_logs_with_details')
-          .select('log_id, task_title, resident_name, timeBlock, status, assigned_role_id')
+          .select('log_id, task_title, resident_name, timeBlock, status')
           .eq('nursinghome_id', nursinghomeId)
           .eq('adjust_date', dateStr)
           .eq('shift_response', shift)
           .isFilter('completed_by', null)
           .neq('s_special_status', 'Refer')
           .neq('s_special_status', 'Home')
-          .order('timeBlock', ascending: true);
+          .order('timeBlock', ascending: true)
+          .limit(limit);
 
-      var tasks = List<Map<String, dynamic>>.from(response as List);
-
-      // Filter ตาม role ของ user (ถ้ามี)
-      if (systemRole != null) {
-        tasks = tasks.where((t) {
-          final assignedRoleId = t['assigned_role_id'] as int?;
-          return systemRole.canSeeTasksForRole(assignedRoleId);
-        }).toList();
-      }
-
-      // จำกัดจำนวนหลัง filter
-      return tasks.take(limit).toList();
+      return List<Map<String, dynamic>>.from(response as List);
     } catch (e) {
       debugPrint('getRemainingTasks error: $e');
       return [];
@@ -242,7 +210,6 @@ class HomeService {
   }
 
   /// ดึง Task Progress ของวันนี้ filter ตาม residents ที่ user เลือกตอน clock in
-  /// + filter ตาม role ของ user — นับเฉพาะงานที่ user เห็นได้
   Future<({int total, int completed})> getMyShiftTaskProgress({
     required List<int> residentIds,
   }) async {
@@ -252,9 +219,6 @@ class HomeService {
       final nursinghomeId = await _userService.getNursinghomeId();
       if (nursinghomeId == null) return (total: 0, completed: 0);
 
-      // ดึง role ของ user เพื่อ filter งานที่เห็นได้
-      final systemRole = await _userService.getSystemRole();
-
       // วันทำงาน: 07:00 - 06:59 วันถัดไป
       final now = DateTime.now();
       final adjustDate = now.hour < 7
@@ -263,26 +227,15 @@ class HomeService {
       final dateStr =
           '${adjustDate.year}-${adjustDate.month.toString().padLeft(2, '0')}-${adjustDate.day.toString().padLeft(2, '0')}';
 
-      // ดึง assigned_role_id มาด้วย เพื่อ filter ตาม role ของ user
       final response = await _supabase
           .from('v2_task_logs_with_details')
-          .select('log_id, status, resident_id, assigned_role_id')
+          .select('log_id, status, resident_id')
           .eq('nursinghome_id', nursinghomeId)
           .eq('adjust_date', dateStr)
           .not('timeBlock', 'is', null)
           .inFilter('resident_id', residentIds);
 
-      var tasks = (response as List).toList();
-
-      // Filter ตาม role ของ user (ถ้ามี)
-      // นับเฉพาะงานที่ user เห็นได้ → progress ถึง 100% ได้จริง
-      if (systemRole != null) {
-        tasks = tasks.where((t) {
-          final assignedRoleId = t['assigned_role_id'] as int?;
-          return systemRole.canSeeTasksForRole(assignedRoleId);
-        }).toList();
-      }
-
+      final tasks = response as List;
       final total = tasks.length;
       final completed = tasks
           .where((t) =>

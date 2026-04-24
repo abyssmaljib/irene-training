@@ -452,22 +452,6 @@ class UserService {
     }
   }
 
-  /// Get all available system roles
-  Future<List<SystemRole>> getAllSystemRoles() async {
-    try {
-      final response = await Supabase.instance.client
-          .from('user_system_roles')
-          .select()
-          .order('id');
-
-      return (response as List)
-          .map((json) => SystemRole.fromJson(json as Map<String, dynamic>))
-          .toList();
-    } catch (e) {
-      return [];
-    }
-  }
-
   // ============================================================
   // Dev Mode: Get all users for impersonation
   // ============================================================

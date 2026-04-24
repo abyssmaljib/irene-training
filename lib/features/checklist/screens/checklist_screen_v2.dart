@@ -113,7 +113,7 @@ class _ChecklistScreenV2State extends ConsumerState<ChecklistScreenV2> {
             showFilterButton: true,
             isFilterActive: viewMode != TaskViewMode.upcoming,
             // ✨ ใช้ V2 provider
-            filterCount: ref.watch(myRolePendingTasksCountV2Provider),
+            filterCount: ref.watch(totalPendingTasksCountV2Provider),
             onFilterTap: () {
               _scaffoldKey.currentState?.openDrawer();
             },
